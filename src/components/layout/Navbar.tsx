@@ -10,7 +10,7 @@ const platformLinks = [
   { label: "How the Platform Works", href: "/platform/how-it-works", icon: Shield },
   { label: "Compliance Infrastructure", href: "/platform/infrastructure", icon: Building2 },
   { label: "AI + Human Review Model", href: "/platform/ai-human-review", icon: Users },
-  { label: "Company Dashboards", href: "/platform/dashboards", icon: Building2 },
+  { label: "Company Dashboards", href: "/dashboard", icon: Building2 },
   { label: "Regulatory Coverage", href: "/platform/regulators", icon: Shield },
   { label: "AI Assistant", href: "/platform/ai-assistant", icon: Cpu },
   { label: "Audit & Traceability", href: "/platform/audit", icon: Lock },
