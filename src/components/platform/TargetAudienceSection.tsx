@@ -39,7 +39,7 @@ const TargetAudienceSection = () => {
             Who This Is For
           </h2>
           <p className="text-lg text-muted-foreground max-w-2xl mx-auto">
-            XYZ AI serves organizations across the spectrum — from early-stage startups 
+            REGULON serves organizations across the spectrum — from early-stage startups 
             to large enterprises navigating complex regulatory environments.
           </p>
         </motion.div>
