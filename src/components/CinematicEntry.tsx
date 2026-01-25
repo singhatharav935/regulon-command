@@ -60,8 +60,7 @@ const CinematicEntry = ({ onComplete }: CinematicEntryProps) => {
             transition={{ duration: 0.8, ease: [0.22, 1, 0.36, 1] }}
           >
             <h1 className="text-6xl md:text-8xl font-bold tracking-tight">
-              <span className="text-foreground">XYZ</span>
-              <span className="text-gradient-primary ml-3">AI</span>
+              <span className="text-gradient-primary">REGULON</span>
             </h1>
             
             {/* Subtle underline glow */}
