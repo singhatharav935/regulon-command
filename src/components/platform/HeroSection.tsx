@@ -33,8 +33,7 @@ const HeroSection = () => {
             transition={{ duration: 0.5, delay: 0.1 }}
             className="text-5xl md:text-7xl font-bold tracking-tight mb-6"
           >
-            <span className="text-foreground">XYZ</span>
-            <span className="text-gradient-primary ml-3">AI</span>
+            <span className="text-gradient-primary">REGULON</span>
           </motion.h1>
 
           {/* Subtitle */}

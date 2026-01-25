@@ -26,7 +26,7 @@ const AIAssistantPreview = () => {
         >
           <div className="inline-flex items-center gap-2 px-4 py-2 rounded-full bg-primary/10 border border-primary/20 mb-6">
             <Cpu className="w-4 h-4 text-primary" />
-            <span className="text-sm text-primary font-medium">XYZ AI Assistant</span>
+            <span className="text-sm text-primary font-medium">REGULON AI Assistant</span>
           </div>
           <h2 className="text-3xl md:text-4xl font-bold mb-4">
             AI-Powered Compliance Analysis
@@ -105,7 +105,7 @@ const AIAssistantPreview = () => {
             <div>
               <p className="text-sm font-medium text-foreground mb-1">AI-Generated Draft Notice</p>
               <p className="text-xs text-muted-foreground">
-                All outputs from XYZ AI Assistant are marked as AI-generated drafts and require 
+                All outputs from REGULON AI Assistant are marked as AI-generated drafts and require 
                 mandatory verification by a licensed CA or Lawyer before any action is taken. 
                 This tool does not provide legal or financial advice.
               </p>

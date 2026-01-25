@@ -9,10 +9,7 @@ const Footer = () => {
           {/* Brand */}
           <div className="col-span-2 lg:col-span-1">
             <Link to="/" className="inline-flex items-center gap-2 mb-4">
-              <span className="text-xl font-bold">
-                <span className="text-foreground">XYZ</span>
-                <span className="text-primary ml-1">AI</span>
-              </span>
+              <span className="text-xl font-bold text-gradient-primary">REGULON</span>
             </Link>
             <p className="text-sm text-muted-foreground leading-relaxed">
               Enterprise-grade compliance infrastructure powered by AI and verified professionals.
@@ -69,10 +66,10 @@ const Footer = () => {
             <AlertTriangle className="w-5 h-5 text-warning shrink-0 mt-0.5" />
             <div className="space-y-2">
               <p className="text-sm text-muted-foreground">
-                <strong className="text-foreground">Important Disclaimer:</strong> XYZ AI provides compliance assistance and regulatory guidance through AI-powered analysis verified by licensed professionals. This platform does not provide legal or financial advice. All regulatory filings and compliance actions are executed through verified Chartered Accountants and Lawyers.
+                <strong className="text-foreground">Important Disclaimer:</strong> REGULON provides compliance assistance and regulatory guidance through AI-powered analysis verified by licensed professionals. This platform does not provide legal or financial advice. All regulatory filings and compliance actions are executed through verified Chartered Accountants and Lawyers.
               </p>
               <p className="text-sm text-muted-foreground">
-                XYZ AI is not endorsed by or affiliated with any regulatory authority including MCA, GST Council, Income Tax Department, RBI, or SEBI. All actions taken through this platform are fully auditable and traceable.
+                REGULON is not endorsed by or affiliated with any regulatory authority including MCA, GST Council, Income Tax Department, RBI, or SEBI. All actions taken through this platform are fully auditable and traceable.
               </p>
             </div>
           </div>
@@ -81,7 +78,7 @@ const Footer = () => {
         {/* Bottom */}
         <div className="mt-8 pt-8 border-t border-border/30 flex flex-col md:flex-row items-center justify-between gap-4">
           <p className="text-sm text-muted-foreground">
-            © {new Date().getFullYear()} XYZ AI. All rights reserved.
+            © {new Date().getFullYear()} REGULON. All rights reserved.
           </p>
           <div className="flex items-center gap-2 text-sm text-muted-foreground">
             <Shield className="w-4 h-4 text-primary" />
