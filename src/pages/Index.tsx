@@ -14,14 +14,14 @@ const Index = () => {
   const [showCinematic, setShowCinematic] = useState(true);
 
   useEffect(() => {
-    const hasSeenIntro = sessionStorage.getItem("xyz-ai-intro-seen");
+    const hasSeenIntro = sessionStorage.getItem("regulon-intro-seen");
     if (hasSeenIntro) {
       setShowCinematic(false);
     }
   }, []);
 
   const handleCinematicComplete = () => {
-    sessionStorage.setItem("xyz-ai-intro-seen", "true");
+    sessionStorage.setItem("regulon-intro-seen", "true");
     setShowCinematic(false);
   };
 

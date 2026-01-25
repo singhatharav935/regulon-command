@@ -87,7 +87,7 @@ const Auth = () => {
           }
         });
         if (error) throw error;
-        toast({ title: "Account created!", description: "Welcome to XYZ AI." });
+        toast({ title: "Account created!", description: "Welcome to REGULON." });
       }
     } catch (error: any) {
       let message = error.message;
@@ -120,10 +120,7 @@ const Auth = () => {
 
         <div className="glass-card p-8">
           <div className="text-center mb-8">
-            <h1 className="text-2xl font-bold mb-2">
-              <span className="text-foreground">XYZ</span>
-              <span className="text-primary ml-1">AI</span>
-            </h1>
+            <h1 className="text-2xl font-bold mb-2 text-gradient-primary">REGULON</h1>
             <p className="text-muted-foreground">
               {isLogin ? "Login to your dashboard" : "Create your account"}
             </p>
