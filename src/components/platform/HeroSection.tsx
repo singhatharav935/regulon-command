@@ -111,8 +111,8 @@ const HeroSection = () => {
               <div className="flex items-center justify-center w-12 h-12 mx-auto mb-3 rounded-xl bg-primary/10">
                 <Shield className="w-6 h-6 text-primary" />
               </div>
-              <p className="text-3xl font-bold text-foreground">SOC 2</p>
-              <p className="text-sm text-muted-foreground">Compliant</p>
+              <p className="text-3xl font-bold text-foreground">ISO 27001</p>
+              <p className="text-sm text-muted-foreground">Certified</p>
             </div>
           </motion.div>
         </div>
