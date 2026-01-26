@@ -58,20 +58,13 @@ interface FlipCardState {
 
 const CapabilitiesSection = () => {
   const [flippedCards, setFlippedCards] = useState<FlipCardState>({});
-  const [animatingCards, setAnimatingCards] = useState<FlipCardState>({});
 
   const handleMouseEnter = (index: number) => {
-    if (!animatingCards[index]) {
-      setAnimatingCards(prev => ({ ...prev, [index]: true }));
-      setFlippedCards(prev => ({ ...prev, [index]: true }));
-      
-      setTimeout(() => {
-        setFlippedCards(prev => ({ ...prev, [index]: false }));
-        setTimeout(() => {
-          setAnimatingCards(prev => ({ ...prev, [index]: false }));
-        }, 600);
-      }, 1200);
-    }
+    setFlippedCards(prev => ({ ...prev, [index]: true }));
+  };
+
+  const handleMouseLeave = (index: number) => {
+    setFlippedCards(prev => ({ ...prev, [index]: false }));
   };
 
   return (
@@ -103,6 +96,7 @@ const CapabilitiesSection = () => {
               className="perspective-1000"
               style={{ perspective: "1000px" }}
               onMouseEnter={() => handleMouseEnter(index)}
+              onMouseLeave={() => handleMouseLeave(index)}
             >
               <div
                 className={cn(
