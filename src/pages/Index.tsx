@@ -9,6 +9,7 @@ import ExecutionPipeline from "@/components/platform/ExecutionPipeline";
 import AIAssistantPreview from "@/components/platform/AIAssistantPreview";
 import TargetAudienceSection from "@/components/platform/TargetAudienceSection";
 import TeamSection from "@/components/platform/TeamSection";
+import ComplianceShowcase from "@/components/platform/ComplianceShowcase";
 
 const Index = () => {
   const [showCinematic, setShowCinematic] = useState(true);
@@ -36,6 +37,7 @@ const Index = () => {
         <HeroSection />
         <RegulatorsSection />
         <CapabilitiesSection />
+        <ComplianceShowcase />
         <ExecutionPipeline />
         <AIAssistantPreview />
         <TargetAudienceSection />
