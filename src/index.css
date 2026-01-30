@@ -235,6 +235,137 @@
     @apply pointer-events-none fixed inset-0 z-50 opacity-[0.015];
     background-image: url("data:image/svg+xml,%3Csvg viewBox='0 0 256 256' xmlns='http://www.w3.org/2000/svg'%3E%3Cfilter id='noiseFilter'%3E%3CfeTurbulence type='fractalNoise' baseFrequency='0.9' numOctaves='4' stitchTiles='stitch'/%3E%3C/filter%3E%3Crect width='100%25' height='100%25' filter='url(%23noiseFilter)'/%3E%3C/svg%3E");
   }
+
+  /* Aurora Background Effect */
+  .aurora-bg {
+    @apply fixed inset-0 -z-10 overflow-hidden;
+  }
+
+  .aurora-bg::before {
+    content: '';
+    @apply absolute -top-1/2 -left-1/4 w-[150%] h-[150%];
+    background: 
+      radial-gradient(ellipse 80% 50% at 20% 40%, hsl(192 85% 55% / 0.15) 0%, transparent 50%),
+      radial-gradient(ellipse 60% 40% at 80% 20%, hsl(280 85% 60% / 0.1) 0%, transparent 50%),
+      radial-gradient(ellipse 50% 60% at 50% 80%, hsl(142 76% 40% / 0.08) 0%, transparent 50%);
+    animation: auroraMove 20s ease-in-out infinite;
+  }
+
+  .aurora-bg::after {
+    content: '';
+    @apply absolute -bottom-1/2 -right-1/4 w-[150%] h-[150%];
+    background: 
+      radial-gradient(ellipse 70% 50% at 70% 60%, hsl(192 85% 55% / 0.1) 0%, transparent 50%),
+      radial-gradient(ellipse 50% 40% at 30% 80%, hsl(45 93% 47% / 0.05) 0%, transparent 50%);
+    animation: auroraMove 25s ease-in-out infinite reverse;
+  }
+
+  /* Floating Orbs */
+  .floating-orbs {
+    @apply fixed inset-0 -z-10 overflow-hidden pointer-events-none;
+  }
+
+  .orb {
+    @apply absolute rounded-full blur-3xl opacity-30;
+  }
+
+  .orb-1 {
+    @apply w-96 h-96 top-[10%] left-[10%];
+    background: radial-gradient(circle, hsl(192 85% 55% / 0.4) 0%, transparent 70%);
+    animation: orbFloat1 15s ease-in-out infinite;
+  }
+
+  .orb-2 {
+    @apply w-80 h-80 top-[60%] right-[15%];
+    background: radial-gradient(circle, hsl(280 85% 60% / 0.3) 0%, transparent 70%);
+    animation: orbFloat2 18s ease-in-out infinite;
+  }
+
+  .orb-3 {
+    @apply w-64 h-64 bottom-[20%] left-[30%];
+    background: radial-gradient(circle, hsl(142 76% 40% / 0.25) 0%, transparent 70%);
+    animation: orbFloat3 20s ease-in-out infinite;
+  }
+
+  .orb-4 {
+    @apply w-72 h-72 top-[40%] right-[40%];
+    background: radial-gradient(circle, hsl(45 93% 47% / 0.15) 0%, transparent 70%);
+    animation: orbFloat4 22s ease-in-out infinite;
+  }
+
+  /* Mesh Gradient Background */
+  .mesh-gradient {
+    @apply fixed inset-0 -z-20;
+    background: 
+      radial-gradient(at 0% 0%, hsl(222 47% 8%) 0%, transparent 50%),
+      radial-gradient(at 100% 0%, hsl(222 47% 10%) 0%, transparent 50%),
+      radial-gradient(at 100% 100%, hsl(222 47% 6%) 0%, transparent 50%),
+      radial-gradient(at 0% 100%, hsl(222 47% 9%) 0%, transparent 50%),
+      hsl(222 47% 6%);
+  }
+
+  /* Starfield Effect */
+  .starfield {
+    @apply fixed inset-0 -z-10 overflow-hidden pointer-events-none;
+  }
+
+  .starfield::before {
+    content: '';
+    @apply absolute inset-0;
+    background-image: 
+      radial-gradient(1px 1px at 20px 30px, hsl(var(--foreground) / 0.3), transparent),
+      radial-gradient(1px 1px at 40px 70px, hsl(var(--foreground) / 0.2), transparent),
+      radial-gradient(1px 1px at 50px 160px, hsl(var(--foreground) / 0.3), transparent),
+      radial-gradient(1px 1px at 90px 40px, hsl(var(--foreground) / 0.2), transparent),
+      radial-gradient(1px 1px at 130px 80px, hsl(var(--foreground) / 0.3), transparent),
+      radial-gradient(1px 1px at 160px 120px, hsl(var(--foreground) / 0.2), transparent),
+      radial-gradient(2px 2px at 200px 50px, hsl(var(--primary) / 0.4), transparent),
+      radial-gradient(1px 1px at 250px 90px, hsl(var(--foreground) / 0.3), transparent),
+      radial-gradient(1px 1px at 300px 150px, hsl(var(--foreground) / 0.2), transparent);
+    background-size: 350px 200px;
+    animation: starfieldTwinkle 8s ease-in-out infinite;
+  }
+
+  /* Gradient Border Effect */
+  .gradient-border {
+    @apply relative;
+  }
+
+  .gradient-border::before {
+    content: '';
+    @apply absolute -inset-px rounded-xl -z-10;
+    background: linear-gradient(
+      135deg,
+      hsl(var(--primary) / 0.5) 0%,
+      hsl(280 85% 60% / 0.3) 50%,
+      hsl(var(--primary) / 0.5) 100%
+    );
+    opacity: 0;
+    transition: opacity 0.3s ease;
+  }
+
+  .gradient-border:hover::before {
+    opacity: 1;
+  }
+
+  /* Scan Line Effect */
+  .scan-line {
+    @apply fixed inset-0 pointer-events-none overflow-hidden;
+    z-index: -5;
+    opacity: 0.03;
+  }
+
+  .scan-line::before {
+    content: '';
+    @apply absolute inset-0;
+    background: repeating-linear-gradient(
+      0deg,
+      transparent,
+      transparent 2px,
+      hsl(var(--foreground) / 0.1) 2px,
+      hsl(var(--foreground) / 0.1) 4px
+    );
+  }
 }
 
 @layer utilities {
@@ -295,6 +426,43 @@
   @keyframes float {
     0%, 100% { transform: translateY(0px); }
     50% { transform: translateY(-10px); }
+  }
+
+  @keyframes auroraMove {
+    0%, 100% { transform: translate(0, 0) rotate(0deg); }
+    25% { transform: translate(5%, 3%) rotate(1deg); }
+    50% { transform: translate(-3%, 5%) rotate(-1deg); }
+    75% { transform: translate(-5%, -3%) rotate(0.5deg); }
+  }
+
+  @keyframes orbFloat1 {
+    0%, 100% { transform: translate(0, 0) scale(1); }
+    25% { transform: translate(50px, 30px) scale(1.1); }
+    50% { transform: translate(-30px, 60px) scale(0.95); }
+    75% { transform: translate(40px, -20px) scale(1.05); }
+  }
+
+  @keyframes orbFloat2 {
+    0%, 100% { transform: translate(0, 0) scale(1); }
+    33% { transform: translate(-40px, -50px) scale(1.15); }
+    66% { transform: translate(60px, 30px) scale(0.9); }
+  }
+
+  @keyframes orbFloat3 {
+    0%, 100% { transform: translate(0, 0) scale(1); }
+    50% { transform: translate(70px, -40px) scale(1.1); }
+  }
+
+  @keyframes orbFloat4 {
+    0%, 100% { transform: translate(0, 0) scale(1); opacity: 0.3; }
+    25% { transform: translate(-30px, 50px) scale(1.2); opacity: 0.4; }
+    50% { transform: translate(50px, -30px) scale(0.85); opacity: 0.2; }
+    75% { transform: translate(-50px, -40px) scale(1.1); opacity: 0.35; }
+  }
+
+  @keyframes starfieldTwinkle {
+    0%, 100% { opacity: 0.5; }
+    50% { opacity: 0.8; }
   }
 
   /* Stagger animations */

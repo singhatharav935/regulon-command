@@ -10,6 +10,7 @@ import AIAssistantPreview from "@/components/platform/AIAssistantPreview";
 import TargetAudienceSection from "@/components/platform/TargetAudienceSection";
 import TeamSection from "@/components/platform/TeamSection";
 import ComplianceShowcase from "@/components/platform/ComplianceShowcase";
+import BackgroundEffects from "@/components/BackgroundEffects";
 
 const Index = () => {
   const [showCinematic, setShowCinematic] = useState(true);
@@ -31,13 +32,14 @@ const Index = () => {
   }
 
   return (
-    <div className="min-h-screen bg-background">
+    <div className="min-h-screen bg-background relative">
+      <BackgroundEffects />
       <Navbar />
       <main>
         <HeroSection />
+        <ComplianceShowcase />
         <RegulatorsSection />
         <CapabilitiesSection />
-        <ComplianceShowcase />
         <ExecutionPipeline />
         <AIAssistantPreview />
         <TargetAudienceSection />
