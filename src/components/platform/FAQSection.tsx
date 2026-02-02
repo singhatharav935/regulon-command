@@ -1,4 +1,5 @@
-import { motion } from "framer-motion";
+import { useState } from "react";
+import { motion, AnimatePresence } from "framer-motion";
 import { HelpCircle, ChevronDown, Shield, Users, FileCheck, Building2, Scale, Clock } from "lucide-react";
 import {
   Accordion,
@@ -6,7 +7,6 @@ import {
   AccordionItem,
   AccordionTrigger,
 } from "@/components/ui/accordion";
-
 const faqCategories = [
   {
     title: "Why REGULON?",
@@ -187,6 +187,12 @@ const faqCategories = [
 ];
 
 const FAQSection = () => {
+  const [openCategory, setOpenCategory] = useState<string | null>(null);
+
+  const toggleCategory = (title: string) => {
+    setOpenCategory(openCategory === title ? null : title);
+  };
+
   return (
     <section className="py-24 px-4 sm:px-6 lg:px-8 relative overflow-hidden">
       {/* Background Decoration */}
@@ -195,7 +201,7 @@ const FAQSection = () => {
         <div className="absolute bottom-1/4 right-0 w-96 h-96 bg-accent/5 rounded-full blur-3xl" />
       </div>
 
-      <div className="max-w-6xl mx-auto relative z-10">
+      <div className="max-w-4xl mx-auto relative z-10">
         {/* Header */}
         <motion.div
           initial={{ opacity: 0, y: 20 }}
@@ -219,44 +225,73 @@ const FAQSection = () => {
           </p>
         </motion.div>
 
-        {/* FAQ Categories */}
-        <div className="grid md:grid-cols-2 gap-8">
+        {/* FAQ Categories - Collapsible */}
+        <div className="space-y-4">
           {faqCategories.map((category, categoryIndex) => (
             <motion.div
               key={category.title}
-              initial={{ opacity: 0, y: 30 }}
+              initial={{ opacity: 0, y: 20 }}
               whileInView={{ opacity: 1, y: 0 }}
               viewport={{ once: true }}
-              transition={{ duration: 0.5, delay: categoryIndex * 0.1 }}
-              className="glass-card p-6 rounded-2xl"
+              transition={{ duration: 0.4, delay: categoryIndex * 0.05 }}
+              className="glass-card rounded-2xl overflow-hidden"
             >
-              {/* Category Header */}
-              <div className="flex items-center gap-3 mb-6">
-                <div className="p-2.5 rounded-xl bg-primary/10 border border-primary/20">
-                  <category.icon className="w-5 h-5 text-primary" />
+              {/* Category Header - Clickable */}
+              <button
+                onClick={() => toggleCategory(category.title)}
+                className="w-full flex items-center justify-between p-5 hover:bg-accent/20 transition-colors"
+              >
+                <div className="flex items-center gap-3">
+                  <div className="p-2.5 rounded-xl bg-primary/10 border border-primary/20">
+                    <category.icon className="w-5 h-5 text-primary" />
+                  </div>
+                  <div className="text-left">
+                    <h3 className="text-lg font-semibold text-foreground">
+                      {category.title}
+                    </h3>
+                    <p className="text-sm text-muted-foreground">
+                      {category.faqs.length} questions
+                    </p>
+                  </div>
                 </div>
-                <h3 className="text-xl font-semibold text-foreground">
-                  {category.title}
-                </h3>
-              </div>
+                <ChevronDown 
+                  className={`w-5 h-5 text-muted-foreground transition-transform duration-300 ${
+                    openCategory === category.title ? 'rotate-180' : ''
+                  }`} 
+                />
+              </button>
 
-              {/* Accordion */}
-              <Accordion type="single" collapsible className="space-y-2">
-                {category.faqs.map((faq, faqIndex) => (
-                  <AccordionItem
-                    key={faqIndex}
-                    value={`${categoryIndex}-${faqIndex}`}
-                    className="border border-border/50 rounded-xl px-4 data-[state=open]:bg-accent/30 transition-colors"
+              {/* Questions - Nested Accordion */}
+              <AnimatePresence>
+                {openCategory === category.title && (
+                  <motion.div
+                    initial={{ height: 0, opacity: 0 }}
+                    animate={{ height: "auto", opacity: 1 }}
+                    exit={{ height: 0, opacity: 0 }}
+                    transition={{ duration: 0.3, ease: "easeInOut" }}
+                    className="overflow-hidden"
                   >
-                    <AccordionTrigger className="text-left text-sm font-medium hover:no-underline py-4 gap-3">
-                      <span className="flex-1">{faq.q}</span>
-                    </AccordionTrigger>
-                    <AccordionContent className="text-sm text-muted-foreground pb-4 leading-relaxed">
-                      {faq.a}
-                    </AccordionContent>
-                  </AccordionItem>
-                ))}
-              </Accordion>
+                    <div className="px-5 pb-5 pt-2 border-t border-border/30">
+                      <Accordion type="single" collapsible className="space-y-2">
+                        {category.faqs.map((faq, faqIndex) => (
+                          <AccordionItem
+                            key={faqIndex}
+                            value={`${categoryIndex}-${faqIndex}`}
+                            className="border border-border/50 rounded-xl px-4 data-[state=open]:bg-accent/30 transition-colors"
+                          >
+                            <AccordionTrigger className="text-left text-sm font-medium hover:no-underline py-4 gap-3">
+                              <span className="flex-1">{faq.q}</span>
+                            </AccordionTrigger>
+                            <AccordionContent className="text-sm text-muted-foreground pb-4 leading-relaxed">
+                              {faq.a}
+                            </AccordionContent>
+                          </AccordionItem>
+                        ))}
+                      </Accordion>
+                    </div>
+                  </motion.div>
+                )}
+              </AnimatePresence>
             </motion.div>
           ))}
         </div>
