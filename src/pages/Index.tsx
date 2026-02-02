@@ -10,6 +10,7 @@ import AIAssistantPreview from "@/components/platform/AIAssistantPreview";
 import TargetAudienceSection from "@/components/platform/TargetAudienceSection";
 import TeamSection from "@/components/platform/TeamSection";
 import ComplianceShowcase from "@/components/platform/ComplianceShowcase";
+import FAQSection from "@/components/platform/FAQSection";
 import BackgroundEffects from "@/components/BackgroundEffects";
 
 const Index = () => {
@@ -43,6 +44,7 @@ const Index = () => {
         <ExecutionPipeline />
         <AIAssistantPreview />
         <TargetAudienceSection />
+        <FAQSection />
         <TeamSection />
       </main>
       <Footer />
