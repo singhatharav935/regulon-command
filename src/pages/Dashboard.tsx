@@ -11,6 +11,9 @@ import ComplianceTasksTable from "@/components/dashboard/ComplianceTasksTable";
 import DocumentVault from "@/components/dashboard/DocumentVault";
 import UpcomingDeadlines from "@/components/dashboard/UpcomingDeadlines";
 import QuickActions from "@/components/dashboard/QuickActions";
+import ComplianceGapSection from "@/components/dashboard/ComplianceGapSection";
+import UpcomingLawImpactSection from "@/components/dashboard/UpcomingLawImpactSection";
+import AuditEvidenceVault from "@/components/dashboard/AuditEvidenceVault";
 
 // Demo data for the dashboard example
 const demoCompany = {
@@ -113,6 +116,11 @@ const Dashboard = () => {
           />
           
           <RegulatoryExposurePanel exposures={demoExposures} />
+          
+          {/* New Sections */}
+          <ComplianceGapSection />
+          <UpcomingLawImpactSection />
+          <AuditEvidenceVault />
           
           <QuickActions />
           
