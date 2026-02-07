@@ -4,7 +4,7 @@ import { motion } from "framer-motion";
 import { supabase } from "@/integrations/supabase/client";
 import Navbar from "@/components/layout/Navbar";
 import Footer from "@/components/layout/Footer";
-import DashboardNav from "@/components/dashboard/DashboardNav";
+import DashboardTypeNav from "@/components/dashboard/DashboardTypeNav";
 import DashboardHeader from "@/components/dashboard/DashboardHeader";
 import RegulatoryExposurePanel from "@/components/dashboard/RegulatoryExposurePanel";
 import ComplianceTasksTable from "@/components/dashboard/ComplianceTasksTable";
@@ -94,8 +94,8 @@ const Dashboard = () => {
       
       <main className="pt-24 pb-16">
         <div className="container mx-auto px-4 max-w-7xl">
-          {/* Dashboard Navigation */}
-          <DashboardNav />
+          {/* Dashboard Type Navigation */}
+          <DashboardTypeNav activeType="company" />
           
           {/* Demo Banner */}
           <motion.div
