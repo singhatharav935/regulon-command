@@ -14,6 +14,7 @@ import ComplianceChangeLog from "@/components/ca-dashboard/ComplianceChangeLog";
 import CAAuditSupport from "@/components/ca-dashboard/CAAuditSupport";
 import CACommunicationLogs from "@/components/ca-dashboard/CACommunicationLogs";
 import CAAnalyticsSection from "@/components/ca-dashboard/CAAnalyticsSection";
+import AIDraftingEngine from "@/components/ca-dashboard/AIDraftingEngine";
 
 const CADashboard = () => {
   const navigate = useNavigate();
@@ -59,6 +60,10 @@ const CADashboard = () => {
           </motion.div>
 
           <CAHomeSection />
+          
+          {/* AI Drafting Engine - CA Only */}
+          <AIDraftingEngine />
+          
           <ClientPortfolioSection />
           <TaskFilingManagement />
           <ClientDependencyTracker />

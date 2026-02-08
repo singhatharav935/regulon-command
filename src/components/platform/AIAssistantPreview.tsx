@@ -1,22 +1,45 @@
 import { useState } from "react";
 import { motion } from "framer-motion";
-import { Upload, Send, Cpu, AlertTriangle, FileText, Search, Shield } from "lucide-react";
+import { Upload, Eye, Shield, FileCheck, Clock, BarChart3 } from "lucide-react";
 import { Button } from "@/components/ui/button";
-import { Input } from "@/components/ui/input";
 
-const examplePrompts = [
-  "Summarize compliance risks in this document",
-  "Check SEBI applicability for my business",
-  "Draft a response to this MCA notice",
-  "Identify GST filing gaps for Q4",
+const customerCapabilities = [
+  {
+    icon: Upload,
+    title: "Upload Documents",
+    description: "Submit PDF, DOCX, XLSX files for compliance processing"
+  },
+  {
+    icon: Eye,
+    title: "Track Compliance Status",
+    description: "Monitor filing progress and regulatory deadlines"
+  },
+  {
+    icon: BarChart3,
+    title: "View Health Score",
+    description: "See your real-time compliance health percentage"
+  },
+  {
+    icon: FileCheck,
+    title: "Download Approved Documents",
+    description: "Access CA-verified, regulator-ready filings"
+  },
+  {
+    icon: Clock,
+    title: "Deadline Alerts",
+    description: "Never miss a statutory deadline with smart notifications"
+  },
+  {
+    icon: Shield,
+    title: "Audit-Ready Packs",
+    description: "One-click download of complete evidence packages"
+  },
 ];
 
 const AIAssistantPreview = () => {
-  const [query, setQuery] = useState("");
-
   return (
     <section className="py-24 relative bg-card/30">
-      <div className="max-w-4xl mx-auto px-4 sm:px-6 lg:px-8">
+      <div className="max-w-5xl mx-auto px-4 sm:px-6 lg:px-8">
         <motion.div
           initial={{ opacity: 0, y: 20 }}
           whileInView={{ opacity: 1, y: 0 }}
@@ -25,92 +48,101 @@ const AIAssistantPreview = () => {
           className="text-center mb-12"
         >
           <div className="inline-flex items-center gap-2 px-4 py-2 rounded-full bg-primary/10 border border-primary/20 mb-6">
-            <Cpu className="w-4 h-4 text-primary" />
-            <span className="text-sm text-primary font-medium">REGULON AI Assistant</span>
+            <Upload className="w-4 h-4 text-primary" />
+            <span className="text-sm text-primary font-medium">Customer Portal</span>
           </div>
           <h2 className="text-3xl md:text-4xl font-bold mb-4">
-            AI-Powered Compliance Analysis
+            Your Compliance Control Center
           </h2>
           <p className="text-lg text-muted-foreground max-w-2xl mx-auto">
-            Upload documents, ask questions, and receive AI-generated drafts — 
-            all verified by professionals before any action is taken.
+            Upload documents, track compliance status, and download regulator-ready filings — 
+            all verified by licensed CAs before approval.
           </p>
         </motion.div>
 
+        {/* Customer Capabilities Grid */}
         <motion.div
           initial={{ opacity: 0, y: 20 }}
           whileInView={{ opacity: 1, y: 0 }}
           viewport={{ once: true }}
           transition={{ duration: 0.5, delay: 0.2 }}
+          className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6 mb-12"
+        >
+          {customerCapabilities.map((capability, index) => {
+            const Icon = capability.icon;
+            return (
+              <motion.div
+                key={capability.title}
+                initial={{ opacity: 0, y: 20 }}
+                whileInView={{ opacity: 1, y: 0 }}
+                viewport={{ once: true }}
+                transition={{ delay: index * 0.1 }}
+                className="glass-card p-6 hover:border-primary/30 transition-all duration-300"
+              >
+                <div className="flex items-start gap-4">
+                  <div className="p-3 rounded-xl bg-primary/10">
+                    <Icon className="w-6 h-6 text-primary" />
+                  </div>
+                  <div>
+                    <h3 className="font-semibold text-foreground mb-1">{capability.title}</h3>
+                    <p className="text-sm text-muted-foreground">{capability.description}</p>
+                  </div>
+                </div>
+              </motion.div>
+            );
+          })}
+        </motion.div>
+
+        {/* Document Upload Preview */}
+        <motion.div
+          initial={{ opacity: 0, y: 20 }}
+          whileInView={{ opacity: 1, y: 0 }}
+          viewport={{ once: true }}
+          transition={{ duration: 0.5, delay: 0.3 }}
           className="glass-card p-8"
         >
-          {/* Document Upload */}
-          <div className="mb-8">
-            <label className="block text-sm font-medium text-foreground mb-3">
-              Upload Document for Analysis
-            </label>
-            <div className="border-2 border-dashed border-border rounded-xl p-8 text-center hover:border-primary/50 transition-colors cursor-pointer">
-              <Upload className="w-10 h-10 text-muted-foreground mx-auto mb-3" />
-              <p className="text-sm text-muted-foreground mb-1">
-                Drag and drop files here, or click to browse
-              </p>
-              <p className="text-xs text-muted-foreground/70">
-                PDF, DOCX, XLSX up to 25MB
-              </p>
-            </div>
-          </div>
-
-          {/* Query Input */}
           <div className="mb-6">
-            <label className="block text-sm font-medium text-foreground mb-3">
-              Ask a Compliance Question
-            </label>
-            <div className="flex gap-3">
-              <div className="relative flex-1">
-                <Search className="absolute left-3 top-1/2 -translate-y-1/2 w-5 h-5 text-muted-foreground" />
-                <Input
-                  value={query}
-                  onChange={(e) => setQuery(e.target.value)}
-                  placeholder="e.g., What are the compliance requirements for..."
-                  className="pl-10 h-12 bg-background/50"
-                />
-              </div>
-              <Button size="lg" className="btn-glow h-12 px-6">
-                <Send className="w-4 h-4 mr-2" />
-                Submit for Analysis
-              </Button>
-            </div>
+            <h3 className="text-xl font-semibold text-foreground mb-2">Upload Compliance Documents</h3>
+            <p className="text-sm text-muted-foreground">
+              Submit your documents for CA review. All drafting and regulatory submissions are handled by licensed professionals.
+            </p>
+          </div>
+          
+          <div className="border-2 border-dashed border-border rounded-xl p-8 text-center hover:border-primary/50 transition-colors cursor-pointer mb-6">
+            <Upload className="w-12 h-12 text-muted-foreground mx-auto mb-4" />
+            <p className="text-foreground font-medium mb-1">
+              Drag and drop files here, or click to browse
+            </p>
+            <p className="text-xs text-muted-foreground">
+              PDF, DOCX, XLSX up to 25MB
+            </p>
           </div>
 
-          {/* Example Prompts */}
-          <div className="mb-8">
-            <p className="text-xs text-muted-foreground mb-3">Try an example:</p>
-            <div className="flex flex-wrap gap-2">
-              {examplePrompts.map((prompt) => (
-                <button
-                  key={prompt}
-                  onClick={() => setQuery(prompt)}
-                  className="inline-flex items-center gap-2 px-3 py-1.5 rounded-full text-xs bg-accent hover:bg-accent/80 text-accent-foreground transition-colors"
-                >
-                  <FileText className="w-3 h-3" />
-                  {prompt}
-                </button>
-              ))}
-            </div>
+          <div className="flex flex-wrap items-center justify-center gap-4">
+            <Button size="lg" className="btn-glow">
+              <Upload className="w-4 h-4 mr-2" />
+              Upload for Review
+            </Button>
+            <Button size="lg" variant="outline">
+              <Eye className="w-4 h-4 mr-2" />
+              Track Status
+            </Button>
           </div>
+        </motion.div>
 
-          {/* Disclaimer */}
-          <div className="flex items-start gap-3 p-4 rounded-lg bg-warning/10 border border-warning/20">
-            <AlertTriangle className="w-5 h-5 text-warning shrink-0 mt-0.5" />
-            <div>
-              <p className="text-sm font-medium text-foreground mb-1">AI-Generated Draft Notice</p>
-              <p className="text-xs text-muted-foreground">
-                All outputs from REGULON AI Assistant are marked as AI-generated drafts and require 
-                mandatory verification by a licensed CA or Lawyer before any action is taken. 
-                This tool does not provide legal or financial advice.
-              </p>
-            </div>
-          </div>
+        {/* Important Notice */}
+        <motion.div
+          initial={{ opacity: 0, y: 20 }}
+          whileInView={{ opacity: 1, y: 0 }}
+          viewport={{ once: true }}
+          transition={{ duration: 0.5, delay: 0.4 }}
+          className="mt-8 p-4 rounded-xl bg-accent/30 border border-accent/50 text-center"
+        >
+          <p className="text-sm text-foreground">
+            <Shield className="w-4 h-4 inline-block mr-2 text-primary" />
+            <strong>Professional Verification Required:</strong> All regulatory drafts are created and verified by licensed Chartered Accountants. 
+            You cannot generate, edit, or submit regulatory documents directly.
+          </p>
         </motion.div>
 
         {/* Trust indicators */}
@@ -118,7 +150,7 @@ const AIAssistantPreview = () => {
           initial={{ opacity: 0, y: 20 }}
           whileInView={{ opacity: 1, y: 0 }}
           viewport={{ once: true }}
-          transition={{ duration: 0.5, delay: 0.3 }}
+          transition={{ duration: 0.5, delay: 0.5 }}
           className="mt-8 flex flex-wrap items-center justify-center gap-6 text-sm text-muted-foreground"
         >
           <div className="flex items-center gap-2">
@@ -126,8 +158,8 @@ const AIAssistantPreview = () => {
             <span>End-to-end encrypted</span>
           </div>
           <div className="flex items-center gap-2">
-            <Cpu className="w-4 h-4 text-primary" />
-            <span>Powered by Lovable AI</span>
+            <FileCheck className="w-4 h-4 text-primary" />
+            <span>CA-Verified Documents</span>
           </div>
           <div className="flex items-center gap-2">
             <Shield className="w-4 h-4 text-primary" />
