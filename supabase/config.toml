@@ -1,1 +1,4 @@
 project_id = "naapmulrxmrqzyjodbvn"
+
+[functions.ai-draft]
+verify_jwt = false
