@@ -1,5 +1,5 @@
 import { useState } from "react";
-import { motion, AnimatePresence } from "framer-motion";
+import { motion } from "framer-motion";
 import { 
   FileText, 
   Building2, 
@@ -13,8 +13,8 @@ import {
   Book,
   Loader2,
   Edit3,
-  Send,
-  Eye
+  Eye,
+  Upload
 } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
@@ -28,6 +28,7 @@ import {
 } from "@/components/ui/select";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
+import { toast } from "sonner";
 
 const documentTypes = [
   { id: "mca-notice", label: "MCA Notice Response", authority: "MCA" },
@@ -47,14 +48,22 @@ const demoClients = [
 ];
 
 const draftModes = [
-  { id: "conservative", label: "Conservative", description: "Lowest risk, most cautious language", color: "text-green-400" },
-  { id: "balanced", label: "Balanced", description: "Standard industry practice", color: "text-yellow-400" },
-  { id: "aggressive", label: "Assertive", description: "Legally defensible, assertive stance", color: "text-orange-400" },
+  { id: "conservative", label: "Conservative", description: "Lowest risk, most cautious language", color: "text-green-500" },
+  { id: "balanced", label: "Balanced", description: "Standard industry practice", color: "text-yellow-500" },
+  { id: "aggressive", label: "Assertive", description: "Legally defensible, assertive stance", color: "text-orange-500" },
 ];
 
-const reviewSteps = [
-  { id: 1, label: "AI Draft Generated", status: "completed" },
-  { id: 2, label: "CA Review & Edit", status: "current" },
+type StepStatus = "pending" | "completed" | "current";
+
+interface ReviewStep {
+  id: number;
+  label: string;
+  status: StepStatus;
+}
+
+const initialReviewSteps: ReviewStep[] = [
+  { id: 1, label: "AI Draft Generated", status: "pending" },
+  { id: 2, label: "CA Review & Edit", status: "pending" },
   { id: 3, label: "Lawyer Review", status: "pending" },
   { id: 4, label: "Final Approval", status: "pending" },
   { id: 5, label: "Ready for Submission", status: "pending" },
@@ -64,62 +73,103 @@ const AIDraftingEngine = () => {
   const [selectedClient, setSelectedClient] = useState<string>("");
   const [selectedDocType, setSelectedDocType] = useState<string>("");
   const [selectedMode, setSelectedMode] = useState<string>("balanced");
+  const [noticeDetails, setNoticeDetails] = useState<string>("");
   const [isGenerating, setIsGenerating] = useState(false);
   const [draftGenerated, setDraftGenerated] = useState(false);
   const [draftContent, setDraftContent] = useState("");
+  const [currentSteps, setCurrentSteps] = useState<ReviewStep[]>(initialReviewSteps);
+  const [generationError, setGenerationError] = useState<string | null>(null);
+
+  const DRAFT_URL = `${import.meta.env.VITE_SUPABASE_URL}/functions/v1/ai-draft`;
 
   const handleGenerateDraft = async () => {
     if (!selectedClient || !selectedDocType) return;
     
     setIsGenerating(true);
+    setGenerationError(null);
+    setDraftContent("");
     
-    // Simulate AI draft generation
-    await new Promise(resolve => setTimeout(resolve, 2000));
+    const client = demoClients.find(c => c.id === selectedClient);
     
-    setDraftContent(`DRAFT RESPONSE TO SHOW CAUSE NOTICE
+    try {
+      const response = await fetch(DRAFT_URL, {
+        method: "POST",
+        headers: {
+          "Content-Type": "application/json",
+          Authorization: `Bearer ${import.meta.env.VITE_SUPABASE_PUBLISHABLE_KEY}`,
+        },
+        body: JSON.stringify({
+          documentType: selectedDocType,
+          companyName: client?.name || "Company",
+          industry: client?.industry || "",
+          draftMode: selectedMode,
+          noticeDetails: noticeDetails || undefined,
+          stream: true,
+        }),
+      });
 
-Reference: SCN/GST/2026/001234
-Date: ${new Date().toLocaleDateString()}
+      if (response.status === 429) {
+        throw new Error("Rate limit exceeded. Please try again in a moment.");
+      }
+      if (response.status === 402) {
+        throw new Error("AI credits exhausted. Please add credits to continue.");
+      }
+      if (!response.ok || !response.body) {
+        throw new Error("Failed to generate draft. Please try again.");
+      }
 
-To,
-The Assistant Commissioner
-GST Division, Maharashtra
+      const reader = response.body.getReader();
+      const decoder = new TextDecoder();
+      let textBuffer = "";
+      let fullContent = "";
 
-Subject: Reply to Show Cause Notice dated [DATE]
+      while (true) {
+        const { done, value } = await reader.read();
+        if (done) break;
+        
+        textBuffer += decoder.decode(value, { stream: true });
 
-Respected Sir/Madam,
+        let newlineIndex: number;
+        while ((newlineIndex = textBuffer.indexOf("\n")) !== -1) {
+          let line = textBuffer.slice(0, newlineIndex);
+          textBuffer = textBuffer.slice(newlineIndex + 1);
 
-This response is submitted on behalf of ${demoClients.find(c => c.id === selectedClient)?.name} ("the Company") in reply to the Show Cause Notice referenced above.
+          if (line.endsWith("\r")) line = line.slice(0, -1);
+          if (line.startsWith(":") || line.trim() === "") continue;
+          if (!line.startsWith("data: ")) continue;
 
-1. PRELIMINARY SUBMISSIONS
-   The Company has reviewed the allegations contained in the Notice and submits the following response with supporting documentation.
+          const jsonStr = line.slice(6).trim();
+          if (jsonStr === "[DONE]") break;
 
-2. FACTUAL BACKGROUND
-   [Details of the transaction/filing in question]
+          try {
+            const parsed = JSON.parse(jsonStr);
+            const content = parsed.choices?.[0]?.delta?.content as string | undefined;
+            if (content) {
+              fullContent += content;
+              setDraftContent(fullContent);
+            }
+          } catch {
+            textBuffer = line + "\n" + textBuffer;
+            break;
+          }
+        }
+      }
 
-3. LEGAL POSITION
-   As per Section 73 of the CGST Act, 2017, read with Rule 142 of the CGST Rules...
+      setDraftGenerated(true);
+      setCurrentSteps(prev => prev.map(step => {
+        if (step.id === 1) return { ...step, status: "completed" as StepStatus };
+        if (step.id === 2) return { ...step, status: "current" as StepStatus };
+        return step;
+      }));
+      toast.success("Filing-ready draft generated successfully!");
 
-4. DOCUMENTARY EVIDENCE
-   The following documents are enclosed in support:
-   - Invoice copies
-   - E-way bills
-   - Bank statements
-   - Ledger extracts
-
-5. PRAYER
-   In view of the above submissions, it is humbly prayed that the proceedings may be dropped.
-
-Respectfully submitted,
-
-For ${demoClients.find(c => c.id === selectedClient)?.name}
-
-[Authorized Signatory]
-[Place]
-[Date]`);
-    
-    setDraftGenerated(true);
-    setIsGenerating(false);
+    } catch (error) {
+      console.error("Draft generation error:", error);
+      setGenerationError(error instanceof Error ? error.message : "An error occurred");
+      toast.error(error instanceof Error ? error.message : "Failed to generate draft");
+    } finally {
+      setIsGenerating(false);
+    }
   };
 
   return (
@@ -131,15 +181,15 @@ For ${demoClients.find(c => c.id === selectedClient)?.name}
     >
       <div className="flex items-center gap-3 mb-6">
         <div className="p-3 rounded-xl bg-cyan-500/10">
-          <Sparkles className="w-6 h-6 text-cyan-400" />
+          <Sparkles className="w-6 h-6 text-cyan-500" />
         </div>
         <div>
           <h2 className="text-xl font-semibold text-foreground">AI Drafting Engine</h2>
           <p className="text-sm text-muted-foreground">
-            Generate compliance drafts with mandatory CA verification
+            Generate filing-ready regulatory drafts with mandatory CA verification
           </p>
         </div>
-        <Badge className="ml-auto bg-cyan-500/20 text-cyan-400 border-cyan-500/30">
+        <Badge className="ml-auto bg-cyan-500/20 text-cyan-500 border-cyan-500/30">
           CA-Only Access
         </Badge>
       </div>
@@ -234,6 +284,23 @@ For ${demoClients.find(c => c.id === selectedClient)?.name}
                 </div>
               </div>
 
+              {/* Notice Details */}
+              <div>
+                <label className="block text-sm font-medium text-foreground mb-2">
+                  <Upload className="w-4 h-4 inline-block mr-2" />
+                  Notice Details (Optional)
+                </label>
+                <Textarea 
+                  placeholder="Paste notice content or key details for para-by-para rebuttal..."
+                  value={noticeDetails}
+                  onChange={(e) => setNoticeDetails(e.target.value)}
+                  className="min-h-[100px] bg-background/50"
+                />
+                <p className="text-xs text-muted-foreground mt-1">
+                  Providing notice details enables point-by-point rebuttal in the draft.
+                </p>
+              </div>
+
               {/* Generate Button */}
               <Button 
                 size="lg" 
@@ -244,7 +311,7 @@ For ${demoClients.find(c => c.id === selectedClient)?.name}
                 {isGenerating ? (
                   <>
                     <Loader2 className="w-4 h-4 mr-2 animate-spin" />
-                    Generating Draft...
+                    Generating Filing-Ready Draft...
                   </>
                 ) : (
                   <>
@@ -253,6 +320,12 @@ For ${demoClients.find(c => c.id === selectedClient)?.name}
                   </>
                 )}
               </Button>
+
+              {generationError && (
+                <div className="p-3 rounded-lg bg-destructive/10 border border-destructive/20 text-sm text-destructive">
+                  {generationError}
+                </div>
+              )}
             </div>
 
             {/* Right: Draft Preview */}
@@ -263,19 +336,19 @@ For ${demoClients.find(c => c.id === selectedClient)?.name}
                   Draft Content
                 </label>
                 {draftGenerated && (
-                  <Badge className="bg-yellow-500/20 text-yellow-400 border-yellow-500/30">
+                  <Badge className="bg-yellow-500/20 text-yellow-500 border-yellow-500/30">
                     AI-Generated Draft
                   </Badge>
                 )}
               </div>
               <Textarea 
-                placeholder="Draft will appear here after generation..."
+                placeholder="Draft will appear here after generation. The AI will create a filing-ready document with proper legal structure, section citations, and prayer for reliefs..."
                 value={draftContent}
                 onChange={(e) => setDraftContent(e.target.value)}
-                className="min-h-[300px] bg-background/50 font-mono text-sm"
+                className="min-h-[400px] bg-background/50 font-mono text-sm"
               />
               <p className="text-xs text-muted-foreground mt-2">
-                All edits are tracked line-by-line for audit compliance.
+                All edits are tracked line-by-line for audit compliance. Draft follows: Facts → Law → Application → Conclusion structure.
               </p>
             </div>
           </div>
@@ -298,11 +371,11 @@ For ${demoClients.find(c => c.id === selectedClient)?.name}
                 <div className="absolute left-6 top-0 bottom-0 w-0.5 bg-border/50" />
                 
                 <div className="space-y-6">
-                  {reviewSteps.map((step, index) => (
+                  {currentSteps.map((step) => (
                     <div key={step.id} className="flex items-start gap-4 relative">
                       <div className={`relative z-10 w-12 h-12 rounded-full flex items-center justify-center ${
                         step.status === "completed" 
-                          ? "bg-green-500/20 text-green-400" 
+                          ? "bg-green-500/20 text-green-500" 
                           : step.status === "current"
                             ? "bg-primary/20 text-primary ring-2 ring-primary"
                             : "bg-muted text-muted-foreground"
@@ -316,7 +389,7 @@ For ${demoClients.find(c => c.id === selectedClient)?.name}
                       <div className="flex-1 pt-2">
                         <p className={`font-medium ${
                           step.status === "completed" 
-                            ? "text-green-400" 
+                            ? "text-green-500" 
                             : step.status === "current"
                               ? "text-foreground"
                               : "text-muted-foreground"
@@ -380,22 +453,22 @@ For ${demoClients.find(c => c.id === selectedClient)?.name}
                   </div>
 
                   {/* Risk Highlights */}
-                  <div className="p-4 rounded-lg bg-red-500/10 border border-red-500/20">
+                  <div className="p-4 rounded-lg bg-destructive/10 border border-destructive/20">
                     <h4 className="font-medium text-foreground mb-3 flex items-center gap-2">
-                      <FileWarning className="w-4 h-4 text-red-400" />
+                      <FileWarning className="w-4 h-4 text-destructive" />
                       Risk & Gap Highlights
                     </h4>
                     <ul className="space-y-2 text-sm">
                       <li className="flex items-start gap-2">
-                        <AlertTriangle className="w-4 h-4 text-yellow-400 shrink-0 mt-0.5" />
+                        <AlertTriangle className="w-4 h-4 text-yellow-500 shrink-0 mt-0.5" />
                         <span>Missing disclosure: Bank reconciliation statement not attached</span>
                       </li>
                       <li className="flex items-start gap-2">
-                        <AlertTriangle className="w-4 h-4 text-orange-400 shrink-0 mt-0.5" />
+                        <AlertTriangle className="w-4 h-4 text-orange-500 shrink-0 mt-0.5" />
                         <span>Penalty exposure: ₹2,50,000 if notice not addressed within 30 days</span>
                       </li>
                       <li className="flex items-start gap-2">
-                        <AlertTriangle className="w-4 h-4 text-red-400 shrink-0 mt-0.5" />
+                        <AlertTriangle className="w-4 h-4 text-destructive shrink-0 mt-0.5" />
                         <span>Filing delay: Response deadline is February 15, 2026</span>
                       </li>
                     </ul>
