@@ -1,4 +1,9 @@
 project_id = "naapmulrxmrqzyjodbvn"
 
 [functions.ai-draft]
+enabled = true
+verify_jwt = false
+
+[functions.compliance-chat]
+enabled = true
 verify_jwt = false

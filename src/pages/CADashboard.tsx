@@ -15,6 +15,7 @@ import CAAuditSupport from "@/components/ca-dashboard/CAAuditSupport";
 import CACommunicationLogs from "@/components/ca-dashboard/CACommunicationLogs";
 import CAAnalyticsSection from "@/components/ca-dashboard/CAAnalyticsSection";
 import AIDraftingEngine from "@/components/ca-dashboard/AIDraftingEngine";
+import ComplianceChatbot from "@/components/ca-dashboard/ComplianceChatbot";
 
 const CADashboard = () => {
   const navigate = useNavigate();
@@ -76,6 +77,9 @@ const CADashboard = () => {
       </main>
       
       <Footer />
+      
+      {/* Compliance Chatbot - Floating */}
+      <ComplianceChatbot />
     </div>
   );
 };
