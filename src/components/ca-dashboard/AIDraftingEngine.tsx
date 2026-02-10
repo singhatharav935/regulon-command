@@ -36,6 +36,7 @@ const documentTypes = [
   { id: "income-tax-response", label: "Income Tax Response", authority: "Income Tax" },
   { id: "rbi-filing", label: "RBI Filing", authority: "RBI" },
   { id: "sebi-compliance", label: "SEBI Compliance", authority: "SEBI" },
+  { id: "customs-response", label: "Customs Response", authority: "Customs" },
   { id: "contract-review", label: "Contract Review", authority: "Legal" },
   { id: "custom-draft", label: "Custom Regulatory Draft", authority: "Custom" },
 ];
@@ -48,7 +49,7 @@ const demoClients = [
 ];
 
 const draftModes = [
-  { id: "conservative", label: "Conservative", description: "Lowest risk, most cautious language", color: "text-green-500" },
+  { id: "conservative", label: "Conservative", description: "Lowest risk, compliance-first language", color: "text-green-500" },
   { id: "balanced", label: "Balanced", description: "Standard industry practice", color: "text-yellow-500" },
   { id: "aggressive", label: "Assertive", description: "Legally defensible, assertive stance", color: "text-orange-500" },
 ];
@@ -62,7 +63,7 @@ interface ReviewStep {
 }
 
 const initialReviewSteps: ReviewStep[] = [
-  { id: 1, label: "AI Draft Generated", status: "pending" },
+  { id: 1, label: "Draft Generated", status: "pending" },
   { id: 2, label: "CA Review & Edit", status: "pending" },
   { id: 3, label: "Lawyer Review", status: "pending" },
   { id: 4, label: "Final Approval", status: "pending" },
@@ -186,24 +187,12 @@ const AIDraftingEngine = () => {
         <div>
           <h2 className="text-xl font-semibold text-foreground">AI Drafting Engine</h2>
           <p className="text-sm text-muted-foreground">
-            Generate filing-ready regulatory drafts with mandatory CA verification
+            Generate filing-ready regulatory drafts — Facts → Law → Application → Conclusion
           </p>
         </div>
         <Badge className="ml-auto bg-cyan-500/20 text-cyan-500 border-cyan-500/30">
           CA-Only Access
         </Badge>
-      </div>
-
-      {/* AI Draft Warning Banner */}
-      <div className="flex items-start gap-3 p-4 rounded-lg bg-warning/10 border border-warning/20 mb-6">
-        <AlertTriangle className="w-5 h-5 text-warning shrink-0 mt-0.5" />
-        <div>
-          <p className="text-sm font-medium text-foreground mb-1">AI-Generated Draft Notice</p>
-          <p className="text-xs text-muted-foreground">
-            All outputs from this engine are marked as <strong>"AI-Generated Draft – Requires CA/Lawyer Verification"</strong>. 
-            No step in the review workflow can be skipped. REGULON does not provide legal or financial advice.
-          </p>
-        </div>
       </div>
 
       <Tabs defaultValue="create" className="w-full">
@@ -288,16 +277,16 @@ const AIDraftingEngine = () => {
               <div>
                 <label className="block text-sm font-medium text-foreground mb-2">
                   <Upload className="w-4 h-4 inline-block mr-2" />
-                  Notice Details (Optional)
+                  Notice / Order Details
                 </label>
                 <Textarea 
-                  placeholder="Paste notice content or key details for para-by-para rebuttal..."
+                  placeholder="Paste notice content, order text, or key facts for para-by-para rebuttal. Technical objections will only be raised if supported by the content provided here."
                   value={noticeDetails}
                   onChange={(e) => setNoticeDetails(e.target.value)}
                   className="min-h-[100px] bg-background/50"
                 />
                 <p className="text-xs text-muted-foreground mt-1">
-                  Providing notice details enables point-by-point rebuttal in the draft.
+                  Providing notice details enables point-by-point rebuttal. Procedural objections are raised only if evidence supports them.
                 </p>
               </div>
 
@@ -316,7 +305,7 @@ const AIDraftingEngine = () => {
                 ) : (
                   <>
                     <Sparkles className="w-4 h-4 mr-2" />
-                    Generate AI Draft
+                    Generate Draft
                   </>
                 )}
               </Button>
@@ -336,19 +325,19 @@ const AIDraftingEngine = () => {
                   Draft Content
                 </label>
                 {draftGenerated && (
-                  <Badge className="bg-yellow-500/20 text-yellow-500 border-yellow-500/30">
-                    AI-Generated Draft
+                  <Badge className="bg-green-500/20 text-green-500 border-green-500/30">
+                    Filing-Ready
                   </Badge>
                 )}
               </div>
               <Textarea 
-                placeholder="Draft will appear here after generation. The AI will create a filing-ready document with proper legal structure, section citations, and prayer for reliefs..."
+                placeholder="Draft will appear here after generation. The engine produces a filing-ready document with proper legal structure, section citations, and prayer for reliefs..."
                 value={draftContent}
                 onChange={(e) => setDraftContent(e.target.value)}
                 className="min-h-[400px] bg-background/50 font-mono text-sm"
               />
               <p className="text-xs text-muted-foreground mt-2">
-                All edits are tracked line-by-line for audit compliance. Draft follows: Facts → Law → Application → Conclusion structure.
+                All edits are tracked line-by-line for audit compliance. Structure: Facts → Law → Application → Conclusion.
               </p>
             </div>
           </div>
