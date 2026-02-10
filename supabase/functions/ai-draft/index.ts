@@ -22,6 +22,7 @@ GST-SPECIFIC INTELLIGENCE (apply only where relevant to the facts):
 - Rule 142 CGST Rules compliance
 - Revenue neutrality argument where applicable
 - Books vs Returns reconciliation, ITC eligibility with 2A/2B vs 3B analysis
+- ITC Defense (2026 Benchmark): For Section 16(2)(c) mismatches, cite Sahil Enterprises vs. Union of India (Tripura HC, Jan 2026). Argue that a bona fide purchaser cannot be penalized for a supplier's failure to remit tax; "reading down" the provision to protect genuine transactions is now the settled legal standard.
 - Penalty & interest non-applicability under Section 75(1)
 - Time limitation under Section 73(10)/74(10)
 
@@ -210,6 +211,7 @@ UNIVERSAL DRAFTING STANDARDS (apply to every draft):
 TECHNICAL OBJECTIONS RULE (CRITICAL SAFETY LOGIC):
 - Raise objections relating to jurisdiction, limitation, DIN/RFN, procedural lapses, or violation of natural justice ONLY IF such defects are clearly supported by the notice text, dates, or records provided.
 - Do NOT raise technical objections by default or as a standard opening strategy.
+- RFN vs. DIN Rule: Per Circular 249/06/2025, portal-generated notices bearing a verifiable Reference Number (RFN) are valid service. Do NOT raise DIN-based objections if a valid RFN is present in the notice. Only challenge service validity where neither DIN nor RFN is traceable.
 - If no procedural defect is evident, proceed directly with substantive factual and legal defence.
 
 COMPANY CONTEXT:
