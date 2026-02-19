@@ -29,6 +29,7 @@ import {
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { toast } from "sonner";
+import { supabase } from "@/integrations/supabase/client";
 
 const documentTypes = [
   { id: "mca-notice", label: "MCA Notice Response", authority: "MCA" },
@@ -93,11 +94,17 @@ const AIDraftingEngine = () => {
     const client = demoClients.find(c => c.id === selectedClient);
     
     try {
+      const {
+        data: { session },
+      } = await supabase.auth.getSession();
+
+      const authToken = session?.access_token ?? import.meta.env.VITE_SUPABASE_PUBLISHABLE_KEY;
+
       const response = await fetch(DRAFT_URL, {
         method: "POST",
         headers: {
           "Content-Type": "application/json",
-          Authorization: `Bearer ${import.meta.env.VITE_SUPABASE_PUBLISHABLE_KEY}`,
+          Authorization: `Bearer ${authToken}`,
         },
         body: JSON.stringify({
           documentType: selectedDocType,
