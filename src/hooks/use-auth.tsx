@@ -50,22 +50,31 @@ export const AuthProvider = ({ children }: { children: ReactNode }) => {
     };
 
     const bootstrap = async () => {
-      const {
-        data: { session: initialSession },
-      } = await supabase.auth.getSession();
+      try {
+        const {
+          data: { session: initialSession },
+        } = await supabase.auth.getSession();
 
-      if (!mounted) return;
+        if (!mounted) return;
 
-      setSession(initialSession);
-      setUser(initialSession?.user ?? null);
+        setSession(initialSession);
+        setUser(initialSession?.user ?? null);
 
-      if (initialSession?.user) {
-        await loadRoles(initialSession.user.id);
-      } else {
+        if (initialSession?.user) {
+          await loadRoles(initialSession.user.id);
+        } else {
+          setRoles([]);
+        }
+      } catch (error) {
+        if (!mounted) return;
+        console.warn("Auth bootstrap failed.", error);
+        setSession(null);
+        setUser(null);
         setRoles([]);
+      } finally {
+        if (!mounted) return;
+        setLoading(false);
       }
-
-      setLoading(false);
     };
 
     bootstrap();
