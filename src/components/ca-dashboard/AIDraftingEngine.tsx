@@ -106,6 +106,81 @@ const documentFormatModules: Record<string, string[]> = {
   ],
 };
 
+const readyNoticeTemplates: Record<string, string> = {
+  "gst-show-cause": "Show Cause Notice No. [INSERT] dated [INSERT DATE] issued by [State/Central GST authority], DIN/RFN [INSERT], alleges wrongful ITC availment for period [INSERT PERIOD] under Section 73 read with Section 16(2)(c), Rule 36/Rule 42/Rule 86A references (as applicable). Proposed tax demand is INR [INSERT], interest under Section 50 and penalty under Section 73(9). Department relies on DRC-01 working sheet, 3B vs 2B mismatch, and vendor filing gaps. Noticee confirms possession of valid invoices, receipt of goods/services, payment through banking channels, and return filing compliance. Mismatches are primarily timing differences and amendment effects. Provide para-wise rebuttal matrix, allegation-wise computation challenge, annexure mapping, and complete prayer for dropping demand/interest/penalty with hearing request.",
+  "mca-notice": "Notice/Adjudication reference [INSERT] dated [INSERT DATE], DIN/RFN [INSERT], issued by Registrar of Companies/Adjudicating Officer under Companies Act, 2013 for alleged non-compliance of Section [INSERT] read with Rule [INSERT], period [INSERT]. Proposed penalty is INR [INSERT] on company and officers. Department alleges delayed filing/non-filing of statutory forms and seeks adjudication under applicable penalty provisions. Noticee submits that default, if any, is technical/procedural without mala fide intent, corrective filing steps have been initiated/completed, and no stakeholder prejudice occurred. Provide issue-wise legal response distinguishing procedural vs substantive default, chronology table, mitigation factors, compounding/leniency submissions where permissible, annexure mapping, and structured prayer for dropping/minimizing penalty with opportunity of personal hearing.",
+  "income-tax-response": "Notice under Income-tax Act reference [INSERT] dated [INSERT DATE], DIN [INSERT], issued by [AO/CPC unit] for AY [INSERT], alleging addition/disallowance under Sections [INSERT], amount INR [INSERT]. Department relies on mismatch in books/return/AIS/TDS data and proposes tax, interest and penalty initiation. Noticee provides ledger extracts, bank proofs, invoices/supporting contracts and reconciliation statements showing bona fide reporting and explainable variance. Where reopening/disallowance is invoked, challenge jurisdictional and merits basis as fact-supported. Prepare para-wise reply against each allegation, computation rebuttal table, documentary annexure mapping, and final prayer for deletion of additions, dropping penalty proceedings, and grant of hearing before final order.",
+  "rbi-filing": "Regulatory communication/SCN reference [INSERT] dated [INSERT DATE], issued by RBI/Authorized authority regarding alleged FEMA/RBI non-compliance for period [INSERT], reference no. [INSERT]. Proposed contravention and monetary implication is INR [INSERT]. Department alleges delayed/incorrect filing and control lapses. Noticee submits transactions were bona fide, underlying records are auditable, delays were procedural, and corrective filings/internal control enhancements are completed or in progress. Draft should provide regulation-wise response, timeline of compliance actions, risk-mitigation controls, proportionality arguments, annexure mapping (returns, board approvals, remittance docs), and layered prayer seeking closure/lenient view/compounding at minimum exposure with hearing request.",
+  "sebi-compliance": "SEBI communication/notice reference [INSERT] dated [INSERT DATE], DIN/reference [INSERT], alleges non-compliance with Regulation/Section [INSERT] for period [INSERT] with proposed action/penalty INR [INSERT]. Basis includes disclosure delay, governance deficiency, or reporting mismatch. Noticee submits investor prejudice is absent, disclosures have been corrected, and governance controls are strengthened. Prepare allegation-wise legal rebuttal with regulatory text linkage, chronology of disclosures, evidence mapping to exchange filings/board records, and reasoned submissions on proportionality and natural justice. Include computation/exposure table, mitigation actions, and prayer seeking dropping or reduction of action with request for personal hearing.",
+  "customs-response": "Show Cause Notice No. [INSERT] dated [INSERT DATE], DIN/RFN [INSERT], issued by Customs authority for period [INSERT], alleging misclassification/undervaluation/wrong exemption on imported goods under Section 28 and related provisions. Proposed differential duty is INR [INSERT], with interest under Section 28AA, penalty under Sections 112/114A/114AA, and confiscation proposal under Section 111 with redemption fine under Section 125. Department relies on NIDB comparison, audit findings, and selected Bills of Entry. Noticee submits declared classification and transaction value are correct based on product specifications, invoices and banking trail, with no suppression or mala fide intent. Provide para-wise rebuttal, duty/interest/penalty/fine computation challenge, evidence annexure matrix, and prayer for dropping proceedings and granting hearing.",
+  "contract-review": "Contract review matter for agreement dated [INSERT DATE] between [Party A] and [Party B], governing law [INSERT], dispute/concern areas include indemnity, limitation of liability, termination rights, payment milestones, confidentiality/IP ownership, and dispute resolution clause enforceability. Business risk exposure estimated at INR [INSERT]. Identify ambiguous or one-sided clauses, statutory non-compliance risks, and litigation/arbitration vulnerabilities. Provide clause-wise risk rating, suggested revised language, fallback negotiation positions, and annexure references to commercial term sheet/emails. Output should include executive risk summary, legal analysis table, recommended redlines, and final action plan for negotiation/execution readiness.",
+  "custom-draft": "Regulatory notice/order reference [INSERT] dated [INSERT DATE], authority [INSERT], DIN/RFN/reference [INSERT], applicable law/provision [INSERT], period [INSERT], proposed tax/penalty/exposure INR [INSERT]. Department allegations are summarized as: [INSERT ALLEGATION 1], [INSERT ALLEGATION 2], [INSERT ALLEGATION 3]. Noticee position is that transactions/compliances are bona fide and supported by records, and disputed findings arise from interpretation/timing/procedural issues. Generate a filing-ready draft with notice snapshot, para-wise rebuttal matrix, computation challenge table, documentary annexure mapping, procedural validity check (only if fact-supported), and layered prayer including hearing opportunity and any alternative relief.",
+};
+
+type AdvancedCheck = {
+  label: string;
+  regex: RegExp;
+};
+
+const advancedChecksByType: Record<string, AdvancedCheck[]> = {
+  "gst-show-cause": [
+    { label: "DIN/RFN reference", regex: /(DIN|RFN|Reference\s*No|Ref\.?\s*No)/i },
+    { label: "Section/Rule references", regex: /(Section|Sec\.|Rule)\s*\d+/i },
+    { label: "Demand/amount details", regex: /(?:Rs\.?|INR|₹)\s?[\d,]+/i },
+    { label: "Date timeline evidence", regex: /\b\d{1,2}[\/.-]\d{1,2}[\/.-]\d{2,4}\b|\b\d{1,2}\s+[A-Za-z]{3,9}\s+\d{4}\b/ },
+    { label: "GST return/context indicators", regex: /(GSTR-3B|GSTR-2B|DRC-01|ITC)/i },
+  ],
+  "mca-notice": [
+    { label: "Notice reference/DIN", regex: /(DIN|SRN|Reference\s*No|Ref\.?\s*No|ROC)/i },
+    { label: "Section/Rule references", regex: /(Section|Sec\.|Rule)\s*\d+/i },
+    { label: "Penalty/amount details", regex: /(?:Rs\.?|INR|₹)\s?[\d,]+/i },
+    { label: "Date timeline evidence", regex: /\b\d{1,2}[\/.-]\d{1,2}[\/.-]\d{2,4}\b|\b\d{1,2}\s+[A-Za-z]{3,9}\s+\d{4}\b/ },
+    { label: "MCA/ROC context", regex: /(Companies Act|ROC|MCA|adjudication|compounding)/i },
+  ],
+  "income-tax-response": [
+    { label: "Notice reference/DIN", regex: /(DIN|Notice\s*No|Ref\.?\s*No|AY)/i },
+    { label: "Section references", regex: /(Section|Sec\.)\s*\d+/i },
+    { label: "Tax/amount details", regex: /(?:Rs\.?|INR|₹)\s?[\d,]+/i },
+    { label: "Date timeline evidence", regex: /\b\d{1,2}[\/.-]\d{1,2}[\/.-]\d{2,4}\b|\b\d{1,2}\s+[A-Za-z]{3,9}\s+\d{4}\b/ },
+    { label: "Income-tax context", regex: /(Income-tax|assessment|reassessment|CPC|AO)/i },
+  ],
+  "rbi-filing": [
+    { label: "Reference number", regex: /(Ref\.?\s*No|Reference\s*No|letter|communication)/i },
+    { label: "Regulation references", regex: /(Regulation|Section|Rule)\s*\d+/i },
+    { label: "Exposure/amount details", regex: /(?:Rs\.?|INR|₹)\s?[\d,]+/i },
+    { label: "Date timeline evidence", regex: /\b\d{1,2}[\/.-]\d{1,2}[\/.-]\d{2,4}\b|\b\d{1,2}\s+[A-Za-z]{3,9}\s+\d{4}\b/ },
+    { label: "RBI/FEMA context", regex: /(RBI|FEMA|authorized dealer|compounding)/i },
+  ],
+  "sebi-compliance": [
+    { label: "Reference number", regex: /(Ref\.?\s*No|Reference\s*No|SEBI)/i },
+    { label: "Regulation references", regex: /(Regulation|Section|Rule)\s*\d+/i },
+    { label: "Exposure/amount details", regex: /(?:Rs\.?|INR|₹)\s?[\d,]+/i },
+    { label: "Date timeline evidence", regex: /\b\d{1,2}[\/.-]\d{1,2}[\/.-]\d{2,4}\b|\b\d{1,2}\s+[A-Za-z]{3,9}\s+\d{4}\b/ },
+    { label: "SEBI/disclosure context", regex: /(SEBI|listing|disclosure|governance|investor)/i },
+  ],
+  "customs-response": [
+    { label: "DIN/RFN reference", regex: /(DIN|RFN|SCN|Ref\.?\s*No)/i },
+    { label: "Section references", regex: /(Section|Sec\.)\s*\d+/i },
+    { label: "Duty/amount details", regex: /(?:Rs\.?|INR|₹)\s?[\d,]+/i },
+    { label: "Date timeline evidence", regex: /\b\d{1,2}[\/.-]\d{1,2}[\/.-]\d{2,4}\b|\b\d{1,2}\s+[A-Za-z]{3,9}\s+\d{4}\b/ },
+    { label: "Customs context", regex: /(Bill of Entry|BOE|classification|valuation|Section 28|Section 111)/i },
+  ],
+  "contract-review": [
+    { label: "Agreement/contract reference", regex: /(agreement|contract|clause|party|effective date)/i },
+    { label: "Clause/legal references", regex: /(clause|section)\s*\d+(\.\d+)*/i },
+    { label: "Commercial exposure details", regex: /(?:Rs\.?|INR|₹)\s?[\d,]+|liability|damages/i },
+    { label: "Date timeline evidence", regex: /\b\d{1,2}[\/.-]\d{1,2}[\/.-]\d{2,4}\b|\b\d{1,2}\s+[A-Za-z]{3,9}\s+\d{4}\b/ },
+    { label: "Dispute/risk context", regex: /(indemnity|termination|dispute|arbitration|liability)/i },
+  ],
+  "custom-draft": [
+    { label: "Reference identifier", regex: /(DIN|RFN|Ref\.?\s*No|Reference\s*No|notice)/i },
+    { label: "Provision references", regex: /(Section|Sec\.|Rule|Regulation)\s*\d+/i },
+    { label: "Amount/exposure details", regex: /(?:Rs\.?|INR|₹)\s?[\d,]+/i },
+    { label: "Date timeline evidence", regex: /\b\d{1,2}[\/.-]\d{1,2}[\/.-]\d{2,4}\b|\b\d{1,2}\s+[A-Za-z]{3,9}\s+\d{4}\b/ },
+    { label: "Authority/law context", regex: /(authority|department|act|regulation|notice|order)/i },
+  ],
+};
+
 const AIDraftingEngine = () => {
   const [selectedClient, setSelectedClient] = useState<string>("");
   const [selectedDocType, setSelectedDocType] = useState<string>("");
@@ -122,12 +197,38 @@ const AIDraftingEngine = () => {
   const DRAFT_URL = `${import.meta.env.VITE_SUPABASE_URL}/functions/v1/ai-draft`;
   const secureFunctionAuth = import.meta.env.VITE_ENABLE_SECURE_FUNCTION_AUTH === "true";
   const noticeLength = noticeDetails.trim().length;
-  const hasDinOrRfn = /(DIN|RFN|Reference\s*No|Ref\.?\s*No)/i.test(noticeDetails);
-  const hasSectionReference = /(Section|Sec\.|Rule|Regulation)\s*\d+/i.test(noticeDetails);
-  const hasAmount = /(?:Rs\.?|INR|₹)\s?[\d,]+/i.test(noticeDetails);
-  const hasDate = /\b\d{1,2}[\/.-]\d{1,2}[\/.-]\d{2,4}\b|\b\d{1,2}\s+[A-Za-z]{3,9}\s+\d{4}\b/.test(noticeDetails);
+  const activeChecks = selectedDocType
+    ? (advancedChecksByType[selectedDocType] || advancedChecksByType["custom-draft"])
+    : [];
+  const checkResults = activeChecks.map((check) => ({
+    ...check,
+    passed: check.regex.test(noticeDetails),
+  }));
   const selectedDocLabel = documentTypes.find(doc => doc.id === selectedDocType)?.label || "Selected Draft";
   const docSpecificFormat = documentFormatModules[selectedDocType] || documentFormatModules["custom-draft"];
+  const selectedTemplate = selectedDocType ? readyNoticeTemplates[selectedDocType] : "";
+
+  const handleInsertTemplate = () => {
+    if (!selectedDocType || !selectedTemplate) {
+      toast.error("Select a document type first.");
+      return;
+    }
+    setNoticeDetails(selectedTemplate);
+    toast.success("Ready 200+ template inserted.");
+  };
+
+  const handleCopyTemplate = async () => {
+    if (!selectedDocType || !selectedTemplate) {
+      toast.error("Select a document type first.");
+      return;
+    }
+    try {
+      await navigator.clipboard.writeText(selectedTemplate);
+      toast.success("Template copied. Paste it in Notice / Order Details.");
+    } catch {
+      toast.error("Clipboard access failed. Use Insert Template instead.");
+    }
+  };
 
   const handleGenerateDraft = async () => {
     if (!selectedClient || !selectedDocType) return;
@@ -135,6 +236,14 @@ const AIDraftingEngine = () => {
     if (advancedMode && noticeLength < 200) {
       toast.error("Advanced Mode requires detailed notice/order text (minimum 200 characters).");
       return;
+    }
+
+    if (advancedMode && checkResults.length > 0) {
+      const missing = checkResults.filter((item) => !item.passed).map((item) => item.label);
+      if (missing.length > 0) {
+        toast.error(`Advanced Mode missing: ${missing.join(", ")}`);
+        return;
+      }
     }
     
     setIsGenerating(true);
@@ -378,6 +487,24 @@ const AIDraftingEngine = () => {
                 <p className="text-xs text-muted-foreground mt-1">
                   Providing notice details enables point-by-point rebuttal. Procedural objections are raised only if evidence supports them.
                 </p>
+                <div className="mt-2 grid grid-cols-1 sm:grid-cols-2 gap-2">
+                  <Button
+                    type="button"
+                    variant="outline"
+                    onClick={handleInsertTemplate}
+                    disabled={!selectedDocType}
+                  >
+                    Insert 200+ Template
+                  </Button>
+                  <Button
+                    type="button"
+                    variant="outline"
+                    onClick={handleCopyTemplate}
+                    disabled={!selectedDocType}
+                  >
+                    Copy 200+ Template
+                  </Button>
+                </div>
               </div>
 
               <div className="p-3 rounded-lg border border-border/50 bg-background/30">
@@ -396,24 +523,21 @@ const AIDraftingEngine = () => {
                   </button>
                 </div>
                 <p className="text-xs text-muted-foreground mb-2">
-                  Enabled: strict para-wise matrix, allegation-wise computation rebuttal, annexure mapping, and quality gates.
+                  Enabled: document-specific para-wise matrix, computation rebuttal, annexure mapping, and quality gates.
                 </p>
                 <div className="grid grid-cols-2 gap-2 text-xs">
                   <p className={noticeLength >= 200 ? "text-green-400" : "text-yellow-400"}>
-                    {noticeLength >= 200 ? "✓" : "!"} Detailed notice text
+                    {noticeLength >= 200 ? "✓" : "!"} Detailed notice text (200+)
                   </p>
-                  <p className={hasDinOrRfn ? "text-green-400" : "text-yellow-400"}>
-                    {hasDinOrRfn ? "✓" : "!"} DIN/RFN reference
-                  </p>
-                  <p className={hasSectionReference ? "text-green-400" : "text-yellow-400"}>
-                    {hasSectionReference ? "✓" : "!"} Section/Rule references
-                  </p>
-                  <p className={hasAmount ? "text-green-400" : "text-yellow-400"}>
-                    {hasAmount ? "✓" : "!"} Demand/amount details
-                  </p>
-                  <p className={hasDate ? "text-green-400" : "text-yellow-400"}>
-                    {hasDate ? "✓" : "!"} Date timeline evidence
-                  </p>
+                  {selectedDocType ? (
+                    checkResults.map((item) => (
+                      <p key={item.label} className={item.passed ? "text-green-400" : "text-yellow-400"}>
+                        {item.passed ? "✓" : "!"} {item.label}
+                      </p>
+                    ))
+                  ) : (
+                    <p className="text-yellow-400">! Select document type to load specific checks</p>
+                  )}
                 </div>
               </div>
 
