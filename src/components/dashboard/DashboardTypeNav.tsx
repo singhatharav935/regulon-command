@@ -5,6 +5,7 @@ import { cn } from "@/lib/utils";
 
 interface DashboardTypeNavProps {
   activeType: "company" | "ca" | "admin";
+  routePrefix?: string;
 }
 
 const dashboardTypes = [
@@ -31,7 +32,9 @@ const dashboardTypes = [
   },
 ];
 
-const DashboardTypeNav = ({ activeType }: DashboardTypeNavProps) => {
+const DashboardTypeNav = ({ activeType, routePrefix = "" }: DashboardTypeNavProps) => {
+  const withPrefix = (href: string) => `${routePrefix}${href}`;
+
   return (
     <motion.div
       initial={{ opacity: 0, y: -10 }}
@@ -58,9 +61,9 @@ const DashboardTypeNav = ({ activeType }: DashboardTypeNavProps) => {
             const isActive = activeType === dashboard.id;
             
             return (
-              <Link
+                  <Link
                 key={dashboard.id}
-                to={dashboard.href}
+                to={withPrefix(dashboard.href)}
                 className={cn(
                   "flex items-center gap-3 px-5 py-3 rounded-xl text-sm font-medium whitespace-nowrap transition-all duration-200 min-w-fit",
                   isActive 

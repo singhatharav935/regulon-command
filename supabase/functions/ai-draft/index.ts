@@ -1,8 +1,24 @@
 import { serve } from "https://deno.land/std@0.168.0/http/server.ts";
+import { createClient } from "https://esm.sh/@supabase/supabase-js@2";
 
-const corsHeaders = {
-  "Access-Control-Allow-Origin": "*",
-  "Access-Control-Allow-Headers": "authorization, x-client-info, apikey, content-type, x-supabase-client-platform, x-supabase-client-platform-version, x-supabase-client-runtime, x-supabase-client-runtime-version",
+const getCorsHeaders = (req: Request) => {
+  const origin = req.headers.get("origin") ?? "";
+  const allowlist = (Deno.env.get("ALLOWED_ORIGINS") ?? "")
+    .split(",")
+    .map((item) => item.trim())
+    .filter(Boolean);
+
+  const allowOrigin = allowlist.length === 0
+    ? "*"
+    : allowlist.includes(origin)
+      ? origin
+      : "null";
+
+  return {
+    "Access-Control-Allow-Origin": allowOrigin,
+    "Access-Control-Allow-Headers": "authorization, x-client-info, apikey, content-type, x-supabase-client-platform, x-supabase-client-platform-version, x-supabase-client-runtime, x-supabase-client-runtime-version",
+    "Access-Control-Allow-Methods": "POST,OPTIONS",
+  };
 };
 
 const getModeDescription = (draftMode: string): string => {
@@ -157,11 +173,89 @@ APPROACH:
 };
 
 serve(async (req) => {
+  const corsHeaders = getCorsHeaders(req);
+
+  if (corsHeaders["Access-Control-Allow-Origin"] === "null") {
+    return new Response(JSON.stringify({ error: "Origin not allowed" }), {
+      status: 403,
+      headers: { ...corsHeaders, "Content-Type": "application/json" },
+    });
+  }
+
   if (req.method === "OPTIONS") {
     return new Response("ok", { headers: corsHeaders });
   }
 
+  if (req.method !== "POST") {
+    return new Response(JSON.stringify({ error: "Method not allowed" }), {
+      status: 405,
+      headers: { ...corsHeaders, "Content-Type": "application/json" },
+    });
+  }
+
   try {
+    const enforceAuth = Deno.env.get("ENFORCE_AUTH") === "true";
+    const supabaseUrl = Deno.env.get("SUPABASE_URL");
+    const supabaseAnonKey = Deno.env.get("SUPABASE_ANON_KEY");
+    const authHeader = req.headers.get("Authorization");
+
+    if (!supabaseUrl || !supabaseAnonKey) {
+      throw new Error("Supabase environment variables are missing");
+    }
+
+    if (enforceAuth && !authHeader) {
+      return new Response(JSON.stringify({ error: "Missing authorization header" }), {
+        status: 401,
+        headers: { ...corsHeaders, "Content-Type": "application/json" },
+      });
+    }
+
+    let userId: string | null = null;
+
+    if (authHeader) {
+      const authClient = createClient(supabaseUrl, supabaseAnonKey, {
+        global: { headers: { Authorization: authHeader } },
+      });
+
+      const {
+        data: { user },
+        error: authError,
+      } = await authClient.auth.getUser();
+
+      if (enforceAuth && (authError || !user)) {
+        return new Response(JSON.stringify({ error: "Unauthorized request" }), {
+          status: 401,
+          headers: { ...corsHeaders, "Content-Type": "application/json" },
+        });
+      }
+
+      userId = user?.id ?? null;
+
+      if (enforceAuth && user) {
+        const { data: roleRows, error: roleError } = await authClient
+          .from("user_roles")
+          .select("role")
+          .eq("user_id", user.id);
+
+        if (roleError) {
+          return new Response(JSON.stringify({ error: "Unable to verify user role" }), {
+            status: 403,
+            headers: { ...corsHeaders, "Content-Type": "application/json" },
+          });
+        }
+
+        const roleSet = new Set((roleRows ?? []).map((row) => row.role));
+        const canDraft = roleSet.has("manager") || roleSet.has("admin");
+
+        if (!canDraft) {
+          return new Response(JSON.stringify({ error: "Only CA/Admin users can generate drafts" }), {
+            status: 403,
+            headers: { ...corsHeaders, "Content-Type": "application/json" },
+          });
+        }
+      }
+    }
+
     const { 
       documentType, 
       companyName, 
@@ -172,7 +266,7 @@ serve(async (req) => {
       stream = false
     } = await req.json();
 
-    console.log("Generating filing-ready draft:", { documentType, companyName, draftMode, stream });
+    console.log("Generating filing-ready draft:", { documentType, companyName, draftMode, stream, userId });
 
     const LOVABLE_API_KEY = Deno.env.get("LOVABLE_API_KEY");
     if (!LOVABLE_API_KEY) {
