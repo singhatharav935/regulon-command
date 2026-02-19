@@ -1,7 +1,5 @@
 import { useEffect, useState } from "react";
-import { useNavigate } from "react-router-dom";
 import { motion } from "framer-motion";
-import { supabase } from "@/integrations/supabase/client";
 import Navbar from "@/components/layout/Navbar";
 import Footer from "@/components/layout/Footer";
 import DashboardTypeNav from "@/components/dashboard/DashboardTypeNav";
@@ -18,22 +16,12 @@ import AIDraftingEngine from "@/components/ca-dashboard/AIDraftingEngine";
 import ComplianceChatbot from "@/components/ca-dashboard/ComplianceChatbot";
 
 const CADashboard = () => {
-  const navigate = useNavigate();
   const [isLoading, setIsLoading] = useState(true);
 
   useEffect(() => {
-    const checkAuth = async () => {
-      try {
-        await supabase.auth.getSession();
-      } catch (error) {
-        console.warn("CA dashboard auth check failed, continuing in demo mode.", error);
-      } finally {
-        // Demo mode - show dashboard without auth
-        setIsLoading(false);
-      }
-    };
-    checkAuth();
-  }, [navigate]);
+    // Demo dashboard must always open, independent of auth/env state.
+    setIsLoading(false);
+  }, []);
 
   if (isLoading) {
     return (
