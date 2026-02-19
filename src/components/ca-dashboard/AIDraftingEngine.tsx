@@ -76,6 +76,7 @@ const AIDraftingEngine = () => {
   const [selectedDocType, setSelectedDocType] = useState<string>("");
   const [selectedMode, setSelectedMode] = useState<string>("balanced");
   const [noticeDetails, setNoticeDetails] = useState<string>("");
+  const [advancedMode, setAdvancedMode] = useState(true);
   const [isGenerating, setIsGenerating] = useState(false);
   const [draftGenerated, setDraftGenerated] = useState(false);
   const [draftContent, setDraftContent] = useState("");
@@ -83,9 +84,20 @@ const AIDraftingEngine = () => {
   const [generationError, setGenerationError] = useState<string | null>(null);
 
   const DRAFT_URL = `${import.meta.env.VITE_SUPABASE_URL}/functions/v1/ai-draft`;
+  const secureFunctionAuth = import.meta.env.VITE_ENABLE_SECURE_FUNCTION_AUTH === "true";
+  const noticeLength = noticeDetails.trim().length;
+  const hasDinOrRfn = /(DIN|RFN|Reference\s*No|Ref\.?\s*No)/i.test(noticeDetails);
+  const hasSectionReference = /(Section|Sec\.|Rule|Regulation)\s*\d+/i.test(noticeDetails);
+  const hasAmount = /(?:Rs\.?|INR|₹)\s?[\d,]+/i.test(noticeDetails);
+  const hasDate = /\b\d{1,2}[\/.-]\d{1,2}[\/.-]\d{2,4}\b|\b\d{1,2}\s+[A-Za-z]{3,9}\s+\d{4}\b/.test(noticeDetails);
 
   const handleGenerateDraft = async () => {
     if (!selectedClient || !selectedDocType) return;
+
+    if (advancedMode && noticeLength < 200) {
+      toast.error("Advanced Mode requires detailed notice/order text (minimum 200 characters).");
+      return;
+    }
     
     setIsGenerating(true);
     setGenerationError(null);
@@ -94,11 +106,13 @@ const AIDraftingEngine = () => {
     const client = demoClients.find(c => c.id === selectedClient);
     
     try {
-      const {
-        data: { session },
-      } = await supabase.auth.getSession();
-
-      const authToken = session?.access_token ?? import.meta.env.VITE_SUPABASE_PUBLISHABLE_KEY;
+      let authToken = import.meta.env.VITE_SUPABASE_PUBLISHABLE_KEY as string;
+      if (secureFunctionAuth) {
+        const {
+          data: { session },
+        } = await supabase.auth.getSession();
+        authToken = session?.access_token ?? authToken;
+      }
 
       const response = await fetch(DRAFT_URL, {
         method: "POST",
@@ -111,6 +125,8 @@ const AIDraftingEngine = () => {
           companyName: client?.name || "Company",
           industry: client?.industry || "",
           draftMode: selectedMode,
+          advancedMode,
+          strictValidation: advancedMode,
           noticeDetails: noticeDetails || undefined,
           stream: true,
         }),
@@ -122,8 +138,18 @@ const AIDraftingEngine = () => {
       if (response.status === 402) {
         throw new Error("AI credits exhausted. Please add credits to continue.");
       }
-      if (!response.ok || !response.body) {
-        throw new Error("Failed to generate draft. Please try again.");
+      if (!response.ok) {
+        let serverError = "Failed to generate draft. Please try again.";
+        try {
+          const data = await response.json();
+          serverError = data?.error || serverError;
+        } catch {
+          // keep default message
+        }
+        throw new Error(serverError);
+      }
+      if (!response.body) {
+        throw new Error("Failed to generate draft stream. Please try again.");
       }
 
       const reader = response.body.getReader();
@@ -295,6 +321,43 @@ const AIDraftingEngine = () => {
                 <p className="text-xs text-muted-foreground mt-1">
                   Providing notice details enables point-by-point rebuttal. Procedural objections are raised only if evidence supports them.
                 </p>
+              </div>
+
+              <div className="p-3 rounded-lg border border-border/50 bg-background/30">
+                <div className="flex items-center justify-between mb-2">
+                  <p className="text-sm font-medium text-foreground">Advanced Draft Mode</p>
+                  <button
+                    type="button"
+                    onClick={() => setAdvancedMode(prev => !prev)}
+                    className={`px-3 py-1 rounded-md text-xs font-medium transition-colors ${
+                      advancedMode
+                        ? "bg-cyan-500/20 text-cyan-300 border border-cyan-500/30"
+                        : "bg-muted text-muted-foreground border border-border"
+                    }`}
+                  >
+                    {advancedMode ? "Enabled" : "Disabled"}
+                  </button>
+                </div>
+                <p className="text-xs text-muted-foreground mb-2">
+                  Enabled: strict para-wise matrix, allegation-wise computation rebuttal, annexure mapping, and quality gates.
+                </p>
+                <div className="grid grid-cols-2 gap-2 text-xs">
+                  <p className={noticeLength >= 200 ? "text-green-400" : "text-yellow-400"}>
+                    {noticeLength >= 200 ? "✓" : "!"} Detailed notice text
+                  </p>
+                  <p className={hasDinOrRfn ? "text-green-400" : "text-yellow-400"}>
+                    {hasDinOrRfn ? "✓" : "!"} DIN/RFN reference
+                  </p>
+                  <p className={hasSectionReference ? "text-green-400" : "text-yellow-400"}>
+                    {hasSectionReference ? "✓" : "!"} Section/Rule references
+                  </p>
+                  <p className={hasAmount ? "text-green-400" : "text-yellow-400"}>
+                    {hasAmount ? "✓" : "!"} Demand/amount details
+                  </p>
+                  <p className={hasDate ? "text-green-400" : "text-yellow-400"}>
+                    {hasDate ? "✓" : "!"} Date timeline evidence
+                  </p>
+                </div>
               </div>
 
               {/* Generate Button */}
