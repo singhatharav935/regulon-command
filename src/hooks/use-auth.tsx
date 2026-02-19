@@ -24,6 +24,22 @@ const rolePriority: Record<AppRole, number> = {
 
 const sortRoles = (roles: AppRole[]) => [...roles].sort((a, b) => rolePriority[b] - rolePriority[a]);
 
+const withTimeout = async <T,>(promise: Promise<T>, timeoutMs: number, fallbackValue: T): Promise<T> => {
+  let timer: ReturnType<typeof setTimeout> | undefined;
+
+  const timeoutPromise = new Promise<T>((resolve) => {
+    timer = setTimeout(() => resolve(fallbackValue), timeoutMs);
+  });
+
+  const result = await Promise.race([promise, timeoutPromise]);
+
+  if (timer) {
+    clearTimeout(timer);
+  }
+
+  return result;
+};
+
 export const AuthProvider = ({ children }: { children: ReactNode }) => {
   const [loading, setLoading] = useState(true);
   const [session, setSession] = useState<Session | null>(null);
@@ -51,9 +67,12 @@ export const AuthProvider = ({ children }: { children: ReactNode }) => {
 
     const bootstrap = async () => {
       try {
-        const {
-          data: { session: initialSession },
-        } = await supabase.auth.getSession();
+        const sessionResponse = await withTimeout(
+          supabase.auth.getSession(),
+          3000,
+          { data: { session: null }, error: null },
+        );
+        const initialSession = sessionResponse.data.session;
 
         if (!mounted) return;
 
