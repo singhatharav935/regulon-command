@@ -34,11 +34,15 @@ const Auth = () => {
       }
     });
 
-    supabase.auth.getSession().then(({ data: { session } }) => {
-      if (session?.user) {
-        navigate(returnPath || "/app", { replace: true });
-      }
-    });
+    supabase.auth.getSession()
+      .then(({ data: { session } }) => {
+        if (session?.user) {
+          navigate(returnPath || "/app", { replace: true });
+        }
+      })
+      .catch((error) => {
+        console.warn("Initial session check failed on auth page.", error);
+      });
 
     return () => subscription.unsubscribe();
   }, [navigate, returnPath]);

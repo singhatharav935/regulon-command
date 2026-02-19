@@ -62,16 +62,14 @@ const Dashboard = () => {
   useEffect(() => {
     // Check auth status
     const checkAuth = async () => {
-      const { data: { session } } = await supabase.auth.getSession();
-      
-      // For demo purposes, we'll show the dashboard even without auth
-      // In production, uncomment below to require authentication
-      // if (!session) {
-      //   navigate("/auth");
-      //   return;
-      // }
-      
-      setIsLoading(false);
+      try {
+        await supabase.auth.getSession();
+      } catch (error) {
+        console.warn("Dashboard auth check failed, continuing in demo mode.", error);
+      } finally {
+        // For demo purposes, we always allow rendering.
+        setIsLoading(false);
+      }
     };
 
     checkAuth();

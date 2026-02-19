@@ -23,9 +23,14 @@ const CADashboard = () => {
 
   useEffect(() => {
     const checkAuth = async () => {
-      const { data: { session } } = await supabase.auth.getSession();
-      // Demo mode - show dashboard without auth
-      setIsLoading(false);
+      try {
+        await supabase.auth.getSession();
+      } catch (error) {
+        console.warn("CA dashboard auth check failed, continuing in demo mode.", error);
+      } finally {
+        // Demo mode - show dashboard without auth
+        setIsLoading(false);
+      }
     };
     checkAuth();
   }, [navigate]);
