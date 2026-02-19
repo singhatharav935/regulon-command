@@ -71,6 +71,41 @@ const initialReviewSteps: ReviewStep[] = [
   { id: 5, label: "Ready for Submission", status: "pending" },
 ];
 
+const documentFormatModules: Record<string, string[]> = {
+  "mca-notice": [
+    "Company law section mapping and default classification (procedural vs substantive).",
+    "Compounding/leniency pathway and rectification-status mapping.",
+  ],
+  "gst-show-cause": [
+    "Section-wise ITC and demand challenge matrix.",
+    "GSTR reconciliation and DRC computation rebuttal.",
+  ],
+  "income-tax-response": [
+    "Issue-wise addition/disallowance response mapping.",
+    "Penalty defense and reassessment validity block (where applicable).",
+  ],
+  "rbi-filing": [
+    "FEMA/RBI compliance narrative with proportionality framing.",
+    "Control-failure remediation and risk-mitigation matrix.",
+  ],
+  "sebi-compliance": [
+    "Disclosure and investor-impact framing under applicable regulations.",
+    "Governance-control and corrective-action matrix.",
+  ],
+  "customs-response": [
+    "Classification/valuation/exemption defense with section mapping.",
+    "Duty/interest/penalty/confiscation computation rebuttal table.",
+  ],
+  "contract-review": [
+    "Clause-by-clause enforceability and risk allocation analysis.",
+    "Redline recommendations with legal exposure notes.",
+  ],
+  "custom-draft": [
+    "Authority and governing law inference block from provided facts.",
+    "General regulatory response format with layered reliefs.",
+  ],
+};
+
 const AIDraftingEngine = () => {
   const [selectedClient, setSelectedClient] = useState<string>("");
   const [selectedDocType, setSelectedDocType] = useState<string>("");
@@ -80,6 +115,7 @@ const AIDraftingEngine = () => {
   const [isGenerating, setIsGenerating] = useState(false);
   const [draftGenerated, setDraftGenerated] = useState(false);
   const [draftContent, setDraftContent] = useState("");
+  const [showFormatDetails, setShowFormatDetails] = useState(false);
   const [currentSteps, setCurrentSteps] = useState<ReviewStep[]>(initialReviewSteps);
   const [generationError, setGenerationError] = useState<string | null>(null);
 
@@ -90,6 +126,8 @@ const AIDraftingEngine = () => {
   const hasSectionReference = /(Section|Sec\.|Rule|Regulation)\s*\d+/i.test(noticeDetails);
   const hasAmount = /(?:Rs\.?|INR|₹)\s?[\d,]+/i.test(noticeDetails);
   const hasDate = /\b\d{1,2}[\/.-]\d{1,2}[\/.-]\d{2,4}\b|\b\d{1,2}\s+[A-Za-z]{3,9}\s+\d{4}\b/.test(noticeDetails);
+  const selectedDocLabel = documentTypes.find(doc => doc.id === selectedDocType)?.label || "Selected Draft";
+  const docSpecificFormat = documentFormatModules[selectedDocType] || documentFormatModules["custom-draft"];
 
   const handleGenerateDraft = async () => {
     if (!selectedClient || !selectedDocType) return;
@@ -128,7 +166,7 @@ const AIDraftingEngine = () => {
           advancedMode,
           strictValidation: advancedMode,
           noticeDetails: noticeDetails || undefined,
-          stream: true,
+          stream: !advancedMode,
         }),
       });
 
@@ -148,6 +186,24 @@ const AIDraftingEngine = () => {
         }
         throw new Error(serverError);
       }
+      if (advancedMode) {
+        const data = await response.json();
+        const content = data?.draft as string | undefined;
+        if (!content) {
+          throw new Error("Advanced draft generation returned empty content.");
+        }
+        setDraftContent(content);
+        setDraftGenerated(true);
+        setShowFormatDetails(false);
+        setCurrentSteps(prev => prev.map(step => {
+          if (step.id === 1) return { ...step, status: "completed" as StepStatus };
+          if (step.id === 2) return { ...step, status: "current" as StepStatus };
+          return step;
+        }));
+        toast.success("Advanced filing-ready draft generated successfully!");
+        return;
+      }
+
       if (!response.body) {
         throw new Error("Failed to generate draft stream. Please try again.");
       }
@@ -190,6 +246,7 @@ const AIDraftingEngine = () => {
       }
 
       setDraftGenerated(true);
+      setShowFormatDetails(false);
       setCurrentSteps(prev => prev.map(step => {
         if (step.id === 1) return { ...step, status: "completed" as StepStatus };
         if (step.id === 2) return { ...step, status: "current" as StepStatus };
@@ -409,6 +466,50 @@ const AIDraftingEngine = () => {
               <p className="text-xs text-muted-foreground mt-2">
                 All edits are tracked line-by-line for audit compliance. Structure: Facts → Law → Application → Conclusion.
               </p>
+
+              {draftGenerated && (
+                <div className="mt-3">
+                  <Button
+                    type="button"
+                    variant="outline"
+                    className="w-full"
+                    onClick={() => setShowFormatDetails(prev => !prev)}
+                  >
+                    {showFormatDetails ? "Hide Draft Format Followed" : "View Draft Format Followed"}
+                  </Button>
+                </div>
+              )}
+
+              {draftGenerated && showFormatDetails && (
+                <div className="mt-3 p-4 rounded-lg border border-cyan-500/30 bg-cyan-500/5 text-sm space-y-3">
+                  <p className="font-medium text-cyan-300">
+                    Format Blueprint: {selectedDocLabel} ({advancedMode ? "Advanced Mode" : "Standard Mode"})
+                  </p>
+                  <ul className="space-y-1 text-muted-foreground list-disc pl-5">
+                    <li>Notice Header and Filing Caption</li>
+                    <li>Preliminary Submissions</li>
+                    <li>Facts and Chronology</li>
+                    <li>Issue-Wise Legal Submissions</li>
+                    <li>Evidence and Annexure Mapping</li>
+                    <li>Prayer / Relief Section with layered requests</li>
+                    <li>Authorized Signatory Block</li>
+                  </ul>
+                  {advancedMode && (
+                    <ul className="space-y-1 text-muted-foreground list-disc pl-5">
+                      <li>Notice Intelligence Snapshot</li>
+                      <li>Para-wise Rebuttal Matrix</li>
+                      <li>Computation Reconciliation Table</li>
+                      <li>Procedural Validity Check (fact-supported only)</li>
+                      <li>RUD vs Annexure Mapping</li>
+                    </ul>
+                  )}
+                  <ul className="space-y-1 text-muted-foreground list-disc pl-5">
+                    {docSpecificFormat.map((item) => (
+                      <li key={item}>{item}</li>
+                    ))}
+                  </ul>
+                </div>
+              )}
             </div>
           </div>
         </TabsContent>
