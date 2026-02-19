@@ -25,7 +25,7 @@ const getModeDescription = (draftMode: string): string => {
   const modes: Record<string, string> = {
     conservative: "Use cautious, compliance-first language. Minimize assertions. Focus on procedural compliance. Maximum protection of client interests. Formal, officer-friendly tone.",
     balanced: "Apply standard industry practice. Make reasonable assertions with proper documentation support. Balance assertiveness with compliance-focused language.",
-    aggressive: "Take a legally defensible but assertive stance. Challenge procedural irregularities where supported by facts. Assert client rights firmly while maintaining professional decorum."
+    aggressive: "Take a legally defensible but assertive stance. Challenge procedural irregularities where supported by facts. Assert client rights firmly while maintaining professional decorum.",
   };
   return modes[draftMode] || modes.balanced;
 };
@@ -38,151 +38,134 @@ GST-SPECIFIC INTELLIGENCE (apply only where relevant to the facts):
 - Rule 142 CGST Rules compliance
 - Revenue neutrality argument where applicable
 - Books vs Returns reconciliation, ITC eligibility with 2A/2B vs 3B analysis
-- ITC Defense (2026 Benchmark): For Section 16(2)(c) mismatches, cite Sahil Enterprises vs. Union of India (Tripura HC, Jan 2026). Argue that a bona fide purchaser cannot be penalized for a supplier's failure to remit tax; "reading down" the provision to protect genuine transactions is now the settled legal standard.
-- Penalty & interest non-applicability under Section 75(1)
-- Time limitation under Section 73(10)/74(10)
+- Penalty & interest non-applicability where law/facts support
+- Time limitation under the correct statutory framework
 
-PRAYERS:
-1. Drop the proceedings initiated vide the impugned SCN
-2. In the alternative, waive penalty under Section 125/Section 127
-3. Waive interest under Section 50
-4. Grant opportunity of personal hearing before passing any adverse order
-5. Any other relief deemed fit and proper
+MANDATORY GST OUTPUT BLOCKS:
+1. Allegation-wise rebuttal matrix against DRC/SCN computation
+2. ITC condition testing matrix under Section 16(2)
+3. Interest/penalty computation challenge table
+4. Annexure mapping for each disputed line item
 `,
     "income-tax-response": `
 INCOME TAX-SPECIFIC INTELLIGENCE (apply only where relevant):
 - Invoked sections analysis (143/147/148/139/194 etc.)
 - Source of income explanation with documentary proof
 - Disallowance rebuttal with legal reasoning
-- Penalty protection (Sections 270A/271AAC) where applicable
+- Penalty protection where applicable
 - Natural justice requirements and hearing rights
-- Time limitation and reopening validity (if 147/148 proceedings)
-
-PRAYERS:
-1. Drop the proposed addition/disallowance
-2. In case of any disallowance, delete the penalty proceedings
-3. Grant adequate opportunity of being heard
-4. Consider all documents placed on record
-5. Pass a speaking order with reasons
-6. Any other relief as deemed fit
+- Time limitation and reopening validity (if applicable)
 `,
     "mca-notice": `
 MCA-SPECIFIC INTELLIGENCE (apply only where relevant):
 - Companies Act 2013 section-wise analysis of sections invoked
-- Clearly distinguish procedural vs substantive default
-- Highlight mitigating factors, officer discretion, absence of public-interest prejudice
+- Distinguish procedural vs substantive default
+- Mitigating factors and rectification status
 - Compounding / leniency where permissible
-- First-time default / technical lapse arguments
-- COVID-19 / economic circumstances if relevant
-
-PRAYERS:
-1. Drop the proceedings / adjudication
-2. Accept the compounding application with minimum penalty
-3. Grant time to rectify the default
-4. Consider the bona fide nature of non-compliance
-5. Waive additional fees/penalty
-6. Any other relief as deemed fit
 `,
     "rbi-filing": `
 RBI-SPECIFIC INTELLIGENCE (apply only where relevant):
-- FEMA Act and relevant regulations analysis
-- Regulatory intent & proportionality
-- Compliance control mechanisms and internal controls in place
-- Risk mitigation measures adopted
-- No systemic harm / no forex loss to nation
-- Corrective action already taken
-- Regulator-respectful tone throughout
-
-PRAYERS:
-1. Drop the proceedings with no adverse action
-2. Accept the delayed filing/return with waiver of late fee
-3. Consider the technical nature of violation
-4. Grant compounding with minimum penalty
-5. Any other relief as deemed fit
+- FEMA/RBI regulations analysis
+- Regulatory intent and proportionality
+- Internal control and corrective action mapping
 `,
     "sebi-compliance": `
 SEBI-SPECIFIC INTELLIGENCE (apply only where relevant):
-- SEBI Act and relevant regulations analysis
-- Regulatory intent & proportionality
-- Investor protection not compromised
-- Disclosure norms compliance
-- No market manipulation / insider trading
-- Corporate governance framework and internal controls
-- Corrective actions taken
-
-PRAYERS:
-1. Drop the proceedings / show cause notice
-2. Accept the submission without penalty
-3. Grant opportunity of hearing before any adverse order
-4. Consider the remedial steps taken
-5. Pass a speaking order with reasons
-6. Any other relief as deemed fit
+- SEBI Act and regulations analysis
+- Investor protection impact
+- Disclosure and governance controls
 `,
     "customs-response": `
 CUSTOMS-SPECIFIC INTELLIGENCE (apply only where relevant):
-- Customs Act 1962 section-wise analysis of sections invoked
-- Classification, valuation, exemption logic as applicable
-- Limitation under Section 28 / extended period applicability
-- Absence of mens rea / suppression / misstatement
-- Proportional penalty principles under Section 112/114/114A/114AA
-- Revenue neutrality where credit is available
-- Reliance on HSN explanatory notes, trade notices, Board circulars
-
-PRAYERS:
-1. Drop the proceedings initiated vide the impugned SCN
-2. In the alternative, reduce the duty demand / penalty proportionally
-3. Waive interest under Section 28AA
-4. Set aside confiscation / redemption fine
-5. Grant opportunity of personal hearing
-6. Any other relief as deemed fit
+- Customs Act section-wise analysis
+- Classification/valuation/exemption logic
+- Limitation and extended period challenge where fact-supported
+- Penalty/confiscation and redemption fine challenge table
 `,
     "contract-review": `
-CONTRACT/LEGAL REVIEW INTELLIGENCE (apply only where relevant):
-- Defined terms interpretation
-- Contractual interpretation logic and enforceability
-- Risk allocation analysis
-- Safeguards and remedies available
-- Dispute resolution mechanism
-- Indemnity and liability provisions
-- Statutory compliance analysis
-
-SPECIFIC ELEMENTS:
-1. Analyze each clause for legal enforceability
-2. Identify ambiguous terms requiring clarification
-3. Assess risk allocation and mitigation
-4. Review compliance with applicable laws
-5. Recommend modifications where necessary
-6. Suggest protective language
+CONTRACT/LEGAL REVIEW INTELLIGENCE:
+- Clause-by-clause risk analysis
+- Enforceability and ambiguity checks
+- Liability/indemnity/dispute risk mapping
 `,
     "custom-draft": `
 CUSTOM REGULATORY DRAFT:
-- First identify the applicable authority and governing law from the context provided
-- Apply the closest regulatory framework logic
-- Follow standard regulatory response structure
-- Ensure filing-ready format with professional sign-off
-
-APPROACH:
-1. Identify regulatory authority from context
-2. Determine applicable Act/Rules/Regulations
-3. Structure response per regulatory norms
-4. Include relevant documentary evidence
-5. Frame appropriate prayers/reliefs
-`
+- Infer authority and governing framework from facts
+- Build a filing-ready legal response structure
+`,
   };
+
   return prompts[documentType] || prompts["custom-draft"];
 };
 
 const getAdvancedDraftingRequirements = () => `
-ADVANCED QUALITY GATES (MANDATORY WHEN ENABLED):
-1. Start with "Notice Intelligence Snapshot" capturing: authority, notice no., DIN/RFN, period, sections/rules invoked, total proposed demand, response deadline.
-2. Add "Para-wise Rebuttal Matrix" with columns: SCN Para/Issue -> Department Allegation -> Noticee Rebuttal -> Evidence Annexure -> Legal Basis.
-3. Add "Demand Computation Reconciliation" table: duty/tax, interest, penalty, confiscation/redemption fine with item-wise acceptance/rejection reasoning.
-4. Add "Procedural Validity Check" section (jurisdiction, limitation, service validity, natural justice), but raise objections only if fact-supported.
-5. Add "RUD vs Defence Evidence Mapping" section.
-6. Add "Missing Data Flags" section ONLY if critical data points are absent; do not fabricate unknown facts.
-7. Output must be hearing-ready and filing-ready in one document with complete layered prayer reliefs.
-8. Each major contention must cite at least one supporting factual input or annexure reference.
+ADVANCED QUALITY GATES (MANDATORY):
+1. Notice Intelligence Snapshot with authority, notice no., DIN/RFN, period, invoked provisions, demand breakup, response deadline.
+2. Para-wise Rebuttal Matrix: SCN para -> allegation -> rebuttal -> evidence -> legal basis.
+3. Computation Reconciliation table: tax/duty, interest, penalty, fine with accepted/disputed reasoning.
+4. Procedural validity checks (jurisdiction, limitation, service, natural justice) only if fact-supported.
+5. RUD-to-Annexure mapping and missing-data flags (never fabricate facts).
+6. Complete layered prayer and hearing request.
 `;
+
+const safeJsonParse = <T,>(raw: string): T | null => {
+  const cleaned = raw
+    .replace(/^```json\s*/i, "")
+    .replace(/^```\s*/i, "")
+    .replace(/```\s*$/i, "")
+    .trim();
+
+  try {
+    return JSON.parse(cleaned) as T;
+  } catch {
+    return null;
+  }
+};
+
+const aiRequest = async ({
+  apiKey,
+  messages,
+  stream,
+}: {
+  apiKey: string;
+  messages: Array<{ role: "system" | "user"; content: string }>;
+  stream: boolean;
+}) => {
+  return fetch("https://ai.gateway.lovable.dev/v1/chat/completions", {
+    method: "POST",
+    headers: {
+      Authorization: `Bearer ${apiKey}`,
+      "Content-Type": "application/json",
+    },
+    body: JSON.stringify({
+      model: "google/gemini-3-flash-preview",
+      messages,
+      stream,
+    }),
+  });
+};
+
+interface NoticeIntelligence {
+  notice_snapshot: {
+    authority: string | null;
+    notice_number: string | null;
+    din_rfn: string | null;
+    period: string | null;
+    response_deadline: string | null;
+    invoked_provisions: string[];
+    demand_total: string | null;
+  };
+  allegations: Array<{
+    scn_para: string;
+    allegation: string;
+    amount: string | null;
+    department_basis: string;
+    rebuttal_direction: string;
+    evidence_expected: string[];
+    legal_hooks: string[];
+  }>;
+  critical_missing_fields: string[];
+}
 
 serve(async (req) => {
   const corsHeaders = getCorsHeaders(req);
@@ -257,9 +240,7 @@ serve(async (req) => {
         }
 
         const roleSet = new Set((roleRows ?? []).map((row) => row.role));
-        const canDraft = roleSet.has("manager") || roleSet.has("admin");
-
-        if (!canDraft) {
+        if (!roleSet.has("manager") && !roleSet.has("admin")) {
           return new Response(JSON.stringify({ error: "Only CA/Admin users can generate drafts" }), {
             status: 403,
             headers: { ...corsHeaders, "Content-Type": "application/json" },
@@ -268,19 +249,17 @@ serve(async (req) => {
       }
     }
 
-    const { 
-      documentType, 
-      companyName, 
+    const {
+      documentType,
+      companyName,
       draftMode,
       industry,
       context,
       noticeDetails,
       advancedMode = false,
       strictValidation = false,
-      stream = false
+      stream = false,
     } = await req.json();
-
-    console.log("Generating filing-ready draft:", { documentType, companyName, draftMode, stream, userId });
 
     if (strictValidation && (!noticeDetails || noticeDetails.trim().length < 200)) {
       return new Response(JSON.stringify({
@@ -298,152 +277,230 @@ serve(async (req) => {
 
     const modeDescription = getModeDescription(draftMode);
     const documentTypePrompt = getDocumentTypePrompt(documentType);
-    const advancedRequirements = advancedMode ? getAdvancedDraftingRequirements() : "";
-    
+
+    let extractedNotice: NoticeIntelligence | null = null;
+
+    if (advancedMode && noticeDetails) {
+      const extractionSystemPrompt = `You are a legal drafting pre-processor for Indian compliance disputes.
+Return STRICT JSON only, no markdown.
+Schema:
+{
+  "notice_snapshot": {
+    "authority": string|null,
+    "notice_number": string|null,
+    "din_rfn": string|null,
+    "period": string|null,
+    "response_deadline": string|null,
+    "invoked_provisions": string[],
+    "demand_total": string|null
+  },
+  "allegations": [{
+    "scn_para": string,
+    "allegation": string,
+    "amount": string|null,
+    "department_basis": string,
+    "rebuttal_direction": string,
+    "evidence_expected": string[],
+    "legal_hooks": string[]
+  }],
+  "critical_missing_fields": string[]
+}
+If notice data is missing, list specific missing items in critical_missing_fields.`;
+
+      const extractionUserPrompt = `Extract notice intelligence for ${documentType} dispute.\n\nNOTICE TEXT:\n${noticeDetails}`;
+
+      const extractionResp = await aiRequest({
+        apiKey: LOVABLE_API_KEY,
+        stream: false,
+        messages: [
+          { role: "system", content: extractionSystemPrompt },
+          { role: "user", content: extractionUserPrompt },
+        ],
+      });
+
+      if (!extractionResp.ok) {
+        const errorText = await extractionResp.text();
+        throw new Error(`Notice extraction failed: ${extractionResp.status} ${errorText}`);
+      }
+
+      const extractionJson = await extractionResp.json();
+      const rawExtraction = extractionJson.choices?.[0]?.message?.content ?? "";
+      extractedNotice = safeJsonParse<NoticeIntelligence>(rawExtraction);
+
+      if (!extractedNotice) {
+        return new Response(JSON.stringify({
+          error: "Advanced extraction failed. Please paste the notice text with clear sections and amounts.",
+        }), {
+          status: 422,
+          headers: { ...corsHeaders, "Content-Type": "application/json" },
+        });
+      }
+
+      if (strictValidation && extractedNotice.critical_missing_fields.length > 0) {
+        return new Response(JSON.stringify({
+          error: `Missing critical details: ${extractedNotice.critical_missing_fields.join(", ")}`,
+          missing: extractedNotice.critical_missing_fields,
+        }), {
+          status: 422,
+          headers: { ...corsHeaders, "Content-Type": "application/json" },
+        });
+      }
+    }
+
     const systemPrompt = `ROLE & AUTHORITY
-You are a Senior Practicing Chartered Accountant & Regulatory Counsel with 15+ years experience in India, handling GST, Income Tax, MCA, RBI, SEBI, Customs, and Legal matters.
-Generate final, directly fileable regulatory drafts that are audit-ready, litigation-defensive, officer-persuasive, and professionally authored, assuming scrutiny by adjudicating authorities, senior officers, auditors, or courts.
+You are a Senior Practicing Chartered Accountant & Regulatory Counsel with 15+ years experience in India.
+Generate a final filing-ready legal draft that is adjudication-ready.
 
 NON-NEGOTIABLE OUTPUT RULES
-1. NEVER include words such as "AI-generated", "draft only", "requires verification", "system generated", or any similar disclaimers.
-2. Do NOT include CA countersignature, UDIN, certification, or firm verification unless explicitly instructed.
-3. Default sign-off must be: "For and on behalf of ${companyName}" / "Authorized Signatory" with placeholders for Name, Designation, Date, Place.
-4. The draft must read as professionally authored by the Noticee, not by any tool or system.
+1. No AI/self references or disclaimers.
+2. No fabricated facts or fabricated authorities.
+3. Do not overstate legal certainty; phrase disputed issues with defensible precision.
+4. Default sign-off: "For and on behalf of ${companyName}" and "Authorized Signatory" with placeholders.
 
 DRAFT MODE: ${draftMode.toUpperCase()}
 ${modeDescription}
 
-UNIVERSAL DRAFTING STANDARDS (apply to every draft):
-1. Follow Facts → Law → Application → Conclusion structure.
-2. Provide para-wise, point-by-point rebuttal ONLY where allegations exist in the notice; do NOT invent allegations.
-3. Include "Without prejudice to other rights and remedies" clause.
-4. No admission of liability unless expressly instructed.
-5. Protect intent by emphasizing (where factually supported):
-   - No mala fide intent
-   - No revenue loss to the exchequer
-   - Bona fide compliance
-   - Technical / clerical lapse
-6. Maintain formal, precise, non-emotional, officer-friendly legal tone (never aggressive by default).
-7. Always provide layered reliefs: Drop proceedings → Alternative relief (no penalty/interest/leniency) → Without-prejudice relief.
+UNIVERSAL STANDARDS
+1. Facts -> Law -> Application -> Conclusion.
+2. Para-wise rebuttal only for allegations present.
+3. "Without prejudice" clause.
+4. No admission unless expressly instructed.
+5. Layered reliefs in final prayer.
 
-TECHNICAL OBJECTIONS RULE (CRITICAL SAFETY LOGIC):
-- Raise objections relating to jurisdiction, limitation, DIN/RFN, procedural lapses, or violation of natural justice ONLY IF such defects are clearly supported by the notice text, dates, or records provided.
-- Do NOT raise technical objections by default or as a standard opening strategy.
-- RFN vs. DIN Rule: Per Circular 249/06/2025, portal-generated notices bearing a verifiable Reference Number (RFN) are valid service. Do NOT raise DIN-based objections if a valid RFN is present in the notice. Only challenge service validity where neither DIN nor RFN is traceable.
-- If no procedural defect is evident, proceed directly with substantive factual and legal defence.
+${getAdvancedDraftingRequirements()}
 
-COMPANY CONTEXT:
-- Company Name: ${companyName}
+DOMAIN DIRECTIVES
+${documentTypePrompt}
+
+COMPANY CONTEXT
+- Company: ${companyName}
 - Industry: ${industry || "Not specified"}
 - Document Type: ${documentType}
 
-${documentTypePrompt}
+${extractedNotice ? `EXTRACTED NOTICE INTELLIGENCE (use as primary structure source):\n${JSON.stringify(extractedNotice, null, 2)}` : ""}
 
-DOCUMENTARY EVIDENCE:
-- Always list and contextually refer to documentary evidence (corroborative, not defensive).
-- Number each document in an Annexure list at the end.
+${noticeDetails ? `RAW NOTICE DETAILS:\n${noticeDetails}` : ""}
+`;
 
-MANDATORY FINAL PRAYER:
-End every draft with a comprehensive prayer section containing layered reliefs:
-1. Drop proceedings
-2. No penalty
-3. No interest
-4. Natural justice / opportunity of hearing
-5. Any other relief as deemed fit and proper
+    const userMessage = context || `Generate a comprehensive, filing-ready ${documentType.replace(/-/g, " ")} for ${companyName}${industry ? ` (${industry} sector)` : ""}. Include para-wise rebuttal, allegation-wise computation challenge, annexure mapping, and complete prayer.`;
 
-OUTPUT FORMAT:
-- Clean headings with proper hierarchy
-- Numbered paragraphs (1.1, 1.2, etc.)
-- Filing-ready format
-- Professional sign-off: "For and on behalf of [Company Name]" with Name/Designation/Date/Place placeholders
-- The document must pass this internal quality check:
-  □ No contradictions
-  □ No admissions of liability
-  □ No weak or apologetic language
-  □ Reads like a senior CA/Counsel authored document
-  □ All paragraphs numbered properly
-  □ Documentary evidence listed and referenced
-  □ Prayer section complete with layered reliefs
-
-${advancedRequirements}
-
-${noticeDetails ? `
-NOTICE DETAILS PROVIDED BY CA:
-${noticeDetails}
-
-Address each point raised in the notice para-by-para with legal reasoning. Only raise technical/procedural objections if supported by the notice content above.
-` : ''}`;
-
-    const userMessage = context || `Generate a comprehensive, filing-ready ${documentType.replace(/-/g, " ")} for ${companyName}${industry ? ` (${industry} sector)` : ""}. Include all mandatory sections, documentary evidence requirements, and complete prayer with layered reliefs.${advancedMode ? " Advanced Mode is enabled, so include Notice Intelligence Snapshot, para-wise rebuttal matrix, demand reconciliation table, and RUD-to-annexure mapping." : ""} The document must be immediately ready for filing.`;
-
-    const response = await fetch("https://ai.gateway.lovable.dev/v1/chat/completions", {
-      method: "POST",
-      headers: {
-        Authorization: `Bearer ${LOVABLE_API_KEY}`,
-        "Content-Type": "application/json",
-      },
-      body: JSON.stringify({
-        model: "google/gemini-3-flash-preview",
+    if (!advancedMode) {
+      const response = await aiRequest({
+        apiKey: LOVABLE_API_KEY,
         messages: [
           { role: "system", content: systemPrompt },
-          { role: "user", content: userMessage }
+          { role: "user", content: userMessage },
         ],
-        stream: stream,
-      }),
-    });
+        stream,
+      });
 
-    if (!response.ok) {
-      const errorText = await response.text();
-      console.error("AI gateway error:", response.status, errorText);
-      
-      if (response.status === 429) {
-        return new Response(JSON.stringify({ 
-          error: "Rate limit exceeded. Please try again in a moment." 
-        }), {
-          status: 429,
-          headers: { ...corsHeaders, "Content-Type": "application/json" },
+      if (!response.ok) {
+        const errorText = await response.text();
+        if (response.status === 429) {
+          return new Response(JSON.stringify({ error: "Rate limit exceeded. Please try again in a moment." }), {
+            status: 429,
+            headers: { ...corsHeaders, "Content-Type": "application/json" },
+          });
+        }
+        if (response.status === 402) {
+          return new Response(JSON.stringify({ error: "AI credits exhausted. Please add credits to continue." }), {
+            status: 402,
+            headers: { ...corsHeaders, "Content-Type": "application/json" },
+          });
+        }
+        throw new Error(`AI gateway error: ${response.status} ${errorText}`);
+      }
+
+      if (stream) {
+        return new Response(response.body, {
+          headers: { ...corsHeaders, "Content-Type": "text/event-stream" },
         });
       }
-      
-      if (response.status === 402) {
-        return new Response(JSON.stringify({ 
-          error: "AI credits exhausted. Please add credits to continue." 
-        }), {
-          status: 402,
-          headers: { ...corsHeaders, "Content-Type": "application/json" },
-        });
-      }
-      
-      throw new Error(`AI gateway error: ${response.status}`);
-    }
 
-    if (stream) {
-      return new Response(response.body, {
-        headers: { ...corsHeaders, "Content-Type": "text/event-stream" },
+      const data = await response.json();
+      const draftContent = data.choices?.[0]?.message?.content || "";
+      return new Response(JSON.stringify({
+        draft: draftContent,
+        metadata: {
+          documentType,
+          companyName,
+          draftMode,
+          industry,
+          advancedMode,
+          generatedAt: new Date().toISOString(),
+          version: "2.0",
+        },
+      }), {
+        headers: { ...corsHeaders, "Content-Type": "application/json" },
       });
     }
 
-    const data = await response.json();
-    const draftContent = data.choices?.[0]?.message?.content || "";
+    // Advanced Mode: two-pass generation + quality review
+    const draftResp = await aiRequest({
+      apiKey: LOVABLE_API_KEY,
+      stream: false,
+      messages: [
+        { role: "system", content: systemPrompt },
+        { role: "user", content: userMessage },
+      ],
+    });
+
+    if (!draftResp.ok) {
+      const errorText = await draftResp.text();
+      throw new Error(`Advanced draft generation failed: ${draftResp.status} ${errorText}`);
+    }
+
+    const draftData = await draftResp.json();
+    const firstDraft = draftData.choices?.[0]?.message?.content || "";
+
+    const reviewerSystemPrompt = `You are final quality control counsel.
+Return ONLY improved final draft text (no commentary).
+Checklist:
+- complete notice snapshot
+- para-wise matrix present
+- computation rebuttal table present
+- procedural objections only if fact-supported
+- annexure mapping present
+- no placeholders unless truly unavailable
+- no contradictions or unsupported assertions`;
+
+    const reviewerResp = await aiRequest({
+      apiKey: LOVABLE_API_KEY,
+      stream: false,
+      messages: [
+        { role: "system", content: reviewerSystemPrompt },
+        { role: "user", content: firstDraft },
+      ],
+    });
+
+    if (!reviewerResp.ok) {
+      const errorText = await reviewerResp.text();
+      throw new Error(`Advanced review pass failed: ${reviewerResp.status} ${errorText}`);
+    }
+
+    const reviewedData = await reviewerResp.json();
+    const finalDraft = reviewedData.choices?.[0]?.message?.content || firstDraft;
 
     return new Response(JSON.stringify({
-      draft: draftContent,
+      draft: finalDraft,
       metadata: {
         documentType,
         companyName,
         draftMode,
         industry,
+        advancedMode,
+        userId,
         generatedAt: new Date().toISOString(),
-        version: "1.0",
-      }
+        version: "3.0-advanced",
+      },
+      intelligence: extractedNotice,
     }), {
       headers: { ...corsHeaders, "Content-Type": "application/json" },
     });
-
   } catch (error) {
     console.error("AI draft error:", error);
-    return new Response(JSON.stringify({ 
-      error: error instanceof Error ? error.message : "Unknown error" 
+    return new Response(JSON.stringify({
+      error: error instanceof Error ? error.message : "Unknown error",
     }), {
       status: 500,
       headers: { ...corsHeaders, "Content-Type": "application/json" },

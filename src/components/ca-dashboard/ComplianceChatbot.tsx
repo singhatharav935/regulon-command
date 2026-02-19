@@ -42,6 +42,7 @@ const ComplianceChatbot = () => {
   const textareaRef = useRef<HTMLTextAreaElement>(null);
 
   const CHAT_URL = `${import.meta.env.VITE_SUPABASE_URL}/functions/v1/compliance-chat`;
+  const secureFunctionAuth = import.meta.env.VITE_ENABLE_SECURE_FUNCTION_AUTH === "true";
 
   useEffect(() => {
     if (scrollAreaRef.current) {
@@ -50,11 +51,13 @@ const ComplianceChatbot = () => {
   }, [messages]);
 
   const streamChat = async (userMessages: Message[]) => {
-    const {
-      data: { session },
-    } = await supabase.auth.getSession();
-
-    const authToken = session?.access_token ?? import.meta.env.VITE_SUPABASE_PUBLISHABLE_KEY;
+    let authToken = import.meta.env.VITE_SUPABASE_PUBLISHABLE_KEY as string;
+    if (secureFunctionAuth) {
+      const {
+        data: { session },
+      } = await supabase.auth.getSession();
+      authToken = session?.access_token ?? authToken;
+    }
 
     const resp = await fetch(CHAT_URL, {
       method: "POST",
