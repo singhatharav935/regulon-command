@@ -1,4 +1,4 @@
-import { useState } from "react";
+import { useEffect, useState } from "react";
 import { motion } from "framer-motion";
 import { 
   FileText, 
@@ -184,6 +184,7 @@ const advancedChecksByType: Record<string, AdvancedCheck[]> = {
 const AIDraftingEngine = () => {
   const [selectedClient, setSelectedClient] = useState<string>("");
   const [selectedDocType, setSelectedDocType] = useState<string>("");
+  const [lastTemplateDocType, setLastTemplateDocType] = useState<string>("");
   const [selectedMode, setSelectedMode] = useState<string>("balanced");
   const [noticeDetails, setNoticeDetails] = useState<string>("");
   const [advancedMode, setAdvancedMode] = useState(true);
@@ -208,12 +209,26 @@ const AIDraftingEngine = () => {
   const docSpecificFormat = documentFormatModules[selectedDocType] || documentFormatModules["custom-draft"];
   const selectedTemplate = selectedDocType ? readyNoticeTemplates[selectedDocType] : "";
 
+  useEffect(() => {
+    if (!selectedDocType) return;
+
+    const prevTemplate = lastTemplateDocType ? readyNoticeTemplates[lastTemplateDocType] : "";
+    const currentText = noticeDetails.trim();
+    const canAutoReplace = currentText.length === 0 || (prevTemplate && currentText === prevTemplate);
+
+    if (canAutoReplace) {
+      setNoticeDetails(readyNoticeTemplates[selectedDocType] || "");
+      setLastTemplateDocType(selectedDocType);
+    }
+  }, [selectedDocType, lastTemplateDocType, noticeDetails]);
+
   const handleInsertTemplate = () => {
     if (!selectedDocType || !selectedTemplate) {
       toast.error("Select a document type first.");
       return;
     }
     setNoticeDetails(selectedTemplate);
+    setLastTemplateDocType(selectedDocType);
     toast.success("Ready 200+ template inserted.");
   };
 
