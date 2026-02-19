@@ -172,6 +172,18 @@ APPROACH:
   return prompts[documentType] || prompts["custom-draft"];
 };
 
+const getAdvancedDraftingRequirements = () => `
+ADVANCED QUALITY GATES (MANDATORY WHEN ENABLED):
+1. Start with "Notice Intelligence Snapshot" capturing: authority, notice no., DIN/RFN, period, sections/rules invoked, total proposed demand, response deadline.
+2. Add "Para-wise Rebuttal Matrix" with columns: SCN Para/Issue -> Department Allegation -> Noticee Rebuttal -> Evidence Annexure -> Legal Basis.
+3. Add "Demand Computation Reconciliation" table: duty/tax, interest, penalty, confiscation/redemption fine with item-wise acceptance/rejection reasoning.
+4. Add "Procedural Validity Check" section (jurisdiction, limitation, service validity, natural justice), but raise objections only if fact-supported.
+5. Add "RUD vs Defence Evidence Mapping" section.
+6. Add "Missing Data Flags" section ONLY if critical data points are absent; do not fabricate unknown facts.
+7. Output must be hearing-ready and filing-ready in one document with complete layered prayer reliefs.
+8. Each major contention must cite at least one supporting factual input or annexure reference.
+`;
+
 serve(async (req) => {
   const corsHeaders = getCorsHeaders(req);
 
@@ -263,10 +275,21 @@ serve(async (req) => {
       industry,
       context,
       noticeDetails,
+      advancedMode = false,
+      strictValidation = false,
       stream = false
     } = await req.json();
 
     console.log("Generating filing-ready draft:", { documentType, companyName, draftMode, stream, userId });
+
+    if (strictValidation && (!noticeDetails || noticeDetails.trim().length < 200)) {
+      return new Response(JSON.stringify({
+        error: "Advanced mode requires detailed notice/order content (minimum 200 characters).",
+      }), {
+        status: 400,
+        headers: { ...corsHeaders, "Content-Type": "application/json" },
+      });
+    }
 
     const LOVABLE_API_KEY = Deno.env.get("LOVABLE_API_KEY");
     if (!LOVABLE_API_KEY) {
@@ -275,6 +298,7 @@ serve(async (req) => {
 
     const modeDescription = getModeDescription(draftMode);
     const documentTypePrompt = getDocumentTypePrompt(documentType);
+    const advancedRequirements = advancedMode ? getAdvancedDraftingRequirements() : "";
     
     const systemPrompt = `ROLE & AUTHORITY
 You are a Senior Practicing Chartered Accountant & Regulatory Counsel with 15+ years experience in India, handling GST, Income Tax, MCA, RBI, SEBI, Customs, and Legal matters.
@@ -341,6 +365,8 @@ OUTPUT FORMAT:
   □ Documentary evidence listed and referenced
   □ Prayer section complete with layered reliefs
 
+${advancedRequirements}
+
 ${noticeDetails ? `
 NOTICE DETAILS PROVIDED BY CA:
 ${noticeDetails}
@@ -348,7 +374,7 @@ ${noticeDetails}
 Address each point raised in the notice para-by-para with legal reasoning. Only raise technical/procedural objections if supported by the notice content above.
 ` : ''}`;
 
-    const userMessage = context || `Generate a comprehensive, filing-ready ${documentType.replace(/-/g, ' ')} for ${companyName}${industry ? ` (${industry} sector)` : ''}. Include all mandatory sections, documentary evidence requirements, and complete prayer with layered reliefs. The document must be immediately ready for filing.`;
+    const userMessage = context || `Generate a comprehensive, filing-ready ${documentType.replace(/-/g, " ")} for ${companyName}${industry ? ` (${industry} sector)` : ""}. Include all mandatory sections, documentary evidence requirements, and complete prayer with layered reliefs.${advancedMode ? " Advanced Mode is enabled, so include Notice Intelligence Snapshot, para-wise rebuttal matrix, demand reconciliation table, and RUD-to-annexure mapping." : ""} The document must be immediately ready for filing.`;
 
     const response = await fetch("https://ai.gateway.lovable.dev/v1/chat/completions", {
       method: "POST",
