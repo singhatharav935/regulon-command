@@ -7,6 +7,7 @@ import {
   CreditCard,
   FileCheck2,
   GraduationCap,
+  Plus,
   Receipt,
   ShieldCheck,
   Users,
@@ -17,12 +18,14 @@ import { Badge } from "@/components/ui/badge";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import { supabase } from "@/integrations/supabase/client";
+import { useToast } from "@/hooks/use-toast";
 
 interface UniversityDashboardShellProps {
   mode: "demo" | "live";
 }
 
 type AdmissionItem = {
+  id?: string;
   application_number: string;
   applicant_name: string;
   program_applied: string;
@@ -36,6 +39,7 @@ type PeopleItem = {
 };
 
 type InvoiceItem = {
+  id?: string;
   invoice_number: string;
   amount: number;
   status: "issued" | "partially_paid" | "paid" | "overdue" | "draft";
@@ -59,6 +63,8 @@ type FilingItem = {
   status: "pending" | "in_progress" | "under_review" | "submitted" | "closed" | "overdue";
   reference_number: string | null;
 };
+
+type UniversityRole = "admin" | "registrar" | "finance" | "faculty" | "student" | "demo";
 
 const demoKpis = {
   students: 8450,
@@ -212,9 +218,13 @@ const statusClass: Record<string, string> = {
 
 const UniversityDashboardShell = ({ mode }: UniversityDashboardShellProps) => {
   const supabaseAny = supabase as any;
+  const { toast } = useToast();
 
   const [viewerName, setViewerName] = useState("University Team");
+  const [viewerRole, setViewerRole] = useState<UniversityRole>(mode === "demo" ? "demo" : "student");
+  const [universityId, setUniversityId] = useState<string | null>(null);
   const [source, setSource] = useState<"demo" | "live">("demo");
+  const [actionBusy, setActionBusy] = useState<string | null>(null);
   const [kpis, setKpis] = useState(demoKpis);
   const [admissions, setAdmissions] = useState<AdmissionItem[]>(demoAdmissions);
   const [students, setStudents] = useState<PeopleItem[]>(demoStudents);
@@ -227,6 +237,8 @@ const UniversityDashboardShell = ({ mode }: UniversityDashboardShellProps) => {
   useEffect(() => {
     if (mode === "demo") {
       setSource("demo");
+      setViewerRole("demo");
+      setUniversityId(null);
       return;
     }
 
@@ -249,25 +261,32 @@ const UniversityDashboardShell = ({ mode }: UniversityDashboardShellProps) => {
 
         const { data: membership } = await supabaseAny
           .from("university_members")
-          .select("university_id")
+          .select("university_id, role")
           .eq("user_id", user.id)
           .limit(1)
           .maybeSingle();
 
-        const universityId = membership?.university_id;
-        if (!universityId || !mounted) {
+        const scopedUniversityId = membership?.university_id;
+        if (!scopedUniversityId || !mounted) {
           setSource("demo");
+          setViewerRole("student");
+          setUniversityId(null);
           return;
         }
 
+        if (mounted) {
+          setUniversityId(scopedUniversityId);
+          setViewerRole((membership?.role as UniversityRole) || "student");
+        }
+
         const [studentsRes, facultyRes, admissionsRes, invoicesRes, tasksRes, filingsRes, evidenceRes] = await Promise.all([
-          supabaseAny.from("university_students").select("id, full_name, program, semester").eq("university_id", universityId).limit(5000),
-          supabaseAny.from("university_faculty").select("id, full_name, designation").eq("university_id", universityId).limit(2000),
-          supabaseAny.from("university_admissions").select("application_number, applicant_name, program_applied, status").eq("university_id", universityId).order("updated_at", { ascending: false }).limit(8),
-          supabaseAny.from("university_fee_invoices").select("invoice_number, total_amount, status, due_date").eq("university_id", universityId).order("created_at", { ascending: false }).limit(8),
-          supabaseAny.from("university_compliance_tasks").select("id, title, authority, due_date, priority, status").eq("university_id", universityId).order("due_date", { ascending: true }).limit(8),
-          supabaseAny.from("university_compliance_filings").select("id, filing_name, authority, period_label, status, reference_number").eq("university_id", universityId).order("updated_at", { ascending: false }).limit(8),
-          supabaseAny.from("university_compliance_evidence").select("id", { count: "exact", head: true }).eq("university_id", universityId),
+          supabaseAny.from("university_students").select("id, full_name, program, semester").eq("university_id", scopedUniversityId).limit(5000),
+          supabaseAny.from("university_faculty").select("id, full_name, designation").eq("university_id", scopedUniversityId).limit(2000),
+          supabaseAny.from("university_admissions").select("id, application_number, applicant_name, program_applied, status").eq("university_id", scopedUniversityId).order("updated_at", { ascending: false }).limit(8),
+          supabaseAny.from("university_fee_invoices").select("id, invoice_number, total_amount, status, due_date").eq("university_id", scopedUniversityId).order("created_at", { ascending: false }).limit(8),
+          supabaseAny.from("university_compliance_tasks").select("id, title, authority, due_date, priority, status").eq("university_id", scopedUniversityId).order("due_date", { ascending: true }).limit(8),
+          supabaseAny.from("university_compliance_filings").select("id, filing_name, authority, period_label, status, reference_number").eq("university_id", scopedUniversityId).order("updated_at", { ascending: false }).limit(8),
+          supabaseAny.from("university_compliance_evidence").select("id", { count: "exact", head: true }).eq("university_id", scopedUniversityId),
         ]);
 
         const studentsData = studentsRes.data ?? [];
@@ -309,15 +328,12 @@ const UniversityDashboardShell = ({ mode }: UniversityDashboardShellProps) => {
           }))
         );
 
-        setAdmissions(
-          admissionsData.length > 0
-            ? admissionsData
-            : demoAdmissions
-        );
+        setAdmissions(admissionsData.length > 0 ? admissionsData : demoAdmissions);
 
         setInvoices(
           invoicesData.length > 0
             ? invoicesData.map((inv: any) => ({
+                id: inv.id,
                 invoice_number: inv.invoice_number,
                 amount: Number(inv.total_amount || 0),
                 status: inv.status,
@@ -326,22 +342,14 @@ const UniversityDashboardShell = ({ mode }: UniversityDashboardShellProps) => {
             : demoInvoices
         );
 
-        setComplianceTasks(
-          tasksData.length > 0
-            ? tasksData
-            : demoComplianceTasks
-        );
-
-        setFilings(
-          filingsData.length > 0
-            ? filingsData
-            : demoFilings
-        );
-
+        setComplianceTasks(tasksData.length > 0 ? tasksData : demoComplianceTasks);
+        setFilings(filingsData.length > 0 ? filingsData : demoFilings);
         setEvidenceCount(typeof evidenceRes.count === "number" ? evidenceRes.count : 128);
       } catch {
         if (!mounted) return;
         setSource("demo");
+        setViewerRole("student");
+        setUniversityId(null);
       }
     };
 
@@ -352,18 +360,22 @@ const UniversityDashboardShell = ({ mode }: UniversityDashboardShellProps) => {
     };
   }, [mode, supabaseAny]);
 
-  const instituteName = mode === "demo"
-    ? "JAYPEE INSTITUTE OF INFORMATION TECHNOLOGY"
-    : source === "live"
-      ? "University Live Operations Workspace"
-      : "Your University Workspace (Demo Fallback)";
+  const instituteName =
+    mode === "demo"
+      ? "JAYPEE INSTITUTE OF INFORMATION TECHNOLOGY"
+      : source === "live"
+        ? "University Live Operations Workspace"
+        : "Your University Workspace (Demo Fallback)";
 
-  const admissionsBreakdown = useMemo(() => ({
-    submitted: admissions.filter((a) => a.status === "submitted").length,
-    under_review: admissions.filter((a) => a.status === "under_review").length,
-    accepted: admissions.filter((a) => a.status === "accepted").length,
-    rejected: admissions.filter((a) => a.status === "rejected").length,
-  }), [admissions]);
+  const admissionsBreakdown = useMemo(
+    () => ({
+      submitted: admissions.filter((a) => a.status === "submitted").length,
+      under_review: admissions.filter((a) => a.status === "under_review").length,
+      accepted: admissions.filter((a) => a.status === "accepted").length,
+      rejected: admissions.filter((a) => a.status === "rejected").length,
+    }),
+    [admissions]
+  );
 
   const feeSummary = useMemo(() => {
     const total = invoices.reduce((sum, inv) => sum + inv.amount, 0);
@@ -373,6 +385,276 @@ const UniversityDashboardShell = ({ mode }: UniversityDashboardShellProps) => {
       .reduce((sum, inv) => sum + inv.amount, 0);
     return { total, collected, outstanding };
   }, [invoices]);
+
+  const openFilings = useMemo(
+    () => filings.filter((f) => f.status !== "submitted" && f.status !== "closed").length || kpis.openFilings,
+    [filings, kpis.openFilings]
+  );
+
+  const isLiveWritable = mode === "live" && source === "live" && !!universityId;
+  const canManageAdmissions = viewerRole === "admin" || viewerRole === "registrar" || mode === "demo";
+  const canManageFinance = viewerRole === "admin" || viewerRole === "registrar" || viewerRole === "finance" || mode === "demo";
+  const canManageCompliance = viewerRole === "admin" || viewerRole === "registrar" || mode === "demo";
+
+  const nextAdmissionStatus = (status: AdmissionItem["status"]): AdmissionItem["status"] => {
+    if (status === "submitted") return "under_review";
+    if (status === "under_review") return "accepted";
+    return status;
+  };
+
+  const nextComplianceStatus = (status: ComplianceTaskItem["status"]): ComplianceTaskItem["status"] => {
+    if (status === "pending") return "in_progress";
+    if (status === "in_progress") return "under_review";
+    if (status === "under_review") return "submitted";
+    if (status === "submitted") return "closed";
+    return status;
+  };
+
+  const handleCreateAdmission = async () => {
+    if (!canManageAdmissions) return;
+    const seed = Date.now().toString().slice(-4);
+    const payload: AdmissionItem = {
+      application_number: `AUTO-${new Date().getFullYear()}-${seed}`,
+      applicant_name: "New Applicant",
+      program_applied: "Program Pending Allocation",
+      status: "submitted",
+    };
+
+    try {
+      setActionBusy("admission-create");
+      if (isLiveWritable) {
+        const { error } = await supabaseAny.from("university_admissions").insert({
+          university_id: universityId,
+          application_number: payload.application_number,
+          applicant_name: payload.applicant_name,
+          program_applied: payload.program_applied,
+          status: payload.status,
+        });
+        if (error) throw error;
+      }
+      setAdmissions((prev) => [payload, ...prev].slice(0, 8));
+      toast({ title: "Admission Added", description: "New application has been queued for review." });
+    } catch (error: any) {
+      toast({ title: "Action failed", description: error?.message ?? "Could not create admission.", variant: "destructive" });
+    } finally {
+      setActionBusy(null);
+    }
+  };
+
+  const handleAdvanceAdmission = async (admission: AdmissionItem) => {
+    if (!canManageAdmissions) return;
+    const nextStatus = nextAdmissionStatus(admission.status);
+    if (nextStatus === admission.status) return;
+
+    try {
+      setActionBusy(`admission-${admission.application_number}`);
+      if (isLiveWritable) {
+        const { error } = await supabaseAny
+          .from("university_admissions")
+          .update({ status: nextStatus })
+          .eq("university_id", universityId)
+          .eq("application_number", admission.application_number);
+        if (error) throw error;
+      }
+      setAdmissions((prev) =>
+        prev.map((item) =>
+          item.application_number === admission.application_number ? { ...item, status: nextStatus } : item
+        )
+      );
+      toast({ title: "Admission Updated", description: `Moved to ${nextStatus.replace("_", " ")}.` });
+    } catch (error: any) {
+      toast({ title: "Action failed", description: error?.message ?? "Could not update admission.", variant: "destructive" });
+    } finally {
+      setActionBusy(null);
+    }
+  };
+
+  const handleCreateInvoice = async () => {
+    if (!canManageFinance) return;
+    const seed = Date.now().toString().slice(-4);
+    const invoiceNumber = `INV-${new Date().getFullYear()}-${seed}`;
+    const dueDate = new Date();
+    dueDate.setDate(dueDate.getDate() + 14);
+    const payload: InvoiceItem = {
+      invoice_number: invoiceNumber,
+      amount: 125000,
+      status: "issued",
+      due_date: dueDate.toISOString().slice(0, 10),
+    };
+
+    try {
+      setActionBusy("invoice-create");
+      if (isLiveWritable) {
+        const { error } = await supabaseAny.from("university_fee_invoices").insert({
+          university_id: universityId,
+          invoice_number: payload.invoice_number,
+          total_amount: payload.amount,
+          due_date: payload.due_date,
+          status: payload.status,
+        });
+        if (error) throw error;
+      }
+      setInvoices((prev) => [payload, ...prev].slice(0, 8));
+      toast({ title: "Invoice Created", description: "Fee invoice is now visible in the collection queue." });
+    } catch (error: any) {
+      toast({ title: "Action failed", description: error?.message ?? "Could not create invoice.", variant: "destructive" });
+    } finally {
+      setActionBusy(null);
+    }
+  };
+
+  const handleMarkInvoicePaid = async (invoice: InvoiceItem) => {
+    if (!canManageFinance || invoice.status === "paid") return;
+
+    try {
+      setActionBusy(`invoice-${invoice.invoice_number}`);
+      if (isLiveWritable && invoice.id) {
+        const { error: invoiceError } = await supabaseAny
+          .from("university_fee_invoices")
+          .update({ status: "paid" })
+          .eq("id", invoice.id)
+          .eq("university_id", universityId);
+        if (invoiceError) throw invoiceError;
+
+        const { error: paymentError } = await supabaseAny.from("university_fee_payments").insert({
+          university_id: universityId,
+          invoice_id: invoice.id,
+          amount: invoice.amount,
+          paid_on: new Date().toISOString().slice(0, 10),
+          payment_method: "portal",
+          reference_number: `PAY-${Date.now().toString().slice(-6)}`,
+        });
+        if (paymentError) throw paymentError;
+      }
+      setInvoices((prev) =>
+        prev.map((item) =>
+          item.invoice_number === invoice.invoice_number ? { ...item, status: "paid" } : item
+        )
+      );
+      toast({ title: "Payment Recorded", description: `${invoice.invoice_number} marked as paid.` });
+    } catch (error: any) {
+      toast({ title: "Action failed", description: error?.message ?? "Could not record payment.", variant: "destructive" });
+    } finally {
+      setActionBusy(null);
+    }
+  };
+
+  const handleCreateTask = async () => {
+    if (!canManageCompliance) return;
+    const seed = Date.now().toString().slice(-4);
+    const dueDate = new Date();
+    dueDate.setDate(dueDate.getDate() + 10);
+    const payload: ComplianceTaskItem = {
+      id: `tmp-task-${seed}`,
+      title: "New Compliance Task",
+      authority: "UGC",
+      due_date: dueDate.toISOString().slice(0, 10),
+      priority: "medium",
+      status: "pending",
+    };
+
+    try {
+      setActionBusy("task-create");
+      if (isLiveWritable) {
+        const { error } = await supabaseAny.from("university_compliance_tasks").insert({
+          university_id: universityId,
+          title: payload.title,
+          authority: payload.authority,
+          due_date: payload.due_date,
+          priority: payload.priority,
+          status: payload.status,
+        });
+        if (error) throw error;
+      }
+      setComplianceTasks((prev) => [payload, ...prev].slice(0, 8));
+      toast({ title: "Task Added", description: "Compliance task has been added to the tracker." });
+    } catch (error: any) {
+      toast({ title: "Action failed", description: error?.message ?? "Could not create task.", variant: "destructive" });
+    } finally {
+      setActionBusy(null);
+    }
+  };
+
+  const handleAdvanceTask = async (task: ComplianceTaskItem) => {
+    if (!canManageCompliance) return;
+    const nextStatus = nextComplianceStatus(task.status);
+    if (nextStatus === task.status) return;
+
+    try {
+      setActionBusy(`task-${task.id}`);
+      if (isLiveWritable) {
+        const { error } = await supabaseAny
+          .from("university_compliance_tasks")
+          .update({ status: nextStatus })
+          .eq("id", task.id)
+          .eq("university_id", universityId);
+        if (error) throw error;
+      }
+      setComplianceTasks((prev) => prev.map((item) => (item.id === task.id ? { ...item, status: nextStatus } : item)));
+      toast({ title: "Task Progressed", description: `Task moved to ${nextStatus.replace("_", " ")}.` });
+    } catch (error: any) {
+      toast({ title: "Action failed", description: error?.message ?? "Could not progress task.", variant: "destructive" });
+    } finally {
+      setActionBusy(null);
+    }
+  };
+
+  const handleCreateFiling = async () => {
+    if (!canManageCompliance) return;
+    const seed = Date.now().toString().slice(-4);
+    const payload: FilingItem = {
+      id: `tmp-filing-${seed}`,
+      filing_name: "New Filing Pack",
+      authority: "AICTE",
+      period_label: `Cycle ${new Date().getFullYear()}`,
+      status: "pending",
+      reference_number: null,
+    };
+
+    try {
+      setActionBusy("filing-create");
+      if (isLiveWritable) {
+        const { error } = await supabaseAny.from("university_compliance_filings").insert({
+          university_id: universityId,
+          filing_name: payload.filing_name,
+          authority: payload.authority,
+          period_label: payload.period_label,
+          status: payload.status,
+        });
+        if (error) throw error;
+      }
+      setFilings((prev) => [payload, ...prev].slice(0, 8));
+      toast({ title: "Filing Added", description: "New filing draft is ready for preparation." });
+    } catch (error: any) {
+      toast({ title: "Action failed", description: error?.message ?? "Could not create filing.", variant: "destructive" });
+    } finally {
+      setActionBusy(null);
+    }
+  };
+
+  const handleAdvanceFiling = async (filing: FilingItem) => {
+    if (!canManageCompliance) return;
+    const nextStatus = nextComplianceStatus(filing.status);
+    if (nextStatus === filing.status) return;
+
+    try {
+      setActionBusy(`filing-${filing.id}`);
+      if (isLiveWritable) {
+        const { error } = await supabaseAny
+          .from("university_compliance_filings")
+          .update({ status: nextStatus })
+          .eq("id", filing.id)
+          .eq("university_id", universityId);
+        if (error) throw error;
+      }
+      setFilings((prev) => prev.map((item) => (item.id === filing.id ? { ...item, status: nextStatus } : item)));
+      toast({ title: "Filing Progressed", description: `Filing moved to ${nextStatus.replace("_", " ")}.` });
+    } catch (error: any) {
+      toast({ title: "Action failed", description: error?.message ?? "Could not progress filing.", variant: "destructive" });
+    } finally {
+      setActionBusy(null);
+    }
+  };
 
   return (
     <div className="min-h-screen bg-background">
@@ -396,6 +678,8 @@ const UniversityDashboardShell = ({ mode }: UniversityDashboardShellProps) => {
                 <Badge className={mode === "demo" ? "bg-cyan-500/20 text-cyan-300 border-cyan-500/40" : source === "live" ? "bg-green-500/20 text-green-300 border-green-500/40" : "bg-yellow-500/20 text-yellow-300 border-yellow-500/40"}>
                   {mode === "demo" ? "Demo Experience" : source === "live" ? "Live Workspace" : "Live Mode (Demo Data)"}
                 </Badge>
+                <Badge variant="outline">Role: {viewerRole}</Badge>
+                <Badge variant="outline">Phase 4 Controls</Badge>
                 <Button variant="outline" className="border-primary/30">
                   <Bell className="w-4 h-4 mr-2" />
                   Notifications
@@ -410,7 +694,7 @@ const UniversityDashboardShell = ({ mode }: UniversityDashboardShellProps) => {
             <Card className="bg-card/50 border-border/50"><CardHeader className="pb-2"><CardTitle className="text-xs text-muted-foreground">Programs</CardTitle></CardHeader><CardContent><p className="text-2xl font-semibold">{kpis.programs}</p></CardContent></Card>
             <Card className="bg-card/50 border-border/50"><CardHeader className="pb-2"><CardTitle className="text-xs text-muted-foreground">Fee Collection</CardTitle></CardHeader><CardContent><p className="text-2xl font-semibold">₹{kpis.feeCollectionCrore} Cr</p></CardContent></Card>
             <Card className="bg-card/50 border-border/50"><CardHeader className="pb-2"><CardTitle className="text-xs text-muted-foreground">Compliance Score</CardTitle></CardHeader><CardContent><p className="text-2xl font-semibold text-green-400">{kpis.complianceScore}%</p></CardContent></Card>
-            <Card className="bg-card/50 border-border/50"><CardHeader className="pb-2"><CardTitle className="text-xs text-muted-foreground">Open Filings</CardTitle></CardHeader><CardContent><p className="text-2xl font-semibold text-yellow-400">{kpis.openFilings}</p></CardContent></Card>
+            <Card className="bg-card/50 border-border/50"><CardHeader className="pb-2"><CardTitle className="text-xs text-muted-foreground">Open Filings</CardTitle></CardHeader><CardContent><p className="text-2xl font-semibold text-yellow-400">{openFilings}</p></CardContent></Card>
           </section>
 
           <section className="grid grid-cols-1 lg:grid-cols-3 gap-6">
@@ -459,7 +743,14 @@ const UniversityDashboardShell = ({ mode }: UniversityDashboardShellProps) => {
           <section className="grid grid-cols-1 lg:grid-cols-3 gap-6">
             <Card className="bg-card/50 border-border/50 lg:col-span-1">
               <CardHeader>
-                <CardTitle className="text-lg flex items-center gap-2"><GraduationCap className="w-5 h-5 text-primary" /> Admissions Pipeline</CardTitle>
+                <CardTitle className="text-lg flex items-center gap-2 justify-between">
+                  <span className="flex items-center gap-2"><GraduationCap className="w-5 h-5 text-primary" /> Admissions Pipeline</span>
+                  {canManageAdmissions ? (
+                    <Button size="sm" variant="outline" onClick={handleCreateAdmission} disabled={actionBusy === "admission-create"}>
+                      <Plus className="w-3 h-3 mr-1" /> Add
+                    </Button>
+                  ) : null}
+                </CardTitle>
               </CardHeader>
               <CardContent className="space-y-3">
                 <div className="grid grid-cols-2 gap-2 text-sm">
@@ -473,6 +764,17 @@ const UniversityDashboardShell = ({ mode }: UniversityDashboardShellProps) => {
                     <p className="text-sm font-medium">{a.applicant_name}</p>
                     <p className="text-xs text-muted-foreground">{a.application_number} • {a.program_applied}</p>
                     <p className={`text-xs mt-1 ${statusClass[a.status] || "text-muted-foreground"}`}>{a.status.replace("_", " ")}</p>
+                    {canManageAdmissions && (a.status === "submitted" || a.status === "under_review") ? (
+                      <Button
+                        size="sm"
+                        variant="ghost"
+                        className="h-7 mt-1 px-2"
+                        disabled={actionBusy === `admission-${a.application_number}`}
+                        onClick={() => void handleAdvanceAdmission(a)}
+                      >
+                        Move Next
+                      </Button>
+                    ) : null}
                   </div>
                 ))}
               </CardContent>
@@ -502,7 +804,14 @@ const UniversityDashboardShell = ({ mode }: UniversityDashboardShellProps) => {
 
             <Card className="bg-card/50 border-border/50 lg:col-span-1">
               <CardHeader>
-                <CardTitle className="text-lg flex items-center gap-2"><Receipt className="w-5 h-5 text-primary" /> Fees & Payments</CardTitle>
+                <CardTitle className="text-lg flex items-center gap-2 justify-between">
+                  <span className="flex items-center gap-2"><Receipt className="w-5 h-5 text-primary" /> Fees & Payments</span>
+                  {canManageFinance ? (
+                    <Button size="sm" variant="outline" onClick={handleCreateInvoice} disabled={actionBusy === "invoice-create"}>
+                      <Plus className="w-3 h-3 mr-1" /> Add
+                    </Button>
+                  ) : null}
+                </CardTitle>
               </CardHeader>
               <CardContent className="space-y-3">
                 <div className="grid grid-cols-1 gap-2 text-sm">
@@ -515,6 +824,17 @@ const UniversityDashboardShell = ({ mode }: UniversityDashboardShellProps) => {
                     <p className="text-sm font-medium">{inv.invoice_number}</p>
                     <p className="text-xs text-muted-foreground">₹{inv.amount.toLocaleString()} • Due {inv.due_date}</p>
                     <p className={`text-xs mt-1 ${statusClass[inv.status] || "text-muted-foreground"}`}>{inv.status.replace("_", " ")}</p>
+                    {canManageFinance && inv.status !== "paid" ? (
+                      <Button
+                        size="sm"
+                        variant="ghost"
+                        className="h-7 mt-1 px-2"
+                        disabled={actionBusy === `invoice-${inv.invoice_number}`}
+                        onClick={() => void handleMarkInvoicePaid(inv)}
+                      >
+                        Mark Paid
+                      </Button>
+                    ) : null}
                   </div>
                 ))}
               </CardContent>
@@ -524,9 +844,21 @@ const UniversityDashboardShell = ({ mode }: UniversityDashboardShellProps) => {
           <section className="grid grid-cols-1 lg:grid-cols-3 gap-6">
             <Card className="bg-card/50 border-border/50 lg:col-span-2">
               <CardHeader>
-                <CardTitle className="text-lg flex items-center gap-2">
-                  <ShieldCheck className="w-5 h-5 text-primary" />
-                  Compliance Command Center
+                <CardTitle className="text-lg flex items-center gap-2 justify-between">
+                  <span className="flex items-center gap-2">
+                    <ShieldCheck className="w-5 h-5 text-primary" />
+                    Compliance Command Center
+                  </span>
+                  {canManageCompliance ? (
+                    <div className="flex gap-2">
+                      <Button size="sm" variant="outline" onClick={handleCreateTask} disabled={actionBusy === "task-create"}>
+                        <Plus className="w-3 h-3 mr-1" /> Task
+                      </Button>
+                      <Button size="sm" variant="outline" onClick={handleCreateFiling} disabled={actionBusy === "filing-create"}>
+                        <Plus className="w-3 h-3 mr-1" /> Filing
+                      </Button>
+                    </div>
+                  ) : null}
                 </CardTitle>
               </CardHeader>
               <CardContent className="grid grid-cols-1 md:grid-cols-2 gap-4">
@@ -539,6 +871,17 @@ const UniversityDashboardShell = ({ mode }: UniversityDashboardShellProps) => {
                       <p className={`text-xs mt-1 ${statusClass[task.status] || "text-muted-foreground"}`}>
                         {task.status.replace("_", " ")} • {task.priority}
                       </p>
+                      {canManageCompliance && task.status !== "closed" ? (
+                        <Button
+                          size="sm"
+                          variant="ghost"
+                          className="h-7 mt-1 px-2"
+                          disabled={actionBusy === `task-${task.id}`}
+                          onClick={() => void handleAdvanceTask(task)}
+                        >
+                          Advance
+                        </Button>
+                      ) : null}
                     </div>
                   ))}
                 </div>
@@ -552,6 +895,17 @@ const UniversityDashboardShell = ({ mode }: UniversityDashboardShellProps) => {
                         {filing.status.replace("_", " ")}
                         {filing.reference_number ? ` • Ref ${filing.reference_number}` : ""}
                       </p>
+                      {canManageCompliance && filing.status !== "closed" ? (
+                        <Button
+                          size="sm"
+                          variant="ghost"
+                          className="h-7 mt-1 px-2"
+                          disabled={actionBusy === `filing-${filing.id}`}
+                          onClick={() => void handleAdvanceFiling(filing)}
+                        >
+                          Advance
+                        </Button>
+                      ) : null}
                     </div>
                   ))}
                 </div>
