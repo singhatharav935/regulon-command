@@ -1,32 +1,26 @@
 import { useEffect, useMemo, useState } from "react";
 import {
   AlertTriangle,
-  ArrowRight,
   BarChart3,
   Bell,
   Bot,
   BookOpen,
-  Building2,
-  CalendarClock,
   CheckCircle2,
+  ChevronRight,
   ClipboardList,
   CreditCard,
   FileCheck2,
   Filter,
-  Flame,
   GraduationCap,
   Landmark,
-  LineChart,
-  Lock,
+  LayoutDashboard,
   Plus,
   Receipt,
   School,
   Search,
   Settings,
-  ShieldAlert,
   ShieldCheck,
   Sparkles,
-  Target,
   Users,
   Workflow,
 } from "lucide-react";
@@ -189,7 +183,7 @@ const statusClass: Record<string, string> = {
   pending: "text-yellow-300",
   in_progress: "text-cyan-300",
   closed: "text-green-300",
-  submitted: "text-yellow-300",
+  submitted: "text-green-300",
   under_review: "text-cyan-300",
   accepted: "text-green-300",
   rejected: "text-red-300",
@@ -229,17 +223,19 @@ const roleProfile: Record<UniversityRole, { title: string; outcomes: string[]; d
 };
 
 const pageConfig: Array<{ id: DashboardPage; label: string; icon: any }> = [
-  { id: "executive", label: "Executive", icon: Landmark },
+  { id: "executive", label: "Executive Command", icon: LayoutDashboard },
   { id: "roledesk", label: "Role Desk", icon: School },
-  { id: "admissions", label: "Admissions", icon: GraduationCap },
-  { id: "academics", label: "Academics", icon: BookOpen },
-  { id: "facultyops", label: "Faculty Ops", icon: Users },
-  { id: "compliance", label: "Compliance", icon: ShieldCheck },
-  { id: "finance", label: "Finance", icon: Receipt },
-  { id: "workflow", label: "Workflow", icon: Workflow },
+  { id: "admissions", label: "Admissions Queue", icon: GraduationCap },
+  { id: "academics", label: "Academics Ops", icon: BookOpen },
+  { id: "facultyops", label: "Faculty Admin", icon: Users },
+  { id: "compliance", label: "Compliance Register", icon: ShieldCheck },
+  { id: "finance", label: "Finance Ledger", icon: Receipt },
+  { id: "workflow", label: "Approval Pipeline", icon: Workflow },
   { id: "copilot", label: "AI Copilot", icon: Bot },
-  { id: "analytics", label: "Analytics", icon: BarChart3 },
+  { id: "analytics", label: "Institution Analytics", icon: BarChart3 },
 ];
+
+const formatCurrency = (amount: number) => `₹${amount.toLocaleString()}`;
 
 const UniversityDashboardShell = ({ mode }: UniversityDashboardShellProps) => {
   const supabaseAny = supabase as any;
@@ -309,10 +305,10 @@ const UniversityDashboardShell = ({ mode }: UniversityDashboardShellProps) => {
         const [studentsRes, facultyRes, admissionsRes, invoicesRes, tasksRes, filingsRes, evidenceRes] = await Promise.all([
           supabaseAny.from("university_students").select("id, full_name, program, semester").eq("university_id", scopedUniversityId).limit(5000),
           supabaseAny.from("university_faculty").select("id, full_name, designation").eq("university_id", scopedUniversityId).limit(2000),
-          supabaseAny.from("university_admissions").select("id, application_number, applicant_name, program_applied, status").eq("university_id", scopedUniversityId).order("updated_at", { ascending: false }).limit(12),
-          supabaseAny.from("university_fee_invoices").select("id, invoice_number, total_amount, status, due_date").eq("university_id", scopedUniversityId).order("created_at", { ascending: false }).limit(12),
-          supabaseAny.from("university_compliance_tasks").select("id, title, authority, due_date, priority, status").eq("university_id", scopedUniversityId).order("due_date", { ascending: true }).limit(12),
-          supabaseAny.from("university_compliance_filings").select("id, filing_name, authority, period_label, status, reference_number").eq("university_id", scopedUniversityId).order("updated_at", { ascending: false }).limit(12),
+          supabaseAny.from("university_admissions").select("id, application_number, applicant_name, program_applied, status").eq("university_id", scopedUniversityId).order("updated_at", { ascending: false }).limit(20),
+          supabaseAny.from("university_fee_invoices").select("id, invoice_number, total_amount, status, due_date").eq("university_id", scopedUniversityId).order("created_at", { ascending: false }).limit(20),
+          supabaseAny.from("university_compliance_tasks").select("id, title, authority, due_date, priority, status").eq("university_id", scopedUniversityId).order("due_date", { ascending: true }).limit(20),
+          supabaseAny.from("university_compliance_filings").select("id, filing_name, authority, period_label, status, reference_number").eq("university_id", scopedUniversityId).order("updated_at", { ascending: false }).limit(20),
           supabaseAny.from("university_compliance_evidence").select("id", { count: "exact", head: true }).eq("university_id", scopedUniversityId),
         ]);
 
@@ -339,7 +335,7 @@ const UniversityDashboardShell = ({ mode }: UniversityDashboardShellProps) => {
         });
 
         setStudents(
-          studentsData.slice(0, 8).map((s: any) => ({
+          studentsData.slice(0, 12).map((s: any) => ({
             id: s.id,
             name: s.full_name,
             tag: `${s.program || "Program"}${s.semester ? ` • Sem ${s.semester}` : ""}`,
@@ -347,7 +343,7 @@ const UniversityDashboardShell = ({ mode }: UniversityDashboardShellProps) => {
         );
 
         setFaculty(
-          facultyData.slice(0, 8).map((f: any) => ({
+          facultyData.slice(0, 12).map((f: any) => ({
             id: f.id,
             name: f.full_name,
             tag: f.designation || "Faculty",
@@ -456,14 +452,6 @@ const UniversityDashboardShell = ({ mode }: UniversityDashboardShellProps) => {
     { title: "Publish weekly VC brief", owner: "Admin", sla: "EOD", risk: "low" },
   ];
 
-  const roleActions: Record<UniversityRole, string[]> = {
-    admin: ["Approve final filings", "Escalate risky workflows", "Review cross-team SLA dashboard"],
-    registrar: ["Process admissions queue", "Validate academic records", "Forward filing pack to final sign-off"],
-    finance: ["Raise invoices", "Mark payments and reconcile", "Track outstanding bucket and scholarship impact"],
-    faculty: ["Upload evidence and metrics", "Close department compliance tasks", "Submit data to registrar review"],
-    student: ["Check application/payment status", "Raise service ticket", "Upload requested documents"],
-  };
-
   const workflowTrail = [
     { stage: "Maker", actor: "Department Coordinator", status: "completed", timestamp: "2026-02-18 10:32" },
     { stage: "Reviewer", actor: "Registrar Office", status: "completed", timestamp: "2026-02-18 15:05" },
@@ -519,7 +507,7 @@ const UniversityDashboardShell = ({ mode }: UniversityDashboardShellProps) => {
         });
         if (error) throw error;
       }
-      setAdmissions((prev) => [payload, ...prev].slice(0, 12));
+      setAdmissions((prev) => [payload, ...prev].slice(0, 20));
       toast({ title: "Admission Added", description: "New application has been queued for review." });
     } catch (error: any) {
       toast({ title: "Action failed", description: error?.message ?? "Could not create admission.", variant: "destructive" });
@@ -581,7 +569,7 @@ const UniversityDashboardShell = ({ mode }: UniversityDashboardShellProps) => {
         });
         if (error) throw error;
       }
-      setInvoices((prev) => [payload, ...prev].slice(0, 12));
+      setInvoices((prev) => [payload, ...prev].slice(0, 20));
       toast({ title: "Invoice Created", description: "Fee invoice added to finance queue." });
     } catch (error: any) {
       toast({ title: "Action failed", description: error?.message ?? "Could not create invoice.", variant: "destructive" });
@@ -649,7 +637,7 @@ const UniversityDashboardShell = ({ mode }: UniversityDashboardShellProps) => {
         });
         if (error) throw error;
       }
-      setComplianceTasks((prev) => [payload, ...prev].slice(0, 12));
+      setComplianceTasks((prev) => [payload, ...prev].slice(0, 20));
       toast({ title: "Task Added", description: "Compliance task has been added." });
     } catch (error: any) {
       toast({ title: "Action failed", description: error?.message ?? "Could not create task.", variant: "destructive" });
@@ -706,7 +694,7 @@ const UniversityDashboardShell = ({ mode }: UniversityDashboardShellProps) => {
         });
         if (error) throw error;
       }
-      setFilings((prev) => [payload, ...prev].slice(0, 12));
+      setFilings((prev) => [payload, ...prev].slice(0, 20));
       toast({ title: "Filing Added", description: "New filing draft is ready." });
     } catch (error: any) {
       toast({ title: "Action failed", description: error?.message ?? "Could not create filing.", variant: "destructive" });
@@ -739,391 +727,563 @@ const UniversityDashboardShell = ({ mode }: UniversityDashboardShellProps) => {
     }
   };
 
+  const renderRoleDesk = () => (
+    <div className="grid grid-cols-1 lg:grid-cols-3 gap-4">
+      <Card className="bg-card/50 border-border/50 lg:col-span-2">
+        <CardHeader>
+          <CardTitle className="text-lg flex items-center gap-2"><School className="w-5 h-5 text-primary" /> {roleProfile[effectiveRole].title} Desk</CardTitle>
+        </CardHeader>
+        <CardContent className="space-y-2 text-sm">
+          {roleProfile[effectiveRole].outcomes.map((line) => (
+            <div key={line} className="rounded border border-border/50 px-3 py-2">{line}</div>
+          ))}
+        </CardContent>
+      </Card>
+      <Card className="bg-card/50 border-border/50">
+        <CardHeader>
+          <CardTitle className="text-lg flex items-center gap-2"><ClipboardList className="w-5 h-5 text-primary" /> My SLA Queue</CardTitle>
+        </CardHeader>
+        <CardContent className="space-y-2 text-sm">
+          {actionQueue.slice(0, 5).map((a) => (
+            <div key={a.title} className="rounded border border-border/50 px-3 py-2">
+              <p>{a.title}</p>
+              <p className="text-xs text-muted-foreground mt-1">{a.owner} • SLA {a.sla} • {a.risk}</p>
+            </div>
+          ))}
+        </CardContent>
+      </Card>
+    </div>
+  );
+
+  const renderExecutive = () => (
+    <div className="space-y-4">
+      <div className="grid grid-cols-1 sm:grid-cols-2 xl:grid-cols-4 gap-4">
+        <Card className="bg-card/50 border-border/50"><CardHeader className="pb-2"><CardTitle className="text-xs text-muted-foreground">Critical Alerts</CardTitle></CardHeader><CardContent><p className="text-2xl font-semibold text-red-300">{complianceSummary.criticalAlerts}</p></CardContent></Card>
+        <Card className="bg-card/50 border-border/50"><CardHeader className="pb-2"><CardTitle className="text-xs text-muted-foreground">At-Risk Filings</CardTitle></CardHeader><CardContent><p className="text-2xl font-semibold text-yellow-300">{complianceSummary.atRiskFilings}</p></CardContent></Card>
+        <Card className="bg-card/50 border-border/50"><CardHeader className="pb-2"><CardTitle className="text-xs text-muted-foreground">Pending Approvals</CardTitle></CardHeader><CardContent><p className="text-2xl font-semibold text-cyan-300">{complianceSummary.pendingApprovals}</p></CardContent></Card>
+        <Card className="bg-card/50 border-border/50"><CardHeader className="pb-2"><CardTitle className="text-xs text-muted-foreground">Collection Velocity</CardTitle></CardHeader><CardContent><p className="text-2xl font-semibold">{feeSummary.velocity}%</p></CardContent></Card>
+      </div>
+
+      <Card className="bg-card/50 border-border/50">
+        <CardHeader>
+          <CardTitle className="text-lg flex items-center gap-2"><Landmark className="w-5 h-5 text-primary" /> Institutional War-Room Queue</CardTitle>
+        </CardHeader>
+        <CardContent>
+          <div className="overflow-x-auto">
+            <table className="w-full text-sm">
+              <thead>
+                <tr className="text-left text-muted-foreground border-b border-border/50">
+                  <th className="py-2 pr-4">Action</th>
+                  <th className="py-2 pr-4">Owner</th>
+                  <th className="py-2 pr-4">SLA</th>
+                  <th className="py-2 pr-4">Risk</th>
+                  <th className="py-2 pr-4">Next</th>
+                </tr>
+              </thead>
+              <tbody>
+                {actionQueue.map((row) => (
+                  <tr key={row.title} className="border-b border-border/30">
+                    <td className="py-2 pr-4">{row.title}</td>
+                    <td className="py-2 pr-4">{row.owner}</td>
+                    <td className="py-2 pr-4">{row.sla}</td>
+                    <td className={`py-2 pr-4 ${row.risk === "high" ? "text-red-300" : row.risk === "medium" ? "text-yellow-300" : "text-green-300"}`}>{row.risk}</td>
+                    <td className="py-2 pr-4"><Button size="sm" variant="ghost">Open</Button></td>
+                  </tr>
+                ))}
+              </tbody>
+            </table>
+          </div>
+        </CardContent>
+      </Card>
+    </div>
+  );
+
+  const renderAdmissions = () => (
+    <Card className="bg-card/50 border-border/50">
+      <CardHeader>
+        <CardTitle className="text-lg flex items-center justify-between gap-2">
+          <span className="flex items-center gap-2"><GraduationCap className="w-5 h-5 text-primary" /> Admissions Processing Queue</span>
+          <div className="flex gap-2">
+            <Badge variant="outline">Submitted {admissionsBreakdown.submitted}</Badge>
+            <Badge variant="outline">Review {admissionsBreakdown.under_review}</Badge>
+            {canManageAdmissions ? <Button size="sm" variant="outline" onClick={handleCreateAdmission} disabled={actionBusy === "admission-create"}><Plus className="w-3 h-3 mr-1" /> New App</Button> : null}
+          </div>
+        </CardTitle>
+      </CardHeader>
+      <CardContent>
+        <div className="overflow-x-auto">
+          <table className="w-full text-sm">
+            <thead>
+              <tr className="text-left text-muted-foreground border-b border-border/50">
+                <th className="py-2 pr-4">Application No.</th>
+                <th className="py-2 pr-4">Applicant</th>
+                <th className="py-2 pr-4">Program</th>
+                <th className="py-2 pr-4">Status</th>
+                <th className="py-2 pr-4">Actions</th>
+              </tr>
+            </thead>
+            <tbody>
+              {admissions.slice(0, 12).map((a) => (
+                <tr key={a.application_number} className="border-b border-border/30">
+                  <td className="py-2 pr-4">{a.application_number}</td>
+                  <td className="py-2 pr-4">{a.applicant_name}</td>
+                  <td className="py-2 pr-4">{a.program_applied}</td>
+                  <td className={`py-2 pr-4 ${statusClass[a.status] || "text-muted-foreground"}`}>{a.status.replace("_", " ")}</td>
+                  <td className="py-2 pr-4 flex gap-2">
+                    <Button size="sm" variant="ghost">Open</Button>
+                    {canManageAdmissions && (a.status === "submitted" || a.status === "under_review") ? (
+                      <Button size="sm" variant="ghost" disabled={actionBusy === `admission-${a.application_number}`} onClick={() => void handleAdvanceAdmission(a)}>Move Next</Button>
+                    ) : null}
+                  </td>
+                </tr>
+              ))}
+            </tbody>
+          </table>
+        </div>
+      </CardContent>
+    </Card>
+  );
+
+  const renderAcademics = () => (
+    <div className="grid grid-cols-1 lg:grid-cols-3 gap-4">
+      <Card className="bg-card/50 border-border/50 lg:col-span-2">
+        <CardHeader>
+          <CardTitle className="text-lg flex items-center gap-2"><BookOpen className="w-5 h-5 text-primary" /> Academic Operations Register</CardTitle>
+        </CardHeader>
+        <CardContent>
+          <div className="overflow-x-auto">
+            <table className="w-full text-sm">
+              <thead>
+                <tr className="text-left text-muted-foreground border-b border-border/50">
+                  <th className="py-2 pr-4">Department</th>
+                  <th className="py-2 pr-4">Timetable</th>
+                  <th className="py-2 pr-4">Assessments</th>
+                  <th className="py-2 pr-4">Attendance</th>
+                  <th className="py-2 pr-4">Status</th>
+                </tr>
+              </thead>
+              <tbody>
+                {[
+                  ["CSE", "100%", "94%", "96%", "healthy"],
+                  ["ECE", "96%", "92%", "91%", "watch"],
+                  ["Biotech", "92%", "86%", "89%", "watch"],
+                  ["MBA", "98%", "95%", "93%", "healthy"],
+                ].map((row) => (
+                  <tr key={row[0]} className="border-b border-border/30">
+                    <td className="py-2 pr-4">{row[0]}</td>
+                    <td className="py-2 pr-4">{row[1]}</td>
+                    <td className="py-2 pr-4">{row[2]}</td>
+                    <td className="py-2 pr-4">{row[3]}</td>
+                    <td className={`py-2 pr-4 ${row[4] === "healthy" ? "text-green-300" : "text-yellow-300"}`}>{row[4]}</td>
+                  </tr>
+                ))}
+              </tbody>
+            </table>
+          </div>
+        </CardContent>
+      </Card>
+      <Card className="bg-card/50 border-border/50">
+        <CardHeader>
+          <CardTitle className="text-lg flex items-center gap-2"><AlertTriangle className="w-5 h-5 text-primary" /> Academic Alerts</CardTitle>
+        </CardHeader>
+        <CardContent className="space-y-2 text-sm">
+          <div className="rounded border border-border/50 px-3 py-2">2 departments pending assessment closure.</div>
+          <div className="rounded border border-border/50 px-3 py-2">4 course plans awaiting HOD approval.</div>
+          <div className="rounded border border-border/50 px-3 py-2">Semester moderation due in 3 days.</div>
+        </CardContent>
+      </Card>
+    </div>
+  );
+
+  const renderFacultyOps = () => (
+    <Card className="bg-card/50 border-border/50">
+      <CardHeader>
+        <CardTitle className="text-lg flex items-center gap-2"><Users className="w-5 h-5 text-primary" /> Faculty Workload and Approvals</CardTitle>
+      </CardHeader>
+      <CardContent>
+        <div className="overflow-x-auto">
+          <table className="w-full text-sm">
+            <thead>
+              <tr className="text-left text-muted-foreground border-b border-border/50">
+                <th className="py-2 pr-4">Faculty</th>
+                <th className="py-2 pr-4">Role</th>
+                <th className="py-2 pr-4">Workload</th>
+                <th className="py-2 pr-4">Leave</th>
+                <th className="py-2 pr-4">Appraisal</th>
+              </tr>
+            </thead>
+            <tbody>
+              {faculty.slice(0, 10).map((f, idx) => (
+                <tr key={f.id} className="border-b border-border/30">
+                  <td className="py-2 pr-4">{f.name}</td>
+                  <td className="py-2 pr-4">{f.tag}</td>
+                  <td className="py-2 pr-4">{90 - (idx % 4) * 5}%</td>
+                  <td className="py-2 pr-4">{idx % 3 === 0 ? "Pending" : "Clear"}</td>
+                  <td className="py-2 pr-4">{idx % 2 === 0 ? "Submitted" : "Due"}</td>
+                </tr>
+              ))}
+            </tbody>
+          </table>
+        </div>
+      </CardContent>
+    </Card>
+  );
+
+  const renderCompliance = () => (
+    <div className="grid grid-cols-1 lg:grid-cols-3 gap-4">
+      <Card className="bg-card/50 border-border/50 lg:col-span-2">
+        <CardHeader>
+          <CardTitle className="text-lg flex items-center justify-between gap-2">
+            <span className="flex items-center gap-2"><ShieldCheck className="w-5 h-5 text-primary" /> Compliance Task and Filing Register</span>
+            <div className="flex gap-2">
+              {canManageCompliance ? <Button size="sm" variant="outline" onClick={handleCreateTask} disabled={actionBusy === "task-create"}><Plus className="w-3 h-3 mr-1" /> Task</Button> : null}
+              {canManageCompliance ? <Button size="sm" variant="outline" onClick={handleCreateFiling} disabled={actionBusy === "filing-create"}><Plus className="w-3 h-3 mr-1" /> Filing</Button> : null}
+            </div>
+          </CardTitle>
+        </CardHeader>
+        <CardContent className="space-y-4">
+          <div className="overflow-x-auto">
+            <table className="w-full text-sm">
+              <thead>
+                <tr className="text-left text-muted-foreground border-b border-border/50">
+                  <th className="py-2 pr-4">Task</th>
+                  <th className="py-2 pr-4">Authority</th>
+                  <th className="py-2 pr-4">Due</th>
+                  <th className="py-2 pr-4">Priority</th>
+                  <th className="py-2 pr-4">Status</th>
+                  <th className="py-2 pr-4">Action</th>
+                </tr>
+              </thead>
+              <tbody>
+                {complianceTasks.slice(0, 10).map((t) => (
+                  <tr key={t.id} className="border-b border-border/30">
+                    <td className="py-2 pr-4">{t.title}</td>
+                    <td className="py-2 pr-4">{t.authority}</td>
+                    <td className="py-2 pr-4">{t.due_date ?? "TBD"}</td>
+                    <td className="py-2 pr-4">{t.priority}</td>
+                    <td className={`py-2 pr-4 ${statusClass[t.status] || "text-muted-foreground"}`}>{t.status.replace("_", " ")}</td>
+                    <td className="py-2 pr-4">{canManageCompliance && t.status !== "closed" ? <Button size="sm" variant="ghost" disabled={actionBusy === `task-${t.id}`} onClick={() => void handleAdvanceTask(t)}>Advance</Button> : "-"}</td>
+                  </tr>
+                ))}
+              </tbody>
+            </table>
+          </div>
+
+          <div className="overflow-x-auto">
+            <table className="w-full text-sm">
+              <thead>
+                <tr className="text-left text-muted-foreground border-b border-border/50">
+                  <th className="py-2 pr-4">Filing</th>
+                  <th className="py-2 pr-4">Authority</th>
+                  <th className="py-2 pr-4">Period</th>
+                  <th className="py-2 pr-4">Status</th>
+                  <th className="py-2 pr-4">Reference</th>
+                  <th className="py-2 pr-4">Action</th>
+                </tr>
+              </thead>
+              <tbody>
+                {filings.slice(0, 10).map((f) => (
+                  <tr key={f.id} className="border-b border-border/30">
+                    <td className="py-2 pr-4">{f.filing_name}</td>
+                    <td className="py-2 pr-4">{f.authority}</td>
+                    <td className="py-2 pr-4">{f.period_label ?? "Current"}</td>
+                    <td className={`py-2 pr-4 ${statusClass[f.status] || "text-muted-foreground"}`}>{f.status.replace("_", " ")}</td>
+                    <td className="py-2 pr-4">{f.reference_number ?? "-"}</td>
+                    <td className="py-2 pr-4">{canManageCompliance && f.status !== "closed" ? <Button size="sm" variant="ghost" disabled={actionBusy === `filing-${f.id}`} onClick={() => void handleAdvanceFiling(f)}>Advance</Button> : "-"}</td>
+                  </tr>
+                ))}
+              </tbody>
+            </table>
+          </div>
+        </CardContent>
+      </Card>
+
+      <Card className="bg-card/50 border-border/50">
+        <CardHeader>
+          <CardTitle className="text-lg flex items-center gap-2"><FileCheck2 className="w-5 h-5 text-primary" /> Compliance Heatmap</CardTitle>
+        </CardHeader>
+        <CardContent className="space-y-3">
+          {complianceHeatmap.map((h) => (
+            <div key={h.authority} className="rounded border border-border/50 px-3 py-2">
+              <div className="flex justify-between text-sm">
+                <span>{h.authority}</span>
+                <span className="text-cyan-300">{h.score}%</span>
+              </div>
+              <div className="h-2 bg-muted/30 rounded mt-2 overflow-hidden">
+                <div className="h-full bg-cyan-400" style={{ width: `${h.score}%` }} />
+              </div>
+              <p className="text-xs text-muted-foreground mt-1">Open: {h.openItems}</p>
+            </div>
+          ))}
+          <div className="rounded border border-border/50 px-3 py-2 text-sm">
+            Evidence mapped: <span className="text-green-300 font-medium">{evidenceCount}</span>
+          </div>
+        </CardContent>
+      </Card>
+    </div>
+  );
+
+  const renderFinance = () => (
+    <Card className="bg-card/50 border-border/50">
+      <CardHeader>
+        <CardTitle className="text-lg flex items-center justify-between gap-2">
+          <span className="flex items-center gap-2"><CreditCard className="w-5 h-5 text-primary" /> Finance Ledger and Reconciliation</span>
+          {canManageFinance ? <Button size="sm" variant="outline" onClick={handleCreateInvoice} disabled={actionBusy === "invoice-create"}><Plus className="w-3 h-3 mr-1" /> New Invoice</Button> : null}
+        </CardTitle>
+      </CardHeader>
+      <CardContent className="space-y-4">
+        <div className="grid grid-cols-1 sm:grid-cols-2 xl:grid-cols-4 gap-4">
+          <div className="rounded border border-border/50 px-3 py-2"><p className="text-xs text-muted-foreground">Billed</p><p className="text-xl">{formatCurrency(feeSummary.total)}</p></div>
+          <div className="rounded border border-border/50 px-3 py-2"><p className="text-xs text-muted-foreground">Collected</p><p className="text-xl text-green-300">{formatCurrency(feeSummary.collected)}</p></div>
+          <div className="rounded border border-border/50 px-3 py-2"><p className="text-xs text-muted-foreground">Outstanding</p><p className="text-xl text-yellow-300">{formatCurrency(feeSummary.outstanding)}</p></div>
+          <div className="rounded border border-border/50 px-3 py-2"><p className="text-xs text-muted-foreground">Velocity</p><p className="text-xl">{feeSummary.velocity}%</p></div>
+        </div>
+
+        <div className="overflow-x-auto">
+          <table className="w-full text-sm">
+            <thead>
+              <tr className="text-left text-muted-foreground border-b border-border/50">
+                <th className="py-2 pr-4">Invoice</th>
+                <th className="py-2 pr-4">Amount</th>
+                <th className="py-2 pr-4">Due Date</th>
+                <th className="py-2 pr-4">Status</th>
+                <th className="py-2 pr-4">Action</th>
+              </tr>
+            </thead>
+            <tbody>
+              {invoices.slice(0, 12).map((i) => (
+                <tr key={i.invoice_number} className="border-b border-border/30">
+                  <td className="py-2 pr-4">{i.invoice_number}</td>
+                  <td className="py-2 pr-4">{formatCurrency(i.amount)}</td>
+                  <td className="py-2 pr-4">{i.due_date}</td>
+                  <td className={`py-2 pr-4 ${statusClass[i.status] || "text-muted-foreground"}`}>{i.status.replace("_", " ")}</td>
+                  <td className="py-2 pr-4">{canManageFinance && i.status !== "paid" ? <Button size="sm" variant="ghost" disabled={actionBusy === `invoice-${i.invoice_number}`} onClick={() => void handleMarkInvoicePaid(i)}>Mark Paid</Button> : "-"}</td>
+                </tr>
+              ))}
+            </tbody>
+          </table>
+        </div>
+      </CardContent>
+    </Card>
+  );
+
+  const renderWorkflow = () => (
+    <div className="grid grid-cols-1 lg:grid-cols-3 gap-4">
+      <Card className="bg-card/50 border-border/50 lg:col-span-2">
+        <CardHeader><CardTitle className="text-lg flex items-center gap-2"><Workflow className="w-5 h-5 text-primary" /> Maker-Checker-Signoff Pipeline</CardTitle></CardHeader>
+        <CardContent className="space-y-2">
+          {workflowTrail.map((s) => (
+            <div key={s.stage} className="rounded border border-border/50 px-3 py-2 flex justify-between items-center gap-3 text-sm">
+              <div>
+                <p className="font-medium">{s.stage}</p>
+                <p className="text-xs text-muted-foreground">{s.actor}</p>
+              </div>
+              <div className="text-right">
+                <p className={statusClass[s.status] || "text-muted-foreground"}>{s.status.replace("_", " ")}</p>
+                <p className="text-xs text-muted-foreground">{s.timestamp}</p>
+              </div>
+            </div>
+          ))}
+          <div className="rounded border border-border/50 px-3 py-2 text-sm flex items-center gap-2"><Settings className="w-4 h-4 text-cyan-300" /> Immutable lock turns on after final sign-off.</div>
+        </CardContent>
+      </Card>
+      <Card className="bg-card/50 border-border/50">
+        <CardHeader><CardTitle className="text-lg flex items-center gap-2"><ClipboardList className="w-5 h-5 text-primary" /> Audit Highlights</CardTitle></CardHeader>
+        <CardContent className="space-y-2 text-sm">
+          <div className="rounded border border-border/50 px-3 py-2">17 field edits tracked with before/after snapshot.</div>
+          <div className="rounded border border-border/50 px-3 py-2">2 SLA breaches auto-escalated to registrar.</div>
+          <div className="rounded border border-border/50 px-3 py-2">Evidence linkage verified for {evidenceCount} documents.</div>
+        </CardContent>
+      </Card>
+    </div>
+  );
+
+  const renderCopilot = () => (
+    <div className="grid grid-cols-1 lg:grid-cols-3 gap-4">
+      <Card className="bg-card/50 border-border/50 lg:col-span-2">
+        <CardHeader><CardTitle className="text-lg flex items-center gap-2"><Bot className="w-5 h-5 text-primary" /> AI Copilot Recommendations</CardTitle></CardHeader>
+        <CardContent className="space-y-2">
+          {copilotRecommendations.map((r) => (
+            <div key={r} className="rounded border border-border/50 px-3 py-2 text-sm">{r}</div>
+          ))}
+          <div className="flex flex-wrap gap-2 pt-2">
+            <Button>Generate Hearing Notes</Button>
+            <Button variant="outline">Create Filing Package</Button>
+            <Button variant="outline">Explain Recommendation</Button>
+          </div>
+        </CardContent>
+      </Card>
+      <Card className="bg-card/50 border-border/50">
+        <CardHeader><CardTitle className="text-lg flex items-center gap-2"><AlertTriangle className="w-5 h-5 text-primary" /> Risk Bands</CardTitle></CardHeader>
+        <CardContent className="space-y-2 text-sm">
+          <div className="rounded border border-border/50 px-3 py-2">Institution Risk: <span className="text-yellow-300">Medium</span></div>
+          <div className="rounded border border-border/50 px-3 py-2">Closure Probability: <span className="text-green-300">78%</span></div>
+          <div className="rounded border border-border/50 px-3 py-2">Top move: clear review filings within 48h.</div>
+        </CardContent>
+      </Card>
+    </div>
+  );
+
+  const renderAnalytics = () => (
+    <div className="grid grid-cols-1 lg:grid-cols-3 gap-4">
+      <Card className="bg-card/50 border-border/50 lg:col-span-2">
+        <CardHeader><CardTitle className="text-lg flex items-center gap-2"><BarChart3 className="w-5 h-5 text-primary" /> Institutional Performance Analytics</CardTitle></CardHeader>
+        <CardContent>
+          <div className="overflow-x-auto">
+            <table className="w-full text-sm">
+              <thead>
+                <tr className="text-left text-muted-foreground border-b border-border/50">
+                  <th className="py-2 pr-4">Metric</th>
+                  <th className="py-2 pr-4">Current</th>
+                  <th className="py-2 pr-4">Last Month</th>
+                  <th className="py-2 pr-4">Trend</th>
+                </tr>
+              </thead>
+              <tbody>
+                {[
+                  ["Automation Coverage", "61%", "55%", "up"],
+                  ["SLA Adherence", "96.2%", "93.4%", "up"],
+                  ["Filing Turnaround", "2.1 days", "2.8 days", "up"],
+                  ["Audit Readiness", "94/100", "89/100", "up"],
+                ].map((r) => (
+                  <tr key={r[0]} className="border-b border-border/30">
+                    <td className="py-2 pr-4">{r[0]}</td>
+                    <td className="py-2 pr-4">{r[1]}</td>
+                    <td className="py-2 pr-4">{r[2]}</td>
+                    <td className="py-2 pr-4 text-green-300">{r[3]}</td>
+                  </tr>
+                ))}
+              </tbody>
+            </table>
+          </div>
+        </CardContent>
+      </Card>
+      <Card className="bg-card/50 border-border/50">
+        <CardHeader><CardTitle className="text-lg flex items-center gap-2"><Sparkles className="w-5 h-5 text-primary" /> Investor Summary</CardTitle></CardHeader>
+        <CardContent className="space-y-2 text-sm">
+          <div className="rounded border border-border/50 px-3 py-2">One OS for admissions, academics, finance, and compliance.</div>
+          <div className="rounded border border-border/50 px-3 py-2">Maker-checker-signoff with evidence lineage and audit trails.</div>
+          <div className="rounded border border-border/50 px-3 py-2">Role-driven adoption across complete university operations.</div>
+        </CardContent>
+      </Card>
+    </div>
+  );
+
+  const contentByPage: Record<DashboardPage, JSX.Element> = {
+    executive: renderExecutive(),
+    roledesk: renderRoleDesk(),
+    admissions: renderAdmissions(),
+    academics: renderAcademics(),
+    facultyops: renderFacultyOps(),
+    compliance: renderCompliance(),
+    finance: renderFinance(),
+    workflow: renderWorkflow(),
+    copilot: renderCopilot(),
+    analytics: renderAnalytics(),
+  };
+
   return (
     <div className="min-h-screen bg-background">
       <Navbar />
 
       <main className="pt-24 pb-16">
-        <div className="container mx-auto px-4 max-w-7xl space-y-6">
-          <section className="glass-card p-6 rounded-2xl border border-primary/20 space-y-4">
-            <div className="flex flex-col lg:flex-row lg:items-center lg:justify-between gap-4">
+        <div className="container mx-auto px-4 max-w-7xl space-y-4">
+          <div className="rounded-2xl border border-primary/20 bg-card/40 p-4">
+            <div className="flex flex-col lg:flex-row lg:items-center lg:justify-between gap-3">
               <div>
-                <p className="text-xs uppercase tracking-[0.2em] text-primary mb-2">University Multi-Page Command Center</p>
-                <h1 className="text-2xl md:text-3xl font-bold text-foreground">{instituteName}</h1>
-                <p className="text-sm text-muted-foreground mt-2">
+                <p className="text-xs uppercase tracking-[0.2em] text-primary">University Operations OS</p>
+                <h1 className="text-2xl font-bold mt-1">{instituteName}</h1>
+                <p className="text-sm text-muted-foreground mt-1">
                   {mode === "demo"
-                    ? "Role-based pages for admissions, academics, finance, compliance, workflow, and AI operations under one dashboard."
-                    : `Welcome ${viewerName}. ${source === "live" ? "Live role-based workspace loaded." : "Showing demo fallback until membership mapping is available."}`}
+                    ? "Enterprise-grade demo with role-based pages, queues, registers, and approval workflows."
+                    : `Welcome ${viewerName}. ${source === "live" ? "Live operational data connected." : "Showing demo fallback until mapping is ready."}`}
                 </p>
               </div>
-
               <div className="flex flex-wrap items-center gap-2">
                 <Badge className={mode === "demo" ? "bg-cyan-500/20 text-cyan-300 border-cyan-500/40" : source === "live" ? "bg-green-500/20 text-green-300 border-green-500/40" : "bg-yellow-500/20 text-yellow-300 border-yellow-500/40"}>
-                  {mode === "demo" ? "Demo Experience" : source === "live" ? "Live Workspace" : "Live Mode (Demo Data)"}
+                  {mode === "demo" ? "Demo" : source === "live" ? "Live" : "Fallback"}
                 </Badge>
                 <Badge variant="outline">Role: {effectiveRole}</Badge>
-                <Button variant="outline" className="border-primary/30"><Bell className="w-4 h-4 mr-2" /> Notifications</Button>
+                <Button size="sm" variant="outline"><Bell className="w-4 h-4 mr-1" /> Alerts</Button>
               </div>
             </div>
+          </div>
 
-            {mode === "demo" ? (
-              <div className="rounded-xl border border-primary/20 p-3 bg-background/30">
-                <p className="text-xs text-muted-foreground mb-2">Demo Role Simulator: choose a role to see that role's default page and controls.</p>
-                <div className="flex flex-wrap gap-2">
-                  {(["admin", "registrar", "finance", "faculty", "student"] as UniversityRole[]).map((role) => (
-                    <Button key={role} size="sm" variant={demoRole === role ? "default" : "outline"} onClick={() => setDemoRole(role)}>{role}</Button>
-                  ))}
+          <div className="grid grid-cols-1 xl:grid-cols-4 gap-4">
+            <Card className="bg-card/50 border-border/50 xl:col-span-1">
+              <CardHeader>
+                <CardTitle className="text-base flex items-center gap-2"><LayoutDashboard className="w-4 h-4 text-primary" /> Workspace Navigation</CardTitle>
+              </CardHeader>
+              <CardContent className="space-y-3">
+                {mode === "demo" ? (
+                  <div className="rounded border border-border/50 p-2">
+                    <p className="text-xs text-muted-foreground mb-2">Role Simulator</p>
+                    <div className="grid grid-cols-2 gap-2">
+                      {(["admin", "registrar", "finance", "faculty", "student"] as UniversityRole[]).map((role) => (
+                        <Button key={role} size="sm" variant={demoRole === role ? "default" : "outline"} onClick={() => setDemoRole(role)}>{role}</Button>
+                      ))}
+                    </div>
+                  </div>
+                ) : null}
+
+                <div className="rounded border border-border/50 p-2 space-y-2">
+                  <p className="text-xs text-muted-foreground">Pages</p>
+                  {pageConfig.map((page) => {
+                    const Icon = page.icon;
+                    const active = activePage === page.id;
+                    return (
+                      <button
+                        key={page.id}
+                        onClick={() => setActivePage(page.id)}
+                        className={`w-full text-left rounded px-2 py-2 border transition ${active ? "border-primary bg-primary/10" : "border-border/40 hover:border-primary/40"}`}
+                      >
+                        <span className="flex items-center justify-between text-sm">
+                          <span className="flex items-center gap-2"><Icon className="w-4 h-4" /> {page.label}</span>
+                          <ChevronRight className="w-4 h-4 text-muted-foreground" />
+                        </span>
+                      </button>
+                    );
+                  })}
                 </div>
-              </div>
-            ) : null}
-
-            <div className="rounded-xl border border-border/50 p-3 bg-background/30">
-              <div className="flex flex-wrap gap-2 items-center">
-                <div className="flex items-center gap-2 text-xs text-muted-foreground mr-2"><Search className="w-4 h-4" /> Quick Search</div>
-                <Button size="sm" variant="outline">Find Student</Button>
-                <Button size="sm" variant="outline">Find Filing</Button>
-                <Button size="sm" variant="outline">Find Invoice</Button>
-                <Button size="sm" variant="outline"><Filter className="w-3 h-3 mr-1" /> Filters</Button>
-              </div>
-            </div>
-
-            <div className="grid grid-cols-2 md:grid-cols-3 xl:grid-cols-5 gap-2">
-              {pageConfig.map((page) => {
-                const Icon = page.icon;
-                const active = activePage === page.id;
-                return (
-                  <button
-                    key={page.id}
-                    className={`rounded-lg border px-3 py-2 text-left transition ${
-                      active ? "border-primary bg-primary/10 text-foreground" : "border-border/50 hover:border-primary/40"
-                    }`}
-                    onClick={() => setActivePage(page.id)}
-                  >
-                    <div className="flex items-center gap-2 text-sm"><Icon className="w-4 h-4" /> <span>{page.label}</span></div>
-                  </button>
-                );
-              })}
-            </div>
-          </section>
-
-          <section className="grid grid-cols-2 md:grid-cols-3 xl:grid-cols-6 gap-4">
-            <Card className="bg-card/50 border-border/50"><CardHeader className="pb-2"><CardTitle className="text-xs text-muted-foreground">Students</CardTitle></CardHeader><CardContent><p className="text-2xl font-semibold">{kpis.students.toLocaleString()}</p></CardContent></Card>
-            <Card className="bg-card/50 border-border/50"><CardHeader className="pb-2"><CardTitle className="text-xs text-muted-foreground">Faculty</CardTitle></CardHeader><CardContent><p className="text-2xl font-semibold">{kpis.faculty}</p></CardContent></Card>
-            <Card className="bg-card/50 border-border/50"><CardHeader className="pb-2"><CardTitle className="text-xs text-muted-foreground">Programs</CardTitle></CardHeader><CardContent><p className="text-2xl font-semibold">{kpis.programs}</p></CardContent></Card>
-            <Card className="bg-card/50 border-border/50"><CardHeader className="pb-2"><CardTitle className="text-xs text-muted-foreground">Fee Collection</CardTitle></CardHeader><CardContent><p className="text-2xl font-semibold">₹{kpis.feeCollectionCrore} Cr</p></CardContent></Card>
-            <Card className="bg-card/50 border-border/50"><CardHeader className="pb-2"><CardTitle className="text-xs text-muted-foreground">Compliance Score</CardTitle></CardHeader><CardContent><p className="text-2xl font-semibold text-green-400">{kpis.complianceScore}%</p></CardContent></Card>
-            <Card className="bg-card/50 border-border/50"><CardHeader className="pb-2"><CardTitle className="text-xs text-muted-foreground">Critical Alerts</CardTitle></CardHeader><CardContent><p className="text-2xl font-semibold text-yellow-300">{complianceSummary.criticalAlerts}</p></CardContent></Card>
-          </section>
-
-          {activePage === "roledesk" ? (
-            <section className="grid grid-cols-1 lg:grid-cols-3 gap-6">
-              <Card className="bg-card/50 border-border/50 lg:col-span-2">
-                <CardHeader><CardTitle className="text-lg flex items-center gap-2"><Target className="w-5 h-5 text-primary" /> {roleProfile[effectiveRole].title} Workspace</CardTitle></CardHeader>
-                <CardContent className="space-y-3">
-                  {roleProfile[effectiveRole].outcomes.map((o) => (
-                    <div key={o} className="rounded-lg border border-border/50 p-3 text-sm">{o}</div>
-                  ))}
-                  <div className="rounded-lg border border-border/50 p-3">
-                    <p className="text-xs text-muted-foreground mb-2">Role-specific key actions</p>
-                    {roleActions[effectiveRole].map((a) => (
-                      <p key={a} className="text-sm">• {a}</p>
-                    ))}
-                  </div>
-                </CardContent>
-              </Card>
-              <Card className="bg-card/50 border-border/50">
-                <CardHeader><CardTitle className="text-lg flex items-center gap-2"><ClipboardList className="w-5 h-5 text-primary" /> Today Queue</CardTitle></CardHeader>
-                <CardContent className="space-y-2">
-                  {actionQueue.slice(0, 4).map((a) => (
-                    <div key={a.title} className="rounded-lg border border-border/50 p-3">
-                      <p className="text-sm font-medium">{a.title}</p>
-                      <p className="text-xs text-muted-foreground">Owner: {a.owner} • SLA: {a.sla}</p>
-                    </div>
-                  ))}
-                </CardContent>
-              </Card>
-            </section>
-          ) : null}
-
-          {activePage === "executive" ? (
-            <section className="space-y-6">
-              <div className="grid grid-cols-1 md:grid-cols-2 xl:grid-cols-4 gap-4">
-                <Card className="bg-card/50 border-border/50"><CardHeader className="pb-2"><CardTitle className="text-sm flex items-center gap-2"><Flame className="w-4 h-4 text-red-300" /> Critical Alerts</CardTitle></CardHeader><CardContent><p className="text-3xl font-semibold text-red-300">{complianceSummary.criticalAlerts}</p></CardContent></Card>
-                <Card className="bg-card/50 border-border/50"><CardHeader className="pb-2"><CardTitle className="text-sm flex items-center gap-2"><ShieldAlert className="w-4 h-4 text-yellow-300" /> At-Risk Filings</CardTitle></CardHeader><CardContent><p className="text-3xl font-semibold">{complianceSummary.atRiskFilings}</p></CardContent></Card>
-                <Card className="bg-card/50 border-border/50"><CardHeader className="pb-2"><CardTitle className="text-sm flex items-center gap-2"><CheckCircle2 className="w-4 h-4 text-green-300" /> Pending Approvals</CardTitle></CardHeader><CardContent><p className="text-3xl font-semibold">{complianceSummary.pendingApprovals}</p></CardContent></Card>
-                <Card className="bg-card/50 border-border/50"><CardHeader className="pb-2"><CardTitle className="text-sm flex items-center gap-2"><LineChart className="w-4 h-4 text-cyan-300" /> Collection Velocity</CardTitle></CardHeader><CardContent><p className="text-3xl font-semibold">{feeSummary.velocity}%</p></CardContent></Card>
-              </div>
-              <Card className="bg-card/50 border-border/50">
-                <CardHeader><CardTitle className="text-lg flex items-center gap-2"><ClipboardList className="w-5 h-5 text-primary" /> Executive Action Queue</CardTitle></CardHeader>
-                <CardContent className="space-y-2">
-                  {actionQueue.map((a) => (
-                    <div key={a.title} className="rounded-lg border border-border/50 p-3 flex flex-wrap justify-between gap-2">
-                      <p className="text-sm">{a.title}</p>
-                      <p className="text-xs text-muted-foreground">{a.owner} • SLA {a.sla} • {a.risk} risk</p>
-                    </div>
-                  ))}
-                </CardContent>
-              </Card>
-            </section>
-          ) : null}
-
-          {activePage === "admissions" ? (
-            <section className="grid grid-cols-1 lg:grid-cols-2 gap-6">
-              <Card className="bg-card/50 border-border/50">
-                <CardHeader>
-                  <CardTitle className="text-lg flex items-center gap-2 justify-between"><span className="flex items-center gap-2"><GraduationCap className="w-5 h-5 text-primary" /> Admissions Pipeline</span>{canManageAdmissions ? <Button size="sm" variant="outline" onClick={handleCreateAdmission} disabled={actionBusy === "admission-create"}><Plus className="w-3 h-3 mr-1" /> Add</Button> : null}</CardTitle>
-                </CardHeader>
-                <CardContent className="space-y-3">
-                  <div className="grid grid-cols-2 gap-2 text-sm">
-                    <div className="rounded-lg border border-border/50 p-2">Submitted: <span className="font-semibold">{admissionsBreakdown.submitted}</span></div>
-                    <div className="rounded-lg border border-border/50 p-2">Review: <span className="font-semibold">{admissionsBreakdown.under_review}</span></div>
-                    <div className="rounded-lg border border-border/50 p-2">Accepted: <span className="font-semibold text-green-400">{admissionsBreakdown.accepted}</span></div>
-                    <div className="rounded-lg border border-border/50 p-2">Rejected: <span className="font-semibold text-red-400">{admissionsBreakdown.rejected}</span></div>
-                  </div>
-                  {admissions.slice(0, 8).map((a) => (
-                    <div key={a.application_number} className="rounded-lg border border-border/50 p-3">
-                      <p className="text-sm font-medium">{a.applicant_name}</p>
-                      <p className="text-xs text-muted-foreground">{a.application_number} • {a.program_applied}</p>
-                      <p className={`text-xs mt-1 ${statusClass[a.status] || "text-muted-foreground"}`}>{a.status.replace("_", " ")}</p>
-                      {canManageAdmissions && (a.status === "submitted" || a.status === "under_review") ? <Button size="sm" variant="ghost" className="h-7 mt-1 px-2" disabled={actionBusy === `admission-${a.application_number}`} onClick={() => void handleAdvanceAdmission(a)}>Move Next</Button> : null}
-                    </div>
-                  ))}
-                </CardContent>
-              </Card>
-
-              <Card className="bg-card/50 border-border/50">
-                <CardHeader><CardTitle className="text-lg flex items-center gap-2"><Target className="w-5 h-5 text-primary" /> Admissions Intelligence</CardTitle></CardHeader>
-                <CardContent className="space-y-3">
-                  <div className="rounded-lg border border-border/50 p-3"><p className="text-xs text-muted-foreground">Conversion to Review</p><p className="text-2xl font-semibold">{Math.max(10, Math.round((admissionsBreakdown.under_review / Math.max(1, admissions.length)) * 100))}%</p></div>
-                  <div className="rounded-lg border border-border/50 p-3"><p className="text-xs text-muted-foreground">Acceptance Yield</p><p className="text-2xl font-semibold text-green-300">{Math.max(10, Math.round((admissionsBreakdown.accepted / Math.max(1, admissions.length)) * 100))}%</p></div>
-                  <div className="rounded-lg border border-border/50 p-3"><p className="text-xs text-muted-foreground">Upcoming Counseling Slots</p><p className="text-sm">Batch A: 42 seats • Batch B: 38 seats • Batch C: 25 seats</p></div>
-                </CardContent>
-              </Card>
-            </section>
-          ) : null}
-
-          {activePage === "academics" ? (
-            <section className="grid grid-cols-1 lg:grid-cols-3 gap-6">
-              <Card className="bg-card/50 border-border/50 lg:col-span-2">
-                <CardHeader><CardTitle className="text-lg flex items-center gap-2"><BookOpen className="w-5 h-5 text-primary" /> Academic Operations</CardTitle></CardHeader>
-                <CardContent className="space-y-3">
-                  <div className="grid grid-cols-1 md:grid-cols-3 gap-3">
-                    <div className="rounded-lg border border-border/50 p-3"><p className="text-xs text-muted-foreground">Timetable Coverage</p><p className="text-2xl font-semibold">97%</p></div>
-                    <div className="rounded-lg border border-border/50 p-3"><p className="text-xs text-muted-foreground">Assessment Submission</p><p className="text-2xl font-semibold">91%</p></div>
-                    <div className="rounded-lg border border-border/50 p-3"><p className="text-xs text-muted-foreground">Attendance Sync</p><p className="text-2xl font-semibold">94%</p></div>
-                  </div>
-                  {students.slice(0, 6).map((s) => (
-                    <div key={s.id} className="rounded-lg border border-border/50 p-3">
-                      <p className="text-sm font-medium">{s.name}</p>
-                      <p className="text-xs text-muted-foreground">{s.tag}</p>
-                    </div>
-                  ))}
-                </CardContent>
-              </Card>
-              <Card className="bg-card/50 border-border/50">
-                <CardHeader><CardTitle className="text-lg flex items-center gap-2"><AlertTriangle className="w-5 h-5 text-primary" /> Academic Alerts</CardTitle></CardHeader>
-                <CardContent className="space-y-2 text-sm">
-                  <div className="rounded-lg border border-border/50 p-3">2 departments pending assessment closure.</div>
-                  <div className="rounded-lg border border-border/50 p-3">4 course plans awaiting HOD approval.</div>
-                  <div className="rounded-lg border border-border/50 p-3">Semester grade moderation due in 3 days.</div>
-                </CardContent>
-              </Card>
-            </section>
-          ) : null}
-
-          {activePage === "facultyops" ? (
-            <section className="grid grid-cols-1 lg:grid-cols-3 gap-6">
-              <Card className="bg-card/50 border-border/50 lg:col-span-2">
-                <CardHeader><CardTitle className="text-lg flex items-center gap-2"><Users className="w-5 h-5 text-primary" /> Faculty Operations</CardTitle></CardHeader>
-                <CardContent className="space-y-2">
-                  {faculty.slice(0, 8).map((f) => (
-                    <div key={f.id} className="rounded-lg border border-border/50 p-3 flex items-center justify-between">
-                      <div><p className="text-sm font-medium">{f.name}</p><p className="text-xs text-muted-foreground">{f.tag}</p></div>
-                      <Badge variant="outline">Active</Badge>
-                    </div>
-                  ))}
-                </CardContent>
-              </Card>
-              <Card className="bg-card/50 border-border/50">
-                <CardHeader><CardTitle className="text-lg flex items-center gap-2"><ClipboardList className="w-5 h-5 text-primary" /> Workload & Leaves</CardTitle></CardHeader>
-                <CardContent className="space-y-3 text-sm">
-                  <div className="rounded-lg border border-border/50 p-3">Teaching Load Balanced: 88%</div>
-                  <div className="rounded-lg border border-border/50 p-3">Pending Leave Approvals: 6</div>
-                  <div className="rounded-lg border border-border/50 p-3">Appraisal Dossiers due this week: 12</div>
-                </CardContent>
-              </Card>
-            </section>
-          ) : null}
-
-          {activePage === "compliance" ? (
-            <section className="grid grid-cols-1 lg:grid-cols-3 gap-6">
-              <Card className="bg-card/50 border-border/50 lg:col-span-2">
-                <CardHeader><CardTitle className="text-lg flex items-center gap-2 justify-between"><span className="flex items-center gap-2"><ShieldCheck className="w-5 h-5 text-primary" /> Compliance Command Center</span><div className="flex gap-2">{canManageCompliance ? <Button size="sm" variant="outline" onClick={handleCreateTask} disabled={actionBusy === "task-create"}><Plus className="w-3 h-3 mr-1" /> Task</Button> : null}{canManageCompliance ? <Button size="sm" variant="outline" onClick={handleCreateFiling} disabled={actionBusy === "filing-create"}><Plus className="w-3 h-3 mr-1" /> Filing</Button> : null}</div></CardTitle></CardHeader>
-                <CardContent className="grid grid-cols-1 md:grid-cols-2 gap-4">
-                  <div className="space-y-2">
-                    <p className="text-xs uppercase tracking-wide text-muted-foreground">Compliance Tasks</p>
-                    {complianceTasks.slice(0, 8).map((task) => (
-                      <div key={task.id} className="rounded-lg border border-border/50 p-3">
-                        <p className="text-sm font-medium">{task.title}</p>
-                        <p className="text-xs text-muted-foreground">{task.authority} • Due {task.due_date ?? "TBD"}</p>
-                        <p className={`text-xs mt-1 ${statusClass[task.status] || "text-muted-foreground"}`}>{task.status.replace("_", " ")} • {task.priority}</p>
-                        {canManageCompliance && task.status !== "closed" ? <Button size="sm" variant="ghost" className="h-7 mt-1 px-2" disabled={actionBusy === `task-${task.id}`} onClick={() => void handleAdvanceTask(task)}>Advance</Button> : null}
-                      </div>
-                    ))}
-                  </div>
-                  <div className="space-y-2">
-                    <p className="text-xs uppercase tracking-wide text-muted-foreground">Filings Pipeline</p>
-                    {filings.slice(0, 8).map((filing) => (
-                      <div key={filing.id} className="rounded-lg border border-border/50 p-3">
-                        <p className="text-sm font-medium">{filing.filing_name}</p>
-                        <p className="text-xs text-muted-foreground">{filing.authority} • {filing.period_label ?? "Current Cycle"}</p>
-                        <p className={`text-xs mt-1 ${statusClass[filing.status] || "text-muted-foreground"}`}>{filing.status.replace("_", " ")}{filing.reference_number ? ` • Ref ${filing.reference_number}` : ""}</p>
-                        {canManageCompliance && filing.status !== "closed" ? <Button size="sm" variant="ghost" className="h-7 mt-1 px-2" disabled={actionBusy === `filing-${filing.id}`} onClick={() => void handleAdvanceFiling(filing)}>Advance</Button> : null}
-                      </div>
-                    ))}
-                  </div>
-                </CardContent>
-              </Card>
-              <Card className="bg-card/50 border-border/50">
-                <CardHeader><CardTitle className="text-lg flex items-center gap-2"><LineChart className="w-5 h-5 text-primary" /> Authority Heatmap</CardTitle></CardHeader>
-                <CardContent className="space-y-3">
-                  {complianceHeatmap.map((h) => (
-                    <div key={h.authority} className="rounded-lg border border-border/50 p-3">
-                      <div className="flex justify-between text-sm"><p>{h.authority}</p><p className="text-cyan-300">{h.score}%</p></div>
-                      <div className="h-2 bg-muted/30 rounded mt-2 overflow-hidden"><div className="h-full bg-cyan-400" style={{ width: `${h.score}%` }} /></div>
-                      <p className="text-xs text-muted-foreground mt-1">Open items: {h.openItems}</p>
-                    </div>
-                  ))}
-                </CardContent>
-              </Card>
-            </section>
-          ) : null}
-
-          {activePage === "finance" ? (
-            <section className="grid grid-cols-1 lg:grid-cols-3 gap-6">
-              <Card className="bg-card/50 border-border/50 lg:col-span-2">
-                <CardHeader><CardTitle className="text-lg flex items-center gap-2 justify-between"><span className="flex items-center gap-2"><Receipt className="w-5 h-5 text-primary" /> Finance Control Room</span>{canManageFinance ? <Button size="sm" variant="outline" onClick={handleCreateInvoice} disabled={actionBusy === "invoice-create"}><Plus className="w-3 h-3 mr-1" /> Invoice</Button> : null}</CardTitle></CardHeader>
-                <CardContent className="space-y-3">
-                  <div className="grid grid-cols-1 md:grid-cols-4 gap-3">
-                    <div className="rounded-lg border border-border/50 p-3"><p className="text-xs text-muted-foreground">Billed</p><p className="text-xl font-semibold">₹{feeSummary.total.toLocaleString()}</p></div>
-                    <div className="rounded-lg border border-border/50 p-3"><p className="text-xs text-muted-foreground">Collected</p><p className="text-xl font-semibold text-green-300">₹{feeSummary.collected.toLocaleString()}</p></div>
-                    <div className="rounded-lg border border-border/50 p-3"><p className="text-xs text-muted-foreground">Outstanding</p><p className="text-xl font-semibold text-yellow-300">₹{feeSummary.outstanding.toLocaleString()}</p></div>
-                    <div className="rounded-lg border border-border/50 p-3"><p className="text-xs text-muted-foreground">Velocity</p><p className="text-xl font-semibold">{feeSummary.velocity}%</p></div>
-                  </div>
-                  {invoices.slice(0, 10).map((inv) => (
-                    <div key={inv.invoice_number} className="rounded-lg border border-border/50 p-3">
-                      <div className="flex flex-wrap items-center justify-between gap-2"><p className="text-sm font-medium">{inv.invoice_number}</p><p className="text-xs text-muted-foreground">Due {inv.due_date}</p></div>
-                      <p className="text-xs text-muted-foreground">₹{inv.amount.toLocaleString()}</p>
-                      <p className={`text-xs mt-1 ${statusClass[inv.status] || "text-muted-foreground"}`}>{inv.status.replace("_", " ")}</p>
-                      {canManageFinance && inv.status !== "paid" ? <Button size="sm" variant="ghost" className="h-7 mt-1 px-2" disabled={actionBusy === `invoice-${inv.invoice_number}`} onClick={() => void handleMarkInvoicePaid(inv)}>Mark Paid</Button> : null}
-                    </div>
-                  ))}
-                </CardContent>
-              </Card>
-              <Card className="bg-card/50 border-border/50">
-                <CardHeader><CardTitle className="text-lg flex items-center gap-2"><CreditCard className="w-5 h-5 text-primary" /> Finance Risk Lens</CardTitle></CardHeader>
-                <CardContent className="space-y-3 text-sm">
-                  <div className="rounded-lg border border-border/50 p-3">Overdue Cohort: <span className="text-red-300 font-semibold">{feeSummary.overdueCount}</span></div>
-                  <div className="rounded-lg border border-border/50 p-3">Scholarship Leakage Risk: <span className="text-yellow-300 font-semibold">2.8%</span></div>
-                  <div className="rounded-lg border border-border/50 p-3">Reconciliation: <span className="text-cyan-300 font-semibold">91% matched</span></div>
-                </CardContent>
-              </Card>
-            </section>
-          ) : null}
-
-          {activePage === "workflow" ? (
-            <section className="grid grid-cols-1 lg:grid-cols-3 gap-6">
-              <Card className="bg-card/50 border-border/50 lg:col-span-2">
-                <CardHeader><CardTitle className="text-lg flex items-center gap-2"><Workflow className="w-5 h-5 text-primary" /> Approval Workflow Control</CardTitle></CardHeader>
-                <CardContent className="space-y-3">
-                  {workflowTrail.map((step) => (
-                    <div key={step.stage} className="rounded-lg border border-border/50 p-3 flex items-start justify-between gap-3">
-                      <div><p className="text-sm font-medium">{step.stage}</p><p className="text-xs text-muted-foreground">{step.actor}</p></div>
-                      <div className="text-right"><p className={`text-xs ${statusClass[step.status] || "text-muted-foreground"}`}>{step.status.replace("_", " ")}</p><p className="text-xs text-muted-foreground">{step.timestamp}</p></div>
-                    </div>
-                  ))}
-                  <div className="rounded-lg border border-border/50 p-3 bg-background/40"><p className="text-sm flex items-center gap-2"><Lock className="w-4 h-4 text-cyan-300" /> Immutable version locking is enabled after final sign-off.</p></div>
-                </CardContent>
-              </Card>
-              <Card className="bg-card/50 border-border/50">
-                <CardHeader><CardTitle className="text-lg flex items-center gap-2"><FileCheck2 className="w-5 h-5 text-primary" /> Audit Trail</CardTitle></CardHeader>
-                <CardContent className="space-y-2 text-sm">
-                  <div className="rounded-lg border border-border/50 p-3">Immutable version v1.8 locked after reviewer approval.</div>
-                  <div className="rounded-lg border border-border/50 p-3">17 field-level edits tracked with before/after snapshots.</div>
-                  <div className="rounded-lg border border-border/50 p-3">2 SLA breaches auto-escalated to registrar.</div>
-                  <div className="rounded-lg border border-border/50 p-3">Evidence linkage verified for {evidenceCount} mapped documents.</div>
-                </CardContent>
-              </Card>
-            </section>
-          ) : null}
-
-          {activePage === "copilot" ? (
-            <section className="grid grid-cols-1 lg:grid-cols-3 gap-6">
-              <Card className="bg-card/50 border-border/50 lg:col-span-2">
-                <CardHeader><CardTitle className="text-lg flex items-center gap-2"><Bot className="w-5 h-5 text-primary" /> AI Copilot Mission Center</CardTitle></CardHeader>
-                <CardContent className="space-y-3">
-                  {copilotRecommendations.map((rec) => (
-                    <div key={rec} className="rounded-lg border border-border/50 p-3 text-sm">{rec}</div>
-                  ))}
-                  <div className="grid grid-cols-1 md:grid-cols-3 gap-3">
-                    <Button className="w-full">Generate Hearing Notes</Button>
-                    <Button className="w-full" variant="outline">Create Filing Package</Button>
-                    <Button className="w-full" variant="outline">Explain Recommendation</Button>
-                  </div>
-                </CardContent>
-              </Card>
-              <Card className="bg-card/50 border-border/50">
-                <CardHeader><CardTitle className="text-lg flex items-center gap-2"><ShieldAlert className="w-5 h-5 text-primary" /> Risk Bands</CardTitle></CardHeader>
-                <CardContent className="space-y-3 text-sm">
-                  <div className="rounded-lg border border-border/50 p-3">Institution Risk: <span className="text-yellow-300 font-semibold">Medium</span></div>
-                  <div className="rounded-lg border border-border/50 p-3">Closure Probability: <span className="text-green-300 font-semibold">78%</span></div>
-                  <div className="rounded-lg border border-border/50 p-3">Top Recommendation: clear filing reviews in 48h.</div>
-                </CardContent>
-              </Card>
-            </section>
-          ) : null}
-
-          {activePage === "analytics" ? (
-            <section className="grid grid-cols-1 lg:grid-cols-3 gap-6">
-              <Card className="bg-card/50 border-border/50 lg:col-span-2">
-                <CardHeader><CardTitle className="text-lg flex items-center gap-2"><BarChart3 className="w-5 h-5 text-primary" /> Institutional Analytics</CardTitle></CardHeader>
-                <CardContent className="space-y-3">
-                  <div className="grid grid-cols-1 md:grid-cols-4 gap-3">
-                    <div className="rounded-lg border border-border/50 p-3"><p className="text-xs text-muted-foreground">Automation Coverage</p><p className="text-xl font-semibold">61%</p></div>
-                    <div className="rounded-lg border border-border/50 p-3"><p className="text-xs text-muted-foreground">SLA Adherence</p><p className="text-xl font-semibold">96.2%</p></div>
-                    <div className="rounded-lg border border-border/50 p-3"><p className="text-xs text-muted-foreground">Filing Turnaround</p><p className="text-xl font-semibold">2.1 days</p></div>
-                    <div className="rounded-lg border border-border/50 p-3"><p className="text-xs text-muted-foreground">Audit Readiness</p><p className="text-xl font-semibold">94/100</p></div>
-                  </div>
-                  <div className="rounded-lg border border-border/50 p-3 text-sm">Trend: Risk profile down 12% QoQ due to improved evidence mapping and workflow closure.</div>
-                </CardContent>
-              </Card>
-              <Card className="bg-card/50 border-border/50">
-                <CardHeader><CardTitle className="text-lg flex items-center gap-2"><Sparkles className="w-5 h-5 text-primary" /> Investor Summary</CardTitle></CardHeader>
-                <CardContent className="space-y-2 text-sm">
-                  <div className="rounded-lg border border-border/50 p-3">"One platform for admissions, academics, finance, and compliance execution."</div>
-                  <div className="rounded-lg border border-border/50 p-3">"Clear maker-checker-signoff controls with immutable evidence trail."</div>
-                  <div className="rounded-lg border border-border/50 p-3">"Role-based adoption path across entire university hierarchy."</div>
-                </CardContent>
-              </Card>
-            </section>
-          ) : null}
-
-          <section className="grid grid-cols-1 lg:grid-cols-2 gap-6">
-            <Card className="bg-card/50 border-border/50">
-              <CardHeader><CardTitle className="text-lg flex items-center gap-2"><ArrowRight className="w-5 h-5 text-primary" /> Multi-Output Pack</CardTitle></CardHeader>
-              <CardContent className="text-sm space-y-1">
-                <p>Reply Draft + Annexure Index + Hearing Notes + Argument Script + Task Checklist.</p>
-                <p className="text-muted-foreground">Every output remains role-auditable and evidence-linked.</p>
               </CardContent>
             </Card>
-            <Card className="bg-card/50 border-border/50">
-              <CardHeader><CardTitle className="text-lg flex items-center gap-2"><Settings className="w-5 h-5 text-primary" /> Enterprise Controls</CardTitle></CardHeader>
-              <CardContent className="text-sm space-y-1">
-                <p>Rate limits, retry queue, uptime logs, incident notes, and scoped role permissions.</p>
-                <p className="text-muted-foreground">PII masking and retention controls are preserved before generation.</p>
-              </CardContent>
-            </Card>
-          </section>
+
+            <div className="xl:col-span-3 space-y-4">
+              <Card className="bg-card/50 border-border/50">
+                <CardContent className="pt-6">
+                  <div className="flex flex-wrap items-center gap-2">
+                    <div className="flex items-center gap-2 rounded border border-border/50 px-3 py-2 text-sm text-muted-foreground"><Search className="w-4 h-4" /> Search records</div>
+                    <Button size="sm" variant="outline">Find Student</Button>
+                    <Button size="sm" variant="outline">Find Filing</Button>
+                    <Button size="sm" variant="outline">Find Invoice</Button>
+                    <Button size="sm" variant="outline"><Filter className="w-3 h-3 mr-1" /> Saved Filters</Button>
+                  </div>
+                </CardContent>
+              </Card>
+
+              <section className="grid grid-cols-2 md:grid-cols-3 xl:grid-cols-6 gap-3">
+                <Card className="bg-card/50 border-border/50"><CardContent className="pt-4"><p className="text-xs text-muted-foreground">Students</p><p className="text-2xl font-semibold mt-1">{kpis.students.toLocaleString()}</p></CardContent></Card>
+                <Card className="bg-card/50 border-border/50"><CardContent className="pt-4"><p className="text-xs text-muted-foreground">Faculty</p><p className="text-2xl font-semibold mt-1">{kpis.faculty}</p></CardContent></Card>
+                <Card className="bg-card/50 border-border/50"><CardContent className="pt-4"><p className="text-xs text-muted-foreground">Programs</p><p className="text-2xl font-semibold mt-1">{kpis.programs}</p></CardContent></Card>
+                <Card className="bg-card/50 border-border/50"><CardContent className="pt-4"><p className="text-xs text-muted-foreground">Fee Collection</p><p className="text-2xl font-semibold mt-1">₹{kpis.feeCollectionCrore} Cr</p></CardContent></Card>
+                <Card className="bg-card/50 border-border/50"><CardContent className="pt-4"><p className="text-xs text-muted-foreground">Compliance Score</p><p className="text-2xl font-semibold mt-1 text-green-300">{kpis.complianceScore}%</p></CardContent></Card>
+                <Card className="bg-card/50 border-border/50"><CardContent className="pt-4"><p className="text-xs text-muted-foreground">Critical Alerts</p><p className="text-2xl font-semibold mt-1 text-yellow-300">{complianceSummary.criticalAlerts}</p></CardContent></Card>
+              </section>
+
+              {contentByPage[activePage]}
+
+              <section className="grid grid-cols-1 lg:grid-cols-2 gap-4">
+                <Card className="bg-card/50 border-border/50">
+                  <CardHeader><CardTitle className="text-base flex items-center gap-2"><CheckCircle2 className="w-4 h-4 text-primary" /> Output Package</CardTitle></CardHeader>
+                  <CardContent className="text-sm">Reply draft, annexure index, hearing notes, argument script, and checklist are generated as one package with version tracking.</CardContent>
+                </Card>
+                <Card className="bg-card/50 border-border/50">
+                  <CardHeader><CardTitle className="text-base flex items-center gap-2"><Sparkles className="w-4 h-4 text-primary" /> Enterprise Controls</CardTitle></CardHeader>
+                  <CardContent className="text-sm">PII masking, role scopes, audit trail, retry queues, and incident monitoring remain enabled for production compliance.</CardContent>
+                </Card>
+              </section>
+            </div>
+          </div>
         </div>
       </main>
 
