@@ -42,6 +42,24 @@ type InvoiceItem = {
   due_date: string;
 };
 
+type ComplianceTaskItem = {
+  id: string;
+  title: string;
+  authority: string;
+  due_date: string | null;
+  priority: "critical" | "high" | "medium" | "low";
+  status: "pending" | "in_progress" | "under_review" | "submitted" | "closed" | "overdue";
+};
+
+type FilingItem = {
+  id: string;
+  filing_name: string;
+  authority: string;
+  period_label: string | null;
+  status: "pending" | "in_progress" | "under_review" | "submitted" | "closed" | "overdue";
+  reference_number: string | null;
+};
+
 const demoKpis = {
   students: 8450,
   faculty: 520,
@@ -75,6 +93,60 @@ const demoInvoices: InvoiceItem[] = [
   { invoice_number: "INV-2026-014", amount: 140000, status: "partially_paid", due_date: "2026-03-15" },
   { invoice_number: "INV-2026-028", amount: 118500, status: "overdue", due_date: "2026-02-27" },
   { invoice_number: "INV-2026-033", amount: 98000, status: "paid", due_date: "2026-02-20" },
+];
+
+const demoComplianceTasks: ComplianceTaskItem[] = [
+  {
+    id: "T-001",
+    title: "AICTE Annual Faculty Compliance",
+    authority: "AICTE",
+    due_date: "2026-03-22",
+    priority: "high",
+    status: "in_progress",
+  },
+  {
+    id: "T-002",
+    title: "NAAC Criterion Evidence Consolidation",
+    authority: "NAAC",
+    due_date: "2026-03-27",
+    priority: "critical",
+    status: "under_review",
+  },
+  {
+    id: "T-003",
+    title: "UGC Academic Audit Submission",
+    authority: "UGC",
+    due_date: "2026-04-04",
+    priority: "medium",
+    status: "pending",
+  },
+];
+
+const demoFilings: FilingItem[] = [
+  {
+    id: "F-001",
+    filing_name: "NIRF Data Sheet 2026",
+    authority: "NIRF",
+    period_label: "AY 2025-26",
+    status: "submitted",
+    reference_number: "NIRF-REF-2026-991",
+  },
+  {
+    id: "F-002",
+    filing_name: "AICTE Approved Intake Return",
+    authority: "AICTE",
+    period_label: "2026",
+    status: "under_review",
+    reference_number: null,
+  },
+  {
+    id: "F-003",
+    filing_name: "State Scholarship Utilization",
+    authority: "State Dept",
+    period_label: "Q4 2025-26",
+    status: "pending",
+    reference_number: null,
+  },
 ];
 
 const moduleCards = [
@@ -124,6 +196,9 @@ const demoDeadlines = [
 ];
 
 const statusClass: Record<string, string> = {
+  pending: "text-yellow-300",
+  in_progress: "text-cyan-300",
+  closed: "text-green-300",
   submitted: "text-yellow-300",
   under_review: "text-cyan-300",
   accepted: "text-green-300",
@@ -145,6 +220,9 @@ const UniversityDashboardShell = ({ mode }: UniversityDashboardShellProps) => {
   const [students, setStudents] = useState<PeopleItem[]>(demoStudents);
   const [faculty, setFaculty] = useState<PeopleItem[]>(demoFaculty);
   const [invoices, setInvoices] = useState<InvoiceItem[]>(demoInvoices);
+  const [complianceTasks, setComplianceTasks] = useState<ComplianceTaskItem[]>(demoComplianceTasks);
+  const [filings, setFilings] = useState<FilingItem[]>(demoFilings);
+  const [evidenceCount, setEvidenceCount] = useState(128);
 
   useEffect(() => {
     if (mode === "demo") {
@@ -182,17 +260,22 @@ const UniversityDashboardShell = ({ mode }: UniversityDashboardShellProps) => {
           return;
         }
 
-        const [studentsRes, facultyRes, admissionsRes, invoicesRes] = await Promise.all([
+        const [studentsRes, facultyRes, admissionsRes, invoicesRes, tasksRes, filingsRes, evidenceRes] = await Promise.all([
           supabaseAny.from("university_students").select("id, full_name, program, semester").eq("university_id", universityId).limit(5000),
           supabaseAny.from("university_faculty").select("id, full_name, designation").eq("university_id", universityId).limit(2000),
           supabaseAny.from("university_admissions").select("application_number, applicant_name, program_applied, status").eq("university_id", universityId).order("updated_at", { ascending: false }).limit(8),
           supabaseAny.from("university_fee_invoices").select("invoice_number, total_amount, status, due_date").eq("university_id", universityId).order("created_at", { ascending: false }).limit(8),
+          supabaseAny.from("university_compliance_tasks").select("id, title, authority, due_date, priority, status").eq("university_id", universityId).order("due_date", { ascending: true }).limit(8),
+          supabaseAny.from("university_compliance_filings").select("id, filing_name, authority, period_label, status, reference_number").eq("university_id", universityId).order("updated_at", { ascending: false }).limit(8),
+          supabaseAny.from("university_compliance_evidence").select("id", { count: "exact", head: true }).eq("university_id", universityId),
         ]);
 
         const studentsData = studentsRes.data ?? [];
         const facultyData = facultyRes.data ?? [];
         const admissionsData = admissionsRes.data ?? [];
         const invoicesData = invoicesRes.data ?? [];
+        const tasksData = tasksRes.data ?? [];
+        const filingsData = filingsRes.data ?? [];
 
         const paidAmount = invoicesData
           .filter((i: any) => i.status === "paid")
@@ -242,6 +325,20 @@ const UniversityDashboardShell = ({ mode }: UniversityDashboardShellProps) => {
               }))
             : demoInvoices
         );
+
+        setComplianceTasks(
+          tasksData.length > 0
+            ? tasksData
+            : demoComplianceTasks
+        );
+
+        setFilings(
+          filingsData.length > 0
+            ? filingsData
+            : demoFilings
+        );
+
+        setEvidenceCount(typeof evidenceRes.count === "number" ? evidenceRes.count : 128);
       } catch {
         if (!mounted) return;
         setSource("demo");
@@ -420,6 +517,65 @@ const UniversityDashboardShell = ({ mode }: UniversityDashboardShellProps) => {
                     <p className={`text-xs mt-1 ${statusClass[inv.status] || "text-muted-foreground"}`}>{inv.status.replace("_", " ")}</p>
                   </div>
                 ))}
+              </CardContent>
+            </Card>
+          </section>
+
+          <section className="grid grid-cols-1 lg:grid-cols-3 gap-6">
+            <Card className="bg-card/50 border-border/50 lg:col-span-2">
+              <CardHeader>
+                <CardTitle className="text-lg flex items-center gap-2">
+                  <ShieldCheck className="w-5 h-5 text-primary" />
+                  Compliance Command Center
+                </CardTitle>
+              </CardHeader>
+              <CardContent className="grid grid-cols-1 md:grid-cols-2 gap-4">
+                <div className="space-y-2">
+                  <p className="text-xs uppercase tracking-wide text-muted-foreground">Active Compliance Tasks</p>
+                  {complianceTasks.slice(0, 4).map((task) => (
+                    <div key={task.id} className="rounded-lg border border-border/50 p-3">
+                      <p className="text-sm font-medium">{task.title}</p>
+                      <p className="text-xs text-muted-foreground">{task.authority} • Due {task.due_date ?? "TBD"}</p>
+                      <p className={`text-xs mt-1 ${statusClass[task.status] || "text-muted-foreground"}`}>
+                        {task.status.replace("_", " ")} • {task.priority}
+                      </p>
+                    </div>
+                  ))}
+                </div>
+                <div className="space-y-2">
+                  <p className="text-xs uppercase tracking-wide text-muted-foreground">Filings Pipeline</p>
+                  {filings.slice(0, 4).map((filing) => (
+                    <div key={filing.id} className="rounded-lg border border-border/50 p-3">
+                      <p className="text-sm font-medium">{filing.filing_name}</p>
+                      <p className="text-xs text-muted-foreground">{filing.authority} • {filing.period_label ?? "Current Cycle"}</p>
+                      <p className={`text-xs mt-1 ${statusClass[filing.status] || "text-muted-foreground"}`}>
+                        {filing.status.replace("_", " ")}
+                        {filing.reference_number ? ` • Ref ${filing.reference_number}` : ""}
+                      </p>
+                    </div>
+                  ))}
+                </div>
+              </CardContent>
+            </Card>
+
+            <Card className="bg-card/50 border-border/50 lg:col-span-1">
+              <CardHeader>
+                <CardTitle className="text-lg flex items-center gap-2">
+                  <FileCheck2 className="w-5 h-5 text-primary" />
+                  Filing Assistant
+                </CardTitle>
+              </CardHeader>
+              <CardContent className="space-y-3">
+                <div className="rounded-lg border border-border/50 p-3 bg-background/40">
+                  <p className="text-xs text-muted-foreground">Evidence Vault</p>
+                  <p className="text-2xl font-semibold">{evidenceCount}</p>
+                  <p className="text-xs text-muted-foreground">documents mapped to compliance tasks</p>
+                </div>
+                <div className="rounded-lg border border-border/50 p-3 bg-background/40">
+                  <p className="text-xs text-muted-foreground">Drafting Engine</p>
+                  <p className="text-sm">Ready for notice replies, hearing notes, and filing packages.</p>
+                </div>
+                <Button className="w-full">Open Filing Workflow</Button>
               </CardContent>
             </Card>
           </section>
