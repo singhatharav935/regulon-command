@@ -49,6 +49,12 @@ const demoClients = [
   { id: "4", name: "DataSync Analytics", industry: "IT Services" },
 ];
 
+type ClientOption = {
+  id: string;
+  name: string;
+  industry: string;
+};
+
 const draftModes = [
   { id: "conservative", label: "Conservative", description: "Lowest risk, compliance-first language", color: "text-green-500" },
   { id: "balanced", label: "Balanced", description: "Standard industry practice", color: "text-yellow-500" },
@@ -182,6 +188,9 @@ const advancedChecksByType: Record<string, AdvancedCheck[]> = {
 };
 
 const AIDraftingEngine = () => {
+  const [clientOptions, setClientOptions] = useState<ClientOption[]>(demoClients);
+  const [clientSource, setClientSource] = useState<"demo" | "live">("demo");
+  const [isLoadingClients, setIsLoadingClients] = useState(false);
   const [selectedClient, setSelectedClient] = useState<string>("");
   const [selectedDocType, setSelectedDocType] = useState<string>("");
   const [lastTemplateDocType, setLastTemplateDocType] = useState<string>("");
@@ -208,6 +217,91 @@ const AIDraftingEngine = () => {
   const selectedDocLabel = documentTypes.find(doc => doc.id === selectedDocType)?.label || "Selected Draft";
   const docSpecificFormat = documentFormatModules[selectedDocType] || documentFormatModules["custom-draft"];
   const selectedTemplate = selectedDocType ? readyNoticeTemplates[selectedDocType] : "";
+
+  useEffect(() => {
+    let mounted = true;
+
+    const loadLiveClients = async () => {
+      setIsLoadingClients(true);
+      try {
+        const {
+          data: { user },
+        } = await supabase.auth.getUser();
+
+        if (!mounted) return;
+
+        if (!user) {
+          setClientOptions(demoClients);
+          setClientSource("demo");
+          return;
+        }
+
+        const { data: memberships, error: membershipError } = await supabase
+          .from("company_members")
+          .select("company_id")
+          .eq("user_id", user.id);
+
+        if (membershipError) {
+          throw membershipError;
+        }
+
+        const companyIds = Array.from(new Set((memberships ?? []).map((row) => row.company_id)));
+
+        if (companyIds.length === 0) {
+          setClientOptions(demoClients);
+          setClientSource("demo");
+          return;
+        }
+
+        const { data: companies, error: companyError } = await supabase
+          .from("companies")
+          .select("id, name, industry")
+          .in("id", companyIds)
+          .order("name", { ascending: true });
+
+        if (companyError) {
+          throw companyError;
+        }
+
+        if ((companies ?? []).length === 0) {
+          setClientOptions(demoClients);
+          setClientSource("demo");
+          return;
+        }
+
+        const mappedCompanies: ClientOption[] = (companies ?? []).map((company) => ({
+          id: company.id,
+          name: company.name,
+          industry: company.industry ?? "General",
+        }));
+
+        setClientOptions(mappedCompanies);
+        setClientSource("live");
+      } catch {
+        if (!mounted) return;
+        setClientOptions(demoClients);
+        setClientSource("demo");
+      } finally {
+        if (mounted) {
+          setIsLoadingClients(false);
+        }
+      }
+    };
+
+    loadLiveClients();
+
+    return () => {
+      mounted = false;
+    };
+  }, []);
+
+  useEffect(() => {
+    if (!selectedClient) return;
+    const exists = clientOptions.some((client) => client.id === selectedClient);
+    if (!exists) {
+      setSelectedClient("");
+    }
+  }, [clientOptions, selectedClient]);
 
   useEffect(() => {
     if (!selectedDocType) return;
@@ -265,7 +359,7 @@ const AIDraftingEngine = () => {
     setGenerationError(null);
     setDraftContent("");
     
-    const client = demoClients.find(c => c.id === selectedClient);
+    const client = clientOptions.find(c => c.id === selectedClient);
     
     try {
       let authToken = import.meta.env.VITE_SUPABASE_PUBLISHABLE_KEY as string;
@@ -431,13 +525,20 @@ const AIDraftingEngine = () => {
                     <SelectValue placeholder="Choose a company..." />
                   </SelectTrigger>
                   <SelectContent>
-                    {demoClients.map(client => (
+                    {clientOptions.map(client => (
                       <SelectItem key={client.id} value={client.id}>
                         {client.name} ({client.industry})
                       </SelectItem>
                     ))}
                   </SelectContent>
                 </Select>
+                <p className="text-xs text-muted-foreground mt-1">
+                  {isLoadingClients
+                    ? "Loading client list..."
+                    : clientSource === "live"
+                      ? "Live clients loaded from your account."
+                      : "Using demo clients (no live company mapping found)."}
+                </p>
               </div>
 
               {/* Document Type */}
