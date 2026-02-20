@@ -4,24 +4,24 @@ import {
   BarChart3,
   Bell,
   Bot,
-  BookOpen,
   CheckCircle2,
   ChevronRight,
   ClipboardList,
   CreditCard,
   FileCheck2,
+  FileSearch,
   Filter,
-  GraduationCap,
   Landmark,
   LayoutDashboard,
+  Lock,
   Plus,
   Receipt,
-  School,
+  Scale,
   Search,
   Settings,
   ShieldCheck,
   Sparkles,
-  Users,
+  UserCheck,
   Workflow,
 } from "lucide-react";
 import Navbar from "@/components/layout/Navbar";
@@ -35,20 +35,6 @@ import { useToast } from "@/hooks/use-toast";
 interface UniversityDashboardShellProps {
   mode: "demo" | "live";
 }
-
-type AdmissionItem = {
-  id?: string;
-  application_number: string;
-  applicant_name: string;
-  program_applied: string;
-  status: "submitted" | "under_review" | "accepted" | "rejected";
-};
-
-type PeopleItem = {
-  id: string;
-  name: string;
-  tag: string;
-};
 
 type InvoiceItem = {
   id?: string;
@@ -77,75 +63,64 @@ type FilingItem = {
 };
 
 type UniversityRole = "admin" | "registrar" | "finance" | "faculty" | "student";
-type DashboardPage =
-  | "executive"
+type CompliancePage =
+  | "command"
   | "roledesk"
-  | "admissions"
-  | "academics"
-  | "facultyops"
-  | "compliance"
+  | "statutory"
   | "finance"
+  | "procurement"
+  | "grants"
+  | "audit"
   | "workflow"
   | "copilot"
   | "analytics";
 
-const demoKpis = {
-  students: 8450,
-  faculty: 520,
-  programs: 74,
-  feeCollectionCrore: 62.4,
-  complianceScore: 94,
+type DashboardKpis = {
+  controlledSpendCrore: number;
+  openFilings: number;
+  overdueItems: number;
+  auditReadiness: number;
+  criticalAlerts: number;
+  evidenceMapped: number;
 };
 
-const demoAdmissions: AdmissionItem[] = [
-  { application_number: "JIIT-2026-1024", applicant_name: "Aarav Sharma", program_applied: "B.Tech CSE", status: "under_review" },
-  { application_number: "JIIT-2026-1028", applicant_name: "Ananya Gupta", program_applied: "B.Tech ECE", status: "accepted" },
-  { application_number: "JIIT-2026-1036", applicant_name: "Yash Mehta", program_applied: "MBA Tech", status: "submitted" },
-  { application_number: "JIIT-2026-1041", applicant_name: "Ishita Jain", program_applied: "M.Tech AI", status: "rejected" },
-];
-
-const demoStudents: PeopleItem[] = [
-  { id: "S-2211", name: "Ritika Bansal", tag: "CSE • Sem 6" },
-  { id: "S-2208", name: "Rohan Khanna", tag: "ECE • Sem 8" },
-  { id: "S-2331", name: "Nikita Verma", tag: "MBA Tech • Sem 2" },
-  { id: "S-2341", name: "Sarthak Raina", tag: "Data Science • Sem 4" },
-];
-
-const demoFaculty: PeopleItem[] = [
-  { id: "F-041", name: "Dr. P. A. Kumar", tag: "Dean Academics" },
-  { id: "F-052", name: "Prof. N. S. Batra", tag: "HOD CSE" },
-  { id: "F-071", name: "Dr. Meenal Saxena", tag: "Associate Professor" },
-  { id: "F-093", name: "Prof. Aditya Rao", tag: "Controller of Examination" },
-];
+const demoKpis: DashboardKpis = {
+  controlledSpendCrore: 62.4,
+  openFilings: 9,
+  overdueItems: 3,
+  auditReadiness: 94,
+  criticalAlerts: 2,
+  evidenceMapped: 128,
+};
 
 const demoInvoices: InvoiceItem[] = [
-  { invoice_number: "INV-2026-001", amount: 125000, status: "issued", due_date: "2026-03-12" },
-  { invoice_number: "INV-2026-014", amount: 140000, status: "partially_paid", due_date: "2026-03-15" },
-  { invoice_number: "INV-2026-028", amount: 118500, status: "overdue", due_date: "2026-02-27" },
-  { invoice_number: "INV-2026-033", amount: 98000, status: "paid", due_date: "2026-02-20" },
+  { invoice_number: "FIN-INV-2026-001", amount: 125000, status: "issued", due_date: "2026-03-12" },
+  { invoice_number: "FIN-INV-2026-014", amount: 140000, status: "partially_paid", due_date: "2026-03-15" },
+  { invoice_number: "FIN-INV-2026-028", amount: 118500, status: "overdue", due_date: "2026-02-27" },
+  { invoice_number: "FIN-INV-2026-033", amount: 98000, status: "paid", due_date: "2026-02-20" },
 ];
 
 const demoComplianceTasks: ComplianceTaskItem[] = [
   {
     id: "T-001",
-    title: "AICTE Annual Faculty Compliance",
-    authority: "AICTE",
+    title: "GST Annual Reconciliation DRC Matrix",
+    authority: "GST",
     due_date: "2026-03-22",
     priority: "high",
     status: "in_progress",
   },
   {
     id: "T-002",
-    title: "NAAC Criterion Evidence Consolidation",
-    authority: "NAAC",
+    title: "PF/ESI Payment Compliance Validation",
+    authority: "Labour",
     due_date: "2026-03-27",
     priority: "critical",
     status: "under_review",
   },
   {
     id: "T-003",
-    title: "UGC Academic Audit Submission",
-    authority: "UGC",
+    title: "Grant Utilization Certificate Pack",
+    authority: "State Dept",
     due_date: "2026-04-04",
     priority: "medium",
     status: "pending",
@@ -155,28 +130,47 @@ const demoComplianceTasks: ComplianceTaskItem[] = [
 const demoFilings: FilingItem[] = [
   {
     id: "F-001",
-    filing_name: "NIRF Data Sheet 2026",
-    authority: "NIRF",
-    period_label: "AY 2025-26",
+    filing_name: "GST Show Cause Reply - Q4",
+    authority: "GST",
+    period_label: "Q4 FY 2025-26",
     status: "submitted",
-    reference_number: "NIRF-REF-2026-991",
+    reference_number: "GST-REF-2026-991",
   },
   {
     id: "F-002",
-    filing_name: "AICTE Approved Intake Return",
-    authority: "AICTE",
-    period_label: "2026",
+    filing_name: "TDS/TCS Statement Rectification",
+    authority: "Income Tax",
+    period_label: "FY 2025-26",
     status: "under_review",
     reference_number: null,
   },
   {
     id: "F-003",
-    filing_name: "State Scholarship Utilization",
-    authority: "State Dept",
-    period_label: "Q4 2025-26",
+    filing_name: "Public Procurement Declaration",
+    authority: "Procurement Cell",
+    period_label: "Mar 2026",
     status: "pending",
     reference_number: null,
   },
+];
+
+const procurementRows = [
+  { id: "PO-2026-041", vendor: "Tech Grid Systems", amount: 4500000, stage: "under_review", control: "L1/L2 approval" },
+  { id: "PO-2026-043", vendor: "Secure Infra LLP", amount: 2200000, stage: "pending", control: "Tender note" },
+  { id: "PO-2026-049", vendor: "Campus Utility Co.", amount: 970000, stage: "submitted", control: "Invoice match" },
+];
+
+const grantRows = [
+  { grant: "State R&D Grant", budget: 12000000, utilized: 9300000, variance: "within limit", status: "reviewed" },
+  { grant: "Central Digital Infra", budget: 8000000, utilized: 7100000, variance: "watch", status: "pending" },
+  { grant: "Innovation Fund", budget: 6000000, utilized: 5800000, variance: "within limit", status: "submitted" },
+];
+
+const employeeComplianceRows = [
+  { area: "Code of Conduct Attestation", completion: "98%", owner: "HR Compliance", status: "healthy" },
+  { area: "Conflict of Interest Declarations", completion: "89%", owner: "Legal", status: "watch" },
+  { area: "Anti-Bribery Training", completion: "93%", owner: "Internal Audit", status: "healthy" },
+  { area: "Vendor Interaction Declarations", completion: "86%", owner: "Procurement", status: "watch" },
 ];
 
 const statusClass: Record<string, string> = {
@@ -185,88 +179,90 @@ const statusClass: Record<string, string> = {
   closed: "text-green-300",
   submitted: "text-green-300",
   under_review: "text-cyan-300",
-  accepted: "text-green-300",
-  rejected: "text-red-300",
   issued: "text-cyan-300",
   partially_paid: "text-yellow-300",
   paid: "text-green-300",
   overdue: "text-red-300",
   draft: "text-muted-foreground",
+  healthy: "text-green-300",
+  watch: "text-yellow-300",
 };
 
-const roleProfile: Record<UniversityRole, { title: string; outcomes: string[]; defaultPage: DashboardPage }> = {
+const roleMeta: Record<UniversityRole, { title: string; defaultPage: CompliancePage; mandate: string[] }> = {
   admin: {
-    title: "University Admin",
-    outcomes: ["Control institution risk and escalations", "Approve final filings and closures", "Track cross-department performance"],
-    defaultPage: "executive",
+    title: "Compliance Head",
+    defaultPage: "command",
+    mandate: ["Cross-sector compliance governance", "Final approvals and escalations", "Risk and closure accountability"],
   },
   registrar: {
-    title: "Registrar",
-    outcomes: ["Run admissions and records workflow", "Clear review queues", "Own academic-compliance SLAs"],
-    defaultPage: "admissions",
+    title: "Statutory Compliance Manager",
+    defaultPage: "statutory",
+    mandate: ["Statutory filing pipeline", "Notice/reply timelines", "Authority-wise closure discipline"],
   },
   finance: {
-    title: "Finance Controller",
-    outcomes: ["Control collection velocity", "Reduce overdues and leakage", "Reconcile invoices and payments"],
+    title: "Finance Compliance Controller",
     defaultPage: "finance",
+    mandate: ["Tax + payment control", "Ledger integrity and reconciliation", "Overdue and leakage containment"],
   },
   faculty: {
-    title: "Faculty/Department",
-    outcomes: ["Publish department evidence quickly", "Close academic action items", "Support filing submissions"],
-    defaultPage: "academics",
+    title: "Department Compliance SPOC",
+    defaultPage: "procurement",
+    mandate: ["Department spend compliance", "Evidence submission quality", "Procurement control checks"],
   },
   student: {
-    title: "Student Services",
-    outcomes: ["Assist application queries", "Support payment confirmations", "Track service response SLAs"],
+    title: "Employee Compliance Desk",
     defaultPage: "roledesk",
+    mandate: ["Policy acknowledgements", "Declaration completion", "Escalation and support routing"],
   },
 };
 
-const pageConfig: Array<{ id: DashboardPage; label: string; icon: any }> = [
-  { id: "executive", label: "Executive Command", icon: LayoutDashboard },
-  { id: "roledesk", label: "Role Desk", icon: School },
-  { id: "admissions", label: "Admissions Queue", icon: GraduationCap },
-  { id: "academics", label: "Academics Ops", icon: BookOpen },
-  { id: "facultyops", label: "Faculty Admin", icon: Users },
-  { id: "compliance", label: "Compliance Register", icon: ShieldCheck },
-  { id: "finance", label: "Finance Ledger", icon: Receipt },
-  { id: "workflow", label: "Approval Pipeline", icon: Workflow },
+const pageConfig: Array<{ id: CompliancePage; label: string; icon: any }> = [
+  { id: "command", label: "Command Center", icon: LayoutDashboard },
+  { id: "roledesk", label: "Employee Compliance Desk", icon: UserCheck },
+  { id: "statutory", label: "Statutory Filings", icon: FileCheck2 },
+  { id: "finance", label: "Finance Compliance", icon: CreditCard },
+  { id: "procurement", label: "Procurement Compliance", icon: Scale },
+  { id: "grants", label: "Grant Utilization", icon: Receipt },
+  { id: "audit", label: "Audit & Controls", icon: FileSearch },
+  { id: "workflow", label: "Approval Workflow", icon: Workflow },
   { id: "copilot", label: "AI Copilot", icon: Bot },
-  { id: "analytics", label: "Institution Analytics", icon: BarChart3 },
+  { id: "analytics", label: "Compliance Analytics", icon: BarChart3 },
 ];
 
-const roleCategoryMatrix: Record<
-  UniversityRole,
-  Array<{ category: string; owns: string; approvals: string; primaryPage: DashboardPage }>
-> = {
-  admin: [
-    { category: "Governance", owns: "Institution risk board", approvals: "Final sign-off", primaryPage: "executive" },
-    { category: "Compliance", owns: "Cross-authority escalation", approvals: "Critical closure", primaryPage: "compliance" },
-  ],
-  registrar: [
-    { category: "Admissions", owns: "Application lifecycle", approvals: "Review and move next", primaryPage: "admissions" },
-    { category: "Records", owns: "Academic workflows", approvals: "Academic clearance", primaryPage: "academics" },
-  ],
-  finance: [
-    { category: "Fees", owns: "Invoice and payment ledger", approvals: "Payment confirmation", primaryPage: "finance" },
-    { category: "Reconciliation", owns: "Outstanding recovery", approvals: "Ledger finalization", primaryPage: "finance" },
-  ],
-  faculty: [
-    { category: "Department Ops", owns: "Evidence and data packs", approvals: "Department submission", primaryPage: "academics" },
-    { category: "Compliance Input", owns: "Task evidence handoff", approvals: "Task completion", primaryPage: "compliance" },
-  ],
-  student: [
-    { category: "Student Services", owns: "Application support", approvals: "Request routing only", primaryPage: "roledesk" },
-    { category: "Payments Support", owns: "Payment issue intake", approvals: "No approval rights", primaryPage: "roledesk" },
-  ],
+const rolePageAccess: Record<UniversityRole, CompliancePage[]> = {
+  admin: ["command", "roledesk", "statutory", "finance", "procurement", "grants", "audit", "workflow", "copilot", "analytics"],
+  registrar: ["command", "statutory", "audit", "workflow", "copilot", "analytics"],
+  finance: ["command", "finance", "grants", "audit", "workflow", "analytics"],
+  faculty: ["roledesk", "procurement", "audit", "copilot"],
+  student: ["roledesk", "workflow"],
 };
 
-const rolePageAccess: Record<UniversityRole, DashboardPage[]> = {
-  admin: ["executive", "roledesk", "admissions", "academics", "facultyops", "compliance", "finance", "workflow", "copilot", "analytics"],
-  registrar: ["roledesk", "admissions", "academics", "compliance", "workflow", "copilot", "analytics"],
-  finance: ["roledesk", "finance", "workflow", "analytics", "copilot"],
-  faculty: ["roledesk", "academics", "facultyops", "compliance", "copilot"],
-  student: ["roledesk", "admissions"],
+const roleQueueMap: Record<UniversityRole, Array<{ title: string; sla: string; risk: string; section: string }>> = {
+  admin: [
+    { title: "Sign-off pending high-risk filing packs", sla: "24h", risk: "high", section: "statutory" },
+    { title: "Close critical procurement exception", sla: "48h", risk: "high", section: "procurement" },
+    { title: "Review audit deviation report", sla: "72h", risk: "medium", section: "audit" },
+  ],
+  registrar: [
+    { title: "Finalize GST reply under Section 73", sla: "24h", risk: "high", section: "statutory" },
+    { title: "Resolve pending DIN/RFN mismatch", sla: "36h", risk: "high", section: "statutory" },
+    { title: "Push filing packet to final approval", sla: "48h", risk: "medium", section: "workflow" },
+  ],
+  finance: [
+    { title: "Reconcile overdue tax-linked invoices", sla: "24h", risk: "high", section: "finance" },
+    { title: "Validate grant utilization variance", sla: "48h", risk: "medium", section: "grants" },
+    { title: "Confirm payroll statutory deductions", sla: "72h", risk: "medium", section: "finance" },
+  ],
+  faculty: [
+    { title: "Upload procurement evidence pack", sla: "24h", risk: "medium", section: "procurement" },
+    { title: "Close department compliance checklist", sla: "48h", risk: "medium", section: "audit" },
+    { title: "Respond to reviewer observations", sla: "72h", risk: "low", section: "workflow" },
+  ],
+  student: [
+    { title: "Complete policy attestation acknowledgement", sla: "24h", risk: "medium", section: "roledesk" },
+    { title: "Submit conflict declaration", sla: "48h", risk: "medium", section: "roledesk" },
+    { title: "Escalate unresolved compliance ticket", sla: "72h", risk: "low", section: "workflow" },
+  ],
 };
 
 const formatCurrency = (amount: number) => `₹${amount.toLocaleString()}`;
@@ -275,18 +271,15 @@ const UniversityDashboardShell = ({ mode }: UniversityDashboardShellProps) => {
   const supabaseAny = supabase as any;
   const { toast } = useToast();
 
-  const [viewerName, setViewerName] = useState("University Team");
+  const [viewerName, setViewerName] = useState("Compliance Team");
   const [viewerRole, setViewerRole] = useState<UniversityRole>("student");
-  const [demoRole, setDemoRole] = useState<UniversityRole>("registrar");
-  const [activePage, setActivePage] = useState<DashboardPage>("executive");
+  const [demoRole, setDemoRole] = useState<UniversityRole>("admin");
+  const [activePage, setActivePage] = useState<CompliancePage>("command");
   const [universityId, setUniversityId] = useState<string | null>(null);
   const [source, setSource] = useState<"demo" | "live">("demo");
   const [actionBusy, setActionBusy] = useState<string | null>(null);
 
-  const [kpis, setKpis] = useState(demoKpis);
-  const [admissions, setAdmissions] = useState<AdmissionItem[]>(demoAdmissions);
-  const [students, setStudents] = useState<PeopleItem[]>(demoStudents);
-  const [faculty, setFaculty] = useState<PeopleItem[]>(demoFaculty);
+  const [kpis, setKpis] = useState<DashboardKpis>(demoKpis);
   const [invoices, setInvoices] = useState<InvoiceItem[]>(demoInvoices);
   const [complianceTasks, setComplianceTasks] = useState<ComplianceTaskItem[]>(demoComplianceTasks);
   const [filings, setFilings] = useState<FilingItem[]>(demoFilings);
@@ -301,7 +294,7 @@ const UniversityDashboardShell = ({ mode }: UniversityDashboardShellProps) => {
 
     let mounted = true;
 
-    const loadLiveUniversity = async () => {
+    const loadLiveCompliance = async () => {
       try {
         const {
           data: { user },
@@ -336,66 +329,46 @@ const UniversityDashboardShell = ({ mode }: UniversityDashboardShellProps) => {
           setViewerRole((membership?.role as UniversityRole) || "student");
         }
 
-        const [studentsRes, facultyRes, admissionsRes, invoicesRes, tasksRes, filingsRes, evidenceRes] = await Promise.all([
-          supabaseAny.from("university_students").select("id, full_name, program, semester").eq("university_id", scopedUniversityId).limit(5000),
-          supabaseAny.from("university_faculty").select("id, full_name, designation").eq("university_id", scopedUniversityId).limit(2000),
-          supabaseAny.from("university_admissions").select("id, application_number, applicant_name, program_applied, status").eq("university_id", scopedUniversityId).order("updated_at", { ascending: false }).limit(20),
-          supabaseAny.from("university_fee_invoices").select("id, invoice_number, total_amount, status, due_date").eq("university_id", scopedUniversityId).order("created_at", { ascending: false }).limit(20),
-          supabaseAny.from("university_compliance_tasks").select("id, title, authority, due_date, priority, status").eq("university_id", scopedUniversityId).order("due_date", { ascending: true }).limit(20),
-          supabaseAny.from("university_compliance_filings").select("id, filing_name, authority, period_label, status, reference_number").eq("university_id", scopedUniversityId).order("updated_at", { ascending: false }).limit(20),
+        const [invoicesRes, tasksRes, filingsRes, evidenceRes] = await Promise.all([
+          supabaseAny.from("university_fee_invoices").select("id, invoice_number, total_amount, status, due_date").eq("university_id", scopedUniversityId).order("created_at", { ascending: false }).limit(30),
+          supabaseAny.from("university_compliance_tasks").select("id, title, authority, due_date, priority, status").eq("university_id", scopedUniversityId).order("due_date", { ascending: true }).limit(30),
+          supabaseAny.from("university_compliance_filings").select("id, filing_name, authority, period_label, status, reference_number").eq("university_id", scopedUniversityId).order("updated_at", { ascending: false }).limit(30),
           supabaseAny.from("university_compliance_evidence").select("id", { count: "exact", head: true }).eq("university_id", scopedUniversityId),
         ]);
 
-        const studentsData = studentsRes.data ?? [];
-        const facultyData = facultyRes.data ?? [];
-        const admissionsData = admissionsRes.data ?? [];
         const invoicesData = invoicesRes.data ?? [];
         const tasksData = tasksRes.data ?? [];
         const filingsData = filingsRes.data ?? [];
 
-        const paidAmount = invoicesData
-          .filter((i: any) => i.status === "paid")
-          .reduce((sum: number, i: any) => sum + Number(i.total_amount || 0), 0);
-
         if (!mounted) return;
+
+        const totalControlledSpend = invoicesData.reduce((sum: number, row: any) => sum + Number(row.total_amount || 0), 0);
+        const overdueItems = invoicesData.filter((row: any) => row.status === "overdue").length;
+        const openFilings = filingsData.filter((row: any) => row.status !== "submitted" && row.status !== "closed").length;
+        const criticalAlerts = tasksData.filter((row: any) => row.priority === "critical" && row.status !== "closed").length + overdueItems;
 
         setSource("live");
         setKpis({
-          students: studentsData.length,
-          faculty: facultyData.length,
-          programs: new Set(studentsData.map((s: any) => s.program)).size || demoKpis.programs,
-          feeCollectionCrore: Number((paidAmount / 10000000).toFixed(2)),
-          complianceScore: demoKpis.complianceScore,
+          controlledSpendCrore: Number((totalControlledSpend / 10000000).toFixed(2)),
+          openFilings,
+          overdueItems,
+          auditReadiness: 94,
+          criticalAlerts,
+          evidenceMapped: typeof evidenceRes.count === "number" ? evidenceRes.count : 0,
         });
 
-        setStudents(
-          studentsData.slice(0, 12).map((s: any) => ({
-            id: s.id,
-            name: s.full_name,
-            tag: `${s.program || "Program"}${s.semester ? ` • Sem ${s.semester}` : ""}`,
-          }))
-        );
-
-        setFaculty(
-          facultyData.slice(0, 12).map((f: any) => ({
-            id: f.id,
-            name: f.full_name,
-            tag: f.designation || "Faculty",
-          }))
-        );
-
-        setAdmissions(admissionsData.length > 0 ? admissionsData : demoAdmissions);
         setInvoices(
           invoicesData.length > 0
-            ? invoicesData.map((inv: any) => ({
-                id: inv.id,
-                invoice_number: inv.invoice_number,
-                amount: Number(inv.total_amount || 0),
-                status: inv.status,
-                due_date: inv.due_date,
+            ? invoicesData.map((row: any) => ({
+                id: row.id,
+                invoice_number: row.invoice_number,
+                amount: Number(row.total_amount || 0),
+                status: row.status,
+                due_date: row.due_date,
               }))
             : demoInvoices
         );
+
         setComplianceTasks(tasksData.length > 0 ? tasksData : demoComplianceTasks);
         setFilings(filingsData.length > 0 ? filingsData : demoFilings);
         setEvidenceCount(typeof evidenceRes.count === "number" ? evidenceRes.count : 128);
@@ -406,7 +379,7 @@ const UniversityDashboardShell = ({ mode }: UniversityDashboardShellProps) => {
       }
     };
 
-    loadLiveUniversity();
+    loadLiveCompliance();
 
     return () => {
       mounted = false;
@@ -416,110 +389,30 @@ const UniversityDashboardShell = ({ mode }: UniversityDashboardShellProps) => {
   const effectiveRole = mode === "demo" ? demoRole : viewerRole;
 
   useEffect(() => {
-    setActivePage(roleProfile[effectiveRole].defaultPage);
+    setActivePage(roleMeta[effectiveRole].defaultPage);
   }, [effectiveRole]);
 
   const instituteName =
     mode === "demo"
       ? "JAYPEE INSTITUTE OF INFORMATION TECHNOLOGY"
       : source === "live"
-        ? "University Live Operations Workspace"
-        : "Your University Workspace (Demo Fallback)";
-
-  const admissionsBreakdown = useMemo(
-    () => ({
-      submitted: admissions.filter((a) => a.status === "submitted").length,
-      under_review: admissions.filter((a) => a.status === "under_review").length,
-      accepted: admissions.filter((a) => a.status === "accepted").length,
-      rejected: admissions.filter((a) => a.status === "rejected").length,
-    }),
-    [admissions]
-  );
-
-  const feeSummary = useMemo(() => {
-    const total = invoices.reduce((sum, inv) => sum + inv.amount, 0);
-    const collected = invoices.filter((i) => i.status === "paid").reduce((sum, inv) => sum + inv.amount, 0);
-    const outstanding = invoices
-      .filter((i) => i.status === "issued" || i.status === "partially_paid" || i.status === "overdue")
-      .reduce((sum, inv) => sum + inv.amount, 0);
-    return {
-      total,
-      collected,
-      outstanding,
-      velocity: total > 0 ? Math.round((collected / total) * 100) : 0,
-      overdueCount: invoices.filter((i) => i.status === "overdue").length,
-    };
-  }, [invoices]);
+        ? "Institution Compliance Workspace"
+        : "Institution Workspace (Demo Fallback)";
 
   const complianceSummary = useMemo(() => {
     const openFilings = filings.filter((f) => f.status !== "submitted" && f.status !== "closed").length;
-    const atRiskFilings = filings.filter((f) => f.status === "pending" || f.status === "overdue").length;
     const pendingApprovals =
       filings.filter((f) => f.status === "under_review").length +
-      complianceTasks.filter((t) => t.status === "under_review").length +
-      admissions.filter((a) => a.status === "under_review").length;
-    const criticalAlerts =
-      complianceTasks.filter((t) => t.priority === "critical" && t.status !== "closed").length +
-      invoices.filter((i) => i.status === "overdue").length;
-    return { openFilings, atRiskFilings, pendingApprovals, criticalAlerts };
-  }, [admissions, complianceTasks, filings, invoices]);
+      complianceTasks.filter((t) => t.status === "under_review").length;
+    return { openFilings, pendingApprovals };
+  }, [filings, complianceTasks]);
 
-  const complianceHeatmap = useMemo(() => {
-    const authorities = ["AICTE", "UGC", "NAAC", "NIRF", "State Dept"];
-    return authorities.map((authority) => {
-      const tasks = complianceTasks.filter((t) => t.authority === authority);
-      const authorityFilings = filings.filter((f) => f.authority === authority);
-      const total = tasks.length + authorityFilings.length;
-      const done =
-        tasks.filter((t) => t.status === "submitted" || t.status === "closed").length +
-        authorityFilings.filter((f) => f.status === "submitted" || f.status === "closed").length;
-      const score = total === 0 ? 90 : Math.max(50, Math.round((done / total) * 100));
-      return { authority, score, openItems: total - done };
-    });
-  }, [complianceTasks, filings]);
-
-  const actionQueue = [
-    { title: "Close registrar review queue", owner: "registrar", sla: "24h", risk: "high" },
-    { title: "Recover overdue student invoices", owner: "finance", sla: "48h", risk: "high" },
-    { title: "Submit NAAC evidence packet", owner: "faculty", sla: "36h", risk: "medium" },
-    { title: "Finalize intake return filing", owner: "registrar", sla: "72h", risk: "medium" },
-    { title: "Publish weekly VC brief", owner: "admin", sla: "EOD", risk: "low" },
-  ];
-
-  const myRoleQueue = useMemo(
-    () => actionQueue.filter((item) => item.owner === effectiveRole || effectiveRole === "admin"),
-    [actionQueue, effectiveRole]
-  );
-
-  const visiblePages = useMemo(
-    () => pageConfig.filter((page) => rolePageAccess[effectiveRole].includes(page.id)),
-    [effectiveRole]
-  );
-
-  const workflowTrail = [
-    { stage: "Maker", actor: "Department Coordinator", status: "completed", timestamp: "2026-02-18 10:32" },
-    { stage: "Reviewer", actor: "Registrar Office", status: "completed", timestamp: "2026-02-18 15:05" },
-    { stage: "Finance Check", actor: "Finance Controller", status: "in_progress", timestamp: "2026-02-20 09:40" },
-    { stage: "Final Sign-off", actor: "University Admin", status: "pending", timestamp: "Awaited" },
-  ];
-
-  const copilotRecommendations = [
-    "Escalate AICTE filing F-002 due to 5-day review delay.",
-    "NAAC evidence completeness below threshold in 2 sub-criteria.",
-    "Trigger parent reminders for invoices overdue above 15 days.",
-    "Registrar can close 3 pending actions to reduce risk band from Medium to Low.",
-  ];
+  const myRoleQueue = useMemo(() => roleQueueMap[effectiveRole], [effectiveRole]);
+  const visiblePages = useMemo(() => pageConfig.filter((p) => rolePageAccess[effectiveRole].includes(p.id)), [effectiveRole]);
 
   const isLiveWritable = mode === "live" && source === "live" && !!universityId;
-  const canManageAdmissions = effectiveRole === "admin" || effectiveRole === "registrar";
-  const canManageFinance = effectiveRole === "admin" || effectiveRole === "registrar" || effectiveRole === "finance";
+  const canManageFinance = effectiveRole === "admin" || effectiveRole === "finance";
   const canManageCompliance = effectiveRole === "admin" || effectiveRole === "registrar" || effectiveRole === "faculty";
-
-  const nextAdmissionStatus = (status: AdmissionItem["status"]): AdmissionItem["status"] => {
-    if (status === "submitted") return "under_review";
-    if (status === "under_review") return "accepted";
-    return status;
-  };
 
   const nextComplianceStatus = (status: ComplianceTaskItem["status"]): ComplianceTaskItem["status"] => {
     if (status === "pending") return "in_progress";
@@ -529,69 +422,10 @@ const UniversityDashboardShell = ({ mode }: UniversityDashboardShellProps) => {
     return status;
   };
 
-  const handleCreateAdmission = async () => {
-    if (!canManageAdmissions) return;
-    const seed = Date.now().toString().slice(-4);
-    const payload: AdmissionItem = {
-      application_number: `AUTO-${new Date().getFullYear()}-${seed}`,
-      applicant_name: "New Applicant",
-      program_applied: "Program Pending Allocation",
-      status: "submitted",
-    };
-
-    try {
-      setActionBusy("admission-create");
-      if (isLiveWritable) {
-        const { error } = await supabaseAny.from("university_admissions").insert({
-          university_id: universityId,
-          application_number: payload.application_number,
-          applicant_name: payload.applicant_name,
-          program_applied: payload.program_applied,
-          status: payload.status,
-        });
-        if (error) throw error;
-      }
-      setAdmissions((prev) => [payload, ...prev].slice(0, 20));
-      toast({ title: "Admission Added", description: "New application has been queued for review." });
-    } catch (error: any) {
-      toast({ title: "Action failed", description: error?.message ?? "Could not create admission.", variant: "destructive" });
-    } finally {
-      setActionBusy(null);
-    }
-  };
-
-  const handleAdvanceAdmission = async (admission: AdmissionItem) => {
-    if (!canManageAdmissions) return;
-    const nextStatus = nextAdmissionStatus(admission.status);
-    if (nextStatus === admission.status) return;
-
-    try {
-      setActionBusy(`admission-${admission.application_number}`);
-      if (isLiveWritable) {
-        const { error } = await supabaseAny
-          .from("university_admissions")
-          .update({ status: nextStatus })
-          .eq("university_id", universityId)
-          .eq("application_number", admission.application_number);
-        if (error) throw error;
-      }
-      setAdmissions((prev) =>
-        prev.map((item) =>
-          item.application_number === admission.application_number ? { ...item, status: nextStatus } : item
-        )
-      );
-      toast({ title: "Admission Updated", description: `Moved to ${nextStatus.replace("_", " ")}.` });
-    } catch (error: any) {
-      toast({ title: "Action failed", description: error?.message ?? "Could not update admission.", variant: "destructive" });
-    } finally {
-      setActionBusy(null);
-    }
-  };
-
   const handleCreateInvoice = async () => {
     if (!canManageFinance) return;
     const seed = Date.now().toString().slice(-4);
-    const invoiceNumber = `INV-${new Date().getFullYear()}-${seed}`;
+    const invoiceNumber = `FIN-INV-${new Date().getFullYear()}-${seed}`;
     const dueDate = new Date();
     dueDate.setDate(dueDate.getDate() + 14);
     const payload: InvoiceItem = {
@@ -613,8 +447,8 @@ const UniversityDashboardShell = ({ mode }: UniversityDashboardShellProps) => {
         });
         if (error) throw error;
       }
-      setInvoices((prev) => [payload, ...prev].slice(0, 20));
-      toast({ title: "Invoice Created", description: "Fee invoice added to finance queue." });
+      setInvoices((prev) => [payload, ...prev].slice(0, 30));
+      toast({ title: "Financial Record Added", description: "Invoice added to compliance ledger." });
     } catch (error: any) {
       toast({ title: "Action failed", description: error?.message ?? "Could not create invoice.", variant: "destructive" });
     } finally {
@@ -634,21 +468,11 @@ const UniversityDashboardShell = ({ mode }: UniversityDashboardShellProps) => {
           .eq("id", invoice.id)
           .eq("university_id", universityId);
         if (invoiceError) throw invoiceError;
-
-        const { error: paymentError } = await supabaseAny.from("university_fee_payments").insert({
-          university_id: universityId,
-          invoice_id: invoice.id,
-          amount: invoice.amount,
-          paid_on: new Date().toISOString().slice(0, 10),
-          payment_method: "portal",
-          reference_number: `PAY-${Date.now().toString().slice(-6)}`,
-        });
-        if (paymentError) throw paymentError;
       }
-      setInvoices((prev) => prev.map((item) => (item.invoice_number === invoice.invoice_number ? { ...item, status: "paid" } : item)));
-      toast({ title: "Payment Recorded", description: `${invoice.invoice_number} marked as paid.` });
+      setInvoices((prev) => prev.map((row) => (row.invoice_number === invoice.invoice_number ? { ...row, status: "paid" } : row)));
+      toast({ title: "Ledger Updated", description: `${invoice.invoice_number} marked paid.` });
     } catch (error: any) {
-      toast({ title: "Action failed", description: error?.message ?? "Could not record payment.", variant: "destructive" });
+      toast({ title: "Action failed", description: error?.message ?? "Could not update invoice.", variant: "destructive" });
     } finally {
       setActionBusy(null);
     }
@@ -662,7 +486,7 @@ const UniversityDashboardShell = ({ mode }: UniversityDashboardShellProps) => {
     const payload: ComplianceTaskItem = {
       id: `tmp-task-${seed}`,
       title: "New Compliance Task",
-      authority: "UGC",
+      authority: "Regulatory",
       due_date: dueDate.toISOString().slice(0, 10),
       priority: "medium",
       status: "pending",
@@ -681,8 +505,8 @@ const UniversityDashboardShell = ({ mode }: UniversityDashboardShellProps) => {
         });
         if (error) throw error;
       }
-      setComplianceTasks((prev) => [payload, ...prev].slice(0, 20));
-      toast({ title: "Task Added", description: "Compliance task has been added." });
+      setComplianceTasks((prev) => [payload, ...prev].slice(0, 30));
+      toast({ title: "Task Created", description: "Compliance task added." });
     } catch (error: any) {
       toast({ title: "Action failed", description: error?.message ?? "Could not create task.", variant: "destructive" });
     } finally {
@@ -705,43 +529,10 @@ const UniversityDashboardShell = ({ mode }: UniversityDashboardShellProps) => {
           .eq("university_id", universityId);
         if (error) throw error;
       }
-      setComplianceTasks((prev) => prev.map((item) => (item.id === task.id ? { ...item, status: nextStatus } : item)));
-      toast({ title: "Task Progressed", description: `Task moved to ${nextStatus.replace("_", " ")}.` });
+      setComplianceTasks((prev) => prev.map((row) => (row.id === task.id ? { ...row, status: nextStatus } : row)));
+      toast({ title: "Task Updated", description: `Moved to ${nextStatus.replace("_", " ")}.` });
     } catch (error: any) {
-      toast({ title: "Action failed", description: error?.message ?? "Could not progress task.", variant: "destructive" });
-    } finally {
-      setActionBusy(null);
-    }
-  };
-
-  const handleCreateFiling = async () => {
-    if (!canManageCompliance) return;
-    const seed = Date.now().toString().slice(-4);
-    const payload: FilingItem = {
-      id: `tmp-filing-${seed}`,
-      filing_name: "New Filing Pack",
-      authority: "AICTE",
-      period_label: `Cycle ${new Date().getFullYear()}`,
-      status: "pending",
-      reference_number: null,
-    };
-
-    try {
-      setActionBusy("filing-create");
-      if (isLiveWritable) {
-        const { error } = await supabaseAny.from("university_compliance_filings").insert({
-          university_id: universityId,
-          filing_name: payload.filing_name,
-          authority: payload.authority,
-          period_label: payload.period_label,
-          status: payload.status,
-        });
-        if (error) throw error;
-      }
-      setFilings((prev) => [payload, ...prev].slice(0, 20));
-      toast({ title: "Filing Added", description: "New filing draft is ready." });
-    } catch (error: any) {
-      toast({ title: "Action failed", description: error?.message ?? "Could not create filing.", variant: "destructive" });
+      toast({ title: "Action failed", description: error?.message ?? "Could not update task.", variant: "destructive" });
     } finally {
       setActionBusy(null);
     }
@@ -762,209 +553,104 @@ const UniversityDashboardShell = ({ mode }: UniversityDashboardShellProps) => {
           .eq("university_id", universityId);
         if (error) throw error;
       }
-      setFilings((prev) => prev.map((item) => (item.id === filing.id ? { ...item, status: nextStatus } : item)));
-      toast({ title: "Filing Progressed", description: `Filing moved to ${nextStatus.replace("_", " ")}.` });
+      setFilings((prev) => prev.map((row) => (row.id === filing.id ? { ...row, status: nextStatus } : row)));
+      toast({ title: "Filing Updated", description: `Moved to ${nextStatus.replace("_", " ")}.` });
     } catch (error: any) {
-      toast({ title: "Action failed", description: error?.message ?? "Could not progress filing.", variant: "destructive" });
+      toast({ title: "Action failed", description: error?.message ?? "Could not update filing.", variant: "destructive" });
     } finally {
       setActionBusy(null);
     }
   };
 
+  const renderCommandCenter = () => (
+    <div className="space-y-4">
+      <div className="grid grid-cols-1 sm:grid-cols-2 xl:grid-cols-4 gap-4">
+        <Card className="bg-card/50 border-border/50"><CardHeader className="pb-2"><CardTitle className="text-xs text-muted-foreground">Open Filings</CardTitle></CardHeader><CardContent><p className="text-2xl font-semibold text-cyan-300">{kpis.openFilings}</p></CardContent></Card>
+        <Card className="bg-card/50 border-border/50"><CardHeader className="pb-2"><CardTitle className="text-xs text-muted-foreground">Overdue Items</CardTitle></CardHeader><CardContent><p className="text-2xl font-semibold text-yellow-300">{kpis.overdueItems}</p></CardContent></Card>
+        <Card className="bg-card/50 border-border/50"><CardHeader className="pb-2"><CardTitle className="text-xs text-muted-foreground">Pending Approvals</CardTitle></CardHeader><CardContent><p className="text-2xl font-semibold">{complianceSummary.pendingApprovals}</p></CardContent></Card>
+        <Card className="bg-card/50 border-border/50"><CardHeader className="pb-2"><CardTitle className="text-xs text-muted-foreground">Critical Alerts</CardTitle></CardHeader><CardContent><p className="text-2xl font-semibold text-red-300">{kpis.criticalAlerts}</p></CardContent></Card>
+      </div>
+
+      <Card className="bg-card/50 border-border/50">
+        <CardHeader><CardTitle className="text-lg flex items-center gap-2"><Landmark className="w-5 h-5 text-primary" /> Role-Owned Action Queue</CardTitle></CardHeader>
+        <CardContent className="space-y-2">
+          {myRoleQueue.map((q) => (
+            <div key={q.title} className="rounded border border-border/50 p-3 flex flex-wrap justify-between gap-2 text-sm">
+              <span>{q.title}</span>
+              <span className="text-muted-foreground">SLA {q.sla} • {q.risk} • {q.section}</span>
+            </div>
+          ))}
+        </CardContent>
+      </Card>
+    </div>
+  );
+
   const renderRoleDesk = () => (
     <div className="grid grid-cols-1 lg:grid-cols-3 gap-4">
       <Card className="bg-card/50 border-border/50 lg:col-span-2">
-        <CardHeader>
-          <CardTitle className="text-lg flex items-center gap-2"><School className="w-5 h-5 text-primary" /> {roleProfile[effectiveRole].title} Desk</CardTitle>
-        </CardHeader>
+        <CardHeader><CardTitle className="text-lg flex items-center gap-2"><UserCheck className="w-5 h-5 text-primary" /> {roleMeta[effectiveRole].title}</CardTitle></CardHeader>
         <CardContent className="space-y-2 text-sm">
-          {roleProfile[effectiveRole].outcomes.map((line) => (
+          {roleMeta[effectiveRole].mandate.map((line) => (
             <div key={line} className="rounded border border-border/50 px-3 py-2">{line}</div>
           ))}
         </CardContent>
       </Card>
       <Card className="bg-card/50 border-border/50">
-        <CardHeader>
-          <CardTitle className="text-lg flex items-center gap-2"><ClipboardList className="w-5 h-5 text-primary" /> My SLA Queue</CardTitle>
-        </CardHeader>
+        <CardHeader><CardTitle className="text-lg flex items-center gap-2"><ClipboardList className="w-5 h-5 text-primary" /> My Queue</CardTitle></CardHeader>
         <CardContent className="space-y-2 text-sm">
-          {myRoleQueue.slice(0, 5).map((a) => (
-            <div key={a.title} className="rounded border border-border/50 px-3 py-2">
-              <p>{a.title}</p>
-              <p className="text-xs text-muted-foreground mt-1">{a.owner.toUpperCase()} • SLA {a.sla} • {a.risk}</p>
+          {myRoleQueue.map((q) => (
+            <div key={q.title} className="rounded border border-border/50 p-2">
+              <p>{q.title}</p>
+              <p className="text-xs text-muted-foreground mt-1">{q.sla} • {q.risk}</p>
             </div>
           ))}
-          {myRoleQueue.length === 0 ? <p className="text-xs text-muted-foreground">No active items for this role.</p> : null}
         </CardContent>
       </Card>
     </div>
   );
 
-  const renderExecutive = () => (
-    <div className="space-y-4">
-      <div className="grid grid-cols-1 sm:grid-cols-2 xl:grid-cols-4 gap-4">
-        <Card className="bg-card/50 border-border/50"><CardHeader className="pb-2"><CardTitle className="text-xs text-muted-foreground">Critical Alerts</CardTitle></CardHeader><CardContent><p className="text-2xl font-semibold text-red-300">{complianceSummary.criticalAlerts}</p></CardContent></Card>
-        <Card className="bg-card/50 border-border/50"><CardHeader className="pb-2"><CardTitle className="text-xs text-muted-foreground">At-Risk Filings</CardTitle></CardHeader><CardContent><p className="text-2xl font-semibold text-yellow-300">{complianceSummary.atRiskFilings}</p></CardContent></Card>
-        <Card className="bg-card/50 border-border/50"><CardHeader className="pb-2"><CardTitle className="text-xs text-muted-foreground">Pending Approvals</CardTitle></CardHeader><CardContent><p className="text-2xl font-semibold text-cyan-300">{complianceSummary.pendingApprovals}</p></CardContent></Card>
-        <Card className="bg-card/50 border-border/50"><CardHeader className="pb-2"><CardTitle className="text-xs text-muted-foreground">Collection Velocity</CardTitle></CardHeader><CardContent><p className="text-2xl font-semibold">{feeSummary.velocity}%</p></CardContent></Card>
-      </div>
-
-      <Card className="bg-card/50 border-border/50">
-        <CardHeader>
-          <CardTitle className="text-lg flex items-center gap-2"><Landmark className="w-5 h-5 text-primary" /> Institutional War-Room Queue</CardTitle>
-        </CardHeader>
-        <CardContent>
-          <div className="overflow-x-auto">
-            <table className="w-full text-sm">
-              <thead>
-                <tr className="text-left text-muted-foreground border-b border-border/50">
-                  <th className="py-2 pr-4">Action</th>
-                  <th className="py-2 pr-4">Owner</th>
-                  <th className="py-2 pr-4">SLA</th>
-                  <th className="py-2 pr-4">Risk</th>
-                  <th className="py-2 pr-4">Next</th>
-                </tr>
-              </thead>
-              <tbody>
-                {actionQueue.map((row) => (
-                  <tr key={row.title} className="border-b border-border/30">
-                    <td className="py-2 pr-4">{row.title}</td>
-                    <td className="py-2 pr-4">{row.owner}</td>
-                    <td className="py-2 pr-4">{row.sla}</td>
-                    <td className={`py-2 pr-4 ${row.risk === "high" ? "text-red-300" : row.risk === "medium" ? "text-yellow-300" : "text-green-300"}`}>{row.risk}</td>
-                    <td className="py-2 pr-4"><Button size="sm" variant="ghost">Open</Button></td>
-                  </tr>
-                ))}
-              </tbody>
-            </table>
-          </div>
-        </CardContent>
-      </Card>
-    </div>
-  );
-
-  const renderAdmissions = () => (
+  const renderStatutory = () => (
     <Card className="bg-card/50 border-border/50">
-      <CardHeader>
-        <CardTitle className="text-lg flex items-center justify-between gap-2">
-          <span className="flex items-center gap-2"><GraduationCap className="w-5 h-5 text-primary" /> Admissions Processing Queue</span>
-          <div className="flex gap-2">
-            <Badge variant="outline">Submitted {admissionsBreakdown.submitted}</Badge>
-            <Badge variant="outline">Review {admissionsBreakdown.under_review}</Badge>
-            {canManageAdmissions ? <Button size="sm" variant="outline" onClick={handleCreateAdmission} disabled={actionBusy === "admission-create"}><Plus className="w-3 h-3 mr-1" /> New App</Button> : null}
-          </div>
-        </CardTitle>
-      </CardHeader>
-      <CardContent>
+      <CardHeader><CardTitle className="text-lg flex items-center justify-between gap-2"><span className="flex items-center gap-2"><FileCheck2 className="w-5 h-5 text-primary" /> Statutory Filing Register</span>{canManageCompliance ? <Button size="sm" variant="outline" onClick={handleCreateTask} disabled={actionBusy === "task-create"}><Plus className="w-3 h-3 mr-1" /> Task</Button> : null}</CardTitle></CardHeader>
+      <CardContent className="space-y-4">
         <div className="overflow-x-auto">
           <table className="w-full text-sm">
             <thead>
               <tr className="text-left text-muted-foreground border-b border-border/50">
-                <th className="py-2 pr-4">Application No.</th>
-                <th className="py-2 pr-4">Applicant</th>
-                <th className="py-2 pr-4">Program</th>
-                <th className="py-2 pr-4">Status</th>
-                <th className="py-2 pr-4">Actions</th>
+                <th className="py-2 pr-4">Task</th><th className="py-2 pr-4">Authority</th><th className="py-2 pr-4">Due</th><th className="py-2 pr-4">Priority</th><th className="py-2 pr-4">Status</th><th className="py-2 pr-4">Action</th>
               </tr>
             </thead>
             <tbody>
-              {admissions.slice(0, 12).map((a) => (
-                <tr key={a.application_number} className="border-b border-border/30">
-                  <td className="py-2 pr-4">{a.application_number}</td>
-                  <td className="py-2 pr-4">{a.applicant_name}</td>
-                  <td className="py-2 pr-4">{a.program_applied}</td>
-                  <td className={`py-2 pr-4 ${statusClass[a.status] || "text-muted-foreground"}`}>{a.status.replace("_", " ")}</td>
-                  <td className="py-2 pr-4 flex gap-2">
-                    <Button size="sm" variant="ghost">Open</Button>
-                    {canManageAdmissions && (a.status === "submitted" || a.status === "under_review") ? (
-                      <Button size="sm" variant="ghost" disabled={actionBusy === `admission-${a.application_number}`} onClick={() => void handleAdvanceAdmission(a)}>Move Next</Button>
-                    ) : null}
-                  </td>
+              {complianceTasks.slice(0, 10).map((t) => (
+                <tr key={t.id} className="border-b border-border/30">
+                  <td className="py-2 pr-4">{t.title}</td>
+                  <td className="py-2 pr-4">{t.authority}</td>
+                  <td className="py-2 pr-4">{t.due_date ?? "TBD"}</td>
+                  <td className="py-2 pr-4">{t.priority}</td>
+                  <td className={`py-2 pr-4 ${statusClass[t.status] || "text-muted-foreground"}`}>{t.status.replace("_", " ")}</td>
+                  <td className="py-2 pr-4">{canManageCompliance && t.status !== "closed" ? <Button size="sm" variant="ghost" onClick={() => void handleAdvanceTask(t)} disabled={actionBusy === `task-${t.id}`}>Advance</Button> : "-"}</td>
                 </tr>
               ))}
             </tbody>
           </table>
         </div>
-      </CardContent>
-    </Card>
-  );
 
-  const renderAcademics = () => (
-    <div className="grid grid-cols-1 lg:grid-cols-3 gap-4">
-      <Card className="bg-card/50 border-border/50 lg:col-span-2">
-        <CardHeader>
-          <CardTitle className="text-lg flex items-center gap-2"><BookOpen className="w-5 h-5 text-primary" /> Academic Operations Register</CardTitle>
-        </CardHeader>
-        <CardContent>
-          <div className="overflow-x-auto">
-            <table className="w-full text-sm">
-              <thead>
-                <tr className="text-left text-muted-foreground border-b border-border/50">
-                  <th className="py-2 pr-4">Department</th>
-                  <th className="py-2 pr-4">Timetable</th>
-                  <th className="py-2 pr-4">Assessments</th>
-                  <th className="py-2 pr-4">Attendance</th>
-                  <th className="py-2 pr-4">Status</th>
-                </tr>
-              </thead>
-              <tbody>
-                {[
-                  ["CSE", "100%", "94%", "96%", "healthy"],
-                  ["ECE", "96%", "92%", "91%", "watch"],
-                  ["Biotech", "92%", "86%", "89%", "watch"],
-                  ["MBA", "98%", "95%", "93%", "healthy"],
-                ].map((row) => (
-                  <tr key={row[0]} className="border-b border-border/30">
-                    <td className="py-2 pr-4">{row[0]}</td>
-                    <td className="py-2 pr-4">{row[1]}</td>
-                    <td className="py-2 pr-4">{row[2]}</td>
-                    <td className="py-2 pr-4">{row[3]}</td>
-                    <td className={`py-2 pr-4 ${row[4] === "healthy" ? "text-green-300" : "text-yellow-300"}`}>{row[4]}</td>
-                  </tr>
-                ))}
-              </tbody>
-            </table>
-          </div>
-        </CardContent>
-      </Card>
-      <Card className="bg-card/50 border-border/50">
-        <CardHeader>
-          <CardTitle className="text-lg flex items-center gap-2"><AlertTriangle className="w-5 h-5 text-primary" /> Academic Alerts</CardTitle>
-        </CardHeader>
-        <CardContent className="space-y-2 text-sm">
-          <div className="rounded border border-border/50 px-3 py-2">2 departments pending assessment closure.</div>
-          <div className="rounded border border-border/50 px-3 py-2">4 course plans awaiting HOD approval.</div>
-          <div className="rounded border border-border/50 px-3 py-2">Semester moderation due in 3 days.</div>
-        </CardContent>
-      </Card>
-    </div>
-  );
-
-  const renderFacultyOps = () => (
-    <Card className="bg-card/50 border-border/50">
-      <CardHeader>
-        <CardTitle className="text-lg flex items-center gap-2"><Users className="w-5 h-5 text-primary" /> Faculty Workload and Approvals</CardTitle>
-      </CardHeader>
-      <CardContent>
         <div className="overflow-x-auto">
           <table className="w-full text-sm">
             <thead>
               <tr className="text-left text-muted-foreground border-b border-border/50">
-                <th className="py-2 pr-4">Faculty</th>
-                <th className="py-2 pr-4">Role</th>
-                <th className="py-2 pr-4">Workload</th>
-                <th className="py-2 pr-4">Leave</th>
-                <th className="py-2 pr-4">Appraisal</th>
+                <th className="py-2 pr-4">Filing</th><th className="py-2 pr-4">Authority</th><th className="py-2 pr-4">Period</th><th className="py-2 pr-4">Status</th><th className="py-2 pr-4">Reference</th><th className="py-2 pr-4">Action</th>
               </tr>
             </thead>
             <tbody>
-              {faculty.slice(0, 10).map((f, idx) => (
+              {filings.slice(0, 10).map((f) => (
                 <tr key={f.id} className="border-b border-border/30">
-                  <td className="py-2 pr-4">{f.name}</td>
-                  <td className="py-2 pr-4">{f.tag}</td>
-                  <td className="py-2 pr-4">{90 - (idx % 4) * 5}%</td>
-                  <td className="py-2 pr-4">{idx % 3 === 0 ? "Pending" : "Clear"}</td>
-                  <td className="py-2 pr-4">{idx % 2 === 0 ? "Submitted" : "Due"}</td>
+                  <td className="py-2 pr-4">{f.filing_name}</td>
+                  <td className="py-2 pr-4">{f.authority}</td>
+                  <td className="py-2 pr-4">{f.period_label ?? "Current"}</td>
+                  <td className={`py-2 pr-4 ${statusClass[f.status] || "text-muted-foreground"}`}>{f.status.replace("_", " ")}</td>
+                  <td className="py-2 pr-4">{f.reference_number ?? "-"}</td>
+                  <td className="py-2 pr-4">{canManageCompliance && f.status !== "closed" ? <Button size="sm" variant="ghost" onClick={() => void handleAdvanceFiling(f)} disabled={actionBusy === `filing-${f.id}`}>Advance</Button> : "-"}</td>
                 </tr>
               ))}
             </tbody>
@@ -972,127 +658,24 @@ const UniversityDashboardShell = ({ mode }: UniversityDashboardShellProps) => {
         </div>
       </CardContent>
     </Card>
-  );
-
-  const renderCompliance = () => (
-    <div className="grid grid-cols-1 lg:grid-cols-3 gap-4">
-      <Card className="bg-card/50 border-border/50 lg:col-span-2">
-        <CardHeader>
-          <CardTitle className="text-lg flex items-center justify-between gap-2">
-            <span className="flex items-center gap-2"><ShieldCheck className="w-5 h-5 text-primary" /> Compliance Task and Filing Register</span>
-            <div className="flex gap-2">
-              {canManageCompliance ? <Button size="sm" variant="outline" onClick={handleCreateTask} disabled={actionBusy === "task-create"}><Plus className="w-3 h-3 mr-1" /> Task</Button> : null}
-              {canManageCompliance ? <Button size="sm" variant="outline" onClick={handleCreateFiling} disabled={actionBusy === "filing-create"}><Plus className="w-3 h-3 mr-1" /> Filing</Button> : null}
-            </div>
-          </CardTitle>
-        </CardHeader>
-        <CardContent className="space-y-4">
-          <div className="overflow-x-auto">
-            <table className="w-full text-sm">
-              <thead>
-                <tr className="text-left text-muted-foreground border-b border-border/50">
-                  <th className="py-2 pr-4">Task</th>
-                  <th className="py-2 pr-4">Authority</th>
-                  <th className="py-2 pr-4">Due</th>
-                  <th className="py-2 pr-4">Priority</th>
-                  <th className="py-2 pr-4">Status</th>
-                  <th className="py-2 pr-4">Action</th>
-                </tr>
-              </thead>
-              <tbody>
-                {complianceTasks.slice(0, 10).map((t) => (
-                  <tr key={t.id} className="border-b border-border/30">
-                    <td className="py-2 pr-4">{t.title}</td>
-                    <td className="py-2 pr-4">{t.authority}</td>
-                    <td className="py-2 pr-4">{t.due_date ?? "TBD"}</td>
-                    <td className="py-2 pr-4">{t.priority}</td>
-                    <td className={`py-2 pr-4 ${statusClass[t.status] || "text-muted-foreground"}`}>{t.status.replace("_", " ")}</td>
-                    <td className="py-2 pr-4">{canManageCompliance && t.status !== "closed" ? <Button size="sm" variant="ghost" disabled={actionBusy === `task-${t.id}`} onClick={() => void handleAdvanceTask(t)}>Advance</Button> : "-"}</td>
-                  </tr>
-                ))}
-              </tbody>
-            </table>
-          </div>
-
-          <div className="overflow-x-auto">
-            <table className="w-full text-sm">
-              <thead>
-                <tr className="text-left text-muted-foreground border-b border-border/50">
-                  <th className="py-2 pr-4">Filing</th>
-                  <th className="py-2 pr-4">Authority</th>
-                  <th className="py-2 pr-4">Period</th>
-                  <th className="py-2 pr-4">Status</th>
-                  <th className="py-2 pr-4">Reference</th>
-                  <th className="py-2 pr-4">Action</th>
-                </tr>
-              </thead>
-              <tbody>
-                {filings.slice(0, 10).map((f) => (
-                  <tr key={f.id} className="border-b border-border/30">
-                    <td className="py-2 pr-4">{f.filing_name}</td>
-                    <td className="py-2 pr-4">{f.authority}</td>
-                    <td className="py-2 pr-4">{f.period_label ?? "Current"}</td>
-                    <td className={`py-2 pr-4 ${statusClass[f.status] || "text-muted-foreground"}`}>{f.status.replace("_", " ")}</td>
-                    <td className="py-2 pr-4">{f.reference_number ?? "-"}</td>
-                    <td className="py-2 pr-4">{canManageCompliance && f.status !== "closed" ? <Button size="sm" variant="ghost" disabled={actionBusy === `filing-${f.id}`} onClick={() => void handleAdvanceFiling(f)}>Advance</Button> : "-"}</td>
-                  </tr>
-                ))}
-              </tbody>
-            </table>
-          </div>
-        </CardContent>
-      </Card>
-
-      <Card className="bg-card/50 border-border/50">
-        <CardHeader>
-          <CardTitle className="text-lg flex items-center gap-2"><FileCheck2 className="w-5 h-5 text-primary" /> Compliance Heatmap</CardTitle>
-        </CardHeader>
-        <CardContent className="space-y-3">
-          {complianceHeatmap.map((h) => (
-            <div key={h.authority} className="rounded border border-border/50 px-3 py-2">
-              <div className="flex justify-between text-sm">
-                <span>{h.authority}</span>
-                <span className="text-cyan-300">{h.score}%</span>
-              </div>
-              <div className="h-2 bg-muted/30 rounded mt-2 overflow-hidden">
-                <div className="h-full bg-cyan-400" style={{ width: `${h.score}%` }} />
-              </div>
-              <p className="text-xs text-muted-foreground mt-1">Open: {h.openItems}</p>
-            </div>
-          ))}
-          <div className="rounded border border-border/50 px-3 py-2 text-sm">
-            Evidence mapped: <span className="text-green-300 font-medium">{evidenceCount}</span>
-          </div>
-        </CardContent>
-      </Card>
-    </div>
   );
 
   const renderFinance = () => (
     <Card className="bg-card/50 border-border/50">
-      <CardHeader>
-        <CardTitle className="text-lg flex items-center justify-between gap-2">
-          <span className="flex items-center gap-2"><CreditCard className="w-5 h-5 text-primary" /> Finance Ledger and Reconciliation</span>
-          {canManageFinance ? <Button size="sm" variant="outline" onClick={handleCreateInvoice} disabled={actionBusy === "invoice-create"}><Plus className="w-3 h-3 mr-1" /> New Invoice</Button> : null}
-        </CardTitle>
-      </CardHeader>
+      <CardHeader><CardTitle className="text-lg flex items-center justify-between gap-2"><span className="flex items-center gap-2"><CreditCard className="w-5 h-5 text-primary" /> Finance Compliance Ledger</span>{canManageFinance ? <Button size="sm" variant="outline" onClick={handleCreateInvoice} disabled={actionBusy === "invoice-create"}><Plus className="w-3 h-3 mr-1" /> Add</Button> : null}</CardTitle></CardHeader>
       <CardContent className="space-y-4">
-        <div className="grid grid-cols-1 sm:grid-cols-2 xl:grid-cols-4 gap-4">
-          <div className="rounded border border-border/50 px-3 py-2"><p className="text-xs text-muted-foreground">Billed</p><p className="text-xl">{formatCurrency(feeSummary.total)}</p></div>
-          <div className="rounded border border-border/50 px-3 py-2"><p className="text-xs text-muted-foreground">Collected</p><p className="text-xl text-green-300">{formatCurrency(feeSummary.collected)}</p></div>
-          <div className="rounded border border-border/50 px-3 py-2"><p className="text-xs text-muted-foreground">Outstanding</p><p className="text-xl text-yellow-300">{formatCurrency(feeSummary.outstanding)}</p></div>
-          <div className="rounded border border-border/50 px-3 py-2"><p className="text-xs text-muted-foreground">Velocity</p><p className="text-xl">{feeSummary.velocity}%</p></div>
+        <div className="grid grid-cols-1 sm:grid-cols-2 xl:grid-cols-4 gap-3">
+          <div className="rounded border border-border/50 p-3"><p className="text-xs text-muted-foreground">Controlled Spend</p><p className="text-xl">₹{kpis.controlledSpendCrore} Cr</p></div>
+          <div className="rounded border border-border/50 p-3"><p className="text-xs text-muted-foreground">Open Financial Items</p><p className="text-xl text-yellow-300">{kpis.overdueItems}</p></div>
+          <div className="rounded border border-border/50 p-3"><p className="text-xs text-muted-foreground">Audit Readiness</p><p className="text-xl text-green-300">{kpis.auditReadiness}%</p></div>
+          <div className="rounded border border-border/50 p-3"><p className="text-xs text-muted-foreground">Evidence Linked</p><p className="text-xl">{evidenceCount}</p></div>
         </div>
 
         <div className="overflow-x-auto">
           <table className="w-full text-sm">
             <thead>
               <tr className="text-left text-muted-foreground border-b border-border/50">
-                <th className="py-2 pr-4">Invoice</th>
-                <th className="py-2 pr-4">Amount</th>
-                <th className="py-2 pr-4">Due Date</th>
-                <th className="py-2 pr-4">Status</th>
-                <th className="py-2 pr-4">Action</th>
+                <th className="py-2 pr-4">Invoice</th><th className="py-2 pr-4">Amount</th><th className="py-2 pr-4">Due</th><th className="py-2 pr-4">Status</th><th className="py-2 pr-4">Action</th>
               </tr>
             </thead>
             <tbody>
@@ -1102,7 +685,7 @@ const UniversityDashboardShell = ({ mode }: UniversityDashboardShellProps) => {
                   <td className="py-2 pr-4">{formatCurrency(i.amount)}</td>
                   <td className="py-2 pr-4">{i.due_date}</td>
                   <td className={`py-2 pr-4 ${statusClass[i.status] || "text-muted-foreground"}`}>{i.status.replace("_", " ")}</td>
-                  <td className="py-2 pr-4">{canManageFinance && i.status !== "paid" ? <Button size="sm" variant="ghost" disabled={actionBusy === `invoice-${i.invoice_number}`} onClick={() => void handleMarkInvoicePaid(i)}>Mark Paid</Button> : "-"}</td>
+                  <td className="py-2 pr-4">{canManageFinance && i.status !== "paid" ? <Button size="sm" variant="ghost" onClick={() => void handleMarkInvoicePaid(i)} disabled={actionBusy === `invoice-${i.invoice_number}`}>Mark Paid</Button> : "-"}</td>
                 </tr>
               ))}
             </tbody>
@@ -1112,58 +695,132 @@ const UniversityDashboardShell = ({ mode }: UniversityDashboardShellProps) => {
     </Card>
   );
 
-  const renderWorkflow = () => (
+  const renderProcurement = () => (
+    <Card className="bg-card/50 border-border/50">
+      <CardHeader><CardTitle className="text-lg flex items-center gap-2"><Scale className="w-5 h-5 text-primary" /> Procurement Compliance Register</CardTitle></CardHeader>
+      <CardContent>
+        <div className="overflow-x-auto">
+          <table className="w-full text-sm">
+            <thead>
+              <tr className="text-left text-muted-foreground border-b border-border/50"><th className="py-2 pr-4">PO/Ref</th><th className="py-2 pr-4">Vendor</th><th className="py-2 pr-4">Amount</th><th className="py-2 pr-4">Stage</th><th className="py-2 pr-4">Control</th></tr>
+            </thead>
+            <tbody>
+              {procurementRows.map((r) => (
+                <tr key={r.id} className="border-b border-border/30">
+                  <td className="py-2 pr-4">{r.id}</td>
+                  <td className="py-2 pr-4">{r.vendor}</td>
+                  <td className="py-2 pr-4">{formatCurrency(r.amount)}</td>
+                  <td className={`py-2 pr-4 ${statusClass[r.stage] || "text-muted-foreground"}`}>{r.stage.replace("_", " ")}</td>
+                  <td className="py-2 pr-4">{r.control}</td>
+                </tr>
+              ))}
+            </tbody>
+          </table>
+        </div>
+      </CardContent>
+    </Card>
+  );
+
+  const renderGrants = () => (
+    <Card className="bg-card/50 border-border/50">
+      <CardHeader><CardTitle className="text-lg flex items-center gap-2"><Receipt className="w-5 h-5 text-primary" /> Grant Utilization Compliance</CardTitle></CardHeader>
+      <CardContent>
+        <div className="overflow-x-auto">
+          <table className="w-full text-sm">
+            <thead>
+              <tr className="text-left text-muted-foreground border-b border-border/50"><th className="py-2 pr-4">Grant</th><th className="py-2 pr-4">Budget</th><th className="py-2 pr-4">Utilized</th><th className="py-2 pr-4">Variance</th><th className="py-2 pr-4">Status</th></tr>
+            </thead>
+            <tbody>
+              {grantRows.map((g) => (
+                <tr key={g.grant} className="border-b border-border/30">
+                  <td className="py-2 pr-4">{g.grant}</td>
+                  <td className="py-2 pr-4">{formatCurrency(g.budget)}</td>
+                  <td className="py-2 pr-4">{formatCurrency(g.utilized)}</td>
+                  <td className={`py-2 pr-4 ${statusClass[g.variance] || "text-muted-foreground"}`}>{g.variance}</td>
+                  <td className={`py-2 pr-4 ${statusClass[g.status] || "text-muted-foreground"}`}>{g.status}</td>
+                </tr>
+              ))}
+            </tbody>
+          </table>
+        </div>
+      </CardContent>
+    </Card>
+  );
+
+  const renderAudit = () => (
     <div className="grid grid-cols-1 lg:grid-cols-3 gap-4">
       <Card className="bg-card/50 border-border/50 lg:col-span-2">
-        <CardHeader><CardTitle className="text-lg flex items-center gap-2"><Workflow className="w-5 h-5 text-primary" /> Maker-Checker-Signoff Pipeline</CardTitle></CardHeader>
-        <CardContent className="space-y-2">
-          {workflowTrail.map((s) => (
-            <div key={s.stage} className="rounded border border-border/50 px-3 py-2 flex justify-between items-center gap-3 text-sm">
-              <div>
-                <p className="font-medium">{s.stage}</p>
-                <p className="text-xs text-muted-foreground">{s.actor}</p>
-              </div>
-              <div className="text-right">
-                <p className={statusClass[s.status] || "text-muted-foreground"}>{s.status.replace("_", " ")}</p>
-                <p className="text-xs text-muted-foreground">{s.timestamp}</p>
-              </div>
-            </div>
-          ))}
-          <div className="rounded border border-border/50 px-3 py-2 text-sm flex items-center gap-2"><Settings className="w-4 h-4 text-cyan-300" /> Immutable lock turns on after final sign-off.</div>
+        <CardHeader><CardTitle className="text-lg flex items-center gap-2"><FileSearch className="w-5 h-5 text-primary" /> Audit and Internal Controls</CardTitle></CardHeader>
+        <CardContent className="space-y-2 text-sm">
+          <div className="rounded border border-border/50 p-3">Control testing coverage: <span className="text-green-300">92%</span></div>
+          <div className="rounded border border-border/50 p-3">Exception queue: <span className="text-yellow-300">7 open</span></div>
+          <div className="rounded border border-border/50 p-3">Material deviations: <span className="text-red-300">2 critical</span></div>
+          <div className="rounded border border-border/50 p-3">Evidence linkage completeness: <span className="text-cyan-300">{evidenceCount} mapped docs</span></div>
         </CardContent>
       </Card>
       <Card className="bg-card/50 border-border/50">
-        <CardHeader><CardTitle className="text-lg flex items-center gap-2"><ClipboardList className="w-5 h-5 text-primary" /> Audit Highlights</CardTitle></CardHeader>
+        <CardHeader><CardTitle className="text-lg flex items-center gap-2"><ShieldCheck className="w-5 h-5 text-primary" /> Audit Trail</CardTitle></CardHeader>
         <CardContent className="space-y-2 text-sm">
-          <div className="rounded border border-border/50 px-3 py-2">17 field edits tracked with before/after snapshot.</div>
-          <div className="rounded border border-border/50 px-3 py-2">2 SLA breaches auto-escalated to registrar.</div>
-          <div className="rounded border border-border/50 px-3 py-2">Evidence linkage verified for {evidenceCount} documents.</div>
+          <div className="rounded border border-border/50 p-3">17 edits tracked with before/after snapshots.</div>
+          <div className="rounded border border-border/50 p-3">2 SLA breaches auto-escalated.</div>
+          <div className="rounded border border-border/50 p-3">Immutable evidence chain active.</div>
         </CardContent>
       </Card>
     </div>
   );
 
+  const renderWorkflow = () => (
+    <Card className="bg-card/50 border-border/50">
+      <CardHeader><CardTitle className="text-lg flex items-center gap-2"><Workflow className="w-5 h-5 text-primary" /> Compliance Approval Workflow</CardTitle></CardHeader>
+      <CardContent className="space-y-2 text-sm">
+        {[
+          ["Maker", "Department SPOC", "completed", "2026-02-18 10:32"],
+          ["Reviewer", "Compliance Manager", "completed", "2026-02-18 15:05"],
+          ["Finance Check", "Finance Controller", "in_progress", "2026-02-20 09:40"],
+          ["Final Sign-off", "Compliance Head", "pending", "Awaited"],
+        ].map((row) => (
+          <div key={row[0]} className="rounded border border-border/50 p-3 flex justify-between gap-2">
+            <div>
+              <p className="font-medium">{row[0]}</p>
+              <p className="text-xs text-muted-foreground">{row[1]}</p>
+            </div>
+            <div className="text-right">
+              <p className={statusClass[row[2]] || "text-muted-foreground"}>{row[2].replace("_", " ")}</p>
+              <p className="text-xs text-muted-foreground">{row[3]}</p>
+            </div>
+          </div>
+        ))}
+        <div className="rounded border border-border/50 p-3 flex items-center gap-2"><Lock className="w-4 h-4 text-cyan-300" /> Immutable lock enabled after final sign-off.</div>
+      </CardContent>
+    </Card>
+  );
+
   const renderCopilot = () => (
     <div className="grid grid-cols-1 lg:grid-cols-3 gap-4">
       <Card className="bg-card/50 border-border/50 lg:col-span-2">
-        <CardHeader><CardTitle className="text-lg flex items-center gap-2"><Bot className="w-5 h-5 text-primary" /> AI Copilot Recommendations</CardTitle></CardHeader>
+        <CardHeader><CardTitle className="text-lg flex items-center gap-2"><Bot className="w-5 h-5 text-primary" /> AI Compliance Copilot</CardTitle></CardHeader>
         <CardContent className="space-y-2">
-          {copilotRecommendations.map((r) => (
-            <div key={r} className="rounded border border-border/50 px-3 py-2 text-sm">{r}</div>
+          {[
+            "Escalate pending GST filing due in 48 hours.",
+            "PF/ESI control check failed for 2 cost centers.",
+            "Overdue invoice cluster suggests vendor compliance risk.",
+            "Prepare personal hearing note pack for next authority date.",
+          ].map((r) => (
+            <div key={r} className="rounded border border-border/50 p-3 text-sm">{r}</div>
           ))}
-          <div className="flex flex-wrap gap-2 pt-2">
-            <Button>Generate Hearing Notes</Button>
-            <Button variant="outline">Create Filing Package</Button>
-            <Button variant="outline">Explain Recommendation</Button>
+          <div className="flex flex-wrap gap-2 pt-1">
+            <Button>Generate Reply Pack</Button>
+            <Button variant="outline">Generate Hearing Notes</Button>
+            <Button variant="outline">Explain Risk Factors</Button>
           </div>
         </CardContent>
       </Card>
       <Card className="bg-card/50 border-border/50">
         <CardHeader><CardTitle className="text-lg flex items-center gap-2"><AlertTriangle className="w-5 h-5 text-primary" /> Risk Bands</CardTitle></CardHeader>
         <CardContent className="space-y-2 text-sm">
-          <div className="rounded border border-border/50 px-3 py-2">Institution Risk: <span className="text-yellow-300">Medium</span></div>
-          <div className="rounded border border-border/50 px-3 py-2">Closure Probability: <span className="text-green-300">78%</span></div>
-          <div className="rounded border border-border/50 px-3 py-2">Top move: clear review filings within 48h.</div>
+          <div className="rounded border border-border/50 p-3">Institution risk: <span className="text-yellow-300">Medium</span></div>
+          <div className="rounded border border-border/50 p-3">Closure probability: <span className="text-green-300">78%</span></div>
+          <div className="rounded border border-border/50 p-3">Primary blocker: delayed statutory review approvals.</div>
         </CardContent>
       </Card>
     </div>
@@ -1172,30 +829,25 @@ const UniversityDashboardShell = ({ mode }: UniversityDashboardShellProps) => {
   const renderAnalytics = () => (
     <div className="grid grid-cols-1 lg:grid-cols-3 gap-4">
       <Card className="bg-card/50 border-border/50 lg:col-span-2">
-        <CardHeader><CardTitle className="text-lg flex items-center gap-2"><BarChart3 className="w-5 h-5 text-primary" /> Institutional Performance Analytics</CardTitle></CardHeader>
+        <CardHeader><CardTitle className="text-lg flex items-center gap-2"><BarChart3 className="w-5 h-5 text-primary" /> Compliance Performance Analytics</CardTitle></CardHeader>
         <CardContent>
           <div className="overflow-x-auto">
             <table className="w-full text-sm">
               <thead>
-                <tr className="text-left text-muted-foreground border-b border-border/50">
-                  <th className="py-2 pr-4">Metric</th>
-                  <th className="py-2 pr-4">Current</th>
-                  <th className="py-2 pr-4">Last Month</th>
-                  <th className="py-2 pr-4">Trend</th>
-                </tr>
+                <tr className="text-left text-muted-foreground border-b border-border/50"><th className="py-2 pr-4">Metric</th><th className="py-2 pr-4">Current</th><th className="py-2 pr-4">Prev</th><th className="py-2 pr-4">Trend</th></tr>
               </thead>
               <tbody>
                 {[
-                  ["Automation Coverage", "61%", "55%", "up"],
-                  ["SLA Adherence", "96.2%", "93.4%", "up"],
-                  ["Filing Turnaround", "2.1 days", "2.8 days", "up"],
-                  ["Audit Readiness", "94/100", "89/100", "up"],
-                ].map((r) => (
-                  <tr key={r[0]} className="border-b border-border/30">
-                    <td className="py-2 pr-4">{r[0]}</td>
-                    <td className="py-2 pr-4">{r[1]}</td>
-                    <td className="py-2 pr-4">{r[2]}</td>
-                    <td className="py-2 pr-4 text-green-300">{r[3]}</td>
+                  ["Filing SLA Compliance", "96.2%", "93.4%", "up"],
+                  ["Audit Control Coverage", "92%", "88%", "up"],
+                  ["Evidence Linkage", `${evidenceCount}`, "110", "up"],
+                  ["Overdue Financial Items", `${kpis.overdueItems}`, "5", "down"],
+                ].map((row) => (
+                  <tr key={row[0]} className="border-b border-border/30">
+                    <td className="py-2 pr-4">{row[0]}</td>
+                    <td className="py-2 pr-4">{row[1]}</td>
+                    <td className="py-2 pr-4">{row[2]}</td>
+                    <td className={`py-2 pr-4 ${row[3] === "up" ? "text-green-300" : "text-yellow-300"}`}>{row[3]}</td>
                   </tr>
                 ))}
               </tbody>
@@ -1204,24 +856,24 @@ const UniversityDashboardShell = ({ mode }: UniversityDashboardShellProps) => {
         </CardContent>
       </Card>
       <Card className="bg-card/50 border-border/50">
-        <CardHeader><CardTitle className="text-lg flex items-center gap-2"><Sparkles className="w-5 h-5 text-primary" /> Investor Summary</CardTitle></CardHeader>
+        <CardHeader><CardTitle className="text-lg flex items-center gap-2"><Sparkles className="w-5 h-5 text-primary" /> Investor Snapshot</CardTitle></CardHeader>
         <CardContent className="space-y-2 text-sm">
-          <div className="rounded border border-border/50 px-3 py-2">One OS for admissions, academics, finance, and compliance.</div>
-          <div className="rounded border border-border/50 px-3 py-2">Maker-checker-signoff with evidence lineage and audit trails.</div>
-          <div className="rounded border border-border/50 px-3 py-2">Role-driven adoption across complete university operations.</div>
+          <div className="rounded border border-border/50 p-3">Single compliance operating system across spend-heavy sectors.</div>
+          <div className="rounded border border-border/50 p-3">Filing + finance + audit + procurement controls in one command plane.</div>
+          <div className="rounded border border-border/50 p-3">Role-based accountability and immutable evidence lineage.</div>
         </CardContent>
       </Card>
     </div>
   );
 
-  const contentByPage: Record<DashboardPage, JSX.Element> = {
-    executive: renderExecutive(),
+  const contentByPage: Record<CompliancePage, JSX.Element> = {
+    command: renderCommandCenter(),
     roledesk: renderRoleDesk(),
-    admissions: renderAdmissions(),
-    academics: renderAcademics(),
-    facultyops: renderFacultyOps(),
-    compliance: renderCompliance(),
+    statutory: renderStatutory(),
     finance: renderFinance(),
+    procurement: renderProcurement(),
+    grants: renderGrants(),
+    audit: renderAudit(),
     workflow: renderWorkflow(),
     copilot: renderCopilot(),
     analytics: renderAnalytics(),
@@ -1236,19 +888,13 @@ const UniversityDashboardShell = ({ mode }: UniversityDashboardShellProps) => {
           <div className="rounded-2xl border border-primary/20 bg-card/40 p-4">
             <div className="flex flex-col lg:flex-row lg:items-center lg:justify-between gap-3">
               <div>
-                <p className="text-xs uppercase tracking-[0.2em] text-primary">University Operations OS</p>
+                <p className="text-xs uppercase tracking-[0.2em] text-primary">Compliance Operations OS</p>
                 <h1 className="text-2xl font-bold mt-1">{instituteName}</h1>
-                <p className="text-sm text-muted-foreground mt-1">
-                  {mode === "demo"
-                    ? "Enterprise-grade demo with role-based pages, queues, registers, and approval workflows."
-                    : `Welcome ${viewerName}. ${source === "live" ? "Live operational data connected." : "Showing demo fallback until mapping is ready."}`}
-                </p>
+                <p className="text-sm text-muted-foreground mt-1">Compliance-only dashboard for all spend-linked sectors: statutory, finance, procurement, grants, audit, and employee controls.</p>
               </div>
               <div className="flex flex-wrap items-center gap-2">
-                <Badge className={mode === "demo" ? "bg-cyan-500/20 text-cyan-300 border-cyan-500/40" : source === "live" ? "bg-green-500/20 text-green-300 border-green-500/40" : "bg-yellow-500/20 text-yellow-300 border-yellow-500/40"}>
-                  {mode === "demo" ? "Demo" : source === "live" ? "Live" : "Fallback"}
-                </Badge>
-                <Badge variant="outline">Role: {effectiveRole}</Badge>
+                <Badge className={mode === "demo" ? "bg-cyan-500/20 text-cyan-300 border-cyan-500/40" : source === "live" ? "bg-green-500/20 text-green-300 border-green-500/40" : "bg-yellow-500/20 text-yellow-300 border-yellow-500/40"}>{mode === "demo" ? "Demo" : source === "live" ? "Live" : "Fallback"}</Badge>
+                <Badge variant="outline">Role: {roleMeta[effectiveRole].title}</Badge>
                 <Button size="sm" variant="outline"><Bell className="w-4 h-4 mr-1" /> Alerts</Button>
               </div>
             </div>
@@ -1256,47 +902,34 @@ const UniversityDashboardShell = ({ mode }: UniversityDashboardShellProps) => {
 
           <div className="grid grid-cols-1 xl:grid-cols-4 gap-4">
             <Card className="bg-card/50 border-border/50 xl:col-span-1">
-              <CardHeader>
-                <CardTitle className="text-base flex items-center gap-2"><LayoutDashboard className="w-4 h-4 text-primary" /> Workspace Navigation</CardTitle>
-              </CardHeader>
+              <CardHeader><CardTitle className="text-base flex items-center gap-2"><LayoutDashboard className="w-4 h-4 text-primary" /> Compliance Navigation</CardTitle></CardHeader>
               <CardContent className="space-y-3">
                 {mode === "demo" ? (
                   <div className="rounded border border-border/50 p-2">
                     <p className="text-xs text-muted-foreground mb-2">Role Simulator</p>
                     <div className="grid grid-cols-2 gap-2">
                       {(["admin", "registrar", "finance", "faculty", "student"] as UniversityRole[]).map((role) => (
-                        <Button key={role} size="sm" variant={demoRole === role ? "default" : "outline"} onClick={() => setDemoRole(role)}>{role}</Button>
+                        <Button key={role} size="sm" variant={demoRole === role ? "default" : "outline"} onClick={() => setDemoRole(role)}>{roleMeta[role].title.split(" ")[0]}</Button>
                       ))}
                     </div>
                   </div>
                 ) : null}
 
                 <div className="rounded border border-border/50 p-2 space-y-2">
-                  <p className="text-xs text-muted-foreground">Role Scope Matrix</p>
-                  {roleCategoryMatrix[effectiveRole].map((row) => (
-                    <div key={`${row.category}-${row.primaryPage}`} className="rounded border border-border/40 p-2">
-                      <p className="text-xs font-medium">{row.category}</p>
-                      <p className="text-xs text-muted-foreground mt-1">Owns: {row.owns}</p>
-                      <p className="text-xs text-muted-foreground">Approvals: {row.approvals}</p>
-                    </div>
+                  <p className="text-xs text-muted-foreground">Role Mandate</p>
+                  {roleMeta[effectiveRole].mandate.map((m) => (
+                    <div key={m} className="rounded border border-border/40 p-2 text-xs">{m}</div>
                   ))}
                 </div>
 
                 <div className="rounded border border-border/50 p-2 space-y-2">
-                  <p className="text-xs text-muted-foreground">Pages for {effectiveRole}</p>
+                  <p className="text-xs text-muted-foreground">Pages for this role</p>
                   {visiblePages.map((page) => {
                     const Icon = page.icon;
                     const active = activePage === page.id;
                     return (
-                      <button
-                        key={page.id}
-                        onClick={() => setActivePage(page.id)}
-                        className={`w-full text-left rounded px-2 py-2 border transition ${active ? "border-primary bg-primary/10" : "border-border/40 hover:border-primary/40"}`}
-                      >
-                        <span className="flex items-center justify-between text-sm">
-                          <span className="flex items-center gap-2"><Icon className="w-4 h-4" /> {page.label}</span>
-                          <ChevronRight className="w-4 h-4 text-muted-foreground" />
-                        </span>
+                      <button key={page.id} onClick={() => setActivePage(page.id)} className={`w-full text-left rounded px-2 py-2 border transition ${active ? "border-primary bg-primary/10" : "border-border/40 hover:border-primary/40"}`}>
+                        <span className="flex items-center justify-between text-sm"><span className="flex items-center gap-2"><Icon className="w-4 h-4" /> {page.label}</span><ChevronRight className="w-4 h-4 text-muted-foreground" /></span>
                       </button>
                     );
                   })}
@@ -1308,22 +941,22 @@ const UniversityDashboardShell = ({ mode }: UniversityDashboardShellProps) => {
               <Card className="bg-card/50 border-border/50">
                 <CardContent className="pt-6">
                   <div className="flex flex-wrap items-center gap-2">
-                    <div className="flex items-center gap-2 rounded border border-border/50 px-3 py-2 text-sm text-muted-foreground"><Search className="w-4 h-4" /> Search records</div>
-                    <Button size="sm" variant="outline">Find Student</Button>
-                    <Button size="sm" variant="outline">Find Filing</Button>
+                    <div className="flex items-center gap-2 rounded border border-border/50 px-3 py-2 text-sm text-muted-foreground"><Search className="w-4 h-4" /> Search compliance records</div>
+                    <Button size="sm" variant="outline">Find DIN/RFN</Button>
                     <Button size="sm" variant="outline">Find Invoice</Button>
-                    <Button size="sm" variant="outline"><Filter className="w-3 h-3 mr-1" /> Saved Filters</Button>
+                    <Button size="sm" variant="outline">Find Filing</Button>
+                    <Button size="sm" variant="outline"><Filter className="w-3 h-3 mr-1" /> Saved Views</Button>
                   </div>
                 </CardContent>
               </Card>
 
               <section className="grid grid-cols-2 md:grid-cols-3 xl:grid-cols-6 gap-3">
-                <Card className="bg-card/50 border-border/50"><CardContent className="pt-4"><p className="text-xs text-muted-foreground">Students</p><p className="text-2xl font-semibold mt-1">{kpis.students.toLocaleString()}</p></CardContent></Card>
-                <Card className="bg-card/50 border-border/50"><CardContent className="pt-4"><p className="text-xs text-muted-foreground">Faculty</p><p className="text-2xl font-semibold mt-1">{kpis.faculty}</p></CardContent></Card>
-                <Card className="bg-card/50 border-border/50"><CardContent className="pt-4"><p className="text-xs text-muted-foreground">Programs</p><p className="text-2xl font-semibold mt-1">{kpis.programs}</p></CardContent></Card>
-                <Card className="bg-card/50 border-border/50"><CardContent className="pt-4"><p className="text-xs text-muted-foreground">Fee Collection</p><p className="text-2xl font-semibold mt-1">₹{kpis.feeCollectionCrore} Cr</p></CardContent></Card>
-                <Card className="bg-card/50 border-border/50"><CardContent className="pt-4"><p className="text-xs text-muted-foreground">Compliance Score</p><p className="text-2xl font-semibold mt-1 text-green-300">{kpis.complianceScore}%</p></CardContent></Card>
-                <Card className="bg-card/50 border-border/50"><CardContent className="pt-4"><p className="text-xs text-muted-foreground">Critical Alerts</p><p className="text-2xl font-semibold mt-1 text-yellow-300">{complianceSummary.criticalAlerts}</p></CardContent></Card>
+                <Card className="bg-card/50 border-border/50"><CardContent className="pt-4"><p className="text-xs text-muted-foreground">Controlled Spend</p><p className="text-2xl font-semibold mt-1">₹{kpis.controlledSpendCrore} Cr</p></CardContent></Card>
+                <Card className="bg-card/50 border-border/50"><CardContent className="pt-4"><p className="text-xs text-muted-foreground">Open Filings</p><p className="text-2xl font-semibold mt-1 text-cyan-300">{kpis.openFilings}</p></CardContent></Card>
+                <Card className="bg-card/50 border-border/50"><CardContent className="pt-4"><p className="text-xs text-muted-foreground">Overdue Items</p><p className="text-2xl font-semibold mt-1 text-yellow-300">{kpis.overdueItems}</p></CardContent></Card>
+                <Card className="bg-card/50 border-border/50"><CardContent className="pt-4"><p className="text-xs text-muted-foreground">Audit Readiness</p><p className="text-2xl font-semibold mt-1 text-green-300">{kpis.auditReadiness}%</p></CardContent></Card>
+                <Card className="bg-card/50 border-border/50"><CardContent className="pt-4"><p className="text-xs text-muted-foreground">Critical Alerts</p><p className="text-2xl font-semibold mt-1 text-red-300">{kpis.criticalAlerts}</p></CardContent></Card>
+                <Card className="bg-card/50 border-border/50"><CardContent className="pt-4"><p className="text-xs text-muted-foreground">Evidence Mapped</p><p className="text-2xl font-semibold mt-1">{kpis.evidenceMapped}</p></CardContent></Card>
               </section>
 
               {contentByPage[activePage]}
@@ -1331,11 +964,11 @@ const UniversityDashboardShell = ({ mode }: UniversityDashboardShellProps) => {
               <section className="grid grid-cols-1 lg:grid-cols-2 gap-4">
                 <Card className="bg-card/50 border-border/50">
                   <CardHeader><CardTitle className="text-base flex items-center gap-2"><CheckCircle2 className="w-4 h-4 text-primary" /> Output Package</CardTitle></CardHeader>
-                  <CardContent className="text-sm">Reply draft, annexure index, hearing notes, argument script, and checklist are generated as one package with version tracking.</CardContent>
+                  <CardContent className="text-sm">Final package includes draft reply, annexure index, hearing notes, argument script, and reviewer checklist.</CardContent>
                 </Card>
                 <Card className="bg-card/50 border-border/50">
-                  <CardHeader><CardTitle className="text-base flex items-center gap-2"><Sparkles className="w-4 h-4 text-primary" /> Enterprise Controls</CardTitle></CardHeader>
-                  <CardContent className="text-sm">PII masking, role scopes, audit trail, retry queues, and incident monitoring remain enabled for production compliance.</CardContent>
+                  <CardHeader><CardTitle className="text-base flex items-center gap-2"><Settings className="w-4 h-4 text-primary" /> Enterprise Controls</CardTitle></CardHeader>
+                  <CardContent className="text-sm">PII masking, role scopes, audit trail, retries, and incident logs remain enforced.</CardContent>
                 </Card>
               </section>
             </div>
