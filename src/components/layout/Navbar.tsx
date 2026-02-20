@@ -11,6 +11,7 @@ const platformLinks = [
   { label: "Compliance Infrastructure", href: "/platform/infrastructure", icon: Building2 },
   { label: "AI + Human Review Model", href: "/platform/ai-human-review", icon: Users },
   { label: "Company Dashboards", href: "/dashboard", icon: Building2 },
+  { label: "University Demo Dashboard", href: "/university-demo", icon: Building2 },
   { label: "Regulatory Coverage", href: "/platform/regulators", icon: Shield },
   { label: "AI Assistant", href: "/platform/ai-assistant", icon: Cpu },
   { label: "Audit & Traceability", href: "/platform/audit", icon: Lock },
