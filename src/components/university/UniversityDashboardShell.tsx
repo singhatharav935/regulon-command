@@ -235,6 +235,40 @@ const pageConfig: Array<{ id: DashboardPage; label: string; icon: any }> = [
   { id: "analytics", label: "Institution Analytics", icon: BarChart3 },
 ];
 
+const roleCategoryMatrix: Record<
+  UniversityRole,
+  Array<{ category: string; owns: string; approvals: string; primaryPage: DashboardPage }>
+> = {
+  admin: [
+    { category: "Governance", owns: "Institution risk board", approvals: "Final sign-off", primaryPage: "executive" },
+    { category: "Compliance", owns: "Cross-authority escalation", approvals: "Critical closure", primaryPage: "compliance" },
+  ],
+  registrar: [
+    { category: "Admissions", owns: "Application lifecycle", approvals: "Review and move next", primaryPage: "admissions" },
+    { category: "Records", owns: "Academic workflows", approvals: "Academic clearance", primaryPage: "academics" },
+  ],
+  finance: [
+    { category: "Fees", owns: "Invoice and payment ledger", approvals: "Payment confirmation", primaryPage: "finance" },
+    { category: "Reconciliation", owns: "Outstanding recovery", approvals: "Ledger finalization", primaryPage: "finance" },
+  ],
+  faculty: [
+    { category: "Department Ops", owns: "Evidence and data packs", approvals: "Department submission", primaryPage: "academics" },
+    { category: "Compliance Input", owns: "Task evidence handoff", approvals: "Task completion", primaryPage: "compliance" },
+  ],
+  student: [
+    { category: "Student Services", owns: "Application support", approvals: "Request routing only", primaryPage: "roledesk" },
+    { category: "Payments Support", owns: "Payment issue intake", approvals: "No approval rights", primaryPage: "roledesk" },
+  ],
+};
+
+const rolePageAccess: Record<UniversityRole, DashboardPage[]> = {
+  admin: ["executive", "roledesk", "admissions", "academics", "facultyops", "compliance", "finance", "workflow", "copilot", "analytics"],
+  registrar: ["roledesk", "admissions", "academics", "compliance", "workflow", "copilot", "analytics"],
+  finance: ["roledesk", "finance", "workflow", "analytics", "copilot"],
+  faculty: ["roledesk", "academics", "facultyops", "compliance", "copilot"],
+  student: ["roledesk", "admissions"],
+};
+
 const formatCurrency = (amount: number) => `₹${amount.toLocaleString()}`;
 
 const UniversityDashboardShell = ({ mode }: UniversityDashboardShellProps) => {
@@ -445,12 +479,22 @@ const UniversityDashboardShell = ({ mode }: UniversityDashboardShellProps) => {
   }, [complianceTasks, filings]);
 
   const actionQueue = [
-    { title: "Close registrar review queue", owner: "Registrar", sla: "24h", risk: "high" },
-    { title: "Recover overdue student invoices", owner: "Finance", sla: "48h", risk: "high" },
-    { title: "Submit NAAC evidence packet", owner: "Faculty", sla: "36h", risk: "medium" },
-    { title: "Finalize intake return filing", owner: "Compliance", sla: "72h", risk: "medium" },
-    { title: "Publish weekly VC brief", owner: "Admin", sla: "EOD", risk: "low" },
+    { title: "Close registrar review queue", owner: "registrar", sla: "24h", risk: "high" },
+    { title: "Recover overdue student invoices", owner: "finance", sla: "48h", risk: "high" },
+    { title: "Submit NAAC evidence packet", owner: "faculty", sla: "36h", risk: "medium" },
+    { title: "Finalize intake return filing", owner: "registrar", sla: "72h", risk: "medium" },
+    { title: "Publish weekly VC brief", owner: "admin", sla: "EOD", risk: "low" },
   ];
+
+  const myRoleQueue = useMemo(
+    () => actionQueue.filter((item) => item.owner === effectiveRole || effectiveRole === "admin"),
+    [actionQueue, effectiveRole]
+  );
+
+  const visiblePages = useMemo(
+    () => pageConfig.filter((page) => rolePageAccess[effectiveRole].includes(page.id)),
+    [effectiveRole]
+  );
 
   const workflowTrail = [
     { stage: "Maker", actor: "Department Coordinator", status: "completed", timestamp: "2026-02-18 10:32" },
@@ -744,12 +788,13 @@ const UniversityDashboardShell = ({ mode }: UniversityDashboardShellProps) => {
           <CardTitle className="text-lg flex items-center gap-2"><ClipboardList className="w-5 h-5 text-primary" /> My SLA Queue</CardTitle>
         </CardHeader>
         <CardContent className="space-y-2 text-sm">
-          {actionQueue.slice(0, 5).map((a) => (
+          {myRoleQueue.slice(0, 5).map((a) => (
             <div key={a.title} className="rounded border border-border/50 px-3 py-2">
               <p>{a.title}</p>
-              <p className="text-xs text-muted-foreground mt-1">{a.owner} • SLA {a.sla} • {a.risk}</p>
+              <p className="text-xs text-muted-foreground mt-1">{a.owner.toUpperCase()} • SLA {a.sla} • {a.risk}</p>
             </div>
           ))}
+          {myRoleQueue.length === 0 ? <p className="text-xs text-muted-foreground">No active items for this role.</p> : null}
         </CardContent>
       </Card>
     </div>
@@ -1227,8 +1272,19 @@ const UniversityDashboardShell = ({ mode }: UniversityDashboardShellProps) => {
                 ) : null}
 
                 <div className="rounded border border-border/50 p-2 space-y-2">
-                  <p className="text-xs text-muted-foreground">Pages</p>
-                  {pageConfig.map((page) => {
+                  <p className="text-xs text-muted-foreground">Role Scope Matrix</p>
+                  {roleCategoryMatrix[effectiveRole].map((row) => (
+                    <div key={`${row.category}-${row.primaryPage}`} className="rounded border border-border/40 p-2">
+                      <p className="text-xs font-medium">{row.category}</p>
+                      <p className="text-xs text-muted-foreground mt-1">Owns: {row.owns}</p>
+                      <p className="text-xs text-muted-foreground">Approvals: {row.approvals}</p>
+                    </div>
+                  ))}
+                </div>
+
+                <div className="rounded border border-border/50 p-2 space-y-2">
+                  <p className="text-xs text-muted-foreground">Pages for {effectiveRole}</p>
+                  {visiblePages.map((page) => {
                     const Icon = page.icon;
                     const active = activePage === page.id;
                     return (
