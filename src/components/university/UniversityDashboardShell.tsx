@@ -407,6 +407,62 @@ const UniversityDashboardShell = ({ mode }: UniversityDashboardShellProps) => {
     return { openFilings, pendingApprovals };
   }, [filings, complianceTasks]);
 
+  const workSnapshot = useMemo(() => {
+    const inProcess =
+      complianceTasks.filter((t) => t.status === "pending" || t.status === "in_progress").length +
+      filings.filter((f) => f.status === "pending" || f.status === "in_progress").length +
+      invoices.filter((i) => i.status === "issued" || i.status === "partially_paid").length;
+    const underReview =
+      complianceTasks.filter((t) => t.status === "under_review").length +
+      filings.filter((f) => f.status === "under_review").length;
+    const completed =
+      complianceTasks.filter((t) => t.status === "submitted" || t.status === "closed").length +
+      filings.filter((f) => f.status === "submitted" || f.status === "closed").length +
+      invoices.filter((i) => i.status === "paid").length;
+    const blocked =
+      complianceTasks.filter((t) => t.status === "overdue").length +
+      filings.filter((f) => f.status === "overdue").length +
+      invoices.filter((i) => i.status === "overdue").length;
+
+    return { inProcess, underReview, completed, blocked };
+  }, [complianceTasks, filings, invoices]);
+
+  const handledSectors = useMemo(
+    () => [
+      {
+        sector: "Statutory & Notices",
+        scope: "SCN replies, DIN/RFN tracking, authority hearings, legal rebuttal packs",
+        owner: "Statutory Desk",
+        status: `${complianceTasks.length} tasks • ${filings.length} filings`,
+      },
+      {
+        sector: "Finance & Tax Compliance",
+        scope: "Tax-linked invoice controls, reconciliation, payment proof chain",
+        owner: "Finance Compliance",
+        status: `${invoices.filter((i) => i.status !== "paid").length} open • ${invoices.filter((i) => i.status === "overdue").length} overdue`,
+      },
+      {
+        sector: "Procurement Controls",
+        scope: "PO compliance checks, vendor declarations, tender rule validations",
+        owner: "Procurement Control",
+        status: `${procurementRows.length} tracked items`,
+      },
+      {
+        sector: "Grant Utilization",
+        scope: "Budget vs utilization, UC evidence, variance watch and escalations",
+        owner: "Grant Monitoring Desk",
+        status: `${grantRows.length} active grants`,
+      },
+      {
+        sector: "Employee Compliance",
+        scope: "Policy attestations, declarations, training and escalation closure",
+        owner: "Employee Compliance Desk",
+        status: `${employeeComplianceRows.length} control tracks`,
+      },
+    ],
+    [complianceTasks.length, filings.length, invoices, procurementRows.length, grantRows.length, employeeComplianceRows.length]
+  );
+
   const myRoleQueue = useMemo(() => roleQueueMap[effectiveRole], [effectiveRole]);
   const visiblePages = useMemo(() => pageConfig.filter((p) => rolePageAccess[effectiveRole].includes(p.id)), [effectiveRole]);
 
@@ -957,6 +1013,46 @@ const UniversityDashboardShell = ({ mode }: UniversityDashboardShellProps) => {
                 <Card className="bg-card/50 border-border/50"><CardContent className="pt-4"><p className="text-xs text-muted-foreground">Audit Readiness</p><p className="text-2xl font-semibold mt-1 text-green-300">{kpis.auditReadiness}%</p></CardContent></Card>
                 <Card className="bg-card/50 border-border/50"><CardContent className="pt-4"><p className="text-xs text-muted-foreground">Critical Alerts</p><p className="text-2xl font-semibold mt-1 text-red-300">{kpis.criticalAlerts}</p></CardContent></Card>
                 <Card className="bg-card/50 border-border/50"><CardContent className="pt-4"><p className="text-xs text-muted-foreground">Evidence Mapped</p><p className="text-2xl font-semibold mt-1">{kpis.evidenceMapped}</p></CardContent></Card>
+              </section>
+
+              <section className="grid grid-cols-1 xl:grid-cols-3 gap-4">
+                <Card className="bg-card/50 border-border/50 xl:col-span-2">
+                  <CardHeader><CardTitle className="text-base flex items-center gap-2"><Scale className="w-4 h-4 text-primary" /> What We Handle for You</CardTitle></CardHeader>
+                  <CardContent>
+                    <div className="overflow-x-auto">
+                      <table className="w-full text-sm">
+                        <thead>
+                          <tr className="text-left text-muted-foreground border-b border-border/50">
+                            <th className="py-2 pr-4">Sector</th>
+                            <th className="py-2 pr-4">Scope Covered</th>
+                            <th className="py-2 pr-4">Owner Desk</th>
+                            <th className="py-2 pr-4">Live Status</th>
+                          </tr>
+                        </thead>
+                        <tbody>
+                          {handledSectors.map((row) => (
+                            <tr key={row.sector} className="border-b border-border/30">
+                              <td className="py-2 pr-4 font-medium">{row.sector}</td>
+                              <td className="py-2 pr-4">{row.scope}</td>
+                              <td className="py-2 pr-4">{row.owner}</td>
+                              <td className="py-2 pr-4 text-cyan-300">{row.status}</td>
+                            </tr>
+                          ))}
+                        </tbody>
+                      </table>
+                    </div>
+                  </CardContent>
+                </Card>
+
+                <Card className="bg-card/50 border-border/50">
+                  <CardHeader><CardTitle className="text-base flex items-center gap-2"><CheckCircle2 className="w-4 h-4 text-primary" /> Work Status Snapshot</CardTitle></CardHeader>
+                  <CardContent className="space-y-2 text-sm">
+                    <div className="rounded border border-border/50 p-3 flex justify-between"><span>In Process</span><span className="text-cyan-300 font-medium">{workSnapshot.inProcess}</span></div>
+                    <div className="rounded border border-border/50 p-3 flex justify-between"><span>Under Review</span><span className="text-yellow-300 font-medium">{workSnapshot.underReview}</span></div>
+                    <div className="rounded border border-border/50 p-3 flex justify-between"><span>Completed</span><span className="text-green-300 font-medium">{workSnapshot.completed}</span></div>
+                    <div className="rounded border border-border/50 p-3 flex justify-between"><span>Blocked/Overdue</span><span className="text-red-300 font-medium">{workSnapshot.blocked}</span></div>
+                  </CardContent>
+                </Card>
               </section>
 
               {contentByPage[activePage]}
