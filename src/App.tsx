@@ -12,6 +12,8 @@ import NotFound from "./pages/NotFound";
 import AppDashboard from "./pages/AppDashboard";
 import AppCADashboard from "./pages/AppCADashboard";
 import AppAdminDashboard from "./pages/AppAdminDashboard";
+import UniversityDemoDashboard from "./pages/UniversityDemoDashboard";
+import AppUniversityDashboard from "./pages/AppUniversityDashboard";
 import { AuthProvider } from "./hooks/use-auth";
 import ProtectedRoute from "./components/auth/ProtectedRoute";
 import RoleLandingRoute from "./components/auth/RoleLandingRoute";
@@ -31,6 +33,7 @@ const App = () => (
             <Route path="/dashboard" element={<Dashboard />} />
             <Route path="/ca-dashboard" element={<CADashboard />} />
             <Route path="/admin-dashboard" element={<AdminDashboard />} />
+            <Route path="/university-demo" element={<UniversityDemoDashboard />} />
 
             <Route path="/app" element={<RoleLandingRoute />} />
             <Route
@@ -54,6 +57,14 @@ const App = () => (
               element={
                 <ProtectedRoute allowRoles={["admin"]}>
                   <AppAdminDashboard />
+                </ProtectedRoute>
+              }
+            />
+            <Route
+              path="/app/university"
+              element={
+                <ProtectedRoute allowRoles={["user", "manager", "admin"]}>
+                  <AppUniversityDashboard />
                 </ProtectedRoute>
               }
             />
