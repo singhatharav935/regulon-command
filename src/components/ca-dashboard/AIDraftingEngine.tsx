@@ -62,6 +62,7 @@ const draftModes = [
 ];
 
 type StepStatus = "pending" | "completed" | "current";
+type WorkflowStatus = "generated" | "under_review" | "approved" | "signed_off";
 
 interface ReviewStep {
   id: number;
@@ -225,11 +226,15 @@ const AIDraftingEngine = () => {
   const [lastTemplateDocType, setLastTemplateDocType] = useState<string>("");
   const [selectedMode, setSelectedMode] = useState<string>("balanced");
   const [noticeDetails, setNoticeDetails] = useState<string>("");
+  const [preferPiiMasking, setPreferPiiMasking] = useState(true);
   const [advancedMode, setAdvancedMode] = useState(true);
   const [isGenerating, setIsGenerating] = useState(false);
   const [draftGenerated, setDraftGenerated] = useState(false);
   const [draftContent, setDraftContent] = useState("");
   const [showFormatDetails, setShowFormatDetails] = useState(false);
+  const [currentDraftRunId, setCurrentDraftRunId] = useState<string | null>(null);
+  const [workflowStatus, setWorkflowStatus] = useState<WorkflowStatus>("generated");
+  const [auditEvents, setAuditEvents] = useState<Array<{ event_type: string; created_at: string }>>([]);
   const [draftQA, setDraftQA] = useState<DraftQA | null>(null);
   const [draftPackage, setDraftPackage] = useState<DraftPackage | null>(null);
   const [currentSteps, setCurrentSteps] = useState<ReviewStep[]>(initialReviewSteps);
@@ -248,6 +253,40 @@ const AIDraftingEngine = () => {
   const selectedDocLabel = documentTypes.find(doc => doc.id === selectedDocType)?.label || "Selected Draft";
   const docSpecificFormat = documentFormatModules[selectedDocType] || documentFormatModules["custom-draft"];
   const selectedTemplate = selectedDocType ? readyNoticeTemplates[selectedDocType] : "";
+  const supabaseAny = supabase as any;
+
+  const maskPII = (text: string) => {
+    if (!preferPiiMasking) return text;
+    return text
+      .replace(/\b[A-Z0-9._%+-]+@[A-Z0-9.-]+\.[A-Z]{2,}\b/gi, "[REDACTED_EMAIL]")
+      .replace(/\b\d{10}\b/g, "[REDACTED_PHONE]")
+      .replace(/\b[A-Z]{5}\d{4}[A-Z]\b/g, "[REDACTED_PAN]")
+      .replace(/\b\d{2}[A-Z]{5}\d{4}[A-Z]\d[Z][A-Z0-9]\b/gi, "[REDACTED_GSTIN]");
+  };
+
+  const recordAudit = async (draftRunId: string, eventType: string, payload?: Record<string, unknown>) => {
+    try {
+      const {
+        data: { user },
+      } = await supabase.auth.getUser();
+      if (!user) return;
+      await supabaseAny.from("draft_audit_events").insert({
+        draft_run_id: draftRunId,
+        user_id: user.id,
+        event_type: eventType,
+        payload: payload ?? null,
+      });
+      const { data } = await supabaseAny
+        .from("draft_audit_events")
+        .select("event_type, created_at")
+        .eq("draft_run_id", draftRunId)
+        .order("created_at", { ascending: false })
+        .limit(10);
+      setAuditEvents(data ?? []);
+    } catch {
+      // non-blocking
+    }
+  };
 
   useEffect(() => {
     let mounted = true;
@@ -327,6 +366,33 @@ const AIDraftingEngine = () => {
   }, []);
 
   useEffect(() => {
+    let mounted = true;
+    const loadPreferences = async () => {
+      try {
+        const {
+          data: { user },
+        } = await supabase.auth.getUser();
+        if (!user || !mounted) return;
+        const { data } = await supabaseAny
+          .from("practice_preferences")
+          .select("preferred_mode, preferred_document_type, prefer_pii_masking")
+          .eq("user_id", user.id)
+          .maybeSingle();
+        if (!mounted || !data) return;
+        if (data.preferred_mode) setSelectedMode(data.preferred_mode);
+        if (data.preferred_document_type) setSelectedDocType(data.preferred_document_type);
+        if (typeof data.prefer_pii_masking === "boolean") setPreferPiiMasking(data.prefer_pii_masking);
+      } catch {
+        // best effort only
+      }
+    };
+    loadPreferences();
+    return () => {
+      mounted = false;
+    };
+  }, []);
+
+  useEffect(() => {
     if (!selectedClient) return;
     const exists = clientOptions.some((client) => client.id === selectedClient);
     if (!exists) {
@@ -393,6 +459,7 @@ const AIDraftingEngine = () => {
     setDraftPackage(null);
     
     const client = clientOptions.find(c => c.id === selectedClient);
+    const maskedNoticeDetails = noticeDetails ? maskPII(noticeDetails) : undefined;
     
     try {
       let authToken = import.meta.env.VITE_SUPABASE_PUBLISHABLE_KEY as string;
@@ -416,7 +483,7 @@ const AIDraftingEngine = () => {
           draftMode: selectedMode,
           advancedMode,
           strictValidation: advancedMode,
-          noticeDetails: noticeDetails || undefined,
+          noticeDetails: maskedNoticeDetails || undefined,
           stream: !advancedMode,
         }),
       });
@@ -448,11 +515,50 @@ const AIDraftingEngine = () => {
         setDraftPackage((data?.package ?? null) as DraftPackage | null);
         setDraftGenerated(true);
         setShowFormatDetails(false);
+        setWorkflowStatus("generated");
         setCurrentSteps(prev => prev.map(step => {
           if (step.id === 1) return { ...step, status: "completed" as StepStatus };
           if (step.id === 2) return { ...step, status: "current" as StepStatus };
           return step;
         }));
+        try {
+          const {
+            data: { user },
+          } = await supabase.auth.getUser();
+          if (user) {
+            const { data: draftRun } = await supabaseAny
+              .from("draft_runs")
+              .insert({
+                user_id: user.id,
+                company_id: clientSource === "live" ? selectedClient : null,
+                document_type: selectedDocType,
+                draft_mode: selectedMode,
+                status: "generated",
+                notice_input: maskedNoticeDetails ?? null,
+                draft_content: content,
+                qa: data?.qa ?? null,
+                package: data?.package ?? null,
+              })
+              .select("id")
+              .single();
+            if (draftRun?.id) {
+              setCurrentDraftRunId(draftRun.id);
+              await recordAudit(draftRun.id, "draft_generated", {
+                document_type: selectedDocType,
+                draft_mode: selectedMode,
+                advanced_mode: advancedMode,
+              });
+            }
+            await supabaseAny.from("practice_preferences").upsert({
+              user_id: user.id,
+              preferred_mode: selectedMode,
+              preferred_document_type: selectedDocType,
+              prefer_pii_masking: preferPiiMasking,
+            });
+          }
+        } catch {
+          // non-blocking persistence
+        }
         toast.success("Advanced filing-ready draft generated successfully!");
         return;
       }
@@ -656,6 +762,20 @@ const AIDraftingEngine = () => {
                     Copy 200+ Template
                   </Button>
                 </div>
+                <div className="mt-2 p-2 rounded-lg border border-border/50 bg-background/40 flex items-center justify-between">
+                  <p className="text-xs text-muted-foreground">PII Masking before generation</p>
+                  <button
+                    type="button"
+                    onClick={() => setPreferPiiMasking((prev) => !prev)}
+                    className={`px-2 py-1 rounded text-xs border ${
+                      preferPiiMasking
+                        ? "bg-green-500/20 text-green-300 border-green-500/40"
+                        : "bg-muted text-muted-foreground border-border"
+                    }`}
+                  >
+                    {preferPiiMasking ? "Enabled" : "Disabled"}
+                  </button>
+                </div>
               </div>
 
               <div className="p-3 rounded-lg border border-border/50 bg-background/30">
@@ -815,6 +935,49 @@ const AIDraftingEngine = () => {
               <p className="text-sm text-muted-foreground">
                 Every draft must pass through all verification steps. No step can be skipped.
               </p>
+              {draftGenerated && (
+                <div className="flex flex-wrap items-center gap-2 mt-2">
+                  <Badge variant="outline">Status: {workflowStatus}</Badge>
+                  <Button
+                    size="sm"
+                    variant="outline"
+                    disabled={!currentDraftRunId || workflowStatus !== "generated"}
+                    onClick={async () => {
+                      if (!currentDraftRunId) return;
+                      await supabaseAny.from("draft_runs").update({ status: "under_review" }).eq("id", currentDraftRunId);
+                      setWorkflowStatus("under_review");
+                      await recordAudit(currentDraftRunId, "submitted_for_review");
+                    }}
+                  >
+                    Submit for Review
+                  </Button>
+                  <Button
+                    size="sm"
+                    variant="outline"
+                    disabled={!currentDraftRunId || workflowStatus !== "under_review"}
+                    onClick={async () => {
+                      if (!currentDraftRunId) return;
+                      await supabaseAny.from("draft_runs").update({ status: "approved" }).eq("id", currentDraftRunId);
+                      setWorkflowStatus("approved");
+                      await recordAudit(currentDraftRunId, "approved_by_senior");
+                    }}
+                  >
+                    Mark Approved
+                  </Button>
+                  <Button
+                    size="sm"
+                    disabled={!currentDraftRunId || workflowStatus !== "approved"}
+                    onClick={async () => {
+                      if (!currentDraftRunId) return;
+                      await supabaseAny.from("draft_runs").update({ status: "signed_off" }).eq("id", currentDraftRunId);
+                      setWorkflowStatus("signed_off");
+                      await recordAudit(currentDraftRunId, "final_sign_off");
+                    }}
+                  >
+                    Final Sign-off
+                  </Button>
+                </div>
+              )}
             </CardHeader>
             <CardContent>
               <div className="relative">
@@ -863,6 +1026,19 @@ const AIDraftingEngine = () => {
                   ))}
                 </div>
               </div>
+
+              {auditEvents.length > 0 && (
+                <div className="mt-6 p-4 rounded-lg border border-border/50 bg-background/30">
+                  <p className="text-sm font-medium mb-2">Recent Audit Trail</p>
+                  <ul className="space-y-1 text-xs text-muted-foreground">
+                    {auditEvents.map((event, idx) => (
+                      <li key={`${event.event_type}-${idx}`}>
+                        {event.event_type} • {new Date(event.created_at).toLocaleString()}
+                      </li>
+                    ))}
+                  </ul>
+                </div>
+              )}
             </CardContent>
           </Card>
         </TabsContent>
