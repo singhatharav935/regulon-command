@@ -1,10 +1,10 @@
 import { Link, useLocation } from "react-router-dom";
 import { motion } from "framer-motion";
-import { Building2, Briefcase, Shield, Home, ChevronRight } from "lucide-react";
+import { Building2, Briefcase, Shield, Home, ChevronRight, GraduationCap } from "lucide-react";
 import { cn } from "@/lib/utils";
 
 interface DashboardTypeNavProps {
-  activeType: "company" | "ca" | "admin";
+  activeType: "company" | "ca" | "admin" | "university";
   routePrefix?: string;
 }
 
@@ -30,10 +30,22 @@ const dashboardTypes = [
     icon: Shield,
     description: "Platform administration & oversight"
   },
+  {
+    id: "university",
+    label: "University Dashboard",
+    href: "/university",
+    icon: GraduationCap,
+    description: "Campus operations & compliance command"
+  },
 ];
 
 const DashboardTypeNav = ({ activeType, routePrefix = "" }: DashboardTypeNavProps) => {
-  const withPrefix = (href: string) => `${routePrefix}${href}`;
+  const withPrefix = (href: string, id: string) => {
+    if (id === "university") {
+      return routePrefix ? "/app/university" : "/university-demo";
+    }
+    return `${routePrefix}${href}`;
+  };
 
   return (
     <motion.div
@@ -61,9 +73,9 @@ const DashboardTypeNav = ({ activeType, routePrefix = "" }: DashboardTypeNavProp
             const isActive = activeType === dashboard.id;
             
             return (
-                  <Link
+              <Link
                 key={dashboard.id}
-                to={withPrefix(dashboard.href)}
+                to={withPrefix(dashboard.href, dashboard.id)}
                 className={cn(
                   "flex items-center gap-3 px-5 py-3 rounded-xl text-sm font-medium whitespace-nowrap transition-all duration-200 min-w-fit",
                   isActive 
@@ -71,7 +83,9 @@ const DashboardTypeNav = ({ activeType, routePrefix = "" }: DashboardTypeNavProp
                       ? "bg-primary text-primary-foreground" 
                       : dashboard.id === "ca"
                         ? "bg-cyan-500 text-white"
-                        : "bg-purple-500 text-white"
+                        : dashboard.id === "admin"
+                          ? "bg-purple-500 text-white"
+                          : "bg-emerald-500 text-white"
                     : "text-muted-foreground hover:text-foreground hover:bg-accent/50"
                 )}
               >
