@@ -56,7 +56,7 @@ const CADashboard = () => {
           <CAHomeSection />
           
           {/* AI Drafting Engine - CA Only */}
-          <AIDraftingEngine />
+          <AIDraftingEngine demoMode />
           
           <ClientPortfolioSection />
           <TaskFilingManagement />
