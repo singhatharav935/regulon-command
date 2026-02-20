@@ -64,6 +64,10 @@ const draftModes = [
 type StepStatus = "pending" | "completed" | "current";
 type WorkflowStatus = "generated" | "under_review" | "approved" | "signed_off";
 
+interface AIDraftingEngineProps {
+  demoMode?: boolean;
+}
+
 interface ReviewStep {
   id: number;
   label: string;
@@ -217,7 +221,7 @@ const advancedChecksByType: Record<string, AdvancedCheck[]> = {
   ],
 };
 
-const AIDraftingEngine = () => {
+const AIDraftingEngine = ({ demoMode = false }: AIDraftingEngineProps) => {
   const [clientOptions, setClientOptions] = useState<ClientOption[]>(demoClients);
   const [clientSource, setClientSource] = useState<"demo" | "live">("demo");
   const [isLoadingClients, setIsLoadingClients] = useState(false);
@@ -265,6 +269,14 @@ const AIDraftingEngine = () => {
   };
 
   const recordAudit = async (draftRunId: string, eventType: string, payload?: Record<string, unknown>) => {
+    if (demoMode) {
+      setAuditEvents((prev) => [
+        { event_type: eventType, created_at: new Date().toISOString() },
+        ...prev,
+      ].slice(0, 10));
+      return;
+    }
+
     try {
       const {
         data: { user },
@@ -289,6 +301,13 @@ const AIDraftingEngine = () => {
   };
 
   useEffect(() => {
+    if (demoMode) {
+      setClientOptions(demoClients);
+      setClientSource("demo");
+      setIsLoadingClients(false);
+      return;
+    }
+
     let mounted = true;
 
     const loadLiveClients = async () => {
@@ -363,9 +382,11 @@ const AIDraftingEngine = () => {
     return () => {
       mounted = false;
     };
-  }, []);
+  }, [demoMode]);
 
   useEffect(() => {
+    if (demoMode) return;
+
     let mounted = true;
     const loadPreferences = async () => {
       try {
@@ -390,7 +411,7 @@ const AIDraftingEngine = () => {
     return () => {
       mounted = false;
     };
-  }, []);
+  }, [demoMode]);
 
   useEffect(() => {
     if (!selectedClient) return;
@@ -522,10 +543,23 @@ const AIDraftingEngine = () => {
           return step;
         }));
         try {
-          const {
-            data: { user },
-          } = await supabase.auth.getUser();
-          if (user) {
+          if (demoMode) {
+            const demoRunId = `demo-${Date.now()}`;
+            setCurrentDraftRunId(demoRunId);
+            await recordAudit(demoRunId, "draft_generated", {
+              document_type: selectedDocType,
+              draft_mode: selectedMode,
+              advanced_mode: advancedMode,
+              mode: "demo",
+            });
+          } else {
+            const {
+              data: { user },
+            } = await supabase.auth.getUser();
+            if (!user) {
+              throw new Error("No authenticated user for persistence.");
+            }
+
             const { data: draftRun } = await supabaseAny
               .from("draft_runs")
               .insert({
@@ -944,7 +978,9 @@ const AIDraftingEngine = () => {
                     disabled={!currentDraftRunId || workflowStatus !== "generated"}
                     onClick={async () => {
                       if (!currentDraftRunId) return;
-                      await supabaseAny.from("draft_runs").update({ status: "under_review" }).eq("id", currentDraftRunId);
+                      if (!demoMode) {
+                        await supabaseAny.from("draft_runs").update({ status: "under_review" }).eq("id", currentDraftRunId);
+                      }
                       setWorkflowStatus("under_review");
                       await recordAudit(currentDraftRunId, "submitted_for_review");
                     }}
@@ -957,7 +993,9 @@ const AIDraftingEngine = () => {
                     disabled={!currentDraftRunId || workflowStatus !== "under_review"}
                     onClick={async () => {
                       if (!currentDraftRunId) return;
-                      await supabaseAny.from("draft_runs").update({ status: "approved" }).eq("id", currentDraftRunId);
+                      if (!demoMode) {
+                        await supabaseAny.from("draft_runs").update({ status: "approved" }).eq("id", currentDraftRunId);
+                      }
                       setWorkflowStatus("approved");
                       await recordAudit(currentDraftRunId, "approved_by_senior");
                     }}
@@ -969,7 +1007,9 @@ const AIDraftingEngine = () => {
                     disabled={!currentDraftRunId || workflowStatus !== "approved"}
                     onClick={async () => {
                       if (!currentDraftRunId) return;
-                      await supabaseAny.from("draft_runs").update({ status: "signed_off" }).eq("id", currentDraftRunId);
+                      if (!demoMode) {
+                        await supabaseAny.from("draft_runs").update({ status: "signed_off" }).eq("id", currentDraftRunId);
+                      }
                       setWorkflowStatus("signed_off");
                       await recordAudit(currentDraftRunId, "final_sign_off");
                     }}
