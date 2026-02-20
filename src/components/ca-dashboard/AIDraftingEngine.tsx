@@ -69,6 +69,35 @@ interface ReviewStep {
   status: StepStatus;
 }
 
+interface DraftQA {
+  filing_score: number;
+  risk_band: "low" | "medium" | "high";
+  mandatory_gates?: Record<string, boolean>;
+  citation_review?: Array<{
+    citation: string;
+    jurisdiction_fit: "high" | "medium" | "low";
+    confidence: number;
+    note: string;
+  }>;
+  explainability?: Array<{
+    legal_point: string;
+    why_included: string;
+    evidence_anchor: string;
+  }>;
+  missing_for_final_filing?: string[];
+}
+
+interface DraftPackage {
+  reply: string;
+  annexure_index?: Array<{
+    annexure_id: string;
+    purpose: string;
+    linked_issue: string;
+  }>;
+  hearing_notes?: string;
+  argument_script?: string[];
+}
+
 const initialReviewSteps: ReviewStep[] = [
   { id: 1, label: "Draft Generated", status: "pending" },
   { id: 2, label: "CA Review & Edit", status: "pending" },
@@ -201,6 +230,8 @@ const AIDraftingEngine = () => {
   const [draftGenerated, setDraftGenerated] = useState(false);
   const [draftContent, setDraftContent] = useState("");
   const [showFormatDetails, setShowFormatDetails] = useState(false);
+  const [draftQA, setDraftQA] = useState<DraftQA | null>(null);
+  const [draftPackage, setDraftPackage] = useState<DraftPackage | null>(null);
   const [currentSteps, setCurrentSteps] = useState<ReviewStep[]>(initialReviewSteps);
   const [generationError, setGenerationError] = useState<string | null>(null);
 
@@ -358,6 +389,8 @@ const AIDraftingEngine = () => {
     setIsGenerating(true);
     setGenerationError(null);
     setDraftContent("");
+    setDraftQA(null);
+    setDraftPackage(null);
     
     const client = clientOptions.find(c => c.id === selectedClient);
     
@@ -411,6 +444,8 @@ const AIDraftingEngine = () => {
           throw new Error("Advanced draft generation returned empty content.");
         }
         setDraftContent(content);
+        setDraftQA((data?.qa ?? null) as DraftQA | null);
+        setDraftPackage((data?.package ?? null) as DraftPackage | null);
         setDraftGenerated(true);
         setShowFormatDetails(false);
         setCurrentSteps(prev => prev.map(step => {
@@ -750,6 +785,22 @@ const AIDraftingEngine = () => {
                   </ul>
                 </div>
               )}
+
+              {draftGenerated && draftQA && (
+                <div className="mt-3 p-4 rounded-lg border border-border/50 bg-background/30 text-sm space-y-2">
+                  <p className="font-medium text-foreground">
+                    Filing Score: {draftQA.filing_score}/100
+                    <span className="ml-2 text-xs uppercase text-muted-foreground">Risk: {draftQA.risk_band}</span>
+                  </p>
+                  {draftQA.missing_for_final_filing && draftQA.missing_for_final_filing.length > 0 && (
+                    <ul className="list-disc pl-5 text-yellow-400">
+                      {draftQA.missing_for_final_filing.map((item) => (
+                        <li key={item}>{item}</li>
+                      ))}
+                    </ul>
+                  )}
+                </div>
+              )}
             </div>
           </div>
         </TabsContent>
@@ -830,6 +881,32 @@ const AIDraftingEngine = () => {
             <CardContent>
               {draftGenerated ? (
                 <div className="space-y-4">
+                  {draftQA && draftQA.explainability && draftQA.explainability.length > 0 && (
+                    <div className="p-4 rounded-lg bg-cyan-500/5 border border-cyan-500/20">
+                      <h4 className="font-medium text-foreground mb-3">Explainability Panel</h4>
+                      <ul className="space-y-2 text-sm">
+                        {draftQA.explainability.slice(0, 5).map((item) => (
+                          <li key={`${item.legal_point}-${item.evidence_anchor}`} className="text-muted-foreground">
+                            <strong className="text-foreground">{item.legal_point}:</strong> {item.why_included}
+                            <span className="block text-xs text-cyan-300">Evidence: {item.evidence_anchor}</span>
+                          </li>
+                        ))}
+                      </ul>
+                    </div>
+                  )}
+
+                  {draftPackage && (
+                    <div className="p-4 rounded-lg bg-primary/5 border border-primary/20">
+                      <h4 className="font-medium text-foreground mb-3">Multi-Output Package</h4>
+                      <ul className="space-y-1 text-sm text-muted-foreground">
+                        <li>Reply Draft: Ready</li>
+                        <li>Annexure Index: {(draftPackage.annexure_index ?? []).length} items</li>
+                        <li>Hearing Notes: {draftPackage.hearing_notes ? "Generated" : "Pending"}</li>
+                        <li>Argument Script: {(draftPackage.argument_script ?? []).length} talking points</li>
+                      </ul>
+                    </div>
+                  )}
+
                   <div className="p-4 rounded-lg bg-primary/5 border border-primary/20">
                     <h4 className="font-medium text-foreground mb-3">Draft prepared under:</h4>
                     <ul className="space-y-2 text-sm">

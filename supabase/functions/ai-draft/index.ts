@@ -171,6 +171,15 @@ interface NoticeIntelligence {
   critical_missing_fields: string[];
 }
 
+const hasPlaceholders = (content: string) =>
+  /\[insert[^\]]*\]|\[to be filled\]|<insert|placeholder/i.test(content);
+
+const buildRiskBand = (score: number): "low" | "medium" | "high" => {
+  if (score >= 75) return "low";
+  if (score >= 45) return "medium";
+  return "high";
+};
+
 serve(async (req) => {
   const corsHeaders = getCorsHeaders(req);
 
@@ -460,7 +469,7 @@ ${noticeDetails ? `RAW NOTICE DETAILS:\n${noticeDetails}` : ""}
     const draftData = await draftResp.json();
     const firstDraft = draftData.choices?.[0]?.message?.content || "";
 
-const reviewerSystemPrompt = `You are final quality control counsel.
+    const reviewerSystemPrompt = `You are final quality control counsel.
 Return ONLY improved final draft text (no commentary).
 Checklist:
 - complete notice snapshot
@@ -491,6 +500,88 @@ Checklist:
     const reviewedData = await reviewerResp.json();
     const finalDraft = reviewedData.choices?.[0]?.message?.content || firstDraft;
 
+    const qaSystemPrompt = `You are a legal QA auditor for filing readiness.
+Return STRICT JSON only, no markdown.
+Schema:
+{
+  "filing_score": number,
+  "mandatory_gates": {
+    "no_placeholders": boolean,
+    "para_wise_matrix_present": boolean,
+    "computation_table_present": boolean,
+    "annexure_mapping_present": boolean,
+    "prayer_complete": boolean
+  },
+  "citation_review": [{
+    "citation": string,
+    "jurisdiction_fit": "high" | "medium" | "low",
+    "confidence": number,
+    "note": string
+  }],
+  "explainability": [{
+    "legal_point": string,
+    "why_included": string,
+    "evidence_anchor": string
+  }],
+  "hearing_notes": string,
+  "argument_script": string[],
+  "annexure_index": [{
+    "annexure_id": string,
+    "purpose": string,
+    "linked_issue": string
+  }],
+  "missing_for_final_filing": string[]
+}`;
+
+    const qaResp = await aiRequest({
+      apiKey: LOVABLE_API_KEY,
+      stream: false,
+      messages: [
+        { role: "system", content: qaSystemPrompt },
+        { role: "user", content: finalDraft },
+      ],
+    });
+
+    let qaPayload: any = null;
+    if (qaResp.ok) {
+      const qaData = await qaResp.json();
+      qaPayload = safeJsonParse<any>(qaData.choices?.[0]?.message?.content ?? "");
+    }
+
+    const fallbackGates = {
+      no_placeholders: !hasPlaceholders(finalDraft),
+      para_wise_matrix_present: /para[- ]wise rebuttal matrix|scn para/i.test(finalDraft),
+      computation_table_present: /computation|reconciliation|accepted|disputed/i.test(finalDraft),
+      annexure_mapping_present: /annexure/i.test(finalDraft),
+      prayer_complete: /prayer|relief|personal hearing/i.test(finalDraft),
+    };
+
+    const mandatoryGates = qaPayload?.mandatory_gates ?? fallbackGates;
+    const noPlaceholderGate = mandatoryGates.no_placeholders && !hasPlaceholders(finalDraft);
+
+    const gateFailures: string[] = [];
+    if (!noPlaceholderGate) gateFailures.push("no_placeholders");
+    if (!mandatoryGates.para_wise_matrix_present) gateFailures.push("para_wise_matrix_present");
+    if (!mandatoryGates.computation_table_present) gateFailures.push("computation_table_present");
+    if (!mandatoryGates.annexure_mapping_present) gateFailures.push("annexure_mapping_present");
+    if (!mandatoryGates.prayer_complete) gateFailures.push("prayer_complete");
+
+    if (strictValidation && gateFailures.length > 0) {
+      return new Response(JSON.stringify({
+        error: `Filing gates not satisfied: ${gateFailures.join(", ")}`,
+        failed_gates: gateFailures,
+      }), {
+        status: 422,
+        headers: { ...corsHeaders, "Content-Type": "application/json" },
+      });
+    }
+
+    const filingScore = Math.max(
+      0,
+      Math.min(100, Number(qaPayload?.filing_score ?? (gateFailures.length === 0 ? 78 : 52)))
+    );
+    const riskBand = buildRiskBand(filingScore);
+
     return new Response(JSON.stringify({
       draft: finalDraft,
       metadata: {
@@ -502,6 +593,23 @@ Checklist:
         userId,
         generatedAt: new Date().toISOString(),
         version: "3.0-advanced",
+      },
+      qa: {
+        filing_score: filingScore,
+        risk_band: riskBand,
+        mandatory_gates: {
+          ...mandatoryGates,
+          no_placeholders: noPlaceholderGate,
+        },
+        citation_review: qaPayload?.citation_review ?? [],
+        explainability: qaPayload?.explainability ?? [],
+        missing_for_final_filing: qaPayload?.missing_for_final_filing ?? [],
+      },
+      package: {
+        reply: finalDraft,
+        annexure_index: qaPayload?.annexure_index ?? [],
+        hearing_notes: qaPayload?.hearing_notes ?? "Prepare hearing note from para-wise rebuttal matrix and computation table.",
+        argument_script: qaPayload?.argument_script ?? [],
       },
       intelligence: extractedNotice,
     }), {
