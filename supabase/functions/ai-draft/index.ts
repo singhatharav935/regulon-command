@@ -106,6 +106,10 @@ ADVANCED QUALITY GATES (MANDATORY):
 4. Procedural validity checks (jurisdiction, limitation, service, natural justice) only if fact-supported.
 5. RUD-to-Annexure mapping and missing-data flags (never fabricate facts).
 6. Complete layered prayer and hearing request.
+7. Avoid absolute legal claims ("settled law") unless clearly supportable from provided record.
+8. Use exact amounts, dates, and reference IDs from the notice/worksheet wherever available.
+9. If mandatory fields remain unavailable, include "Data Required to Finalize Filing" at the end.
+10. Interest and penalty conclusions must be tied to explicit computation facts and statutory conditions.
 `;
 
 const safeJsonParse = <T,>(raw: string): T | null => {
@@ -356,6 +360,7 @@ NON-NEGOTIABLE OUTPUT RULES
 2. No fabricated facts or fabricated authorities.
 3. Do not overstate legal certainty; phrase disputed issues with defensible precision.
 4. Default sign-off: "For and on behalf of ${companyName}" and "Authorized Signatory" with placeholders.
+5. Mention case-law only where fact-applicable and framed with appropriate caution.
 
 DRAFT MODE: ${draftMode.toUpperCase()}
 ${modeDescription}
@@ -366,6 +371,8 @@ UNIVERSAL STANDARDS
 3. "Without prejudice" clause.
 4. No admission unless expressly instructed.
 5. Layered reliefs in final prayer.
+6. Map each major contention to annexure/document references.
+7. Include accepted vs disputed columns in demand/interest/penalty rebuttal table.
 
 ${getAdvancedDraftingRequirements()}
 
@@ -382,7 +389,7 @@ ${extractedNotice ? `EXTRACTED NOTICE INTELLIGENCE (use as primary structure sou
 ${noticeDetails ? `RAW NOTICE DETAILS:\n${noticeDetails}` : ""}
 `;
 
-    const userMessage = context || `Generate a comprehensive, filing-ready ${documentType.replace(/-/g, " ")} for ${companyName}${industry ? ` (${industry} sector)` : ""}. Include para-wise rebuttal, allegation-wise computation challenge, annexure mapping, and complete prayer.`;
+    const userMessage = context || `Generate a comprehensive, filing-ready ${documentType.replace(/-/g, " ")} for ${companyName}${industry ? ` (${industry} sector)` : ""}. Include SCN para-wise rebuttal matrix, allegation-wise computation challenge with accepted/disputed columns, annexure mapping per issue, calibrated legal language, and complete layered prayer.`;
 
     if (!advancedMode) {
       const response = await aiRequest({
@@ -453,7 +460,7 @@ ${noticeDetails ? `RAW NOTICE DETAILS:\n${noticeDetails}` : ""}
     const draftData = await draftResp.json();
     const firstDraft = draftData.choices?.[0]?.message?.content || "";
 
-    const reviewerSystemPrompt = `You are final quality control counsel.
+const reviewerSystemPrompt = `You are final quality control counsel.
 Return ONLY improved final draft text (no commentary).
 Checklist:
 - complete notice snapshot
@@ -462,7 +469,10 @@ Checklist:
 - procedural objections only if fact-supported
 - annexure mapping present
 - no placeholders unless truly unavailable
-- no contradictions or unsupported assertions`;
+- no contradictions or unsupported assertions
+- avoid absolute legal-claim language unless demonstrably supportable
+- use exact amounts/dates/reference IDs where available
+- add "Data Required to Finalize Filing" when critical details are missing`;
 
     const reviewerResp = await aiRequest({
       apiKey: LOVABLE_API_KEY,
