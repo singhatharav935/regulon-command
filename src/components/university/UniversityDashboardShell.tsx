@@ -463,6 +463,26 @@ const UniversityDashboardShell = ({ mode }: UniversityDashboardShellProps) => {
     [complianceTasks.length, filings.length, invoices, procurementRows.length, grantRows.length, employeeComplianceRows.length]
   );
 
+  const deliveryLedger = useMemo(
+    () => [
+      { quarter: "Q1 FY26", planned: 42, completed: 38, carryForward: 4, closureRate: "90%" },
+      { quarter: "Q2 FY26", planned: 47, completed: 44, carryForward: 3, closureRate: "94%" },
+      { quarter: "Q3 FY26", planned: 51, completed: 46, carryForward: 5, closureRate: "90%" },
+      { quarter: "Q4 FY26", planned: 49, completed: 41, carryForward: 8, closureRate: "84%" },
+    ],
+    []
+  );
+
+  const serviceCommitments = useMemo(
+    () => [
+      { commitment: "Critical notice triage", target: "< 6 hours", actual: "4.2 hours", status: "healthy" },
+      { commitment: "Draft turnaround (filing pack)", target: "< 24 hours", actual: "18.5 hours", status: "healthy" },
+      { commitment: "Review-to-signoff cycle", target: "< 48 hours", actual: "43 hours", status: "watch" },
+      { commitment: "Overdue item resolution", target: "< 72 hours", actual: "67 hours", status: "healthy" },
+    ],
+    []
+  );
+
   const myRoleQueue = useMemo(() => roleQueueMap[effectiveRole], [effectiveRole]);
   const visiblePages = useMemo(() => pageConfig.filter((p) => rolePageAccess[effectiveRole].includes(p.id)), [effectiveRole]);
 
@@ -1051,6 +1071,51 @@ const UniversityDashboardShell = ({ mode }: UniversityDashboardShellProps) => {
                     <div className="rounded border border-border/50 p-3 flex justify-between"><span>Under Review</span><span className="text-yellow-300 font-medium">{workSnapshot.underReview}</span></div>
                     <div className="rounded border border-border/50 p-3 flex justify-between"><span>Completed</span><span className="text-green-300 font-medium">{workSnapshot.completed}</span></div>
                     <div className="rounded border border-border/50 p-3 flex justify-between"><span>Blocked/Overdue</span><span className="text-red-300 font-medium">{workSnapshot.blocked}</span></div>
+                  </CardContent>
+                </Card>
+              </section>
+
+              <section className="grid grid-cols-1 xl:grid-cols-3 gap-4">
+                <Card className="bg-card/50 border-border/50 xl:col-span-2">
+                  <CardHeader><CardTitle className="text-base flex items-center gap-2"><BarChart3 className="w-4 h-4 text-primary" /> Delivery Ledger by Quarter</CardTitle></CardHeader>
+                  <CardContent>
+                    <div className="overflow-x-auto">
+                      <table className="w-full text-sm">
+                        <thead>
+                          <tr className="text-left text-muted-foreground border-b border-border/50">
+                            <th className="py-2 pr-4">Quarter</th>
+                            <th className="py-2 pr-4">Planned</th>
+                            <th className="py-2 pr-4">Completed</th>
+                            <th className="py-2 pr-4">Carry Forward</th>
+                            <th className="py-2 pr-4">Closure Rate</th>
+                          </tr>
+                        </thead>
+                        <tbody>
+                          {deliveryLedger.map((row) => (
+                            <tr key={row.quarter} className="border-b border-border/30">
+                              <td className="py-2 pr-4 font-medium">{row.quarter}</td>
+                              <td className="py-2 pr-4">{row.planned}</td>
+                              <td className="py-2 pr-4 text-green-300">{row.completed}</td>
+                              <td className="py-2 pr-4 text-yellow-300">{row.carryForward}</td>
+                              <td className="py-2 pr-4 text-cyan-300">{row.closureRate}</td>
+                            </tr>
+                          ))}
+                        </tbody>
+                      </table>
+                    </div>
+                  </CardContent>
+                </Card>
+
+                <Card className="bg-card/50 border-border/50">
+                  <CardHeader><CardTitle className="text-base flex items-center gap-2"><ClipboardList className="w-4 h-4 text-primary" /> Service Commitments (SLA)</CardTitle></CardHeader>
+                  <CardContent className="space-y-2 text-sm">
+                    {serviceCommitments.map((row) => (
+                      <div key={row.commitment} className="rounded border border-border/50 p-3">
+                        <p className="font-medium">{row.commitment}</p>
+                        <p className="text-xs text-muted-foreground mt-1">Target: {row.target} • Actual: {row.actual}</p>
+                        <p className={`text-xs mt-1 ${statusClass[row.status] || "text-muted-foreground"}`}>{row.status}</p>
+                      </div>
+                    ))}
                   </CardContent>
                 </Card>
               </section>
