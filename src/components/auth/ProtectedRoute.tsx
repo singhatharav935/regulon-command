@@ -2,16 +2,18 @@ import { Navigate, useLocation } from "react-router-dom";
 import type { ReactElement } from "react";
 import { useAuth } from "@/hooks/use-auth";
 import type { Database } from "@/integrations/supabase/types";
+import type { AppPersona } from "@/hooks/use-auth";
 
 type AppRole = Database["public"]["Enums"]["app_role"];
 
 interface ProtectedRouteProps {
   children: ReactElement;
   allowRoles?: AppRole[];
+  allowPersonas?: AppPersona[];
 }
 
-const ProtectedRoute = ({ children, allowRoles }: ProtectedRouteProps) => {
-  const { loading, user, roles } = useAuth();
+const ProtectedRoute = ({ children, allowRoles, allowPersonas }: ProtectedRouteProps) => {
+  const { loading, user, roles, persona } = useAuth();
   const location = useLocation();
 
   if (loading) {
@@ -32,8 +34,15 @@ const ProtectedRoute = ({ children, allowRoles }: ProtectedRouteProps) => {
   if (allowRoles && allowRoles.length > 0) {
     const hasAllowedRole = allowRoles.some((role) => roles.includes(role));
 
-    if (!hasAllowedRole) {
+    if (!hasAllowedRole && (!allowPersonas || allowPersonas.length === 0)) {
       return <Navigate to="/app/dashboard" replace />;
+    }
+  }
+
+  if (allowPersonas && allowPersonas.length > 0) {
+    const hasAllowedPersona = persona ? allowPersonas.includes(persona) : false;
+    if (!hasAllowedPersona) {
+      return <Navigate to="/app" replace />;
     }
   }
 

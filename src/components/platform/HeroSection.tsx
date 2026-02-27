@@ -64,11 +64,11 @@ const HeroSection = () => {
             transition={{ duration: 0.5, delay: 0.4 }}
             className="flex flex-wrap items-center justify-center gap-4 mb-16"
           >
-            <Button size="lg" className="btn-glow h-12 px-8" onClick={() => navigate("/auth?mode=signup")}>
+            <Button size="lg" className="btn-glow h-12 px-8" onClick={() => navigate("/auth?mode=signup&role=company_owner")}>
               Get Started
               <ArrowRight className="w-4 h-4 ml-2" />
             </Button>
-            <Button size="lg" variant="outline" className="h-12 px-8" onClick={() => navigate("/auth")}>
+            <Button size="lg" variant="outline" className="h-12 px-8" onClick={() => navigate("/auth?mode=login&role=company_owner")}>
               Login to Dashboard
             </Button>
             <Button size="lg" variant="ghost" className="h-12 px-8">

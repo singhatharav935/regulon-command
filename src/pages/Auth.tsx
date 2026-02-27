@@ -1,7 +1,7 @@
 import { useState, useEffect } from "react";
 import { useLocation, useNavigate, useSearchParams } from "react-router-dom";
 import { motion } from "framer-motion";
-import { Mail, Lock, User, ArrowLeft, Eye, EyeOff, Shield } from "lucide-react";
+import { Mail, Lock, User, ArrowLeft, Eye, EyeOff, Shield, Briefcase, Building2, Users, Gavel, UserCheck } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
@@ -12,28 +12,72 @@ import { z } from "zod";
 const emailSchema = z.string().email("Please enter a valid email address");
 const passwordSchema = z.string().min(6, "Password must be at least 6 characters");
 
+const personas = [
+  {
+    id: "company_owner",
+    label: "Company Owner",
+    description: "Client dashboard access for company compliance control",
+    icon: Building2,
+  },
+  {
+    id: "external_ca",
+    label: "External CA",
+    description: "Solo/firm CA workflow without in-house lawyer dependency",
+    icon: Briefcase,
+  },
+  {
+    id: "in_house_ca",
+    label: "In-House CA",
+    description: "Regulon internal CA workflow with legal review path",
+    icon: Users,
+  },
+  {
+    id: "in_house_lawyer",
+    label: "In-House Lawyer",
+    description: "Legal QA, citation validation, and filing sign-off",
+    icon: Gavel,
+  },
+  {
+    id: "admin",
+    label: "Admin",
+    description: "Platform governance and tenant-level controls",
+    icon: UserCheck,
+  },
+] as const;
+
+type Persona = (typeof personas)[number]["id"];
+
+const isPersona = (value: string | null): value is Persona => {
+  return personas.some((persona) => persona.id === value);
+};
+
 const Auth = () => {
   const navigate = useNavigate();
   const location = useLocation();
-  const [searchParams] = useSearchParams();
+  const [searchParams, setSearchParams] = useSearchParams();
   const { toast } = useToast();
   const returnPath = (location.state as { from?: string } | null)?.from;
-  
-  const [isLogin, setIsLogin] = useState(searchParams.get("mode") !== "signup");
+
+  const initialMode = searchParams.get("mode") === "signup" ? "signup" : "login";
+  const initialPersona = isPersona(searchParams.get("role")) ? (searchParams.get("role") as Persona) : "company_owner";
+
+  const [mode, setMode] = useState<"login" | "signup">(initialMode);
   const [email, setEmail] = useState("");
   const [password, setPassword] = useState("");
   const [fullName, setFullName] = useState("");
+  const [selectedPersona, setSelectedPersona] = useState<Persona>(initialPersona);
   const [showPassword, setShowPassword] = useState(false);
   const [loading, setLoading] = useState(false);
-  const [errors, setErrors] = useState<{ email?: string; password?: string }>({});
+  const [errors, setErrors] = useState<{ email?: string; password?: string; fullName?: string }>({});
 
   useEffect(() => {
-    const { data: { subscription } } = supabase.auth.onAuthStateChange((event, session) => {
-      if (session?.user) {
-        navigate(returnPath || "/app", { replace: true });
-      }
-    });
+    const syncMode = searchParams.get("mode") === "signup" ? "signup" : "login";
+    const syncPersona = isPersona(searchParams.get("role")) ? (searchParams.get("role") as Persona) : "company_owner";
+    setMode(syncMode);
+    setSelectedPersona(syncPersona);
+  }, [searchParams]);
 
+  useEffect(() => {
     supabase.auth.getSession()
       .then(({ data: { session } }) => {
         if (session?.user) {
@@ -43,13 +87,21 @@ const Auth = () => {
       .catch((error) => {
         console.warn("Initial session check failed on auth page.", error);
       });
-
-    return () => subscription.unsubscribe();
   }, [navigate, returnPath]);
 
+  const updateMode = (nextMode: "login" | "signup") => {
+    setMode(nextMode);
+    setSearchParams({ mode: nextMode, role: selectedPersona });
+  };
+
+  const updatePersona = (persona: Persona) => {
+    setSelectedPersona(persona);
+    setSearchParams({ mode, role: persona });
+  };
+
   const validateForm = () => {
-    const newErrors: { email?: string; password?: string } = {};
-    
+    const newErrors: { email?: string; password?: string; fullName?: string } = {};
+
     try {
       emailSchema.parse(email);
     } catch (e) {
@@ -66,34 +118,105 @@ const Auth = () => {
       }
     }
 
+    if (mode === "signup" && fullName.trim().length < 2) {
+      newErrors.fullName = "Please enter your full name";
+    }
+
     setErrors(newErrors);
     return Object.keys(newErrors).length === 0;
   };
 
+  const resolveUserPersona = async (userId: string): Promise<Persona | null> => {
+    const supabaseAny = supabase as any;
+
+    const { data: personaData } = await supabaseAny
+      .from("user_personas")
+      .select("persona")
+      .eq("user_id", userId)
+      .maybeSingle();
+
+    if (isPersona(personaData?.persona ?? null)) {
+      return personaData.persona;
+    }
+
+    const { data: roleRows } = await supabaseAny
+      .from("user_roles")
+      .select("role")
+      .eq("user_id", userId);
+
+    const roles: string[] = (roleRows ?? []).map((row: { role: string }) => row.role);
+
+    if (roles.includes("admin")) return "admin";
+
+    if (roles.includes("manager")) {
+      const { data: caWorkspace } = await supabaseAny
+        .from("ca_workspace_profiles")
+        .select("workspace_type")
+        .eq("user_id", userId)
+        .maybeSingle();
+
+      if (caWorkspace?.workspace_type === "regulon_ca") return "in_house_ca";
+      return "external_ca";
+    }
+
+    return roles.includes("user") ? "company_owner" : null;
+  };
+
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
-    
+
     if (!validateForm()) return;
-    
+
     setLoading(true);
 
     try {
-      if (isLogin) {
+      if (mode === "login") {
         const { error } = await supabase.auth.signInWithPassword({ email, password });
         if (error) throw error;
-        toast({ title: "Welcome back!", description: "You have been logged in successfully." });
+
+        const {
+          data: { user },
+          error: userError,
+        } = await supabase.auth.getUser();
+
+        if (userError) throw userError;
+
+        if (user) {
+          const accountPersona = await resolveUserPersona(user.id);
+          if (accountPersona && accountPersona !== selectedPersona) {
+            await supabase.auth.signOut();
+            throw new Error(`This account is registered as ${accountPersona.replaceAll("_", " ")}. Select that role to login.`);
+          }
+        }
+
+        toast({ title: "Welcome back", description: "Login successful. Redirecting to your workspace." });
+        navigate(returnPath || "/app", { replace: true });
       } else {
-        const redirectUrl = `${window.location.origin}/`;
-        const { error } = await supabase.auth.signUp({
+        const redirectUrl = `${window.location.origin}/auth?mode=login&role=${selectedPersona}`;
+        const { data, error } = await supabase.auth.signUp({
           email,
           password,
           options: {
             emailRedirectTo: redirectUrl,
-            data: { full_name: fullName }
-          }
+            data: {
+              full_name: fullName,
+              registration_role: selectedPersona,
+            },
+          },
         });
+
         if (error) throw error;
-        toast({ title: "Account created!", description: "Welcome to REGULON." });
+
+        if (data.session) {
+          toast({ title: "Account created", description: "Registration complete. Opening your dashboard." });
+          navigate("/app", { replace: true });
+        } else {
+          toast({
+            title: "Confirm your email",
+            description: "We sent a verification link. After verification, login with the same selected role.",
+          });
+          updateMode("login");
+        }
       }
     } catch (error: any) {
       let message = error.message;
@@ -110,11 +233,11 @@ const Auth = () => {
     <div className="min-h-screen bg-background flex items-center justify-center p-4">
       <div className="absolute inset-0 grid-pattern opacity-50" />
       <div className="absolute top-1/4 left-1/4 w-96 h-96 bg-primary/5 rounded-full blur-3xl" />
-      
+
       <motion.div
         initial={{ opacity: 0, y: 20 }}
         animate={{ opacity: 1, y: 0 }}
-        className="relative z-10 w-full max-w-md"
+        className="relative z-10 w-full max-w-3xl"
       >
         <button
           onClick={() => navigate("/")}
@@ -126,14 +249,52 @@ const Auth = () => {
 
         <div className="glass-card p-8">
           <div className="text-center mb-8">
-            <h1 className="text-2xl font-bold mb-2 text-gradient-primary">REGULON</h1>
-            <p className="text-muted-foreground">
-              {isLogin ? "Login to your dashboard" : "Create your account"}
-            </p>
+            <h1 className="text-2xl font-bold mb-2 text-gradient-primary">REGULON ACCESS</h1>
+            <p className="text-muted-foreground">Role-specific authentication and dashboard routing</p>
+          </div>
+
+          <div className="grid grid-cols-1 md:grid-cols-2 gap-3 mb-6">
+            {personas.map((persona) => {
+              const Icon = persona.icon;
+              const isActive = selectedPersona === persona.id;
+              return (
+                <button
+                  key={persona.id}
+                  type="button"
+                  onClick={() => updatePersona(persona.id)}
+                  className={`rounded-xl border p-4 text-left transition ${isActive ? "border-cyan-400 bg-cyan-500/10" : "border-border hover:border-cyan-600/60"}`}
+                >
+                  <div className="flex items-center gap-2 mb-1">
+                    <Icon className="w-4 h-4 text-cyan-300" />
+                    <p className="font-semibold">{persona.label}</p>
+                  </div>
+                  <p className="text-xs text-muted-foreground">{persona.description}</p>
+                </button>
+              );
+            })}
+          </div>
+
+          <div className="flex gap-2 mb-6">
+            <Button
+              type="button"
+              variant={mode === "login" ? "default" : "outline"}
+              onClick={() => updateMode("login")}
+              className="flex-1"
+            >
+              Login
+            </Button>
+            <Button
+              type="button"
+              variant={mode === "signup" ? "default" : "outline"}
+              onClick={() => updateMode("signup")}
+              className="flex-1"
+            >
+              Register
+            </Button>
           </div>
 
           <form onSubmit={handleSubmit} className="space-y-4">
-            {!isLogin && (
+            {mode === "signup" && (
               <div className="space-y-2">
                 <Label htmlFor="fullName">Full Name</Label>
                 <div className="relative">
@@ -144,9 +305,10 @@ const Auth = () => {
                     placeholder="John Doe"
                     value={fullName}
                     onChange={(e) => setFullName(e.target.value)}
-                    className="pl-10"
+                    className={`pl-10 ${errors.fullName ? "border-destructive" : ""}`}
                   />
                 </div>
+                {errors.fullName && <p className="text-xs text-destructive">{errors.fullName}</p>}
               </div>
             )}
 
@@ -190,22 +352,13 @@ const Auth = () => {
             </div>
 
             <Button type="submit" className="w-full btn-glow" disabled={loading}>
-              {loading ? "Please wait..." : isLogin ? "Login" : "Create Account"}
+              {loading ? "Please wait..." : mode === "login" ? `Login as ${selectedPersona.replaceAll("_", " ")}` : `Register as ${selectedPersona.replaceAll("_", " ")}`}
             </Button>
           </form>
 
-          <div className="mt-6 text-center">
-            <button
-              onClick={() => setIsLogin(!isLogin)}
-              className="text-sm text-muted-foreground hover:text-foreground transition-colors"
-            >
-              {isLogin ? "Don't have an account? Sign up" : "Already have an account? Login"}
-            </button>
-          </div>
-
           <div className="mt-6 pt-6 border-t border-border flex items-center justify-center gap-2 text-xs text-muted-foreground">
             <Shield className="w-3 h-3" />
-            <span>Secured with enterprise-grade encryption</span>
+            <span>Role-bound access with enterprise-grade encryption</span>
           </div>
         </div>
       </motion.div>

@@ -157,7 +157,7 @@ const ComplianceShowcase = () => {
                   
                   <Button 
                     className="mt-4 btn-glow"
-                    onClick={() => navigate("/auth?mode=signup")}
+                    onClick={() => navigate("/auth?mode=signup&role=company_owner")}
                   >
                     Start Your Journey
                     <ArrowRight className="w-4 h-4 ml-2" />
@@ -181,7 +181,7 @@ const ComplianceShowcase = () => {
               Ready to transform your compliance workflow?
             </p>
             <div className="flex flex-wrap items-center justify-center gap-4">
-              <Button size="lg" className="btn-glow" onClick={() => navigate("/auth?mode=signup")}>
+              <Button size="lg" className="btn-glow" onClick={() => navigate("/auth?mode=signup&role=company_owner")}>
                 Get Started Free
                 <ArrowRight className="w-4 h-4 ml-2" />
               </Button>
