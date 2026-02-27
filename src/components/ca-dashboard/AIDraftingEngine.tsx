@@ -1,4 +1,4 @@
-import { useEffect, useState } from "react";
+import { useEffect, useMemo, useState } from "react";
 import { motion } from "framer-motion";
 import { 
   FileText, 
@@ -66,6 +66,7 @@ type WorkflowStatus = "generated" | "under_review" | "approved" | "signed_off";
 
 interface AIDraftingEngineProps {
   demoMode?: boolean;
+  includeLawyerReview?: boolean;
 }
 
 interface ReviewStep {
@@ -103,13 +104,23 @@ interface DraftPackage {
   argument_script?: string[];
 }
 
-const initialReviewSteps: ReviewStep[] = [
-  { id: 1, label: "Draft Generated", status: "pending" },
-  { id: 2, label: "CA Review & Edit", status: "pending" },
-  { id: 3, label: "Lawyer Review", status: "pending" },
-  { id: 4, label: "Final Approval", status: "pending" },
-  { id: 5, label: "Ready for Submission", status: "pending" },
-];
+const buildInitialReviewSteps = (includeLawyerReview: boolean): ReviewStep[] => {
+  const steps: ReviewStep[] = [
+    { id: 1, label: "Draft Generated", status: "pending" },
+    { id: 2, label: "CA Review & Edit", status: "pending" },
+  ];
+
+  if (includeLawyerReview) {
+    steps.push({ id: 3, label: "Lawyer Review", status: "pending" });
+  }
+
+  steps.push(
+    { id: includeLawyerReview ? 4 : 3, label: "Final Approval", status: "pending" },
+    { id: includeLawyerReview ? 5 : 4, label: "Ready for Submission", status: "pending" },
+  );
+
+  return steps;
+};
 
 const documentFormatModules: Record<string, string[]> = {
   "mca-notice": [
@@ -221,7 +232,11 @@ const advancedChecksByType: Record<string, AdvancedCheck[]> = {
   ],
 };
 
-const AIDraftingEngine = ({ demoMode = false }: AIDraftingEngineProps) => {
+const AIDraftingEngine = ({ demoMode = false, includeLawyerReview = true }: AIDraftingEngineProps) => {
+  const initialReviewSteps = useMemo(
+    () => buildInitialReviewSteps(includeLawyerReview),
+    [includeLawyerReview],
+  );
   const [clientOptions, setClientOptions] = useState<ClientOption[]>(demoClients);
   const [clientSource, setClientSource] = useState<"demo" | "live">("demo");
   const [isLoadingClients, setIsLoadingClients] = useState(false);
@@ -258,6 +273,10 @@ const AIDraftingEngine = ({ demoMode = false }: AIDraftingEngineProps) => {
   const docSpecificFormat = documentFormatModules[selectedDocType] || documentFormatModules["custom-draft"];
   const selectedTemplate = selectedDocType ? readyNoticeTemplates[selectedDocType] : "";
   const supabaseAny = supabase as any;
+
+  useEffect(() => {
+    setCurrentSteps(initialReviewSteps);
+  }, [initialReviewSteps]);
 
   const maskPII = (text: string) => {
     if (!preferPiiMasking) return text;
@@ -967,7 +986,9 @@ const AIDraftingEngine = ({ demoMode = false }: AIDraftingEngineProps) => {
                 Mandatory Review Workflow
               </CardTitle>
               <p className="text-sm text-muted-foreground">
-                Every draft must pass through all verification steps. No step can be skipped.
+                {includeLawyerReview
+                  ? "Every draft must pass through CA and lawyer verification before final sign-off."
+                  : "Every draft must pass through CA verification and final sign-off. No step can be skipped."}
               </p>
               {draftGenerated && (
                 <div className="flex flex-wrap items-center gap-2 mt-2">
