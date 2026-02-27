@@ -1,4 +1,4 @@
-import { useMemo } from "react";
+import { useMemo, useState } from "react";
 import { useQuery } from "@tanstack/react-query";
 import { differenceInCalendarDays, format, parseISO } from "date-fns";
 import Navbar from "@/components/layout/Navbar";
@@ -13,11 +13,18 @@ import QuickActions from "@/components/dashboard/QuickActions";
 import ComplianceGapSection from "@/components/dashboard/ComplianceGapSection";
 import UpcomingLawImpactSection from "@/components/dashboard/UpcomingLawImpactSection";
 import AuditEvidenceVault from "@/components/dashboard/AuditEvidenceVault";
+import { Button } from "@/components/ui/button";
+import { Input } from "@/components/ui/input";
+import { useToast } from "@/hooks/use-toast";
 import { supabase } from "@/integrations/supabase/client";
 import { useAuth } from "@/hooks/use-auth";
 
 const AppDashboard = () => {
   const { user } = useAuth();
+  const { toast } = useToast();
+  const [companyName, setCompanyName] = useState("");
+  const [industry, setIndustry] = useState("");
+  const [creatingCompany, setCreatingCompany] = useState(false);
 
   const { data, isLoading, isError, error } = useQuery({
     queryKey: ["app-dashboard", user?.id],
@@ -161,6 +168,42 @@ const AppDashboard = () => {
   }
 
   if (!data?.company || !mappedData) {
+    const handleCreateCompany = async () => {
+      if (!companyName.trim()) {
+        toast({
+          title: "Company name required",
+          description: "Enter your company name to create your workspace.",
+          variant: "destructive",
+        });
+        return;
+      }
+
+      setCreatingCompany(true);
+      try {
+        const supabaseAny = supabase as any;
+        const { error } = await supabaseAny.rpc("create_company_with_owner", {
+          _name: companyName.trim(),
+          _industry: industry.trim() || null,
+        });
+
+        if (error) throw error;
+
+        toast({
+          title: "Company workspace created",
+          description: "Your live compliance dashboard is now ready.",
+        });
+        window.location.reload();
+      } catch (error) {
+        toast({
+          title: "Failed to create company",
+          description: error instanceof Error ? error.message : "Unexpected error",
+          variant: "destructive",
+        });
+      } finally {
+        setCreatingCompany(false);
+      }
+    };
+
     return (
       <div className="min-h-screen bg-background">
         <Navbar />
@@ -169,9 +212,24 @@ const AppDashboard = () => {
             <DashboardTypeNav activeType="company" routePrefix="/app" />
             <div className="glass-card p-8 text-center">
               <h1 className="text-2xl font-semibold mb-3">No company is assigned yet</h1>
-              <p className="text-muted-foreground">
-                Ask an admin to add you to a company in `company_members` so your live dashboard can load.
+              <p className="text-muted-foreground mb-6">
+                Create your company workspace to start using live compliance data immediately.
               </p>
+              <div className="max-w-md mx-auto space-y-3 text-left">
+                <Input
+                  placeholder="Company name"
+                  value={companyName}
+                  onChange={(event) => setCompanyName(event.target.value)}
+                />
+                <Input
+                  placeholder="Industry (optional)"
+                  value={industry}
+                  onChange={(event) => setIndustry(event.target.value)}
+                />
+                <Button className="w-full btn-glow" onClick={handleCreateCompany} disabled={creatingCompany}>
+                  {creatingCompany ? "Creating workspace..." : "Create Company Workspace"}
+                </Button>
+              </div>
             </div>
           </div>
         </main>
