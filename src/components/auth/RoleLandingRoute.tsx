@@ -2,7 +2,7 @@ import { Navigate } from "react-router-dom";
 import { useAuth } from "@/hooks/use-auth";
 
 const RoleLandingRoute = () => {
-  const { loading, user, roles } = useAuth();
+  const { loading, user, roles, persona } = useAuth();
 
   if (loading) {
     return (
@@ -17,6 +17,22 @@ const RoleLandingRoute = () => {
 
   if (!user) {
     return <Navigate to="/auth" replace />;
+  }
+
+  if (persona === "admin") {
+    return <Navigate to="/app/admin-dashboard" replace />;
+  }
+
+  if (persona === "in_house_lawyer") {
+    return <Navigate to="/app/legal-dashboard" replace />;
+  }
+
+  if (persona === "external_ca" || persona === "in_house_ca") {
+    return <Navigate to="/app/ca-dashboard" replace />;
+  }
+
+  if (persona === "company_owner") {
+    return <Navigate to="/app/dashboard" replace />;
   }
 
   if (roles.includes("admin")) {

@@ -140,11 +140,11 @@ const Navbar = () => {
 
           {/* Desktop Actions */}
           <div className="hidden lg:flex items-center gap-3">
-            <Button variant="ghost" size="sm" onClick={() => navigate("/auth")}>
+            <Button variant="ghost" size="sm" onClick={() => navigate("/auth?mode=login&role=company_owner")}>
               <LogIn className="w-4 h-4 mr-2" />
               Login
             </Button>
-            <Button size="sm" className="btn-glow" onClick={() => navigate("/auth?mode=signup")}>
+            <Button size="sm" className="btn-glow" onClick={() => navigate("/auth?mode=signup&role=company_owner")}>
               Get Started
             </Button>
           </div>
@@ -196,10 +196,10 @@ const Navbar = () => {
                 ))}
               </div>
               <div className="pt-4 space-y-3 border-t border-border/50">
-                <Button variant="outline" className="w-full" onClick={() => { navigate("/auth"); setMobileOpen(false); }}>
+                <Button variant="outline" className="w-full" onClick={() => { navigate("/auth?mode=login&role=company_owner"); setMobileOpen(false); }}>
                   Login
                 </Button>
-                <Button className="w-full" onClick={() => { navigate("/auth?mode=signup"); setMobileOpen(false); }}>
+                <Button className="w-full" onClick={() => { navigate("/auth?mode=signup&role=company_owner"); setMobileOpen(false); }}>
                   Get Started
                 </Button>
               </div>

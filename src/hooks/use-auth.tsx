@@ -5,6 +5,7 @@ import { supabase } from "@/integrations/supabase/client";
 import type { Database } from "@/integrations/supabase/types";
 
 type AppRole = Database["public"]["Enums"]["app_role"];
+export type AppPersona = "external_ca" | "admin" | "company_owner" | "in_house_ca" | "in_house_lawyer";
 
 interface AuthContextValue {
   loading: boolean;
@@ -12,6 +13,7 @@ interface AuthContextValue {
   user: User | null;
   roles: AppRole[];
   primaryRole: AppRole | null;
+  persona: AppPersona | null;
 }
 
 const AuthContext = createContext<AuthContextValue | null>(null);
@@ -45,11 +47,12 @@ export const AuthProvider = ({ children }: { children: ReactNode }) => {
   const [session, setSession] = useState<Session | null>(null);
   const [user, setUser] = useState<User | null>(null);
   const [roles, setRoles] = useState<AppRole[]>([]);
+  const [persona, setPersona] = useState<AppPersona | null>(null);
 
   useEffect(() => {
     let mounted = true;
 
-    const loadRoles = async (userId: string) => {
+    const loadIdentity = async (userId: string) => {
       const { data, error } = await supabase
         .from("user_roles")
         .select("role")
@@ -58,11 +61,41 @@ export const AuthProvider = ({ children }: { children: ReactNode }) => {
       if (!mounted) return;
       if (error) {
         setRoles([]);
+        setPersona(null);
         return;
       }
 
       const nextRoles = (data ?? []).map((row) => row.role);
       setRoles(sortRoles(nextRoles));
+
+      const supabaseAny = supabase as any;
+      const { data: personaData } = await supabaseAny
+        .from("user_personas")
+        .select("persona")
+        .eq("user_id", userId)
+        .maybeSingle();
+
+      const nextPersona = personaData?.persona as AppPersona | undefined;
+      if (
+        nextPersona === "external_ca" ||
+        nextPersona === "admin" ||
+        nextPersona === "company_owner" ||
+        nextPersona === "in_house_ca" ||
+        nextPersona === "in_house_lawyer"
+      ) {
+        setPersona(nextPersona);
+        return;
+      }
+
+      if (nextRoles.includes("admin")) {
+        setPersona("admin");
+      } else if (nextRoles.includes("manager")) {
+        setPersona("external_ca");
+      } else if (nextRoles.includes("user")) {
+        setPersona("company_owner");
+      } else {
+        setPersona(null);
+      }
     };
 
     const bootstrap = async () => {
@@ -80,9 +113,10 @@ export const AuthProvider = ({ children }: { children: ReactNode }) => {
         setUser(initialSession?.user ?? null);
 
         if (initialSession?.user) {
-          await loadRoles(initialSession.user.id);
+          await loadIdentity(initialSession.user.id);
         } else {
           setRoles([]);
+          setPersona(null);
         }
       } catch (error) {
         if (!mounted) return;
@@ -90,6 +124,7 @@ export const AuthProvider = ({ children }: { children: ReactNode }) => {
         setSession(null);
         setUser(null);
         setRoles([]);
+        setPersona(null);
       } finally {
         if (!mounted) return;
         setLoading(false);
@@ -107,9 +142,10 @@ export const AuthProvider = ({ children }: { children: ReactNode }) => {
       setUser(nextSession?.user ?? null);
 
       if (nextSession?.user) {
-        await loadRoles(nextSession.user.id);
+        await loadIdentity(nextSession.user.id);
       } else {
         setRoles([]);
+        setPersona(null);
       }
 
       setLoading(false);
@@ -130,8 +166,9 @@ export const AuthProvider = ({ children }: { children: ReactNode }) => {
       user,
       roles,
       primaryRole,
+      persona,
     };
-  }, [loading, session, user, roles]);
+  }, [loading, session, user, roles, persona]);
 
   return <AuthContext.Provider value={value}>{children}</AuthContext.Provider>;
 };

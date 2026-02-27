@@ -14,6 +14,7 @@ import AppCADashboard from "./pages/AppCADashboard";
 import AppAdminDashboard from "./pages/AppAdminDashboard";
 import UniversityDemoDashboard from "./pages/UniversityDemoDashboard";
 import AppUniversityDashboard from "./pages/AppUniversityDashboard";
+import AppLegalDashboard from "./pages/AppLegalDashboard";
 import { AuthProvider } from "./hooks/use-auth";
 import ProtectedRoute from "./components/auth/ProtectedRoute";
 import RoleLandingRoute from "./components/auth/RoleLandingRoute";
@@ -39,7 +40,10 @@ const App = () => (
             <Route
               path="/app/dashboard"
               element={
-                <ProtectedRoute allowRoles={["user", "manager", "admin"]}>
+                <ProtectedRoute
+                  allowRoles={["user", "manager", "admin"]}
+                  allowPersonas={["company_owner", "admin"]}
+                >
                   <AppDashboard />
                 </ProtectedRoute>
               }
@@ -47,7 +51,10 @@ const App = () => (
             <Route
               path="/app/ca-dashboard"
               element={
-                <ProtectedRoute allowRoles={["manager", "admin"]}>
+                <ProtectedRoute
+                  allowRoles={["manager", "admin"]}
+                  allowPersonas={["external_ca", "in_house_ca", "admin"]}
+                >
                   <AppCADashboard />
                 </ProtectedRoute>
               }
@@ -55,8 +62,19 @@ const App = () => (
             <Route
               path="/app/admin-dashboard"
               element={
-                <ProtectedRoute allowRoles={["admin"]}>
+                <ProtectedRoute allowRoles={["admin"]} allowPersonas={["admin"]}>
                   <AppAdminDashboard />
+                </ProtectedRoute>
+              }
+            />
+            <Route
+              path="/app/legal-dashboard"
+              element={
+                <ProtectedRoute
+                  allowRoles={["manager", "admin"]}
+                  allowPersonas={["in_house_lawyer", "admin"]}
+                >
+                  <AppLegalDashboard />
                 </ProtectedRoute>
               }
             />
