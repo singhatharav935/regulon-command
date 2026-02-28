@@ -5,7 +5,8 @@ import { supabase } from "@/integrations/supabase/client";
 import type { Database } from "@/integrations/supabase/types";
 
 type AppRole = Database["public"]["Enums"]["app_role"];
-export type AppPersona = "external_ca" | "admin" | "company_owner" | "in_house_ca" | "in_house_lawyer";
+export type AppPersona = "external_ca" | "admin" | "company_owner" | "in_house_ca" | "in_house_lawyer" | "ca_firm";
+type VerificationStatus = "pending" | "approved" | "rejected";
 
 interface AuthContextValue {
   loading: boolean;
@@ -14,6 +15,8 @@ interface AuthContextValue {
   roles: AppRole[];
   primaryRole: AppRole | null;
   persona: AppPersona | null;
+  verificationStatus: VerificationStatus | null;
+  isVerified: boolean;
 }
 
 const AuthContext = createContext<AuthContextValue | null>(null);
@@ -48,6 +51,8 @@ export const AuthProvider = ({ children }: { children: ReactNode }) => {
   const [user, setUser] = useState<User | null>(null);
   const [roles, setRoles] = useState<AppRole[]>([]);
   const [persona, setPersona] = useState<AppPersona | null>(null);
+  const [verificationStatus, setVerificationStatus] = useState<VerificationStatus | null>(null);
+  const [isVerified, setIsVerified] = useState(false);
 
   useEffect(() => {
     let mounted = true;
@@ -62,6 +67,8 @@ export const AuthProvider = ({ children }: { children: ReactNode }) => {
       if (error) {
         setRoles([]);
         setPersona(null);
+        setVerificationStatus(null);
+        setIsVerified(false);
         return;
       }
 
@@ -81,7 +88,8 @@ export const AuthProvider = ({ children }: { children: ReactNode }) => {
         nextPersona === "admin" ||
         nextPersona === "company_owner" ||
         nextPersona === "in_house_ca" ||
-        nextPersona === "in_house_lawyer"
+        nextPersona === "in_house_lawyer" ||
+        nextPersona === "ca_firm"
       ) {
         setPersona(nextPersona);
         return;
@@ -96,6 +104,20 @@ export const AuthProvider = ({ children }: { children: ReactNode }) => {
       } else {
         setPersona(null);
       }
+
+      const { data: verificationData } = await supabaseAny
+        .from("user_verifications")
+        .select("status,is_verified")
+        .eq("user_id", userId)
+        .maybeSingle();
+
+      const nextStatus = verificationData?.status as VerificationStatus | undefined;
+      if (nextStatus === "pending" || nextStatus === "approved" || nextStatus === "rejected") {
+        setVerificationStatus(nextStatus);
+      } else {
+        setVerificationStatus(null);
+      }
+      setIsVerified(Boolean(verificationData?.is_verified));
     };
 
     const bootstrap = async () => {
@@ -117,6 +139,8 @@ export const AuthProvider = ({ children }: { children: ReactNode }) => {
         } else {
           setRoles([]);
           setPersona(null);
+          setVerificationStatus(null);
+          setIsVerified(false);
         }
       } catch (error) {
         if (!mounted) return;
@@ -125,6 +149,8 @@ export const AuthProvider = ({ children }: { children: ReactNode }) => {
         setUser(null);
         setRoles([]);
         setPersona(null);
+        setVerificationStatus(null);
+        setIsVerified(false);
       } finally {
         if (!mounted) return;
         setLoading(false);
@@ -146,6 +172,8 @@ export const AuthProvider = ({ children }: { children: ReactNode }) => {
       } else {
         setRoles([]);
         setPersona(null);
+        setVerificationStatus(null);
+        setIsVerified(false);
       }
 
       setLoading(false);
@@ -167,8 +195,10 @@ export const AuthProvider = ({ children }: { children: ReactNode }) => {
       roles,
       primaryRole,
       persona,
+      verificationStatus,
+      isVerified,
     };
-  }, [loading, session, user, roles, persona]);
+  }, [loading, session, user, roles, persona, verificationStatus, isVerified]);
 
   return <AuthContext.Provider value={value}>{children}</AuthContext.Provider>;
 };

@@ -26,6 +26,12 @@ const personas = [
     icon: Briefcase,
   },
   {
+    id: "ca_firm",
+    label: "CA Firm",
+    description: "CA firm workspace for multi-CA oversight and search",
+    icon: Briefcase,
+  },
+  {
     id: "in_house_ca",
     label: "In-House CA",
     description: "Regulon internal CA workflow with legal review path",
@@ -51,6 +57,12 @@ const isPersona = (value: string | null): value is Persona => {
   return personas.some((persona) => persona.id === value);
 };
 
+const roleNeedsRegistrationNumber = (persona: Persona) =>
+  persona === "company_owner" || persona === "admin" || persona === "ca_firm";
+
+const roleNeedsLicenseNumber = (persona: Persona) =>
+  persona === "external_ca" || persona === "in_house_ca" || persona === "in_house_lawyer";
+
 const Auth = () => {
   const navigate = useNavigate();
   const location = useLocation();
@@ -66,6 +78,10 @@ const Auth = () => {
   const [password, setPassword] = useState("");
   const [fullName, setFullName] = useState("");
   const [selectedPersona, setSelectedPersona] = useState<Persona>(initialPersona);
+  const [entityName, setEntityName] = useState("");
+  const [registrationNumber, setRegistrationNumber] = useState("");
+  const [licenseNumber, setLicenseNumber] = useState("");
+  const [jurisdiction, setJurisdiction] = useState("");
   const [showPassword, setShowPassword] = useState(false);
   const [loading, setLoading] = useState(false);
   const [errors, setErrors] = useState<{ email?: string; password?: string; fullName?: string }>({});
@@ -105,17 +121,13 @@ const Auth = () => {
     try {
       emailSchema.parse(email);
     } catch (e) {
-      if (e instanceof z.ZodError) {
-        newErrors.email = e.errors[0].message;
-      }
+      if (e instanceof z.ZodError) newErrors.email = e.errors[0].message;
     }
 
     try {
       passwordSchema.parse(password);
     } catch (e) {
-      if (e instanceof z.ZodError) {
-        newErrors.password = e.errors[0].message;
-      }
+      if (e instanceof z.ZodError) newErrors.password = e.errors[0].message;
     }
 
     if (mode === "signup" && fullName.trim().length < 2) {
@@ -123,7 +135,28 @@ const Auth = () => {
     }
 
     setErrors(newErrors);
-    return Object.keys(newErrors).length === 0;
+    if (Object.keys(newErrors).length > 0) return false;
+
+    if (mode === "signup") {
+      if (!entityName.trim()) {
+        toast({ title: "Entity name is required", variant: "destructive" });
+        return false;
+      }
+      if (roleNeedsRegistrationNumber(selectedPersona) && registrationNumber.trim().length < 3) {
+        toast({ title: "Registration number is required", variant: "destructive" });
+        return false;
+      }
+      if (roleNeedsLicenseNumber(selectedPersona) && licenseNumber.trim().length < 3) {
+        toast({ title: "License number is required", variant: "destructive" });
+        return false;
+      }
+      if (jurisdiction.trim().length < 2) {
+        toast({ title: "Jurisdiction is required", variant: "destructive" });
+        return false;
+      }
+    }
+
+    return true;
   };
 
   const resolveUserPersona = async (userId: string): Promise<Persona | null> => {
@@ -135,9 +168,7 @@ const Auth = () => {
       .eq("user_id", userId)
       .maybeSingle();
 
-    if (isPersona(personaData?.persona ?? null)) {
-      return personaData.persona;
-    }
+    if (isPersona(personaData?.persona ?? null)) return personaData.persona;
 
     const { data: roleRows } = await supabaseAny
       .from("user_roles")
@@ -164,7 +195,6 @@ const Auth = () => {
 
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
-
     if (!validateForm()) return;
 
     setLoading(true);
@@ -201,15 +231,33 @@ const Auth = () => {
             data: {
               full_name: fullName,
               registration_role: selectedPersona,
+              verification_entity_name: entityName,
+              verification_registration_number: registrationNumber,
+              verification_license_number: licenseNumber,
+              verification_jurisdiction: jurisdiction,
             },
           },
         });
 
         if (error) throw error;
 
+        if (data.user) {
+          const supabaseAny = supabase as any;
+          await supabaseAny.from("user_verifications").upsert({
+            user_id: data.user.id,
+            persona: selectedPersona,
+            entity_name: entityName,
+            registration_number: registrationNumber || null,
+            license_number: licenseNumber || null,
+            jurisdiction: jurisdiction,
+            status: "pending",
+            is_verified: false,
+          }, { onConflict: "user_id" });
+        }
+
         if (data.session) {
-          toast({ title: "Account created", description: "Registration complete. Opening your dashboard." });
-          navigate("/app", { replace: true });
+          toast({ title: "Account created", description: "Complete verification to unlock dashboard access." });
+          navigate("/app/verification", { replace: true });
         } else {
           toast({
             title: "Confirm your email",
@@ -234,15 +282,8 @@ const Auth = () => {
       <div className="absolute inset-0 grid-pattern opacity-50" />
       <div className="absolute top-1/4 left-1/4 w-96 h-96 bg-primary/5 rounded-full blur-3xl" />
 
-      <motion.div
-        initial={{ opacity: 0, y: 20 }}
-        animate={{ opacity: 1, y: 0 }}
-        className="relative z-10 w-full max-w-3xl"
-      >
-        <button
-          onClick={() => navigate("/")}
-          className="flex items-center gap-2 text-sm text-muted-foreground hover:text-foreground mb-8 transition-colors"
-        >
+      <motion.div initial={{ opacity: 0, y: 20 }} animate={{ opacity: 1, y: 0 }} className="relative z-10 w-full max-w-3xl">
+        <button onClick={() => navigate("/")} className="flex items-center gap-2 text-sm text-muted-foreground hover:text-foreground mb-8 transition-colors">
           <ArrowLeft className="w-4 h-4" />
           Back to Platform
         </button>
@@ -250,7 +291,7 @@ const Auth = () => {
         <div className="glass-card p-8">
           <div className="text-center mb-8">
             <h1 className="text-2xl font-bold mb-2 text-gradient-primary">REGULON ACCESS</h1>
-            <p className="text-muted-foreground">Role-specific authentication and dashboard routing</p>
+            <p className="text-muted-foreground">Role-specific authentication and verification-first onboarding</p>
           </div>
 
           <div className="grid grid-cols-1 md:grid-cols-2 gap-3 mb-6">
@@ -275,55 +316,57 @@ const Auth = () => {
           </div>
 
           <div className="flex gap-2 mb-6">
-            <Button
-              type="button"
-              variant={mode === "login" ? "default" : "outline"}
-              onClick={() => updateMode("login")}
-              className="flex-1"
-            >
+            <Button type="button" variant={mode === "login" ? "default" : "outline"} onClick={() => updateMode("login")} className="flex-1">
               Login
             </Button>
-            <Button
-              type="button"
-              variant={mode === "signup" ? "default" : "outline"}
-              onClick={() => updateMode("signup")}
-              className="flex-1"
-            >
+            <Button type="button" variant={mode === "signup" ? "default" : "outline"} onClick={() => updateMode("signup")} className="flex-1">
               Register
             </Button>
           </div>
 
           <form onSubmit={handleSubmit} className="space-y-4">
             {mode === "signup" && (
-              <div className="space-y-2">
-                <Label htmlFor="fullName">Full Name</Label>
-                <div className="relative">
-                  <User className="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 text-muted-foreground" />
-                  <Input
-                    id="fullName"
-                    type="text"
-                    placeholder="John Doe"
-                    value={fullName}
-                    onChange={(e) => setFullName(e.target.value)}
-                    className={`pl-10 ${errors.fullName ? "border-destructive" : ""}`}
-                  />
+              <>
+                <div className="space-y-2">
+                  <Label htmlFor="fullName">Full Name</Label>
+                  <div className="relative">
+                    <User className="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 text-muted-foreground" />
+                    <Input id="fullName" type="text" placeholder="John Doe" value={fullName} onChange={(e) => setFullName(e.target.value)} className={`pl-10 ${errors.fullName ? "border-destructive" : ""}`} />
+                  </div>
+                  {errors.fullName && <p className="text-xs text-destructive">{errors.fullName}</p>}
                 </div>
-                {errors.fullName && <p className="text-xs text-destructive">{errors.fullName}</p>}
-              </div>
+
+                <div className="space-y-2">
+                  <Label>Entity / Organization Name</Label>
+                  <Input value={entityName} onChange={(e) => setEntityName(e.target.value)} placeholder="Entity name" />
+                </div>
+
+                {roleNeedsRegistrationNumber(selectedPersona) && (
+                  <div className="space-y-2">
+                    <Label>Registration Number</Label>
+                    <Input value={registrationNumber} onChange={(e) => setRegistrationNumber(e.target.value)} placeholder="Company/Firm/Admin registration" />
+                  </div>
+                )}
+
+                {roleNeedsLicenseNumber(selectedPersona) && (
+                  <div className="space-y-2">
+                    <Label>Professional License Number</Label>
+                    <Input value={licenseNumber} onChange={(e) => setLicenseNumber(e.target.value)} placeholder="CA/Lawyer license number" />
+                  </div>
+                )}
+
+                <div className="space-y-2">
+                  <Label>Jurisdiction</Label>
+                  <Input value={jurisdiction} onChange={(e) => setJurisdiction(e.target.value)} placeholder="State/Council/Jurisdiction" />
+                </div>
+              </>
             )}
 
             <div className="space-y-2">
               <Label htmlFor="email">Email</Label>
               <div className="relative">
                 <Mail className="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 text-muted-foreground" />
-                <Input
-                  id="email"
-                  type="email"
-                  placeholder="you@company.com"
-                  value={email}
-                  onChange={(e) => setEmail(e.target.value)}
-                  className={`pl-10 ${errors.email ? "border-destructive" : ""}`}
-                />
+                <Input id="email" type="email" placeholder="you@company.com" value={email} onChange={(e) => setEmail(e.target.value)} className={`pl-10 ${errors.email ? "border-destructive" : ""}`} />
               </div>
               {errors.email && <p className="text-xs text-destructive">{errors.email}</p>}
             </div>
@@ -332,19 +375,8 @@ const Auth = () => {
               <Label htmlFor="password">Password</Label>
               <div className="relative">
                 <Lock className="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 text-muted-foreground" />
-                <Input
-                  id="password"
-                  type={showPassword ? "text" : "password"}
-                  placeholder="••••••••"
-                  value={password}
-                  onChange={(e) => setPassword(e.target.value)}
-                  className={`pl-10 pr-10 ${errors.password ? "border-destructive" : ""}`}
-                />
-                <button
-                  type="button"
-                  onClick={() => setShowPassword(!showPassword)}
-                  className="absolute right-3 top-1/2 -translate-y-1/2 text-muted-foreground hover:text-foreground"
-                >
+                <Input id="password" type={showPassword ? "text" : "password"} placeholder="••••••••" value={password} onChange={(e) => setPassword(e.target.value)} className={`pl-10 pr-10 ${errors.password ? "border-destructive" : ""}`} />
+                <button type="button" onClick={() => setShowPassword(!showPassword)} className="absolute right-3 top-1/2 -translate-y-1/2 text-muted-foreground hover:text-foreground">
                   {showPassword ? <EyeOff className="w-4 h-4" /> : <Eye className="w-4 h-4" />}
                 </button>
               </div>
@@ -358,7 +390,7 @@ const Auth = () => {
 
           <div className="mt-6 pt-6 border-t border-border flex items-center justify-center gap-2 text-xs text-muted-foreground">
             <Shield className="w-3 h-3" />
-            <span>Role-bound access with enterprise-grade encryption</span>
+            <span>Role-bound access with verification-first compliance controls</span>
           </div>
         </div>
       </motion.div>

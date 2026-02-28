@@ -2,7 +2,7 @@ import { Navigate } from "react-router-dom";
 import { useAuth } from "@/hooks/use-auth";
 
 const RoleLandingRoute = () => {
-  const { loading, user, roles, persona } = useAuth();
+  const { loading, user, roles, persona, isVerified } = useAuth();
 
   if (loading) {
     return (
@@ -19,6 +19,18 @@ const RoleLandingRoute = () => {
     return <Navigate to="/auth" replace />;
   }
 
+  const requiresVerification =
+    persona === "external_ca" ||
+    persona === "in_house_ca" ||
+    persona === "in_house_lawyer" ||
+    persona === "company_owner" ||
+    persona === "admin" ||
+    persona === "ca_firm";
+
+  if (requiresVerification && !isVerified) {
+    return <Navigate to="/app/verification" replace />;
+  }
+
   if (persona === "admin") {
     return <Navigate to="/app/admin-dashboard" replace />;
   }
@@ -29,6 +41,10 @@ const RoleLandingRoute = () => {
 
   if (persona === "external_ca" || persona === "in_house_ca") {
     return <Navigate to="/app/ca-dashboard" replace />;
+  }
+
+  if (persona === "ca_firm") {
+    return <Navigate to="/app/ca-firm-dashboard" replace />;
   }
 
   if (persona === "company_owner") {
