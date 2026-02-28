@@ -4,7 +4,7 @@ import { Building2, Briefcase, Shield, Home, ChevronRight, GraduationCap } from 
 import { cn } from "@/lib/utils";
 
 interface DashboardTypeNavProps {
-  activeType: "company" | "ca" | "admin" | "university";
+  activeType: "company" | "ca" | "admin" | "university" | "ca-firm";
   routePrefix?: string;
 }
 
@@ -37,12 +37,22 @@ const dashboardTypes = [
     icon: GraduationCap,
     description: "Campus operations & compliance command"
   },
+  {
+    id: "ca-firm",
+    label: "CA Firm Dashboard",
+    href: "/ca-firm-dashboard",
+    icon: Briefcase,
+    description: "Firm-wide CA operations and workload visibility",
+  },
 ];
 
 const DashboardTypeNav = ({ activeType, routePrefix = "" }: DashboardTypeNavProps) => {
   const withPrefix = (href: string, id: string) => {
     if (id === "university") {
       return routePrefix ? "/app/university" : "/university-demo";
+    }
+    if (id === "ca-firm") {
+      return routePrefix ? "/app/ca-firm-dashboard" : "/ca-firm-dashboard";
     }
     return `${routePrefix}${href}`;
   };

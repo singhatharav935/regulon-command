@@ -15,6 +15,9 @@ import AppAdminDashboard from "./pages/AppAdminDashboard";
 import UniversityDemoDashboard from "./pages/UniversityDemoDashboard";
 import AppUniversityDashboard from "./pages/AppUniversityDashboard";
 import AppLegalDashboard from "./pages/AppLegalDashboard";
+import AppVerification from "./pages/AppVerification";
+import CAFirmDashboard from "./pages/CAFirmDashboard";
+import AppCAFirmDashboard from "./pages/AppCAFirmDashboard";
 import { AuthProvider } from "./hooks/use-auth";
 import ProtectedRoute from "./components/auth/ProtectedRoute";
 import RoleLandingRoute from "./components/auth/RoleLandingRoute";
@@ -35,6 +38,7 @@ const App = () => (
             <Route path="/ca-dashboard" element={<CADashboard />} />
             <Route path="/admin-dashboard" element={<AdminDashboard />} />
             <Route path="/university-demo" element={<UniversityDemoDashboard />} />
+            <Route path="/ca-firm-dashboard" element={<CAFirmDashboard />} />
 
             <Route path="/app" element={<RoleLandingRoute />} />
             <Route
@@ -75,6 +79,29 @@ const App = () => (
                   allowPersonas={["in_house_lawyer", "admin"]}
                 >
                   <AppLegalDashboard />
+                </ProtectedRoute>
+              }
+            />
+            <Route
+              path="/app/ca-firm-dashboard"
+              element={
+                <ProtectedRoute
+                  allowRoles={["manager", "admin"]}
+                  allowPersonas={["ca_firm", "admin"]}
+                >
+                  <AppCAFirmDashboard />
+                </ProtectedRoute>
+              }
+            />
+            <Route
+              path="/app/verification"
+              element={
+                <ProtectedRoute
+                  allowRoles={["user", "manager", "admin"]}
+                  allowPersonas={["company_owner", "external_ca", "in_house_ca", "in_house_lawyer", "admin", "ca_firm"]}
+                  requireVerified={false}
+                >
+                  <AppVerification />
                 </ProtectedRoute>
               }
             />

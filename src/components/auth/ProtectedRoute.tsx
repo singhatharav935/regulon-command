@@ -10,10 +10,13 @@ interface ProtectedRouteProps {
   children: ReactElement;
   allowRoles?: AppRole[];
   allowPersonas?: AppPersona[];
+  requireVerified?: boolean;
 }
 
-const ProtectedRoute = ({ children, allowRoles, allowPersonas }: ProtectedRouteProps) => {
-  const { loading, user, roles, persona } = useAuth();
+const verificationRequiredPersonas: AppPersona[] = ["external_ca", "in_house_ca", "in_house_lawyer", "company_owner", "admin", "ca_firm"];
+
+const ProtectedRoute = ({ children, allowRoles, allowPersonas, requireVerified = true }: ProtectedRouteProps) => {
+  const { loading, user, roles, persona, isVerified } = useAuth();
   const location = useLocation();
 
   if (loading) {
@@ -44,6 +47,10 @@ const ProtectedRoute = ({ children, allowRoles, allowPersonas }: ProtectedRouteP
     if (!hasAllowedPersona) {
       return <Navigate to="/app" replace />;
     }
+  }
+
+  if (requireVerified && persona && verificationRequiredPersonas.includes(persona) && !isVerified) {
+    return <Navigate to="/app/verification" replace />;
   }
 
   return children;
