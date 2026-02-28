@@ -44,7 +44,12 @@ const ProtectedRoute = ({ children, allowRoles, allowPersonas, requireVerified =
 
   if (allowPersonas && allowPersonas.length > 0) {
     const hasAllowedPersona = persona ? allowPersonas.includes(persona) : false;
-    if (!hasAllowedPersona) {
+    const hasAllowedRole = allowRoles && allowRoles.length > 0
+      ? allowRoles.some((role) => roles.includes(role))
+      : false;
+
+    // Fallback for older users/sessions where persona row is not present yet.
+    if (!hasAllowedPersona && !hasAllowedRole) {
       return <Navigate to="/app" replace />;
     }
   }
