@@ -93,18 +93,6 @@ const Auth = () => {
     setSelectedPersona(syncPersona);
   }, [searchParams]);
 
-  useEffect(() => {
-    supabase.auth.getSession()
-      .then(({ data: { session } }) => {
-        if (session?.user) {
-          navigate(returnPath || "/app", { replace: true });
-        }
-      })
-      .catch((error) => {
-        console.warn("Initial session check failed on auth page.", error);
-      });
-  }, [navigate, returnPath]);
-
   const updateMode = (nextMode: "login" | "signup") => {
     setMode(nextMode);
     setSearchParams({ mode: nextMode, role: selectedPersona });
