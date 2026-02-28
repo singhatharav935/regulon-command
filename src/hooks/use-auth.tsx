@@ -92,17 +92,16 @@ export const AuthProvider = ({ children }: { children: ReactNode }) => {
         nextPersona === "ca_firm"
       ) {
         setPersona(nextPersona);
-        return;
-      }
-
-      if (nextRoles.includes("admin")) {
-        setPersona("admin");
-      } else if (nextRoles.includes("manager")) {
-        setPersona("external_ca");
-      } else if (nextRoles.includes("user")) {
-        setPersona("company_owner");
       } else {
-        setPersona(null);
+        if (nextRoles.includes("admin")) {
+          setPersona("admin");
+        } else if (nextRoles.includes("manager")) {
+          setPersona("external_ca");
+        } else if (nextRoles.includes("user")) {
+          setPersona("company_owner");
+        } else {
+          setPersona(null);
+        }
       }
 
       const { data: verificationData } = await supabaseAny
