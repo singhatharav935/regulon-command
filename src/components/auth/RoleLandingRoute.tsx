@@ -19,6 +19,10 @@ const RoleLandingRoute = () => {
     return <Navigate to="/auth" replace />;
   }
 
+  if (!persona && roles.length === 0) {
+    return <Navigate to="/auth?mode=login&role=company_owner" replace />;
+  }
+
   const requiresVerification =
     persona === "external_ca" ||
     persona === "in_house_ca" ||
