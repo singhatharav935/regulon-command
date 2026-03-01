@@ -1,6 +1,8 @@
 import { createRoot } from "react-dom/client";
 import "./index.css";
 
+let appMounted = false;
+
 const renderFatal = (message: string, detail?: string) => {
   const rootElement = document.getElementById("root");
   if (!rootElement) return;
@@ -22,12 +24,30 @@ const renderFatal = (message: string, detail?: string) => {
 
 window.addEventListener("error", (event) => {
   console.error("[REGULON] Uncaught startup error", event.error || event.message);
-  renderFatal("Unhandled runtime error.", String(event.error || event.message || ""));
+  if (!appMounted) {
+    renderFatal("Unhandled runtime error.", String(event.error || event.message || ""));
+  }
 });
 
+const isBenignAbort = (reason: unknown) => {
+  const message = String(reason ?? "").toLowerCase();
+  if (message.includes("aborterror")) return true;
+  if (message.includes("signal is aborted")) return true;
+  if (message.includes("the operation was aborted")) return true;
+  if (message.includes("request was aborted")) return true;
+  return false;
+};
+
 window.addEventListener("unhandledrejection", (event) => {
+  if (isBenignAbort(event.reason)) {
+    console.warn("[REGULON] Ignored benign aborted promise.", event.reason);
+    return;
+  }
+
   console.error("[REGULON] Unhandled promise rejection", event.reason);
-  renderFatal("Unhandled promise rejection.", String(event.reason || ""));
+  if (!appMounted) {
+    renderFatal("Unhandled promise rejection.", String(event.reason || ""));
+  }
 });
 
 const bootstrap = async () => {
@@ -47,6 +67,7 @@ const bootstrap = async () => {
         <App />
       </StartupErrorBoundary>
     );
+    appMounted = true;
   } catch (error) {
     console.error("[REGULON] Fatal bootstrap failure.", error);
     renderFatal("App failed during bootstrap.", String(error));
