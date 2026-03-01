@@ -8,9 +8,18 @@ const getCorsHeaders = (req: Request) => {
     .map((item) => item.trim())
     .filter(Boolean);
 
+  const isLocalOrigin =
+    origin.startsWith("http://localhost:") ||
+    origin.startsWith("https://localhost:") ||
+    origin.startsWith("http://127.0.0.1:") ||
+    origin.startsWith("https://127.0.0.1:");
+
+  const hasWildcard = allowlist.includes("*");
+  const isAllowlisted = allowlist.includes(origin);
+
   const allowOrigin = allowlist.length === 0
     ? "*"
-    : allowlist.includes(origin)
+    : (isLocalOrigin || hasWildcard || isAllowlisted)
       ? origin
       : "null";
 
