@@ -104,6 +104,58 @@ interface DraftPackage {
   argument_script?: string[];
 }
 
+const buildOfflineDraft = ({
+  authority,
+  companyName,
+  noticeText,
+  modeLabel,
+}: {
+  authority: string;
+  companyName: string;
+  noticeText: string;
+  modeLabel: string;
+}) => {
+  const trimmed = (noticeText || "").trim();
+  const noticeSnapshot = trimmed.length > 0 ? trimmed.slice(0, 2200) : "[Insert detailed notice text]";
+
+  return `**BEFORE THE ADJUDICATING AUTHORITY / PROPER OFFICER**
+
+**In the matter of:** ${companyName}
+**Subject:** Reply Draft for ${authority}
+
+### 1. Notice Snapshot
+${noticeSnapshot}
+
+### 2. Preliminary Submissions
+1. The Noticee denies allegations not expressly admitted.
+2. This reply is submitted in ${modeLabel} mode with fact-led and law-led rebuttal.
+3. The Department must establish allegation-wise facts, legal provision, and quantification.
+
+### 3. Para-Wise Rebuttal Matrix
+1. Allegation summary: [Insert para reference from notice]
+   Noticee response: Transaction facts, document proof, and statutory compliance matrix enclosed.
+2. Legal response: Section/Rule/Regulation application challenged on facts and interpretation.
+3. Computation response: Demand working disputed due to reconciliation, timing, and duplication checks.
+
+### 4. Computation Challenge
+1. Proposed amount (department): [Insert]
+2. Reconciled amount (noticee): [Insert]
+3. Difference reason: [Classification/valuation/timing/portal mismatch/arithmetical issue]
+
+### 5. Evidence Mapping (Annexures)
+1. Annexure A: Notice copy + DIN/RFN reference.
+2. Annexure B: Invoices/returns/filings/payment trail.
+3. Annexure C: Reconciliation statement + computation table.
+4. Annexure D: Case-law/circular extract relied upon.
+
+### 6. Prayer
+1. Drop or substantially reduce the proposed demand.
+2. Drop penalty/interest to the extent not legally sustainable.
+3. Grant personal hearing before adverse order.
+4. Pass any other order in the interest of justice.
+`;
+};
+
 const buildInitialReviewSteps = (includeLawyerReview: boolean): ReviewStep[] => {
   const steps: ReviewStep[] = [
     { id: 1, label: "Draft Generated", status: "pending" },
@@ -260,6 +312,7 @@ const AIDraftingEngine = ({ demoMode = false, includeLawyerReview = true }: AIDr
   const [generationError, setGenerationError] = useState<string | null>(null);
 
   const DRAFT_URL = `${import.meta.env.VITE_SUPABASE_URL}/functions/v1/ai-draft`;
+  const hasDraftEndpoint = typeof import.meta.env.VITE_SUPABASE_URL === "string" && import.meta.env.VITE_SUPABASE_URL.startsWith("http");
   const secureFunctionAuth = import.meta.env.VITE_ENABLE_SECURE_FUNCTION_AUTH === "true";
   const noticeLength = noticeDetails.trim().length;
   const activeChecks = selectedDocType
@@ -500,8 +553,59 @@ const AIDraftingEngine = ({ demoMode = false, includeLawyerReview = true }: AIDr
     
     const client = clientOptions.find(c => c.id === selectedClient);
     const maskedNoticeDetails = noticeDetails ? maskPII(noticeDetails) : undefined;
+
+    const applyOfflineFallback = async (reason?: string) => {
+      const offlineContent = buildOfflineDraft({
+        authority: selectedDocLabel,
+        companyName: client?.name || "Company",
+        noticeText: maskedNoticeDetails || noticeDetails,
+        modeLabel: selectedMode,
+      });
+
+      const passedChecks = checkResults.filter((item) => item.passed).length;
+      const totalChecks = checkResults.length || 1;
+      const score = Math.max(58, Math.min(88, Math.round((passedChecks / totalChecks) * 100)));
+      const riskBand: DraftQA["risk_band"] = score >= 80 ? "low" : score >= 65 ? "medium" : "high";
+
+      setDraftContent(offlineContent);
+      setDraftQA({
+        filing_score: score,
+        risk_band: riskBand,
+        mandatory_gates: Object.fromEntries(checkResults.map((item) => [item.label, item.passed])),
+        missing_for_final_filing: checkResults.filter((item) => !item.passed).map((item) => item.label),
+      });
+      setDraftPackage({
+        reply: offlineContent,
+        annexure_index: [
+          { annexure_id: "Annexure A", purpose: "Notice + reference proof", linked_issue: "Notice baseline" },
+          { annexure_id: "Annexure B", purpose: "Invoice/ledger/payment support", linked_issue: "Fact proof" },
+          { annexure_id: "Annexure C", purpose: "Computation reconciliation", linked_issue: "Demand rebuttal" },
+        ],
+        hearing_notes: "Focus on allegation-wise rebuttal, computation mismatch, and evidence sequence.",
+        argument_script: [
+          "Department must prove allegation and quantification with evidence.",
+          "Noticee records support bona fide compliance and reconciliation.",
+          "Without prejudice, relief sought includes demand recalculation and penalty waiver.",
+        ],
+      });
+      setDraftGenerated(true);
+      setShowFormatDetails(false);
+      setWorkflowStatus("generated");
+      setCurrentSteps(prev => prev.map(step => {
+        if (step.id === 1) return { ...step, status: "completed" as StepStatus };
+        if (step.id === 2) return { ...step, status: "current" as StepStatus };
+        return step;
+      }));
+      setGenerationError(null);
+      toast.warning(reason || "Live drafting service unreachable. Generated offline structured draft.");
+    };
     
     try {
+      if (!hasDraftEndpoint) {
+        await applyOfflineFallback("Draft endpoint not configured. Generated offline structured draft.");
+        return;
+      }
+
       let authToken = import.meta.env.VITE_SUPABASE_PUBLISHABLE_KEY as string;
       if (secureFunctionAuth) {
         const {
@@ -668,8 +772,20 @@ const AIDraftingEngine = ({ demoMode = false, includeLawyerReview = true }: AIDr
 
     } catch (error) {
       console.error("Draft generation error:", error);
-      setGenerationError(error instanceof Error ? error.message : "An error occurred");
-      toast.error(error instanceof Error ? error.message : "Failed to generate draft");
+      const errorMessage = error instanceof Error ? error.message : "An error occurred";
+      const networkLikeFailure =
+        /failed to fetch/i.test(errorMessage) ||
+        /networkerror/i.test(errorMessage) ||
+        /load failed/i.test(errorMessage) ||
+        /aborterror/i.test(errorMessage);
+
+      if (networkLikeFailure) {
+        await applyOfflineFallback("Live drafting service unreachable. Generated offline structured draft.");
+        return;
+      }
+
+      setGenerationError(errorMessage);
+      toast.error(errorMessage || "Failed to generate draft");
     } finally {
       setIsGenerating(false);
     }
