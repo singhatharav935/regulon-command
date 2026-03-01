@@ -1,7 +1,7 @@
 import { useState } from "react";
 import { Link, useNavigate } from "react-router-dom";
 import { motion, AnimatePresence } from "framer-motion";
-import { ChevronDown, Menu, X, Shield, Cpu, Building2, Users, Lock, BookOpen, Info, LogIn } from "lucide-react";
+import { ChevronDown, Menu, X, Shield, Cpu, Building2, Users, Lock, BookOpen, Info, LogIn, Briefcase } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { cn } from "@/lib/utils";
 
