@@ -465,6 +465,8 @@ const AIDraftingEngine = ({ demoMode = false, includeLawyerReview = true }: AIDr
   const DRAFT_URL = `${import.meta.env.VITE_SUPABASE_URL}/functions/v1/ai-draft`;
   const hasDraftEndpoint = typeof import.meta.env.VITE_SUPABASE_URL === "string" && import.meta.env.VITE_SUPABASE_URL.startsWith("http");
   const secureFunctionAuth = import.meta.env.VITE_ENABLE_SECURE_FUNCTION_AUTH === "true";
+  const supabaseUrl = (import.meta.env.VITE_SUPABASE_URL as string) || "";
+  const supabasePublishableKey = (import.meta.env.VITE_SUPABASE_PUBLISHABLE_KEY as string) || "";
   const noticeLength = noticeDetails.trim().length;
   const activeChecks = selectedDocType
     ? (advancedChecksByType[selectedDocType] || advancedChecksByType["custom-draft"])
@@ -477,6 +479,22 @@ const AIDraftingEngine = ({ demoMode = false, includeLawyerReview = true }: AIDr
   const docSpecificFormat = documentFormatModules[selectedDocType] || documentFormatModules["custom-draft"];
   const selectedTemplate = selectedDocType ? readyNoticeTemplates[selectedDocType] : "";
   const supabaseAny = supabase as any;
+
+  const getProjectRefFromUrl = (url: string) => {
+    const match = url.match(/^https:\/\/([a-z0-9]+)\.supabase\.co/i);
+    return match?.[1] ?? null;
+  };
+
+  const getProjectRefFromJwt = (jwt: string) => {
+    try {
+      const parts = jwt.split(".");
+      if (parts.length < 2) return null;
+      const payload = JSON.parse(atob(parts[1].replace(/-/g, "+").replace(/_/g, "/")));
+      return payload?.ref ?? null;
+    } catch {
+      return null;
+    }
+  };
 
   useEffect(() => {
     setCurrentSteps(initialReviewSteps);
@@ -764,7 +782,15 @@ const AIDraftingEngine = ({ demoMode = false, includeLawyerReview = true }: AIDr
         return;
       }
 
-      let authToken = import.meta.env.VITE_SUPABASE_PUBLISHABLE_KEY as string;
+      const urlRef = getProjectRefFromUrl(supabaseUrl);
+      const keyRef = getProjectRefFromJwt(supabasePublishableKey);
+      if (urlRef && keyRef && urlRef !== keyRef) {
+        throw new Error(
+          `Supabase config mismatch: URL project (${urlRef}) and publishable key project (${keyRef}) are different. Update VITE_SUPABASE_PUBLISHABLE_KEY.`,
+        );
+      }
+
+      let authToken = supabasePublishableKey;
       if (secureFunctionAuth) {
         const {
           data: { session },
@@ -772,23 +798,41 @@ const AIDraftingEngine = ({ demoMode = false, includeLawyerReview = true }: AIDr
         authToken = session?.access_token ?? authToken;
       }
 
-      const response = await fetch(DRAFT_URL, {
-        method: "POST",
-        headers: {
-          "Content-Type": "application/json",
-          Authorization: `Bearer ${authToken}`,
-        },
-        body: JSON.stringify({
-          documentType: selectedDocType,
-          companyName: client?.name || "Company",
-          industry: client?.industry || "",
-          draftMode: selectedMode,
-          advancedMode,
-          strictValidation: advancedMode,
-          noticeDetails: maskedNoticeDetails || undefined,
-          stream: !advancedMode,
-        }),
+      const requestBody = JSON.stringify({
+        documentType: selectedDocType,
+        companyName: client?.name || "Company",
+        industry: client?.industry || "",
+        draftMode: selectedMode,
+        advancedMode,
+        strictValidation: advancedMode,
+        noticeDetails: maskedNoticeDetails || undefined,
+        stream: !advancedMode,
       });
+
+      const tryRequest = async (withAuthHeaders: boolean) =>
+        fetch(DRAFT_URL, {
+          method: "POST",
+          headers: withAuthHeaders
+            ? {
+                "Content-Type": "application/json",
+                Authorization: `Bearer ${authToken}`,
+                apikey: supabasePublishableKey,
+              }
+            : {
+                "Content-Type": "application/json",
+              },
+          body: requestBody,
+        });
+
+      let response: Response;
+      try {
+        response = await tryRequest(true);
+      } catch (networkError) {
+        if (secureFunctionAuth) {
+          throw networkError;
+        }
+        response = await tryRequest(false);
+      }
 
       if (response.status === 429) {
         throw new Error("Rate limit exceeded. Please try again in a moment.");
