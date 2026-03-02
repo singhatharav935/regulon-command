@@ -1,5 +1,7 @@
 import { createRoot } from "react-dom/client";
+import App from "./App.tsx";
 import "./index.css";
+import StartupErrorBoundary from "./components/system/StartupErrorBoundary.tsx";
 
 let appMounted = false;
 
@@ -50,18 +52,13 @@ window.addEventListener("unhandledrejection", (event) => {
   }
 });
 
-const bootstrap = async () => {
+const bootstrap = () => {
   const rootElement = document.getElementById("root");
   if (!rootElement) {
     throw new Error("Root element '#root' not found.");
   }
 
   try {
-    const [{ default: App }, { default: StartupErrorBoundary }] = await Promise.all([
-      import("./App.tsx"),
-      import("./components/system/StartupErrorBoundary.tsx"),
-    ]);
-
     createRoot(rootElement).render(
       <StartupErrorBoundary>
         <App />
