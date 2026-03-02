@@ -158,6 +158,24 @@ const buildOfflineDraft = ({
       .map((line) => line.trim())
       .find((line) => /(alleges|wrongful|default|non[- ]compliance|mismatch|demand|penalty|interest|disallow|violation)/i.test(line)) ??
     "The notice alleges statutory non-compliance and proposes demand with consequential interest and penalty.";
+
+  const rebuttalFocus = Array.from(
+    new Set(
+      compactNotice
+        .split(/[.!?]/)
+        .map((line) => line.trim())
+        .filter((line) => /(invoice|return|payment|reconciliation|ledger|filing|timeline|evidence|computation|classification|valuation)/i.test(line))
+        .slice(0, 4),
+    ),
+  );
+  const rebuttalFocusLine =
+    rebuttalFocus.length > 0
+      ? rebuttalFocus.map((line, idx) => `${idx + 1}. ${line}.`).join("\n")
+      : `1. Invoice and filing trail reconciliation.
+2. Computation working challenge and arithmetic verification.
+3. Statutory interpretation and burden-of-proof response.
+4. Penalty and interest sustainability challenge.`;
+
   if (documentType === "gst-show-cause") {
     return `**BEFORE THE ADJUDICATING AUTHORITY / PROPER OFFICER**
 
