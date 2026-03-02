@@ -1,9 +1,8 @@
 import { createRoot } from "react-dom/client";
-import App from "./App.tsx";
 import "./index.css";
-import StartupErrorBoundary from "./components/system/StartupErrorBoundary.tsx";
 
 let appMounted = false;
+const APP_BOOTSTRAP_RETRY_KEY = "regulon-bootstrap-retry";
 
 const renderFatal = (message: string, detail?: string) => {
   const rootElement = document.getElementById("root");
@@ -22,6 +21,28 @@ const renderFatal = (message: string, detail?: string) => {
       </div>
     </div>
   `;
+};
+
+const shouldAttemptBootstrapRetry = (errorText: string) => {
+  if (!/failed to fetch dynamically imported module/i.test(errorText)) return false;
+
+  try {
+    const match = errorText.match(/https?:\/\/[^/\s]+/i);
+    const failedOrigin = match?.[0] ?? "";
+    if (!failedOrigin) return false;
+    if (failedOrigin === window.location.origin) return false;
+  } catch {
+    return false;
+  }
+
+  const alreadyRetried = sessionStorage.getItem(APP_BOOTSTRAP_RETRY_KEY) === "1";
+  return !alreadyRetried;
+};
+
+const retryBootstrap = () => {
+  sessionStorage.setItem(APP_BOOTSTRAP_RETRY_KEY, "1");
+  const retryUrl = `${window.location.origin}${window.location.pathname}?v=${Date.now()}`;
+  window.location.replace(retryUrl);
 };
 
 window.addEventListener("error", (event) => {
@@ -58,17 +79,29 @@ const bootstrap = () => {
     throw new Error("Root element '#root' not found.");
   }
 
-  try {
-    createRoot(rootElement).render(
-      <StartupErrorBoundary>
-        <App />
-      </StartupErrorBoundary>
-    );
-    appMounted = true;
-  } catch (error) {
+  import("./App.tsx")
+    .then(async ({ default: App }) => {
+      const { default: StartupErrorBoundary } = await import("./components/system/StartupErrorBoundary.tsx");
+
+      createRoot(rootElement).render(
+        <StartupErrorBoundary>
+          <App />
+        </StartupErrorBoundary>
+      );
+      appMounted = true;
+      sessionStorage.removeItem(APP_BOOTSTRAP_RETRY_KEY);
+    })
+    .catch((error) => {
+      const errorText = String(error ?? "");
+      if (shouldAttemptBootstrapRetry(errorText)) {
+        console.warn("[REGULON] Retrying bootstrap after stale module origin error.", errorText);
+        retryBootstrap();
+        return;
+      }
+
     console.error("[REGULON] Fatal bootstrap failure.", error);
-    renderFatal("App failed during bootstrap.", String(error));
-  }
+      renderFatal("App failed during bootstrap.", errorText);
+    });
 };
 
 bootstrap();
