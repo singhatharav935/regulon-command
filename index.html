@@ -19,6 +19,32 @@
 
   <body class="dark">
     <div id="root"></div>
-    <script type="module" src="/src/main.tsx"></script>
+    <script type="module">
+      const showBootstrapError = (message) => {
+        const root = document.getElementById("root");
+        if (!root) return;
+        root.innerHTML = `
+          <div style="min-height:100vh;background:#040b1a;color:#e5eefc;font-family:Inter,system-ui,sans-serif;display:flex;align-items:center;justify-content:center;padding:24px;">
+            <div style="width:100%;max-width:860px;border:1px solid #1f355d;border-radius:12px;padding:20px;background:#07122a;">
+              <h1 style="margin:0 0 10px 0;font-size:20px;">REGULON startup error</h1>
+              <p style="margin:0 0 12px 0;color:#9eb2d9;">App failed during bootstrap.</p>
+              <pre style="white-space:pre-wrap;word-break:break-word;margin:0;padding:12px;background:#030917;border-radius:8px;border:1px solid #1a2a49;color:#9ce9ff;font-size:12px;line-height:1.5;max-height:50vh;overflow:auto;">${message}</pre>
+            </div>
+          </div>
+        `;
+      };
+
+      window.addEventListener("unhandledrejection", (event) => {
+        const reason = event?.reason;
+        if (reason) {
+          const text = typeof reason === "string" ? reason : reason?.message || "Unhandled promise rejection";
+          showBootstrapError(text);
+        }
+      });
+
+      import("/src/main.tsx").catch((error) => {
+        showBootstrapError(error?.message || "Failed to load /src/main.tsx");
+      });
+    </script>
   </body>
 </html>
