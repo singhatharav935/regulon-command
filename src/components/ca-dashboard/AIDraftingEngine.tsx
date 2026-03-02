@@ -118,27 +118,38 @@ const buildOfflineDraft = ({
   modeLabel: string;
 }) => {
   const trimmed = (noticeText || "").trim();
-  const noticeSnapshot = trimmed.length > 0 ? trimmed.slice(0, 2400) : "Notice text not provided.";
+  const noticeSnapshot = trimmed.length > 0 ? trimmed.slice(0, 3200) : "Notice text not provided.";
   const compactNotice = noticeSnapshot.replace(/\s+/g, " ").trim();
 
-  const extract = (regex: RegExp, fallback = "Not clearly stated in notice text") =>
-    noticeSnapshot.match(regex)?.[1]?.trim() ?? fallback;
+  const extract = (regex: RegExp, fallback = "Not clearly stated in notice text") => {
+    const match = noticeSnapshot.match(regex);
+    return (match?.[1] || fallback).trim();
+  };
 
-  const noticeNo = extract(/(?:Notice\s*No\.?|SCN\s*No\.?|Ref(?:erence)?\s*No\.?)\s*[:\-]?\s*([A-Z0-9\/\-.]+)/i);
-  const din = extract(/(?:DIN|RFN)\s*[:\-]?\s*([A-Z0-9\/\-.]+)/i);
-  const amount = extract(/(?:INR|Rs\.?|₹)\s*([0-9,]+(?:\.\d+)?)/i, "To be quantified from notice computation sheet");
-  const period = extract(/(?:period|for)\s+([A-Za-z0-9,\-\s]+(?:to|–|-)[A-Za-z0-9,\-\s]+)/i);
-  const noticeDate = extract(/dated\s*([0-9]{1,2}\s+[A-Za-z]+\s+[0-9]{4}|[0-9]{1,2}[\/\-][0-9]{1,2}[\/\-][0-9]{2,4})/i);
+  const extractNoticeNo = () =>
+    extract(
+      /(?:Show\s*Cause\s*Notice\s*No\.?|SCN\s*No\.?|Notice\s*No\.?|Reference\s*No\.?|Ref\s*No\.?)\s*[:\-]?\s*([A-Z0-9\/\-.]+)/i,
+      "Not specified",
+    );
+  const extractDin = () =>
+    extract(
+      /DIN\/RFN\s*[:\-]?\s*([A-Z0-9\/\-.]+)/i,
+      extract(/DIN\s*[:\-]?\s*([A-Z0-9\/\-.]+)/i, extract(/RFN\s*[:\-]?\s*([A-Z0-9\/\-.]+)/i, "Not specified")),
+    );
+
+  const noticeNo = extractNoticeNo();
+  const din = extractDin();
+  const amount = extract(/(?:Proposed(?:\s+tax)?\s+demand\s+is\s+)?(?:INR|Rs\.?|₹)\s*([0-9,]+(?:\.\d+)?)/i, "To be quantified");
+  const period = extract(/(?:for\s+period|period)\s+([A-Za-z0-9,\-\s]+?(?:to|–|-)\s*[A-Za-z0-9,\-\s]+?)(?:\s+under|,|\.|$)/i, "Not clearly stated");
+  const noticeDate = extract(/dated\s*([0-9]{1,2}\s+[A-Za-z]+\s+[0-9]{4}|[0-9]{1,2}[\/\-][0-9]{1,2}[\/\-][0-9]{2,4})/i, "Not clearly stated");
   const adjudicatingOffice = extract(
     /issued\s+by\s+([A-Za-z0-9,\s\-&()/.]+?)(?:,|\s+under|\s+for|\s+dated)/i,
     `The Competent ${authority} Authority`,
   );
 
-  const sectionMatches = Array.from(compactNotice.matchAll(/\b(?:Section|Sec\.?)\s*([0-9A-Za-z()/. -]{1,20})/gi))
-    .map((m) => `Section ${m[1].trim()}`);
-  const ruleMatches = Array.from(compactNotice.matchAll(/\bRule\s*([0-9A-Za-z()/. -]{1,20})/gi))
-    .map((m) => `Rule ${m[1].trim()}`);
-  const provisions = Array.from(new Set([...sectionMatches, ...ruleMatches])).slice(0, 8);
+  const sectionMatches = Array.from(compactNotice.matchAll(/\bSection\s+\d+(?:\(\d+\))?(?:\([a-zA-Z0-9]+\))?/gi)).map((m) => m[0]);
+  const ruleMatches = Array.from(compactNotice.matchAll(/\bRule\s+\d+(?:\(\d+\))?(?:[A-Z])?/gi)).map((m) => m[0]);
+  const provisions = Array.from(new Set([...sectionMatches, ...ruleMatches])).slice(0, 10);
   const provisionsLine = provisions.length > 0 ? provisions.join(", ") : "Applicable provisions to be read from the notice record";
 
   const allegationSentence =
@@ -147,77 +158,66 @@ const buildOfflineDraft = ({
       .map((line) => line.trim())
       .find((line) => /(alleges|wrongful|default|non[- ]compliance|mismatch|demand|penalty|interest|disallow|violation)/i.test(line)) ??
     "The notice alleges statutory non-compliance and proposes demand with consequential interest and penalty.";
+  if (documentType === "gst-show-cause") {
+    return `**BEFORE THE ADJUDICATING AUTHORITY / PROPER OFFICER**
 
-  const rebuttalFocus = Array.from(
-    new Set(
-      compactNotice
-        .split(/[.!?]/)
-        .map((line) => line.trim())
-        .filter((line) => /(invoice|return|payment|reconciliation|ledger|filing|timeline|evidence|computation|classification|valuation)/i.test(line))
-        .slice(0, 4),
-    ),
-  );
-  const rebuttalFocusLine =
-    rebuttalFocus.length > 0
-      ? rebuttalFocus.map((line, idx) => `${idx + 1}. ${line}.`).join("\n")
-      : `1. Invoice and filing trail reconciliation.
-2. Computation working challenge and arithmetic verification.
-3. Statutory interpretation and burden-of-proof response.
-4. Penalty and interest sustainability challenge.`;
+**IN THE MATTER OF:** ${companyName}  
+**SUBJECT:** Detailed Reply to Show Cause Notice under GST  
+**Notice No.:** ${noticeNo}  
+**DIN/RFN:** ${din}  
+**Date:** ${noticeDate}  
+**Period:** ${period}
 
-  const domainBlocks: Record<string, { coreLaw: string; allegation: string; issue1: string; issue2: string }> = {
-    "gst-show-cause": {
-      coreLaw: "Section 73/74 framework, Section 16 ITC eligibility, Rule 36/42 context, interest under Section 50, penalty standards under Section 73(9).",
-      allegation: "ITC mismatch / wrongful availment allegation based on return mismatch and vendor compliance flags.",
-      issue1: "Invoice-level and vendor-level reconciliation with GSTR, books, and payment trail.",
-      issue2: "Penalty and interest challenge where bona fide compliance and documentary trail exist.",
-    },
-    "mca-notice": {
-      coreLaw: "Companies Act procedural compliance, officer-in-default standards, and proportionality/leniency factors.",
-      allegation: "Delayed/defective filing and statutory non-compliance allegation.",
-      issue1: "Rectification status, additional fee compliance, and no-prejudice submission.",
-      issue2: "Penalty mitigation based on procedural nature and corrective action.",
-    },
-    "income-tax-response": {
-      coreLaw: "Assessment/disallowance standards, evidence burden, and penalty initiation thresholds.",
-      allegation: "Income mismatch/disallowance/addition allegation from return and ledger variance.",
-      issue1: "Books-vs-return-vs-supporting evidence tie-out with legal allowability analysis.",
-      issue2: "Interest/penalty containment on bona fide reporting position.",
-    },
-    "rbi-filing": {
-      coreLaw: "FEMA/RBI reporting requirements, proportionality, and remedial compliance.",
-      allegation: "Delay/mismatch in filing and remittance disclosures.",
-      issue1: "Authorized dealer trail, remittance evidence, and corrected filing chronology.",
-      issue2: "Compounding/leniency request based on non-mala fide conduct.",
-    },
-    "sebi-compliance": {
-      coreLaw: "SEBI disclosure/governance obligations and investor-impact framework.",
-      allegation: "Disclosure delay/inconsistency allegation.",
-      issue1: "Exchange filing chronology and governance action evidencing correction.",
-      issue2: "Penalty proportionality and absence of investor prejudice.",
-    },
-    "customs-response": {
-      coreLaw: "Classification/valuation/exemption framework, Section 28 demand standards, penalty/confiscation limits.",
-      allegation: "Misclassification/undervaluation leading to differential duty demand.",
-      issue1: "Technical literature and transaction value evidence rebuttal.",
-      issue2: "Extended limitation / penalty / confiscation challenge.",
-    },
-    "contract-review": {
-      coreLaw: "Contract enforceability, risk allocation, indemnity/liability fairness, dispute resolution mechanics.",
-      allegation: "Commercial and legal exposure from unbalanced clauses.",
-      issue1: "Clause-wise risk scoring and redline recommendations.",
-      issue2: "Negotiation fallback positions and execution-readiness checks.",
-    },
-    "custom-draft": {
-      coreLaw: "Applicable authority provisions inferred from notice text and cited sections/rules.",
-      allegation: "Regulatory non-compliance allegation requiring fact-law-application rebuttal.",
-      issue1: "Allegation mapping and computation reconciliation from source notice.",
-      issue2: "Procedural legality checks and layered relief strategy.",
-    },
-  };
+### WRITTEN SUBMISSIONS ON BEHALF OF THE NOTICEE
 
-  const block = domainBlocks[documentType] ?? domainBlocks["custom-draft"];
-  const reliefLabel = documentType === "contract-review" ? "recommendations and risk controls" : "reliefs";
+**MOST RESPECTFULLY SUBMITTED:**
+
+1. This reply is filed against the above notice issued by ${adjudicatingOffice}. Unless specifically admitted, every allegation, inference, and quantification proposed in the notice is denied.
+2. The impugned demand appears to be founded on portal mismatch/computation assumptions and not on complete transaction-level verification.
+3. The statutory provisions appearing from the notice are: ${provisionsLine}.
+
+### 1. BRIEF FACTUAL BACKGROUND
+1.1 The Noticee is a compliant registered taxpayer and has maintained regular return filing and books of account.
+1.2 The notice alleges wrongful availment / inadmissibility of credit and proposes demand of INR ${amount}, with consequential interest and penalty.
+1.3 The principal observation in the notice is: "${allegationSentence}".
+
+### 2. PRELIMINARY LEGAL OBJECTIONS
+2.1 Demand confirmation requires para-wise allegation proof, invoice-level linkage, and legally sustainable computation.
+2.2 A mechanical variance between portal statements and returns cannot, by itself, establish evasion or deliberate contravention.
+2.3 Interest and penalty are consequential and cannot survive if principal demand is not legally established.
+
+### 3. PARA-WISE REBUTTAL FRAMEWORK
+| Notice Allegation | Department Position | Noticee Rebuttal | Evidence Support |
+|---|---|---|---|
+| ITC inadmissibility / mismatch | Credit treated as ineligible based on mismatch logic | Credit eligibility is to be tested on document + receipt + tax nexus + return compliance, not only mismatch flags | Annexure A, B |
+| Computation in DRC working | Gross demand proposed without transaction reconciliation | Reconciliation requires invoice-wise validation, timing alignment, and duplicate exclusion | Annexure C |
+| Interest and penalty | Automatically proposed | Not automatic; dependent on sustainable principal liability and statutory thresholds | Annexure D |
+
+### 4. COMPUTATION RECONCILIATION CHALLENGE
+4.1 Proposed principal demand: INR ${amount}.  
+4.2 Noticee requests recomputation after:
+1. Invoice-wise tie-out with books and return data.
+2. Period-wise reconciliation and timing variance adjustment.
+3. Removal of duplicated / non-actionable line items.
+4. Exclusion of unsupported assumptions not backed by documentary evidence.
+
+### 5. EVIDENCE AND ANNEXURE MAPPING
+1. **Annexure A:** Notice set, DIN/RFN, and chronology table.
+2. **Annexure B:** Invoice set, return extracts, and payment trail.
+3. **Annexure C:** Reconciliation workbook and computation challenge matrix.
+4. **Annexure D:** Legal submissions, circular/case support, and penalty challenge.
+
+### 6. PRAYER
+In view of the above, the Noticee respectfully prays that this Hon'ble Authority may be pleased to:
+1. Drop or substantially reduce the proposed demand after proper reconciliation.
+2. Set aside / suitably restrict interest and penalty to the extent unsustainable in law.
+3. Grant personal hearing and permit filing of additional documentary submissions.
+4. Pass such further order(s) as deemed fit in the interest of justice.
+
+**Notice Extract Used for Drafting:**  
+${noticeSnapshot}
+`;
+  }
 
   return `**BEFORE THE ADJUDICATING AUTHORITY / PROPER OFFICER**
 
@@ -236,7 +236,7 @@ The Noticee submits this reply to contest the allegations raised in the above pr
 
 ### 1. Notice Summary and Jurisdictional Context
 1. Issuing authority: ${adjudicatingOffice}.
-2. Nature of allegation: ${block.allegation}
+2. Nature of allegation: ${allegationSentence}
 3. Core statutory framework involved: ${provisionsLine}.
 4. Proposed exposure indicated in notice: INR ${amount}.
 5. Primary observation from notice text: ${allegationSentence}
@@ -248,8 +248,8 @@ The Noticee submits this reply to contest the allegations raised in the above pr
 4. Consequential interest/penalty cannot survive where foundational demand is unproven or overstated.
 
 ### 3. Issue-Wise Defence Matrix
-1. **Issue A - Foundational allegation challenge:** ${block.issue1}
-2. **Issue B - Computation and proportionality challenge:** ${block.issue2}
+1. **Issue A - Foundational allegation challenge:** Allegation-wise proof and applicability challenge based on record.
+2. **Issue B - Computation and proportionality challenge:** Demand working and consequential levy challenge.
 3. **Issue C - Documentary substantiation:** Noticee relies on invoices/returns/contracts, payment trail, and internal reconciliations mapped annexure-wise.
 4. **Issue D - Relief calibration:** Demand, interest, and penalty must be dropped or proportionately reduced based on verified facts.
 
@@ -282,7 +282,7 @@ In view of the above, the Noticee respectfully prays that this Hon'ble Authority
 1. Set aside, drop, or materially reduce the impugned demand after full reconciliation.
 2. Drop or substantially curtail interest and penalty proposals to the extent unsustainable in law.
 3. Grant a personal hearing and permit further documentary submissions.
-4. Pass such further order(s), including consequential ${reliefLabel}, as may be deemed fit in the interest of justice.
+4. Pass such further order(s), including consequential reliefs, as may be deemed fit in the interest of justice.
 
 ### 9. Notice Text Used for Drafting
 ${noticeSnapshot}
