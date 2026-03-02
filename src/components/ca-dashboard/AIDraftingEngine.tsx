@@ -597,10 +597,19 @@ const AIDraftingEngine = ({ demoMode = false, includeLawyerReview = true }: AIDr
         return step;
       }));
       setGenerationError(null);
-      toast.warning(reason || "Live drafting service unreachable. Generated offline structured draft.");
+      if (demoMode) {
+        toast.success("Demo filing-ready draft generated.");
+      } else if (reason) {
+        toast.warning(reason);
+      }
     };
     
     try {
+      if (demoMode) {
+        await applyOfflineFallback();
+        return;
+      }
+
       if (!hasDraftEndpoint) {
         await applyOfflineFallback("Draft endpoint not configured. Generated offline structured draft.");
         return;
