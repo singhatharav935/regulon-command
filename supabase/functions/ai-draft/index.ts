@@ -135,23 +135,53 @@ const safeJsonParse = <T,>(raw: string): T | null => {
   }
 };
 
+type AIProvider = "lovable" | "openai";
+
+const resolveAIConfig = (): { provider: AIProvider; apiKey: string; model: string; endpoint: string } => {
+  const lovableApiKey = Deno.env.get("LOVABLE_API_KEY");
+  if (lovableApiKey) {
+    return {
+      provider: "lovable",
+      apiKey: lovableApiKey,
+      model: Deno.env.get("LOVABLE_MODEL") ?? "google/gemini-3-flash-preview",
+      endpoint: "https://ai.gateway.lovable.dev/v1/chat/completions",
+    };
+  }
+
+  const openAiApiKey = Deno.env.get("OPENAI_API_KEY");
+  if (openAiApiKey) {
+    return {
+      provider: "openai",
+      apiKey: openAiApiKey,
+      model: Deno.env.get("OPENAI_MODEL") ?? "gpt-4o-mini",
+      endpoint: "https://api.openai.com/v1/chat/completions",
+    };
+  }
+
+  throw new Error("No AI provider key configured. Set LOVABLE_API_KEY or OPENAI_API_KEY.");
+};
+
 const aiRequest = async ({
   apiKey,
+  model,
+  endpoint,
   messages,
   stream,
 }: {
   apiKey: string;
+  model: string;
+  endpoint: string;
   messages: Array<{ role: "system" | "user"; content: string }>;
   stream: boolean;
 }) => {
-  return fetch("https://ai.gateway.lovable.dev/v1/chat/completions", {
+  return fetch(endpoint, {
     method: "POST",
     headers: {
       Authorization: `Bearer ${apiKey}`,
       "Content-Type": "application/json",
     },
     body: JSON.stringify({
-      model: "google/gemini-3-flash-preview",
+      model,
       messages,
       stream,
     }),
@@ -292,10 +322,7 @@ serve(async (req) => {
       });
     }
 
-    const LOVABLE_API_KEY = Deno.env.get("LOVABLE_API_KEY");
-    if (!LOVABLE_API_KEY) {
-      throw new Error("LOVABLE_API_KEY is not configured");
-    }
+    const aiConfig = resolveAIConfig();
 
     const modeDescription = getModeDescription(draftMode);
     const documentTypePrompt = getDocumentTypePrompt(documentType);
@@ -332,7 +359,9 @@ If notice data is missing, list specific missing items in critical_missing_field
       const extractionUserPrompt = `Extract notice intelligence for ${documentType} dispute.\n\nNOTICE TEXT:\n${noticeDetails}`;
 
       const extractionResp = await aiRequest({
-        apiKey: LOVABLE_API_KEY,
+        apiKey: aiConfig.apiKey,
+        model: aiConfig.model,
+        endpoint: aiConfig.endpoint,
         stream: false,
         messages: [
           { role: "system", content: extractionSystemPrompt },
@@ -411,7 +440,9 @@ ${noticeDetails ? `RAW NOTICE DETAILS:\n${noticeDetails}` : ""}
 
     if (!advancedMode) {
       const response = await aiRequest({
-        apiKey: LOVABLE_API_KEY,
+        apiKey: aiConfig.apiKey,
+        model: aiConfig.model,
+        endpoint: aiConfig.endpoint,
         messages: [
           { role: "system", content: systemPrompt },
           { role: "user", content: userMessage },
@@ -462,7 +493,9 @@ ${noticeDetails ? `RAW NOTICE DETAILS:\n${noticeDetails}` : ""}
 
     // Advanced Mode: two-pass generation + quality review
     const draftResp = await aiRequest({
-      apiKey: LOVABLE_API_KEY,
+      apiKey: aiConfig.apiKey,
+      model: aiConfig.model,
+      endpoint: aiConfig.endpoint,
       stream: false,
       messages: [
         { role: "system", content: systemPrompt },
@@ -493,7 +526,9 @@ Checklist:
 - add "Data Required to Finalize Filing" when critical details are missing`;
 
     const reviewerResp = await aiRequest({
-      apiKey: LOVABLE_API_KEY,
+      apiKey: aiConfig.apiKey,
+      model: aiConfig.model,
+      endpoint: aiConfig.endpoint,
       stream: false,
       messages: [
         { role: "system", content: reviewerSystemPrompt },
@@ -543,7 +578,9 @@ Schema:
 }`;
 
     const qaResp = await aiRequest({
-      apiKey: LOVABLE_API_KEY,
+      apiKey: aiConfig.apiKey,
+      model: aiConfig.model,
+      endpoint: aiConfig.endpoint,
       stream: false,
       messages: [
         { role: "system", content: qaSystemPrompt },
