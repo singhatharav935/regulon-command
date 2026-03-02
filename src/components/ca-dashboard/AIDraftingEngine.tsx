@@ -105,54 +105,187 @@ interface DraftPackage {
 }
 
 const buildOfflineDraft = ({
+  documentType,
   authority,
   companyName,
   noticeText,
   modeLabel,
 }: {
+  documentType: string;
   authority: string;
   companyName: string;
   noticeText: string;
   modeLabel: string;
 }) => {
   const trimmed = (noticeText || "").trim();
-  const noticeSnapshot = trimmed.length > 0 ? trimmed.slice(0, 2200) : "[Insert detailed notice text]";
+  const noticeSnapshot = trimmed.length > 0 ? trimmed.slice(0, 2400) : "Notice text not provided.";
+  const compactNotice = noticeSnapshot.replace(/\s+/g, " ").trim();
+
+  const extract = (regex: RegExp, fallback = "Not clearly stated in notice text") =>
+    noticeSnapshot.match(regex)?.[1]?.trim() ?? fallback;
+
+  const noticeNo = extract(/(?:Notice\s*No\.?|SCN\s*No\.?|Ref(?:erence)?\s*No\.?)\s*[:\-]?\s*([A-Z0-9\/\-.]+)/i);
+  const din = extract(/(?:DIN|RFN)\s*[:\-]?\s*([A-Z0-9\/\-.]+)/i);
+  const amount = extract(/(?:INR|Rs\.?|₹)\s*([0-9,]+(?:\.\d+)?)/i, "To be quantified from notice computation sheet");
+  const period = extract(/(?:period|for)\s+([A-Za-z0-9,\-\s]+(?:to|–|-)[A-Za-z0-9,\-\s]+)/i);
+  const noticeDate = extract(/dated\s*([0-9]{1,2}\s+[A-Za-z]+\s+[0-9]{4}|[0-9]{1,2}[\/\-][0-9]{1,2}[\/\-][0-9]{2,4})/i);
+  const adjudicatingOffice = extract(
+    /issued\s+by\s+([A-Za-z0-9,\s\-&()/.]+?)(?:,|\s+under|\s+for|\s+dated)/i,
+    `The Competent ${authority} Authority`,
+  );
+
+  const sectionMatches = Array.from(compactNotice.matchAll(/\b(?:Section|Sec\.?)\s*([0-9A-Za-z()/. -]{1,20})/gi))
+    .map((m) => `Section ${m[1].trim()}`);
+  const ruleMatches = Array.from(compactNotice.matchAll(/\bRule\s*([0-9A-Za-z()/. -]{1,20})/gi))
+    .map((m) => `Rule ${m[1].trim()}`);
+  const provisions = Array.from(new Set([...sectionMatches, ...ruleMatches])).slice(0, 8);
+  const provisionsLine = provisions.length > 0 ? provisions.join(", ") : "Applicable provisions to be read from the notice record";
+
+  const allegationSentence =
+    compactNotice
+      .split(/[.!?]/)
+      .map((line) => line.trim())
+      .find((line) => /(alleges|wrongful|default|non[- ]compliance|mismatch|demand|penalty|interest|disallow|violation)/i.test(line)) ??
+    "The notice alleges statutory non-compliance and proposes demand with consequential interest and penalty.";
+
+  const rebuttalFocus = Array.from(
+    new Set(
+      compactNotice
+        .split(/[.!?]/)
+        .map((line) => line.trim())
+        .filter((line) => /(invoice|return|payment|reconciliation|ledger|filing|timeline|evidence|computation|classification|valuation)/i.test(line))
+        .slice(0, 4),
+    ),
+  );
+  const rebuttalFocusLine =
+    rebuttalFocus.length > 0
+      ? rebuttalFocus.map((line, idx) => `${idx + 1}. ${line}.`).join("\n")
+      : `1. Invoice and filing trail reconciliation.
+2. Computation working challenge and arithmetic verification.
+3. Statutory interpretation and burden-of-proof response.
+4. Penalty and interest sustainability challenge.`;
+
+  const domainBlocks: Record<string, { coreLaw: string; allegation: string; issue1: string; issue2: string }> = {
+    "gst-show-cause": {
+      coreLaw: "Section 73/74 framework, Section 16 ITC eligibility, Rule 36/42 context, interest under Section 50, penalty standards under Section 73(9).",
+      allegation: "ITC mismatch / wrongful availment allegation based on return mismatch and vendor compliance flags.",
+      issue1: "Invoice-level and vendor-level reconciliation with GSTR, books, and payment trail.",
+      issue2: "Penalty and interest challenge where bona fide compliance and documentary trail exist.",
+    },
+    "mca-notice": {
+      coreLaw: "Companies Act procedural compliance, officer-in-default standards, and proportionality/leniency factors.",
+      allegation: "Delayed/defective filing and statutory non-compliance allegation.",
+      issue1: "Rectification status, additional fee compliance, and no-prejudice submission.",
+      issue2: "Penalty mitigation based on procedural nature and corrective action.",
+    },
+    "income-tax-response": {
+      coreLaw: "Assessment/disallowance standards, evidence burden, and penalty initiation thresholds.",
+      allegation: "Income mismatch/disallowance/addition allegation from return and ledger variance.",
+      issue1: "Books-vs-return-vs-supporting evidence tie-out with legal allowability analysis.",
+      issue2: "Interest/penalty containment on bona fide reporting position.",
+    },
+    "rbi-filing": {
+      coreLaw: "FEMA/RBI reporting requirements, proportionality, and remedial compliance.",
+      allegation: "Delay/mismatch in filing and remittance disclosures.",
+      issue1: "Authorized dealer trail, remittance evidence, and corrected filing chronology.",
+      issue2: "Compounding/leniency request based on non-mala fide conduct.",
+    },
+    "sebi-compliance": {
+      coreLaw: "SEBI disclosure/governance obligations and investor-impact framework.",
+      allegation: "Disclosure delay/inconsistency allegation.",
+      issue1: "Exchange filing chronology and governance action evidencing correction.",
+      issue2: "Penalty proportionality and absence of investor prejudice.",
+    },
+    "customs-response": {
+      coreLaw: "Classification/valuation/exemption framework, Section 28 demand standards, penalty/confiscation limits.",
+      allegation: "Misclassification/undervaluation leading to differential duty demand.",
+      issue1: "Technical literature and transaction value evidence rebuttal.",
+      issue2: "Extended limitation / penalty / confiscation challenge.",
+    },
+    "contract-review": {
+      coreLaw: "Contract enforceability, risk allocation, indemnity/liability fairness, dispute resolution mechanics.",
+      allegation: "Commercial and legal exposure from unbalanced clauses.",
+      issue1: "Clause-wise risk scoring and redline recommendations.",
+      issue2: "Negotiation fallback positions and execution-readiness checks.",
+    },
+    "custom-draft": {
+      coreLaw: "Applicable authority provisions inferred from notice text and cited sections/rules.",
+      allegation: "Regulatory non-compliance allegation requiring fact-law-application rebuttal.",
+      issue1: "Allegation mapping and computation reconciliation from source notice.",
+      issue2: "Procedural legality checks and layered relief strategy.",
+    },
+  };
+
+  const block = domainBlocks[documentType] ?? domainBlocks["custom-draft"];
+  const reliefLabel = documentType === "contract-review" ? "recommendations and risk controls" : "reliefs";
 
   return `**BEFORE THE ADJUDICATING AUTHORITY / PROPER OFFICER**
 
-**In the matter of:** ${companyName}
-**Subject:** Reply Draft for ${authority}
+**IN THE MATTER OF:** ${companyName}
+**SUBJECT:** Reply to ${authority} Proceedings
+**NOTICE REFERENCE:** ${noticeNo}
+**DIN/RFN:** ${din}
+**NOTICE DATE:** ${noticeDate}
+**PERIOD UNDER DISPUTE:** ${period}
 
-### 1. Notice Snapshot
+### WRITTEN SUBMISSIONS ON BEHALF OF THE NOTICEE
+
+**Most Respectfully Submitted:**
+
+The Noticee submits this reply to contest the allegations raised in the above proceedings. This submission is drafted in **${modeLabel.toUpperCase()}** mode, with a filing-first structure intended for adjudication readiness. Unless expressly admitted, every allegation and computation in the notice is denied.
+
+### 1. Notice Summary and Jurisdictional Context
+1. Issuing authority: ${adjudicatingOffice}.
+2. Nature of allegation: ${block.allegation}
+3. Core statutory framework involved: ${provisionsLine}.
+4. Proposed exposure indicated in notice: INR ${amount}.
+5. Primary observation from notice text: ${allegationSentence}
+
+### 2. Preliminary Legal Position
+1. The notice must sustain allegation-wise burden of proof on facts, law, and quantification.
+2. A mismatch, delay, or third-party irregularity cannot automatically establish enforceable liability against the Noticee without evidence-linked adjudication.
+3. The impugned computation requires strict line-item testing before confirmation of any demand.
+4. Consequential interest/penalty cannot survive where foundational demand is unproven or overstated.
+
+### 3. Issue-Wise Defence Matrix
+1. **Issue A - Foundational allegation challenge:** ${block.issue1}
+2. **Issue B - Computation and proportionality challenge:** ${block.issue2}
+3. **Issue C - Documentary substantiation:** Noticee relies on invoices/returns/contracts, payment trail, and internal reconciliations mapped annexure-wise.
+4. **Issue D - Relief calibration:** Demand, interest, and penalty must be dropped or proportionately reduced based on verified facts.
+
+### 4. Para-Wise Rebuttal Framework
+| Notice Component | Department Position | Noticee Response | Documentary Anchor | Adjudication Ask |
+|---|---|---|---|---|
+| Jurisdiction and allegation setup | Breach asserted in broad terms | Requires allegation-wise proof and legal linkage | Annexure A | Restrict to evidenced issues only |
+| Factual narrative | Selective interpretation of records | Full transaction/factual chronology materially differs | Annexure B | Consider complete record set |
+| Quantification and working | Demand proposed at gross level | Reconciliation reveals adjustments and overstatement risk | Annexure C | Recompute before confirmation |
+| Interest / penalty proposal | Consequential imposition proposed | Not maintainable where base demand is disputed/unsupported | Annexure D | Drop or proportionately curtail |
+
+### 5. Computation Reconciliation Position
+| Particulars | Notice Position | Noticee Position | Reconciliation Note |
+|---|---|---|---|
+| Principal amount | INR ${amount} | Subject to verified recomputation | Requires invoice-wise and period-wise tie-out |
+| Interest | Proposed consequentially | Disputed in principle and quantum | Contingent on sustainable principal |
+| Penalty | Proposed | Contested on law and facts | Threshold conditions not established |
+
+### 6. Evidence-Linked Rebuttal Points
+${rebuttalFocusLine}
+
+### 7. Annexure Mapping (For Final Filing Pack)
+1. **Annexure A:** Notice set, DIN/RFN, notice chronology, and scope mapping.
+2. **Annexure B:** Primary factual evidence pack (invoices, returns, filings, contracts, correspondence as applicable).
+3. **Annexure C:** Computation workbook, mismatch reconciliation, and period-wise adjustment statement.
+4. **Annexure D:** Legal authorities and procedural compliance material relied upon.
+
+### 8. Prayer
+In view of the above, the Noticee respectfully prays that this Hon'ble Authority may be pleased to:
+1. Set aside, drop, or materially reduce the impugned demand after full reconciliation.
+2. Drop or substantially curtail interest and penalty proposals to the extent unsustainable in law.
+3. Grant a personal hearing and permit further documentary submissions.
+4. Pass such further order(s), including consequential ${reliefLabel}, as may be deemed fit in the interest of justice.
+
+### 9. Notice Text Used for Drafting
 ${noticeSnapshot}
-
-### 2. Preliminary Submissions
-1. The Noticee denies allegations not expressly admitted.
-2. This reply is submitted in ${modeLabel} mode with fact-led and law-led rebuttal.
-3. The Department must establish allegation-wise facts, legal provision, and quantification.
-
-### 3. Para-Wise Rebuttal Matrix
-1. Allegation summary: [Insert para reference from notice]
-   Noticee response: Transaction facts, document proof, and statutory compliance matrix enclosed.
-2. Legal response: Section/Rule/Regulation application challenged on facts and interpretation.
-3. Computation response: Demand working disputed due to reconciliation, timing, and duplication checks.
-
-### 4. Computation Challenge
-1. Proposed amount (department): [Insert]
-2. Reconciled amount (noticee): [Insert]
-3. Difference reason: [Classification/valuation/timing/portal mismatch/arithmetical issue]
-
-### 5. Evidence Mapping (Annexures)
-1. Annexure A: Notice copy + DIN/RFN reference.
-2. Annexure B: Invoices/returns/filings/payment trail.
-3. Annexure C: Reconciliation statement + computation table.
-4. Annexure D: Case-law/circular extract relied upon.
-
-### 6. Prayer
-1. Drop or substantially reduce the proposed demand.
-2. Drop penalty/interest to the extent not legally sustainable.
-3. Grant personal hearing before adverse order.
-4. Pass any other order in the interest of justice.
 `;
 };
 
