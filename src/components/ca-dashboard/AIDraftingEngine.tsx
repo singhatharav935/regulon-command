@@ -462,12 +462,8 @@ const AIDraftingEngine = ({ demoMode = false, includeLawyerReview = true }: AIDr
   const [currentSteps, setCurrentSteps] = useState<ReviewStep[]>(initialReviewSteps);
   const [generationError, setGenerationError] = useState<string | null>(null);
 
-  const DRAFT_URL = import.meta.env.DEV
-    ? "/functions/v1/ai-draft"
-    : `${import.meta.env.VITE_SUPABASE_URL}/functions/v1/ai-draft`;
-  const hasDraftEndpoint = import.meta.env.DEV
-    ? true
-    : typeof import.meta.env.VITE_SUPABASE_URL === "string" && import.meta.env.VITE_SUPABASE_URL.startsWith("http");
+  const DRAFT_URL = `${import.meta.env.VITE_SUPABASE_URL}/functions/v1/ai-draft`;
+  const hasDraftEndpoint = typeof import.meta.env.VITE_SUPABASE_URL === "string" && import.meta.env.VITE_SUPABASE_URL.startsWith("http");
   const secureFunctionAuth = import.meta.env.VITE_ENABLE_SECURE_FUNCTION_AUTH === "true";
   const supabaseUrl = (import.meta.env.VITE_SUPABASE_URL as string) || "";
   const supabasePublishableKey = (import.meta.env.VITE_SUPABASE_PUBLISHABLE_KEY as string) || "";
