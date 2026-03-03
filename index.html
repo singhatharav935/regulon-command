@@ -34,14 +34,6 @@
         `;
       };
 
-      window.addEventListener("unhandledrejection", (event) => {
-        const reason = event?.reason;
-        if (reason) {
-          const text = typeof reason === "string" ? reason : reason?.message || "Unhandled promise rejection";
-          showBootstrapError(text);
-        }
-      });
-
       import("/src/main.tsx").catch((error) => {
         showBootstrapError(error?.message || "Failed to load /src/main.tsx");
       });
