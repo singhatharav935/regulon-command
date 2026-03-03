@@ -841,12 +841,19 @@ const AIDraftingEngine = ({ demoMode = false, includeLawyerReview = true }: AIDr
         throw new Error("AI credits exhausted. Please add credits to continue.");
       }
       if (!response.ok) {
-        let serverError = "Failed to generate draft. Please try again.";
+        let serverError = `Draft request failed (${response.status}).`;
         try {
           const data = await response.json();
-          serverError = data?.error || serverError;
+          serverError = data?.error ? `${serverError} ${data.error}` : serverError;
         } catch {
-          // keep default message
+          try {
+            const text = await response.text();
+            if (text) {
+              serverError = `${serverError} ${text.slice(0, 240)}`;
+            }
+          } catch {
+            // ignore secondary parse failures
+          }
         }
         throw new Error(serverError);
       }
