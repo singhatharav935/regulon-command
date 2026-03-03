@@ -41,7 +41,9 @@ const ComplianceChatbot = () => {
   const scrollAreaRef = useRef<HTMLDivElement>(null);
   const textareaRef = useRef<HTMLTextAreaElement>(null);
 
-  const CHAT_URL = `${import.meta.env.VITE_SUPABASE_URL}/functions/v1/compliance-chat`;
+  const CHAT_URL = import.meta.env.DEV
+    ? "/functions/v1/compliance-chat"
+    : `${import.meta.env.VITE_SUPABASE_URL}/functions/v1/compliance-chat`;
   const secureFunctionAuth = import.meta.env.VITE_ENABLE_SECURE_FUNCTION_AUTH === "true";
 
   useEffect(() => {
