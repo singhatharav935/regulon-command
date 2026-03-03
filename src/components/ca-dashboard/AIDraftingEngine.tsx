@@ -775,11 +775,7 @@ const AIDraftingEngine = ({ demoMode = false, includeLawyerReview = true }: AIDr
     
     try {
       if (!hasDraftEndpoint) {
-        const message = demoMode
-          ? "Live draft endpoint not configured. Generated offline structured draft."
-          : "Draft endpoint not configured. Generated offline structured draft.";
-        await applyOfflineFallback(message);
-        return;
+        throw new Error("Draft endpoint is not configured. Set VITE_SUPABASE_URL correctly.");
       }
 
       const urlRef = getProjectRefFromUrl(supabaseUrl);
@@ -982,7 +978,8 @@ const AIDraftingEngine = ({ demoMode = false, includeLawyerReview = true }: AIDr
         /aborterror/i.test(errorMessage);
 
       if (networkLikeFailure) {
-        await applyOfflineFallback("Live drafting service unreachable. Generated offline structured draft.");
+        setGenerationError("Live drafting service unreachable. Check Supabase function deployment and API keys.");
+        toast.error("Live drafting service unreachable. Fix backend configuration.");
         return;
       }
 
