@@ -615,6 +615,23 @@ const AIDraftingEngine = ({ demoMode = false, includeLawyerReview = true }: AIDr
     });
   };
 
+  useEffect(() => {
+    if (selectedDocType !== "mca-notice" || !draftGenerated || !draftContent.trim()) return;
+    runMcaDraftIssueCheck(draftContent);
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [selectedDocType, draftGenerated, draftContent, draftQA]);
+
+  useEffect(() => {
+    if (selectedDocType !== "mca-notice") return;
+    if (!mcaIssueReport || mcaIssueReport.ok) return;
+    if (mcaFixNotes.trim().length > 0) return;
+
+    const autoNotes = mcaIssueReport.items
+      .map((item, idx) => `${idx + 1}. ${item.issue}\nSuggestion: ${item.suggestion}`)
+      .join("\n\n");
+    setMcaFixNotes(autoNotes);
+  }, [selectedDocType, mcaIssueReport, mcaFixNotes]);
+
   const getProjectRefFromUrl = (url: string) => {
     const match = url.match(/^https:\/\/([a-z0-9]+)\.supabase\.co/i);
     return match?.[1] ?? null;
@@ -900,13 +917,13 @@ const AIDraftingEngine = ({ demoMode = false, includeLawyerReview = true }: AIDr
       return;
     }
 
-    if (!mcaIssueReport && !mcaFixNotes.trim()) {
-      toast.error("Run issue check or add fix notes first.");
-      return;
+    if (!mcaIssueReport) {
+      runMcaDraftIssueCheck();
     }
 
     const client = clientOptions.find((c) => c.id === selectedClient);
-    const issueText = (mcaIssueReport?.items ?? [])
+    const effectiveIssueItems = mcaIssueReport?.items ?? evaluateMcaDraftIssues(draftContent, draftQA, inferredMcaReplyType);
+    const issueText = effectiveIssueItems
       .map((item, idx) => `${idx + 1}. Issue: ${item.issue}\n   Suggestion: ${item.suggestion}`)
       .join("\n");
 
@@ -926,7 +943,7 @@ DETECTED ISSUES:
 ${issueText || "None provided"}
 
 CA/LAWYER ADDITIONAL FIX NOTES:
-${mcaFixNotes || "None"}
+${mcaFixNotes || "Use the detected issues and suggestions above as mandatory corrections."}
 
 Return only the revised final draft text.`;
 
