@@ -224,6 +224,170 @@ interface NoticeIntelligence {
   critical_missing_fields: string[];
 }
 
+interface McaDraftBlueprint {
+  heading: {
+    forum: string;
+    matter: string;
+  };
+  notice_meta: {
+    notice_number: string;
+    notice_date: string;
+    din: string;
+    company_name: string;
+    cin: string;
+    registered_office: string;
+    officers_in_default: string[];
+  };
+  preliminary_submissions: string[];
+  chronology_rows: Array<{
+    particulars: string;
+    section: string;
+    due_date: string;
+    filing_date: string;
+    srn_challan: string;
+    status: string;
+  }>;
+  legal_submissions: {
+    sections_92_137_403: string;
+    section_454_proviso: string;
+    procedural_vs_substantive: string;
+    proportionality: string;
+  };
+  officer_defense_rows: Array<{
+    name: string;
+    role_period: string;
+    alleged_responsibility: string;
+    mitigating_facts: string;
+  }>;
+  section_446b_submission: string;
+  annexures: Array<{
+    annexure_id: string;
+    description: string;
+  }>;
+  prayer: string[];
+  signoff: {
+    signatory_name: string;
+    designation: string;
+    din_or_membership: string;
+    date: string;
+    place: string;
+  };
+  data_required_to_finalize_filing: string[];
+}
+
+const ensureMcaValue = (value: string | null | undefined, fallback: string) => {
+  const trimmed = (value ?? "").trim();
+  return trimmed.length > 0 ? trimmed : fallback;
+};
+
+const buildMcaDraftFromBlueprint = (bp: McaDraftBlueprint) => {
+  const officers = (bp.notice_meta.officers_in_default ?? []).length > 0
+    ? bp.notice_meta.officers_in_default.map((officer) => `- ${officer}`).join("\n")
+    : "- [To be filled by CA/Lawyer]";
+
+  const chronology = (bp.chronology_rows ?? []).length > 0
+    ? bp.chronology_rows
+      .map((row) => `| ${row.particulars} | ${row.section} | ${row.due_date} | ${row.filing_date} | ${row.srn_challan} | ${row.status} |`)
+      .join("\n")
+    : `| AOC-4 filing | Section 137(1) | [To be filled by CA/Lawyer] | [To be filled by CA/Lawyer] | [To be filled by CA/Lawyer] | Completed |
+| MGT-7 filing | Section 92(4) | [To be filled by CA/Lawyer] | [To be filled by CA/Lawyer] | [To be filled by CA/Lawyer] | Completed |`;
+
+  const officerDefenseRows = (bp.officer_defense_rows ?? []).length > 0
+    ? bp.officer_defense_rows
+      .map((row) => `| ${row.name} | ${row.role_period} | ${row.alleged_responsibility} | ${row.mitigating_facts} |`)
+      .join("\n")
+    : `| [To be filled by CA/Lawyer] | [To be filled by CA/Lawyer] | [To be filled by CA/Lawyer] | [To be filled by CA/Lawyer] |`;
+
+  const annexures = (bp.annexures ?? []).length > 0
+    ? bp.annexures.map((item, idx) => `${idx + 1}. **${item.annexure_id}:** ${item.description}`).join("\n")
+    : `1. **Annexure A:** AOC-4 acknowledgment, SRN, challan, and filing receipt.
+2. **Annexure B:** MGT-7 acknowledgment, SRN, challan, and filing receipt.
+3. **Annexure C:** Board Resolution/authority letter for signatory.
+4. **Annexure D:** Supporting explanation note and record extracts.`;
+
+  const prelims = (bp.preliminary_submissions ?? []).length > 0
+    ? bp.preliminary_submissions.map((line, idx) => `${idx + 1}. ${line}`).join("\n")
+    : `1. The proceedings relate to alleged delay in filing AOC-4 and MGT-7 for FY 2023-24 under Sections 137 and 92.
+2. Filings stand completed with applicable additional fees under Section 403.
+3. The delay was procedural and unintentional, without mala fide intent.`;
+
+  const prayers = (bp.prayer ?? []).length > 0
+    ? bp.prayer.map((line, idx) => `${idx + 1}. ${line}`).join("\n")
+    : `1. Drop proceedings in light of completed compliance and facts on record.
+2. Alternatively, impose only minimal/nominal penalty proportionate to the procedural nature of default.
+3. Drop or reduce penalty on officers in default based on role, conduct, and mitigating facts.
+4. Grant opportunity of personal hearing before passing any adverse order.`;
+
+  const dataRequired = (bp.data_required_to_finalize_filing ?? []).length > 0
+    ? `\n### Data Required to Finalize Filing\n${bp.data_required_to_finalize_filing.map((line, idx) => `${idx + 1}. ${line}`).join("\n")}\n`
+    : "";
+
+  return `**${ensureMcaValue(bp.heading?.forum, "BEFORE THE ADJUDICATING OFFICER / REGISTRAR OF COMPANIES, KARNATAKA")}**  
+**${ensureMcaValue(bp.heading?.matter, "In the matter of adjudication under Section 454 of the Companies Act, 2013")}**
+
+**Notice No:** ${ensureMcaValue(bp.notice_meta?.notice_number, "[To be filled by CA/Lawyer]")}  
+**Date:** ${ensureMcaValue(bp.notice_meta?.notice_date, "[To be filled by CA/Lawyer]")}  
+**DIN:** ${ensureMcaValue(bp.notice_meta?.din, "[To be filled by CA/Lawyer]")}
+
+**In the matter of:**  
+**${ensureMcaValue(bp.notice_meta?.company_name, "[To be filled by CA/Lawyer]")}**  
+(CIN: ${ensureMcaValue(bp.notice_meta?.cin, "[To be filled by CA/Lawyer]")})  
+Registered Office: ${ensureMcaValue(bp.notice_meta?.registered_office, "[To be filled by CA/Lawyer]")}  
+…Company/Noticee
+
+**Officers in Default (as alleged):**  
+${officers}
+
+### **REPLY TO ADJUDICATION NOTICE FOR ALLEGED NON-COMPLIANCE OF SECTIONS 92 AND 137 OF THE COMPANIES ACT, 2013**
+
+**To,**  
+The Registrar of Companies / Adjudicating Officer, Karnataka  
+[Insert Office Address]
+
+**Most Respectfully Submitted,**
+
+This reply is submitted without prejudice to all rights and remedies available in law.
+
+### 1. Preliminary Submissions
+${prelims}
+
+### 2. Chronology of Compliance
+| Particulars | Section | Due Date | Actual Filing Date | SRN/Challan | Status |
+|---|---|---|---|---|---|
+${chronology}
+
+### 3. Legal Submissions
+1. **Sections 92, 137 and 403:** ${ensureMcaValue(bp.legal_submissions?.sections_92_137_403, "Section 403 permits delayed filing upon payment of additional fees; completed filing with additional fees is a material mitigating circumstance in adjudication.")}
+2. **Section 454 Proviso (fact-dependent):** ${ensureMcaValue(bp.legal_submissions?.section_454_proviso, "Where default is rectified before notice dated 15 January 2026 or within 30 days thereof, the Noticee seeks consideration under the proviso to Section 454 subject to statutory satisfaction.")}
+3. **Procedural vs Substantive Default:** ${ensureMcaValue(bp.legal_submissions?.procedural_vs_substantive, "The lapse is procedural timeline non-compliance and not a case of fraud or suppression.")}
+4. **Proportionality:** ${ensureMcaValue(bp.legal_submissions?.proportionality, "Penalty may be calibrated based on nature of default, rectification status, role-specific responsibility, and mitigating facts.")}
+
+### 4. Officer-Specific Defense
+| Officer | Role Period | Alleged Responsibility | Mitigating Facts |
+|---|---|---|---|
+${officerDefenseRows}
+
+### 5. Section 446B Submission (Only if Factually Eligible)
+${ensureMcaValue(bp.section_446b_submission, "If the Company qualifies under Section 2(85) and related criteria on the relevant date, benefit under Section 446B may be considered based on paid-up capital/turnover/startup evidence.")}
+
+### 6. Annexures
+${annexures}
+
+### 7. Prayer
+${prayers}
+
+**For and on behalf of ${ensureMcaValue(bp.notice_meta?.company_name, "[To be filled by CA/Lawyer]")}**
+
+__________________________  
+**Authorized Signatory**  
+Name: ${ensureMcaValue(bp.signoff?.signatory_name, "[To be filled by CA/Lawyer]")}  
+Designation: ${ensureMcaValue(bp.signoff?.designation, "[To be filled by CA/Lawyer]")}  
+DIN/Membership No.: ${ensureMcaValue(bp.signoff?.din_or_membership, "[To be filled by CA/Lawyer]")}  
+Date: ${ensureMcaValue(bp.signoff?.date, "[To be filled by CA/Lawyer]")}  
+Place: ${ensureMcaValue(bp.signoff?.place, "[To be filled by CA/Lawyer]")}
+${dataRequired}`;
+};
+
 const hasPlaceholderMarkers = (content: string) =>
   /\[insert[^\]]*\]|\[to be filled[^\]]*\]|<insert|placeholder/i.test(content);
 
@@ -280,6 +444,19 @@ const runMcaDomainGates = (draft: string): DomainGateResult => {
       .filter(([, passed]) => !passed)
       .map(([name]) => name),
   };
+};
+
+const validateMcaBlueprint = (bp: McaDraftBlueprint): string[] => {
+  const missing: string[] = [];
+  if (!(bp.notice_meta?.notice_number || "").trim()) missing.push("notice_meta.notice_number");
+  if (!(bp.notice_meta?.notice_date || "").trim()) missing.push("notice_meta.notice_date");
+  if (!(bp.notice_meta?.din || "").trim()) missing.push("notice_meta.din");
+  if (!(bp.notice_meta?.company_name || "").trim()) missing.push("notice_meta.company_name");
+  if ((bp.chronology_rows ?? []).length < 2) missing.push("chronology_rows(minimum 2: AOC-4 and MGT-7)");
+  if (!(bp.legal_submissions?.sections_92_137_403 || "").trim()) missing.push("legal_submissions.sections_92_137_403");
+  if (!(bp.legal_submissions?.section_454_proviso || "").trim()) missing.push("legal_submissions.section_454_proviso");
+  if ((bp.prayer ?? []).length < 3) missing.push("prayer(minimum 3 points)");
+  return missing;
 };
 
 serve(async (req) => {
@@ -569,27 +746,141 @@ Avoid unsupported case law. Use controlled placeholders only where unavoidable.`
       });
     }
 
-    // Advanced Mode: two-pass generation + quality review
-    const draftResp = await aiRequest({
-      apiKey: aiConfig.apiKey,
-      model: aiConfig.model,
-      endpoint: aiConfig.endpoint,
-      stream: false,
-      messages: [
-        { role: "system", content: systemPrompt },
-        { role: "user", content: userMessage },
-      ],
-    });
+    // Advanced Mode: domain-structured generation + quality review
+    let firstDraft = "";
+    if (documentType === "mca-notice") {
+      const blueprintSystemPrompt = `You are an expert legal drafting engine for MCA adjudication replies.
+Return STRICT JSON only (no markdown).
+Generate a complete object with this exact schema:
+{
+  "heading": { "forum": string, "matter": string },
+  "notice_meta": {
+    "notice_number": string,
+    "notice_date": string,
+    "din": string,
+    "company_name": string,
+    "cin": string,
+    "registered_office": string,
+    "officers_in_default": string[]
+  },
+  "preliminary_submissions": string[],
+  "chronology_rows": [{
+    "particulars": string,
+    "section": string,
+    "due_date": string,
+    "filing_date": string,
+    "srn_challan": string,
+    "status": string
+  }],
+  "legal_submissions": {
+    "sections_92_137_403": string,
+    "section_454_proviso": string,
+    "procedural_vs_substantive": string,
+    "proportionality": string
+  },
+  "officer_defense_rows": [{
+    "name": string,
+    "role_period": string,
+    "alleged_responsibility": string,
+    "mitigating_facts": string
+  }],
+  "section_446b_submission": string,
+  "annexures": [{ "annexure_id": string, "description": string }],
+  "prayer": string[],
+  "signoff": {
+    "signatory_name": string,
+    "designation": string,
+    "din_or_membership": string,
+    "date": string,
+    "place": string
+  },
+  "data_required_to_finalize_filing": string[]
+}
 
-    if (!draftResp.ok) {
-      const errorText = await draftResp.text();
-      throw new Error(`Advanced draft generation failed: ${draftResp.status} ${errorText}`);
+Hard constraints:
+- Use Sections 92, 137, 403 and 454 with correct legal framing.
+- Include AOC-4 and MGT-7 rows in chronology.
+- Include officer-specific defense entries.
+- Never use phrase "waive penalty for officers"; use "drop or reduce penalty on officers in default...".
+- Use placeholders only where truly unavailable, and keep them CA/Lawyer-fillable.
+- Do not add unsupported case law.
+`;
+
+      const blueprintResp = await aiRequest({
+        apiKey: aiConfig.apiKey,
+        model: aiConfig.model,
+        endpoint: aiConfig.endpoint,
+        stream: false,
+        messages: [
+          { role: "system", content: blueprintSystemPrompt },
+          { role: "user", content: userMessage + `\n\nNOTICE DETAILS:\n${noticeDetails || ""}` },
+        ],
+      });
+
+      if (!blueprintResp.ok) {
+        const errorText = await blueprintResp.text();
+        throw new Error(`Advanced MCA blueprint generation failed: ${blueprintResp.status} ${errorText}`);
+      }
+
+      const blueprintData = await blueprintResp.json();
+      const blueprintRaw = blueprintData.choices?.[0]?.message?.content || "";
+      const parsedBlueprint = safeJsonParse<McaDraftBlueprint>(blueprintRaw);
+      if (!parsedBlueprint) {
+        return new Response(JSON.stringify({
+          error: "MCA blueprint parsing failed. Please provide clearer notice facts and retry.",
+        }), {
+          status: 422,
+          headers: { ...corsHeaders, "Content-Type": "application/json" },
+        });
+      }
+
+      const missingBlueprintFields = validateMcaBlueprint(parsedBlueprint);
+      if (strictValidation && missingBlueprintFields.length > 0) {
+        return new Response(JSON.stringify({
+          error: `MCA blueprint incomplete: ${missingBlueprintFields.join(", ")}`,
+          missing: missingBlueprintFields,
+        }), {
+          status: 422,
+          headers: { ...corsHeaders, "Content-Type": "application/json" },
+        });
+      }
+
+      firstDraft = buildMcaDraftFromBlueprint(parsedBlueprint);
+    } else {
+      const draftResp = await aiRequest({
+        apiKey: aiConfig.apiKey,
+        model: aiConfig.model,
+        endpoint: aiConfig.endpoint,
+        stream: false,
+        messages: [
+          { role: "system", content: systemPrompt },
+          { role: "user", content: userMessage },
+        ],
+      });
+
+      if (!draftResp.ok) {
+        const errorText = await draftResp.text();
+        throw new Error(`Advanced draft generation failed: ${draftResp.status} ${errorText}`);
+      }
+
+      const draftData = await draftResp.json();
+      firstDraft = draftData.choices?.[0]?.message?.content || "";
     }
 
-    const draftData = await draftResp.json();
-    const firstDraft = draftData.choices?.[0]?.message?.content || "";
-
-    const reviewerSystemPrompt = `You are final quality control counsel.
+    const reviewerSystemPrompt = documentType === "mca-notice"
+      ? `You are final quality control counsel for MCA adjudication replies.
+Return ONLY improved final draft text (no commentary).
+Checklist:
+- exact ROC jurisdiction from notice, no multi-jurisdiction guess
+- chronology table with due date vs actual filing date for AOC-4 and MGT-7 with SRN/challan refs where available
+- sections 92, 137, 403 and 454 properly addressed
+- section 454 proviso submission framed as fact-dependent
+- officer-specific defense table present
+- section 446B included only if qualification basis is stated
+- never use "waive penalty for officers"; use "drop or reduce penalty on officers in default..."
+- keep placeholders only for CA/Lawyer-fillable metadata
+- add "Data Required to Finalize Filing" if critical details are unavailable`
+      : `You are final quality control counsel.
 Return ONLY improved final draft text (no commentary).
 Checklist:
 - complete notice snapshot
@@ -674,8 +965,8 @@ Schema:
 
     const fallbackGates = {
       no_placeholders: isNoPlaceholderGatePassed(finalDraft, documentType),
-      para_wise_matrix_present: /para[- ]wise rebuttal matrix|scn para/i.test(finalDraft),
-      computation_table_present: /computation|reconciliation|accepted|disputed/i.test(finalDraft),
+      para_wise_matrix_present: documentType === "mca-notice" ? true : /para[- ]wise rebuttal matrix|scn para/i.test(finalDraft),
+      computation_table_present: documentType === "mca-notice" ? true : /computation|reconciliation|accepted|disputed/i.test(finalDraft),
       annexure_mapping_present: /annexure/i.test(finalDraft),
       prayer_complete: /prayer|relief|personal hearing/i.test(finalDraft),
     };
@@ -685,8 +976,8 @@ Schema:
 
     const gateFailures: string[] = [];
     if (!noPlaceholderGate) gateFailures.push("no_placeholders");
-    if (!mandatoryGates.para_wise_matrix_present) gateFailures.push("para_wise_matrix_present");
-    if (!mandatoryGates.computation_table_present) gateFailures.push("computation_table_present");
+    if (documentType !== "mca-notice" && !mandatoryGates.para_wise_matrix_present) gateFailures.push("para_wise_matrix_present");
+    if (documentType !== "mca-notice" && !mandatoryGates.computation_table_present) gateFailures.push("computation_table_present");
     if (!mandatoryGates.annexure_mapping_present) gateFailures.push("annexure_mapping_present");
     if (!mandatoryGates.prayer_complete) gateFailures.push("prayer_complete");
 
