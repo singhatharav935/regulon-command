@@ -113,6 +113,10 @@ type McaReplyType =
   | "charge-77-79"
   | "beneficial-ownership-90"
   | "board-governance-173"
+  | "board-report-134"
+  | "related-party-188"
+  | "managerial-kmp-203"
+  | "deposits-73-76"
   | "general-mca";
 
 const inferMcaReplyType = (noticeDetails?: string, extractedNotice?: NoticeIntelligence | null): McaReplyType => {
@@ -122,6 +126,10 @@ const inferMcaReplyType = (noticeDetails?: string, extractedNotice?: NoticeIntel
   if (/\bsection\s*77\b|\bsection\s*78\b|\bsection\s*79\b|\bchg-?1\b|\bcharge\b/.test(corpus)) return "charge-77-79";
   if (/\bsection\s*90\b|\bben-?2\b|\bbeneficial owner\b|\bsbo\b/.test(corpus)) return "beneficial-ownership-90";
   if (/\bsection\s*173\b|\bboard meeting\b|\bminutes\b/.test(corpus)) return "board-governance-173";
+  if (/\bsection\s*134\b|\bboard'?s report\b/.test(corpus)) return "board-report-134";
+  if (/\bsection\s*188\b|\brelated party\b|\baoc-?2\b/.test(corpus)) return "related-party-188";
+  if (/\bsection\s*203\b|\bkmp\b|company secretary|managing director|whole-time director/.test(corpus)) return "managerial-kmp-203";
+  if (/\bsection\s*73\b|\bsection\s*74\b|\bsection\s*76\b|\bdeposit\b/.test(corpus)) return "deposits-73-76";
   return "general-mca";
 };
 
@@ -142,6 +150,18 @@ const getMcaTypeSpecificRequirements = (mcaReplyType: McaReplyType) => {
     "board-governance-173": `TYPE-SPECIFIC:
 - Cover Section 173 and board-governance timeline obligations.
 - Include chronology rows for meeting dates, compliance actions, and evidentiary records.`,
+    "board-report-134": `TYPE-SPECIFIC:
+- Cover Section 134 obligations and board's report compliance context.
+- Include chronology rows for board approval date, circulation/adoption milestones, and filing references.`,
+    "related-party-188": `TYPE-SPECIFIC:
+- Cover Section 188 and related-party approval/disclosure framework.
+- Include chronology rows for approval, contract execution, disclosure, and supporting record references.`,
+    "managerial-kmp-203": `TYPE-SPECIFIC:
+- Cover Section 203 and KMP appointment/continuity obligations.
+- Include chronology rows for vacancy/appointment dates, board action dates, and filing references.`,
+    "deposits-73-76": `TYPE-SPECIFIC:
+- Cover deposit-related obligations under Sections 73/74/76 as applicable.
+- Include chronology rows for acceptance/repayment/compliance events with documentary references.`,
     "general-mca": `TYPE-SPECIFIC:
 - Infer relevant MCA sections from notice and build section-wise defense accordingly.
 - Include chronology rows tied to key compliance milestones in the notice.`,
@@ -294,6 +314,7 @@ interface McaDraftBlueprint {
   }>;
   legal_submissions: {
     sections_92_137_403: string;
+    invoked_sections_analysis?: string;
     section_454_proviso: string;
     procedural_vs_substantive: string;
     proportionality: string;
@@ -409,7 +430,9 @@ ${prelims}
 ${chronology}
 
 ### 3. Legal Submissions
-1. **Sections 92, 137 and 403:** ${ensureMcaValue(bp.legal_submissions?.sections_92_137_403, "Section 403 permits delayed filing upon payment of additional fees; completed filing with additional fees is a material mitigating circumstance in adjudication.")}
+${bp.mca_reply_type === "annual-filing-92-137"
+    ? `1. **Sections 92, 137 and 403:** ${ensureMcaValue(bp.legal_submissions?.sections_92_137_403, "Section 403 permits delayed filing upon payment of additional fees; completed filing with additional fees is a material mitigating circumstance in adjudication.")}`
+    : `1. **Invoked MCA Sections Analysis:** ${ensureMcaValue(bp.legal_submissions?.invoked_sections_analysis, "The Noticee addresses each invoked section on facts, timeline, and documentary record, with relief sought under Section 454 adjudicatory discretion.")}`}
 2. **Section 454 Proviso (fact-dependent):** ${ensureMcaValue(bp.legal_submissions?.section_454_proviso, "Where default is rectified before notice dated 15 January 2026 or within 30 days thereof, the Noticee seeks consideration under the proviso to Section 454 subject to statutory satisfaction.")}
 3. **Procedural vs Substantive Default:** ${ensureMcaValue(bp.legal_submissions?.procedural_vs_substantive, "The lapse is procedural timeline non-compliance and not a case of fraud or suppression.")}
 4. **Proportionality:** ${ensureMcaValue(bp.legal_submissions?.proportionality, "Penalty may be calibrated based on nature of default, rectification status, role-specific responsibility, and mitigating facts.")}
@@ -501,6 +524,22 @@ const runMcaDomainGates = (draft: string, mcaReplyType: McaReplyType): DomainGat
       mentions_173: /\bSection\s*173\b/i.test(draft),
       has_type_chronology: /board meeting|minutes|quorum/i.test(draft),
     },
+    "board-report-134": {
+      mentions_134: /\bSection\s*134\b/i.test(draft),
+      has_type_chronology: /board'?s report|board approval date|director'?s responsibility/i.test(draft),
+    },
+    "related-party-188": {
+      mentions_188: /\bSection\s*188\b/i.test(draft),
+      has_type_chronology: /related party|aoc-?2|approval/i.test(draft),
+    },
+    "managerial-kmp-203": {
+      mentions_203: /\bSection\s*203\b/i.test(draft),
+      has_type_chronology: /kmp|appointment|vacancy|board action/i.test(draft),
+    },
+    "deposits-73-76": {
+      mentions_73_76: /\bSection\s*73\b|\bSection\s*74\b|\bSection\s*76\b/i.test(draft),
+      has_type_chronology: /deposit|repayment|acceptance/i.test(draft),
+    },
     "general-mca": {
       has_type_chronology: /due date|filing date|timeline|chronology/i.test(draft),
     },
@@ -509,8 +548,10 @@ const runMcaDomainGates = (draft: string, mcaReplyType: McaReplyType): DomainGat
   const gates: Record<string, boolean> = {
     ...typeGates[mcaReplyType],
     mentions_454: /\bSection\s*454\b/i.test(draft),
+    has_454_proviso_submission: /proviso to section 454|within 30 days|before notice dated/i.test(draft),
     has_chronology_table: /due date|timeline|chronology/i.test(draft) && /actual|filing date|event date/i.test(draft),
     has_officer_defense: /officer in default|officer-specific|role period|willful default/i.test(draft),
+    avoids_waive_penalty_phrase: !/\bwaive\b[^.\n]{0,40}\bpenalt/i.test(draft),
     avoids_waive_officer_penalty_phrase: !/waive penalty for officers/i.test(draft),
     qualifies_446b_if_used: !has446bMention || /(paid-?up capital|turnover|startup recognition|section 2\(85\))/i.test(draft),
   };
@@ -532,6 +573,9 @@ const validateMcaBlueprint = (bp: McaDraftBlueprint, mcaReplyType: McaReplyType)
   if ((bp.chronology_rows ?? []).length < 2) missing.push("chronology_rows(minimum 2 entries)");
   if (mcaReplyType === "annual-filing-92-137" && !(bp.legal_submissions?.sections_92_137_403 || "").trim()) {
     missing.push("legal_submissions.sections_92_137_403");
+  }
+  if (mcaReplyType !== "annual-filing-92-137" && !(bp.legal_submissions?.invoked_sections_analysis || "").trim()) {
+    missing.push("legal_submissions.invoked_sections_analysis");
   }
   if (!(bp.legal_submissions?.section_454_proviso || "").trim()) missing.push("legal_submissions.section_454_proviso");
   if (mcaReplyType === "annual-filing-92-137") {
@@ -866,6 +910,7 @@ Generate a complete object with this exact schema:
   }],
   "legal_submissions": {
     "sections_92_137_403": string,
+    "invoked_sections_analysis": string,
     "section_454_proviso": string,
     "procedural_vs_substantive": string,
     "proportionality": string
