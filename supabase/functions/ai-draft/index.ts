@@ -822,6 +822,7 @@ serve(async (req) => {
     }
 
     const {
+      operation = "draft",
       documentType,
       companyName,
       draftMode,
@@ -834,6 +835,70 @@ serve(async (req) => {
       stream = false,
     } = await req.json();
 
+    const normalizedOperation = typeof operation === "string" ? operation.trim().toLowerCase() : "draft";
+    const aiConfig = resolveAIConfig();
+
+    if (normalizedOperation === "notice-details") {
+      const mcaReplyType: McaReplyType | null = documentType === "mca-notice"
+        ? (normalizeMcaReplyType(mcaReplyTypeOverride) ?? inferMcaReplyType(noticeDetails, null))
+        : null;
+
+      const noticeDetailsSystemPrompt = `You are a legal intake drafting assistant for Indian regulatory replies.
+Generate ONLY "Notice / Order Details" input text to be pasted into a drafting engine.
+Rules:
+1) 220-420 words.
+2) One dense paragraph block with clear facts and numbers/dates where available.
+3) Include authority, notice reference, DIN/RFN, date, invoked sections/rules, period, proposed penalty/demand, and noticee position.
+4) For MCA annual filing notices, include AOC-4/MGT-7 chronology anchors and SRN/date placeholders only when unavailable.
+5) Do not include headings, markdown tables, prayer, or signature block.
+6) Do not fabricate; if unavailable, mark as "[To be filled by CA/Lawyer]".`;
+
+      const noticeDetailsUserPrompt = `Prepare Notice/Order Details for:
+- Document Type: ${documentType}
+- Company: ${companyName}
+- Industry: ${industry || "Not specified"}
+${documentType === "mca-notice" && mcaReplyType ? `- MCA Reply Type: ${mcaReplyType}` : ""}
+
+Use this context if provided:
+${context || "No extra context provided."}
+
+Existing notice text (if any):
+${noticeDetails || "None provided."}`;
+
+      const detailsResp = await aiRequest({
+        apiKey: aiConfig.apiKey,
+        model: aiConfig.model,
+        endpoint: aiConfig.endpoint,
+        stream: false,
+        messages: [
+          { role: "system", content: noticeDetailsSystemPrompt },
+          { role: "user", content: noticeDetailsUserPrompt },
+        ],
+      });
+
+      if (!detailsResp.ok) {
+        const errorText = await detailsResp.text();
+        throw new Error(`Notice details generation failed: ${detailsResp.status} ${errorText}`);
+      }
+
+      const detailsData = await detailsResp.json();
+      const generatedNoticeDetails = detailsData.choices?.[0]?.message?.content?.trim() || "";
+
+      return new Response(JSON.stringify({
+        noticeDetails: generatedNoticeDetails,
+        metadata: {
+          operation: "notice-details",
+          documentType,
+          companyName,
+          industry,
+          mcaReplyType,
+          generatedAt: new Date().toISOString(),
+        },
+      }), {
+        headers: { ...corsHeaders, "Content-Type": "application/json" },
+      });
+    }
+
     if (strictValidation && (!noticeDetails || noticeDetails.trim().length < 200)) {
       return new Response(JSON.stringify({
         error: "Advanced mode requires detailed notice/order content (minimum 200 characters).",
@@ -842,8 +907,6 @@ serve(async (req) => {
         headers: { ...corsHeaders, "Content-Type": "application/json" },
       });
     }
-
-    const aiConfig = resolveAIConfig();
 
     const modeDescription = getModeDescription(draftMode);
     const documentTypePrompt = getDocumentTypePrompt(documentType);
