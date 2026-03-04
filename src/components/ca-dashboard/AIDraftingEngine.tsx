@@ -101,7 +101,7 @@ const sanitizeNoticeDetailsClient = (raw: string, fallback: string) => {
   let text = (raw || "").trim();
   if (!text) return fallback;
 
-  const looksLikeReply = /before the registrar|adjudicating officer|most respectfully|prayer|for and on behalf|authorized signatory|annexure/i.test(text);
+  const looksLikeReply = /before the registrar|adjudicating officer|most respectfully|prayer|for and on behalf|authorized signatory|annexure|reply to the adjudication notice|showeth/i.test(text);
   if (looksLikeReply) {
     text = text
       .replace(/\*\*/g, "")
@@ -112,6 +112,10 @@ const sanitizeNoticeDetailsClient = (raw: string, fallback: string) => {
       .replace(/\s+/g, " ")
       .trim();
   }
+
+  const disallowedReplySignals = /(most respectfully|prayer|for and on behalf|authorized signatory|annexure-|list of annexures|without prejudice)/i;
+  const hasIntakeCore = /(notice\s*(no|number|reference|ref\.?)|din|rfn|dated|section\s*\d+|rule\s*\d+|proposed penalty|alleging|financial year|fy)/i.test(text);
+  if (disallowedReplySignals.test(text) || !hasIntakeCore) return fallback;
 
   const wordCount = text.split(/\s+/).filter(Boolean).length;
   if (wordCount < 120) return fallback;
@@ -562,14 +566,14 @@ const AIDraftingEngine = ({ demoMode = false, includeLawyerReview = true }: AIDr
   ): Array<{ issue: string; suggestion: string }> => {
     const items: Array<{ issue: string; suggestion: string }> = [];
     const hasChronologyTable =
-      /\|\s*(Particulars|Event|Date)\s*\|\s*(Section|Provision)\s*\|/i.test(content) &&
+      /\|\s*(Particulars|Event|Date|Compliance Event)\s*\|\s*(Section|Provision|Relevant Provision)\s*\|/i.test(content) &&
       /due date|due\/event date|statutory due date/i.test(content) &&
       /actual filing|actual date|action date|date of filing|filing date/i.test(content) &&
       /\|\s*[-:]+\s*\|\s*[-:]+\s*\|/.test(content);
 
     const hasOfficerDefenseTable =
-      /\|\s*Officer(?:\s+in\s+Default)?\s*\|\s*Role\s*Period\s*\|/i.test(content) &&
-      /\|\s*(Alleged Responsibility|Responsibility|Allegation)\s*\|\s*(Mitigating Facts|Defense|Remarks)\s*\|/i.test(content) &&
+      /\|\s*(Officer(?:\s+in\s+Default)?|Name of Officer)\s*\|\s*(Role\s*Period|Designation|Period of Responsibility)\s*\|/i.test(content) &&
+      /\|\s*(Alleged Responsibility|Responsibility|Allegation|Role|Monitoring Compliance)\s*\|\s*(Mitigating Facts|Defense|Remarks|Explanation)\s*\|/i.test(content) &&
       /\|\s*[-:]+\s*\|\s*[-:]+\s*\|/.test(content);
 
     const addIssue = (condition: boolean, issue: string, suggestion: string) => {
@@ -577,7 +581,7 @@ const AIDraftingEngine = ({ demoMode = false, includeLawyerReview = true }: AIDr
     };
 
     addIssue(
-      !/section\s*454/i.test(content) || !/proviso to section 454|within 30 days|before issuance of notice/i.test(content),
+      !/section\s*454/i.test(content) || !/proviso to section 454|within 30 days|before issuance of notice|prior to issuance of notice|rectified before notice/i.test(content),
       "Missing or weak Section 454 proviso submission.",
       "Add a fact-dependent paragraph: if default was rectified before notice dated 15 January 2026 or within 30 days of service, seek proviso benefit under Section 454.",
     );
@@ -592,7 +596,7 @@ const AIDraftingEngine = ({ demoMode = false, includeLawyerReview = true }: AIDr
       "Add officer table: Officer | Role Period | Alleged Responsibility | Mitigating Facts, with no-willful-default basis.",
     );
     addIssue(
-      /\bwaive\b[^.\n]{0,60}\bpenalt/i.test(content) || /\babsolve\b[^.\n]{0,120}\bofficer|personal liability/i.test(content),
+      /\bwaive\b[^.\n]{0,60}\bpenalt/i.test(content) || /\babsolve\b[^.\n]{0,120}\bofficer/i.test(content),
       "Prayer wording is risky. Use 'drop or reduce penalty' language instead of 'waive/absolve'.",
       "Rewrite prayer to: 'drop or reduce penalty on the Company and officers in default based on role, conduct, and mitigating facts.'",
     );
@@ -706,7 +710,15 @@ const AIDraftingEngine = ({ demoMode = false, includeLawyerReview = true }: AIDr
 
   const runMcaDraftIssueCheck = (contentOverride?: string, qaOverride?: DraftQA | null) => {
     const content = contentOverride ?? draftContent ?? "";
-    const items = evaluateMcaDraftIssues(content, qaOverride ?? draftQA, inferredMcaReplyType, true);
+    const normalizedContent = enforceMcaHardFixes(
+      content,
+      noticeDetails,
+      mcaReplyTypeOverride !== "auto" ? mcaReplyTypeOverride : inferredMcaReplyType,
+    );
+    if (normalizedContent !== content) {
+      setDraftContent(normalizedContent);
+    }
+    const items = evaluateMcaDraftIssues(normalizedContent, qaOverride ?? draftQA, inferredMcaReplyType, true);
 
     setMcaIssueReport({
       ok: items.length === 0,
@@ -714,6 +726,9 @@ const AIDraftingEngine = ({ demoMode = false, includeLawyerReview = true }: AIDr
       issues: items.map((item) => item.issue),
       checkedAt: new Date().toISOString(),
     });
+    if (items.length === 0) {
+      setMcaFixNotes("");
+    }
   };
 
   useEffect(() => {
@@ -724,14 +739,14 @@ const AIDraftingEngine = ({ demoMode = false, includeLawyerReview = true }: AIDr
 
   useEffect(() => {
     if (selectedDocType !== "mca-notice") return;
-    if (!mcaIssueReport || mcaIssueReport.ok) return;
+    if (!mcaIssueReport || mcaIssueReport.ok || isApplyingMcaFix) return;
     if (mcaFixNotes.trim().length > 0) return;
 
     const autoNotes = mcaIssueReport.items
       .map((item, idx) => `${idx + 1}. ${item.issue}\nSuggestion: ${item.suggestion}`)
       .join("\n\n");
     setMcaFixNotes(autoNotes);
-  }, [selectedDocType, mcaIssueReport, mcaFixNotes]);
+  }, [selectedDocType, mcaIssueReport, mcaFixNotes, isApplyingMcaFix]);
 
   const getProjectRefFromUrl = (url: string) => {
     const match = url.match(/^https:\/\/([a-z0-9]+)\.supabase\.co/i);
