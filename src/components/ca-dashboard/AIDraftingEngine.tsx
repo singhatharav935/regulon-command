@@ -740,6 +740,11 @@ const AIDraftingEngine = ({ demoMode = false, includeLawyerReview = true }: AIDr
   const handleGenerateDraft = async () => {
     if (!selectedClient || !selectedDocType) return;
 
+    if (selectedDocType === "mca-notice" && !advancedMode) {
+      toast.error("MCA drafting requires Advanced Mode for strict legal quality gates.");
+      return;
+    }
+
     if (advancedMode && noticeLength < 200) {
       toast.error("Advanced Mode requires detailed notice/order text (minimum 200 characters).");
       return;

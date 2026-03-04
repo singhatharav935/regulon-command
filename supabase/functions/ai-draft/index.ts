@@ -606,6 +606,49 @@ const validateMcaBlueprint = (bp: McaDraftBlueprint, mcaReplyType: McaReplyType)
   return missing;
 };
 
+const buildMcaFallbackChronologyRows = (mcaReplyType: McaReplyType) => {
+  if (mcaReplyType === "annual-filing-92-137") {
+    return `| AOC-4 filing | Section 137(1) | [To be filled by CA/Lawyer] | [To be filled by CA/Lawyer] | [To be filled by CA/Lawyer] | Completed |
+| MGT-7 filing | Section 92(4) | [To be filled by CA/Lawyer] | [To be filled by CA/Lawyer] | [To be filled by CA/Lawyer] | Completed |`;
+  }
+  return `| Compliance event 1 | [Invoked Section] | [To be filled by CA/Lawyer] | [To be filled by CA/Lawyer] | [To be filled by CA/Lawyer] | Completed |
+| Compliance event 2 | [Invoked Section] | [To be filled by CA/Lawyer] | [To be filled by CA/Lawyer] | [To be filled by CA/Lawyer] | Completed |`;
+};
+
+const enforceMcaDraftMinimumStructure = (draft: string, mcaReplyType: McaReplyType): string => {
+  let fixed = draft;
+
+  // Hard safety phrase replacement
+  fixed = fixed.replace(/waive(?:\s+or\s+reduce)?\s+the\s+penalty/gi, "drop or reduce penalty");
+  fixed = fixed.replace(/waive penalty for officers/gi, "drop or reduce penalty on officers in default based on role, conduct, and mitigating facts");
+
+  if (!/Section\s*454/i.test(fixed)) {
+    fixed += `\n\n### Section 454 Submission\nThe Noticee seeks adjudicatory consideration under Section 454 based on rectification status, role-specific responsibility, and mitigating facts on record.`;
+  }
+
+  if (!/proviso to section 454|within 30 days|before notice dated/i.test(fixed)) {
+    fixed += `\n\n### Section 454 Proviso (Fact-Dependent)\nWithout prejudice, if the default stood rectified before issuance of notice, or within 30 days from notice service, the Noticee seeks consideration under the proviso to Section 454, subject to statutory satisfaction.`;
+  }
+
+  const hasChronologyTable = /###\s*2\.\s*Chronology|Chronology of Compliance|Chronology/i.test(fixed)
+    && /\|\s*Particulars\s*\|\s*Section\s*\|\s*(Due Date|Due\/Event Date)\s*\|/i.test(fixed);
+  if (!hasChronologyTable) {
+    fixed += `\n\n### Chronology of Compliance\n| Particulars | Section | Due/Event Date | Actual Filing/Action Date | SRN/Challan/Reference | Status |\n|---|---|---|---|---|---|\n${buildMcaFallbackChronologyRows(mcaReplyType)}`;
+  }
+
+  const hasOfficerTable = /Officer-Specific Defense|officer in default/i.test(fixed)
+    && /\|\s*Officer\s*\|\s*Role Period\s*\|/i.test(fixed);
+  if (!hasOfficerTable) {
+    fixed += `\n\n### Officer-Specific Defense\n| Officer | Role Period | Alleged Responsibility | Mitigating Facts |\n|---|---|---|---|\n| [To be filled by CA/Lawyer] | [To be filled by CA/Lawyer] | [To be filled by CA/Lawyer] | No willful default; actions were bona fide and compliance-focused. |`;
+  }
+
+  if (!/personal hearing|hearing/i.test(fixed)) {
+    fixed += `\n\n### Hearing Request\nThe Noticee requests an opportunity of personal hearing (physical/VC mode) before any adverse order is passed.`;
+  }
+
+  return fixed;
+};
+
 serve(async (req) => {
   const corsHeaders = getCorsHeaders(req);
 
@@ -1074,7 +1117,10 @@ Checklist:
     }
 
     const reviewedData = await reviewerResp.json();
-    const finalDraft = reviewedData.choices?.[0]?.message?.content || firstDraft;
+    const reviewedDraft = reviewedData.choices?.[0]?.message?.content || firstDraft;
+    const finalDraft = documentType === "mca-notice"
+      ? enforceMcaDraftMinimumStructure(reviewedDraft, mcaReplyType ?? "general-mca")
+      : reviewedDraft;
 
     const qaSystemPrompt = `You are a legal QA auditor for filing readiness.
 Return STRICT JSON only, no markdown.
