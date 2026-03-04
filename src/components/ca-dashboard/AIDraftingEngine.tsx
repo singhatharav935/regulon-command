@@ -107,6 +107,7 @@ interface DraftQA {
   filing_score: number;
   risk_band: "low" | "medium" | "high";
   mandatory_gates?: Record<string, boolean>;
+  domain_gates?: Record<string, boolean>;
   citation_review?: Array<{
     citation: string;
     jurisdiction_fit: "high" | "medium" | "low";
@@ -131,6 +132,12 @@ interface DraftPackage {
   hearing_notes?: string;
   argument_script?: string[];
 }
+
+type McaIssueReport = {
+  ok: boolean;
+  issues: string[];
+  checkedAt: string;
+};
 
 const buildOfflineDraft = ({
   documentType,
@@ -488,6 +495,7 @@ const AIDraftingEngine = ({ demoMode = false, includeLawyerReview = true }: AIDr
   const [auditEvents, setAuditEvents] = useState<Array<{ event_type: string; created_at: string }>>([]);
   const [draftQA, setDraftQA] = useState<DraftQA | null>(null);
   const [draftPackage, setDraftPackage] = useState<DraftPackage | null>(null);
+  const [mcaIssueReport, setMcaIssueReport] = useState<McaIssueReport | null>(null);
   const [currentSteps, setCurrentSteps] = useState<ReviewStep[]>(initialReviewSteps);
   const [generationError, setGenerationError] = useState<string | null>(null);
 
@@ -512,6 +520,52 @@ const AIDraftingEngine = ({ demoMode = false, includeLawyerReview = true }: AIDr
     [noticeDetails],
   );
   const supabaseAny = supabase as any;
+
+  const runMcaDraftIssueCheck = () => {
+    const issues: string[] = [];
+    const content = draftContent || "";
+
+    const addIssue = (condition: boolean, message: string) => {
+      if (condition) issues.push(message);
+    };
+
+    addIssue(
+      !/section\s*454/i.test(content) || !/proviso to section 454|within 30 days|before issuance of notice/i.test(content),
+      "Missing or weak Section 454 proviso submission.",
+    );
+    addIssue(
+      !(/\|\s*Particulars\s*\|\s*Section\s*\|/i.test(content) && /due date|due\/event date/i.test(content) && /actual filing|actual date|action date|filing date/i.test(content)),
+      "Chronology table is missing or does not contain due vs actual filing/action fields.",
+    );
+    addIssue(
+      !(/\|\s*Officer\s*\|\s*Role Period\s*\|\s*Alleged Responsibility\s*\|\s*Mitigating Facts\s*\|/i.test(content)),
+      "Officer-specific defense table is missing.",
+    );
+    addIssue(
+      /\bwaive\b[^.\n]{0,60}\bpenalt/i.test(content) || /\babsolve\b[^.\n]{0,120}\bofficer|personal liability/i.test(content),
+      "Prayer wording is risky. Use 'drop or reduce penalty' language instead of 'waive/absolve'.",
+    );
+    addIssue(
+      /double jeopardy|maximum sequestration of penalties|total waiver/i.test(content),
+      "Over-strong legal rhetoric detected; use calibrated proportionality language.",
+    );
+
+    const badDomainGates = Object.entries(draftQA?.domain_gates || {})
+      .filter(([, passed]) => !passed)
+      .map(([gate]) => `Domain gate failed: ${gate}`);
+    issues.push(...badDomainGates);
+
+    const badMandatoryGates = Object.entries(draftQA?.mandatory_gates || {})
+      .filter(([, passed]) => !passed)
+      .map(([gate]) => `Mandatory gate failed: ${gate}`);
+    issues.push(...badMandatoryGates);
+
+    setMcaIssueReport({
+      ok: issues.length === 0,
+      issues,
+      checkedAt: new Date().toISOString(),
+    });
+  };
 
   const getProjectRefFromUrl = (url: string) => {
     const match = url.match(/^https:\/\/([a-z0-9]+)\.supabase\.co/i);
@@ -763,6 +817,7 @@ const AIDraftingEngine = ({ demoMode = false, includeLawyerReview = true }: AIDr
     setDraftContent("");
     setDraftQA(null);
     setDraftPackage(null);
+    setMcaIssueReport(null);
     
     const client = clientOptions.find(c => c.id === selectedClient);
     const maskedNoticeDetails = noticeDetails ? maskPII(noticeDetails) : undefined;
@@ -1353,6 +1408,41 @@ const AIDraftingEngine = ({ demoMode = false, includeLawyerReview = true }: AIDr
                       <li key={item}>{item}</li>
                     ))}
                   </ul>
+                </div>
+              )}
+
+              {draftGenerated && selectedDocType === "mca-notice" && (
+                <div className="mt-3 space-y-2">
+                  <Button
+                    type="button"
+                    variant="outline"
+                    className="w-full"
+                    onClick={runMcaDraftIssueCheck}
+                  >
+                    Check What Is Wrong In This MCA Draft
+                  </Button>
+                  {mcaIssueReport && (
+                    <div
+                      className={`p-4 rounded-lg border text-sm ${
+                        mcaIssueReport.ok
+                          ? "border-green-500/30 bg-green-500/10 text-green-300"
+                          : "border-yellow-500/30 bg-yellow-500/10 text-yellow-200"
+                      }`}
+                    >
+                      {mcaIssueReport.ok ? (
+                        <p>All MCA checks passed. This draft is structurally aligned for CA review.</p>
+                      ) : (
+                        <div className="space-y-2">
+                          <p className="font-medium">Issues detected:</p>
+                          <ul className="list-disc pl-5 space-y-1">
+                            {mcaIssueReport.issues.map((item, idx) => (
+                              <li key={`${item}-${idx}`}>{item}</li>
+                            ))}
+                          </ul>
+                        </div>
+                      )}
+                    </div>
+                  )}
                 </div>
               )}
 
