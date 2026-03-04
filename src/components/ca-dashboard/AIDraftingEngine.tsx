@@ -527,6 +527,21 @@ const AIDraftingEngine = ({ demoMode = false, includeLawyerReview = true }: AIDr
   const runMcaDraftIssueCheck = (contentOverride?: string) => {
     const items: Array<{ issue: string; suggestion: string }> = [];
     const content = contentOverride ?? draftContent ?? "";
+    const hasChronologyTable =
+      (
+        /\|\s*(Particulars|Event|Date)\s*\|\s*(Section|Provision)\s*\|/i.test(content) ||
+        /chronology of compliance|compliance chronology|timeline of events/i.test(content)
+      ) &&
+      /due date|due\/event date|statutory due date/i.test(content) &&
+      /actual filing|actual date|action date|date of filing|filing date/i.test(content);
+
+    const hasOfficerDefenseTable =
+      (
+        /\|\s*Officer(?:\s+in\s+Default)?\s*\|\s*Role\s*Period\s*\|/i.test(content) &&
+        /\|\s*(Alleged Responsibility|Responsibility|Allegation)\s*\|\s*(Mitigating Facts|Defense|Remarks)\s*\|/i.test(content)
+      ) ||
+      (/officer-specific defense|officers in default/i.test(content) &&
+        /role period|willful default|mitigating facts/i.test(content));
 
     const addIssue = (condition: boolean, issue: string, suggestion: string) => {
       if (condition) items.push({ issue, suggestion });
@@ -538,12 +553,12 @@ const AIDraftingEngine = ({ demoMode = false, includeLawyerReview = true }: AIDr
       "Add a fact-dependent paragraph: if default was rectified before notice dated 15 January 2026 or within 30 days of service, seek proviso benefit under Section 454.",
     );
     addIssue(
-      !(/\|\s*Particulars\s*\|\s*Section\s*\|/i.test(content) && /due date|due\/event date/i.test(content) && /actual filing|actual date|action date|filing date/i.test(content)),
+      !hasChronologyTable,
       "Chronology table is missing or does not contain due vs actual filing/action fields.",
       "Include a chronology table with columns: Particulars, Section, Due/Event Date, Actual Filing/Action Date, SRN/Challan/Reference, Status.",
     );
     addIssue(
-      !(/\|\s*Officer\s*\|\s*Role Period\s*\|\s*Alleged Responsibility\s*\|\s*Mitigating Facts\s*\|/i.test(content)),
+      !hasOfficerDefenseTable,
       "Officer-specific defense table is missing.",
       "Add officer table: Officer | Role Period | Alleged Responsibility | Mitigating Facts, with no-willful-default basis.",
     );
