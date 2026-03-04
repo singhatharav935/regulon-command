@@ -107,11 +107,53 @@ CUSTOM REGULATORY DRAFT:
   return prompts[documentType] || prompts["custom-draft"];
 };
 
-const getMcaHardRequirements = () => `
+type McaReplyType =
+  | "annual-filing-92-137"
+  | "board-reporting-117"
+  | "charge-77-79"
+  | "beneficial-ownership-90"
+  | "board-governance-173"
+  | "general-mca";
+
+const inferMcaReplyType = (noticeDetails?: string, extractedNotice?: NoticeIntelligence | null): McaReplyType => {
+  const corpus = `${noticeDetails ?? ""}\n${JSON.stringify(extractedNotice?.notice_snapshot?.invoked_provisions ?? [])}`.toLowerCase();
+  if (/\bsection\s*92\b|\bsection\s*137\b|\bmgt-?7\b|\baoc-?4\b/.test(corpus)) return "annual-filing-92-137";
+  if (/\bsection\s*117\b|\bmgt-?14\b|\bboard resolution\b/.test(corpus)) return "board-reporting-117";
+  if (/\bsection\s*77\b|\bsection\s*78\b|\bsection\s*79\b|\bchg-?1\b|\bcharge\b/.test(corpus)) return "charge-77-79";
+  if (/\bsection\s*90\b|\bben-?2\b|\bbeneficial owner\b|\bsbo\b/.test(corpus)) return "beneficial-ownership-90";
+  if (/\bsection\s*173\b|\bboard meeting\b|\bminutes\b/.test(corpus)) return "board-governance-173";
+  return "general-mca";
+};
+
+const getMcaTypeSpecificRequirements = (mcaReplyType: McaReplyType) => {
+  const map: Record<McaReplyType, string> = {
+    "annual-filing-92-137": `TYPE-SPECIFIC:
+- Cover Sections 92/137 with Section 403 and Section 454 framing.
+- Include chronology rows for AOC-4 and MGT-7 with due date, filing date, SRN/challan.`,
+    "board-reporting-117": `TYPE-SPECIFIC:
+- Cover Section 117 read with applicable rules and filing timeline.
+- Include chronology rows for resolution date, due date, filing date, SRN/challan (MGT-14 where applicable).`,
+    "charge-77-79": `TYPE-SPECIFIC:
+- Cover Sections 77/78/79 and charge-registration timeline.
+- Include chronology rows for charge creation/modification/satisfaction events, due dates, and filing references.`,
+    "beneficial-ownership-90": `TYPE-SPECIFIC:
+- Cover Section 90 and SBO reporting obligations.
+- Include chronology rows for declaration date, register update, filing date, and form references.`,
+    "board-governance-173": `TYPE-SPECIFIC:
+- Cover Section 173 and board-governance timeline obligations.
+- Include chronology rows for meeting dates, compliance actions, and evidentiary records.`,
+    "general-mca": `TYPE-SPECIFIC:
+- Infer relevant MCA sections from notice and build section-wise defense accordingly.
+- Include chronology rows tied to key compliance milestones in the notice.`,
+  };
+  return map[mcaReplyType];
+};
+
+const getMcaHardRequirements = (mcaReplyType: McaReplyType) => `
 MCA ADJUDICATION HARD REQUIREMENTS (MANDATORY FOR MCA NOTICE DRAFTS):
 1. Identify and use the exact ROC jurisdiction from notice facts (do not guess multiple jurisdictions).
-2. Include a chronology table with BOTH due dates and actual filing dates for AOC-4 and MGT-7, with SRNs/challan refs where available.
-3. Explicitly address Sections 92, 137, 403 and 454 in the legal analysis if these are part of notice facts.
+2. Include a chronology table with due dates vs actual dates and filing references for the specific notice type.
+3. Explicitly address invoked MCA sections and Section 454 in legal analysis.
 4. Add officer-specific defense: identify "officer in default", role period, and absence/presence of willful default based on records.
 5. If rectification occurred before notice OR within 30 days of notice, include a specific Section 454 proviso submission seeking no-penalty treatment (fact-dependent, no over-claim).
 6. Mention Section 446B only when factual qualification is shown in the draft (e.g., paid-up capital/turnover/startup recognition date).
@@ -119,6 +161,7 @@ MCA ADJUDICATION HARD REQUIREMENTS (MANDATORY FOR MCA NOTICE DRAFTS):
 8. Use this output skeleton: heading + notice metadata + preliminary submissions + chronology table + legal submissions + officer-specific defense + 446B block (if eligible) + annexures + layered prayer + sign-off.
 9. If filing-critical data is unavailable, placeholders are allowed only as "[To be filled by CA/Lawyer]" or simple metadata placeholders (CIN/address/signatory fields).
 10. If critical details remain unavailable, append "Data Required to Finalize Filing".
+${getMcaTypeSpecificRequirements(mcaReplyType)}
 `;
 
 const getAdvancedDraftingRequirements = () => `
@@ -225,6 +268,8 @@ interface NoticeIntelligence {
 }
 
 interface McaDraftBlueprint {
+  mca_reply_type?: McaReplyType;
+  subject_line?: string;
   heading: {
     forum: string;
     matter: string;
@@ -322,6 +367,13 @@ const buildMcaDraftFromBlueprint = (bp: McaDraftBlueprint) => {
     ? `\n### Data Required to Finalize Filing\n${bp.data_required_to_finalize_filing.map((line, idx) => `${idx + 1}. ${line}`).join("\n")}\n`
     : "";
 
+  const replySubject = ensureMcaValue(
+    bp.subject_line,
+    bp.mca_reply_type === "annual-filing-92-137"
+      ? "REPLY TO ADJUDICATION NOTICE FOR ALLEGED NON-COMPLIANCE OF SECTIONS 92 AND 137 OF THE COMPANIES ACT, 2013"
+      : "REPLY TO ADJUDICATION NOTICE UNDER THE COMPANIES ACT, 2013",
+  );
+
   return `**${ensureMcaValue(bp.heading?.forum, "BEFORE THE ADJUDICATING OFFICER / REGISTRAR OF COMPANIES, KARNATAKA")}**  
 **${ensureMcaValue(bp.heading?.matter, "In the matter of adjudication under Section 454 of the Companies Act, 2013")}**
 
@@ -338,7 +390,7 @@ Registered Office: ${ensureMcaValue(bp.notice_meta?.registered_office, "[To be f
 **Officers in Default (as alleged):**  
 ${officers}
 
-### **REPLY TO ADJUDICATION NOTICE FOR ALLEGED NON-COMPLIANCE OF SECTIONS 92 AND 137 OF THE COMPANIES ACT, 2013**
+### **${replySubject}**
 
 **To,**  
 The Registrar of Companies / Adjudicating Officer, Karnataka  
@@ -425,14 +477,39 @@ type DomainGateResult = {
   failed: string[];
 };
 
-const runMcaDomainGates = (draft: string): DomainGateResult => {
+const runMcaDomainGates = (draft: string, mcaReplyType: McaReplyType): DomainGateResult => {
   const has446bMention = /\b446B\b/i.test(draft);
+  const typeGates: Record<McaReplyType, Record<string, boolean>> = {
+    "annual-filing-92-137": {
+      mentions_92_137: /\bSection\s*92\b/i.test(draft) && /\bSection\s*137\b/i.test(draft),
+      mentions_403: /\bSection\s*403\b/i.test(draft),
+      has_type_chronology: /\bAOC-?4\b/i.test(draft) && /\bMGT-?7\b/i.test(draft),
+    },
+    "board-reporting-117": {
+      mentions_117: /\bSection\s*117\b/i.test(draft),
+      has_type_chronology: /\bMGT-?14\b|board resolution|resolution date/i.test(draft),
+    },
+    "charge-77-79": {
+      mentions_77_79: /\bSection\s*77\b|\bSection\s*78\b|\bSection\s*79\b/i.test(draft),
+      has_type_chronology: /\bCHG-?1\b|charge creation|satisfaction/i.test(draft),
+    },
+    "beneficial-ownership-90": {
+      mentions_90: /\bSection\s*90\b/i.test(draft),
+      has_type_chronology: /\bBEN-?2\b|beneficial owner|SBO/i.test(draft),
+    },
+    "board-governance-173": {
+      mentions_173: /\bSection\s*173\b/i.test(draft),
+      has_type_chronology: /board meeting|minutes|quorum/i.test(draft),
+    },
+    "general-mca": {
+      has_type_chronology: /due date|filing date|timeline|chronology/i.test(draft),
+    },
+  };
+
   const gates: Record<string, boolean> = {
-    mentions_92_137: /\bSection\s*92\b/i.test(draft) && /\bSection\s*137\b/i.test(draft),
-    mentions_403: /\bSection\s*403\b/i.test(draft),
+    ...typeGates[mcaReplyType],
     mentions_454: /\bSection\s*454\b/i.test(draft),
-    has_aoc4_mgt7: /\bAOC-?4\b/i.test(draft) && /\bMGT-?7\b/i.test(draft),
-    has_chronology_table: /due date/i.test(draft) && /actual date/i.test(draft),
+    has_chronology_table: /due date|timeline|chronology/i.test(draft) && /actual|filing date|event date/i.test(draft),
     has_officer_defense: /officer in default|officer-specific|role period|willful default/i.test(draft),
     avoids_waive_officer_penalty_phrase: !/waive penalty for officers/i.test(draft),
     qualifies_446b_if_used: !has446bMention || /(paid-?up capital|turnover|startup recognition|section 2\(85\))/i.test(draft),
@@ -446,15 +523,22 @@ const runMcaDomainGates = (draft: string): DomainGateResult => {
   };
 };
 
-const validateMcaBlueprint = (bp: McaDraftBlueprint): string[] => {
+const validateMcaBlueprint = (bp: McaDraftBlueprint, mcaReplyType: McaReplyType): string[] => {
   const missing: string[] = [];
   if (!(bp.notice_meta?.notice_number || "").trim()) missing.push("notice_meta.notice_number");
   if (!(bp.notice_meta?.notice_date || "").trim()) missing.push("notice_meta.notice_date");
   if (!(bp.notice_meta?.din || "").trim()) missing.push("notice_meta.din");
   if (!(bp.notice_meta?.company_name || "").trim()) missing.push("notice_meta.company_name");
-  if ((bp.chronology_rows ?? []).length < 2) missing.push("chronology_rows(minimum 2: AOC-4 and MGT-7)");
-  if (!(bp.legal_submissions?.sections_92_137_403 || "").trim()) missing.push("legal_submissions.sections_92_137_403");
+  if ((bp.chronology_rows ?? []).length < 2) missing.push("chronology_rows(minimum 2 entries)");
+  if (mcaReplyType === "annual-filing-92-137" && !(bp.legal_submissions?.sections_92_137_403 || "").trim()) {
+    missing.push("legal_submissions.sections_92_137_403");
+  }
   if (!(bp.legal_submissions?.section_454_proviso || "").trim()) missing.push("legal_submissions.section_454_proviso");
+  if (mcaReplyType === "annual-filing-92-137") {
+    const hasAoc4 = (bp.chronology_rows ?? []).some((r) => /aoc-?4/i.test(r.particulars));
+    const hasMgt7 = (bp.chronology_rows ?? []).some((r) => /mgt-?7/i.test(r.particulars));
+    if (!hasAoc4 || !hasMgt7) missing.push("chronology_rows(AOC-4 and MGT-7 required for annual filing notices)");
+  }
   if ((bp.prayer ?? []).length < 3) missing.push("prayer(minimum 3 points)");
   return missing;
 };
@@ -638,6 +722,10 @@ If notice data is missing, list specific missing items in critical_missing_field
       }
     }
 
+    const mcaReplyType: McaReplyType | null = documentType === "mca-notice"
+      ? inferMcaReplyType(noticeDetails, extractedNotice)
+      : null;
+
     const systemPrompt = `ROLE & AUTHORITY
 You are a Senior Practicing Chartered Accountant & Regulatory Counsel with 15+ years experience in India.
 Generate a final filing-ready legal draft that is adjudication-ready.
@@ -665,12 +753,13 @@ ${getAdvancedDraftingRequirements()}
 
 DOMAIN DIRECTIVES
 ${documentTypePrompt}
-${documentType === "mca-notice" ? getMcaHardRequirements() : ""}
+${documentType === "mca-notice" && mcaReplyType ? getMcaHardRequirements(mcaReplyType) : ""}
 
 COMPANY CONTEXT
 - Company: ${companyName}
 - Industry: ${industry || "Not specified"}
 - Document Type: ${documentType}
+${documentType === "mca-notice" && mcaReplyType ? `- MCA Reply Type: ${mcaReplyType}` : ""}
 
 ${extractedNotice ? `EXTRACTED NOTICE INTELLIGENCE (use as primary structure source):\n${JSON.stringify(extractedNotice, null, 2)}` : ""}
 
@@ -679,12 +768,13 @@ ${noticeDetails ? `RAW NOTICE DETAILS:\n${noticeDetails}` : ""}
 
     const userMessage = context || (documentType === "mca-notice"
       ? `Generate a final adjudication-ready MCA reply for ${companyName}${industry ? ` (${industry} sector)` : ""}.
+Detected notice class: ${mcaReplyType ?? "general-mca"}.
 Mandatory structure:
 1) Heading + exact ROC jurisdiction from notice
 2) Notice metadata (notice no, date, DIN, company block, officers in default block)
 3) Preliminary submissions
-4) Chronology table with due date vs actual filing date and SRN/challan for AOC-4 and MGT-7
-5) Legal submissions under Sections 92, 137, 403, 454 (with fact-dependent proviso request)
+4) Chronology table with due date/event date vs filing/action date and reference IDs
+5) Legal submissions under invoked sections + Section 454 (with fact-dependent proviso request)
 6) Officer-specific defense table
 7) Section 446B block only if factual qualification is shown
 8) Annexure index
@@ -753,6 +843,8 @@ Avoid unsupported case law. Use controlled placeholders only where unavoidable.`
 Return STRICT JSON only (no markdown).
 Generate a complete object with this exact schema:
 {
+  "mca_reply_type": string,
+  "subject_line": string,
   "heading": { "forum": string, "matter": string },
   "notice_meta": {
     "notice_number": string,
@@ -798,12 +890,14 @@ Generate a complete object with this exact schema:
 }
 
 Hard constraints:
-- Use Sections 92, 137, 403 and 454 with correct legal framing.
-- Include AOC-4 and MGT-7 rows in chronology.
+- Use invoked sections and Section 454 with correct legal framing.
+- Match chronology rows to detected MCA notice class.
 - Include officer-specific defense entries.
 - Never use phrase "waive penalty for officers"; use "drop or reduce penalty on officers in default...".
 - Use placeholders only where truly unavailable, and keep them CA/Lawyer-fillable.
 - Do not add unsupported case law.
+Detected notice class: ${mcaReplyType ?? "general-mca"}
+${mcaReplyType ? getMcaTypeSpecificRequirements(mcaReplyType) : ""}
 `;
 
       const blueprintResp = await aiRequest({
@@ -834,7 +928,7 @@ Hard constraints:
         });
       }
 
-      const missingBlueprintFields = validateMcaBlueprint(parsedBlueprint);
+      const missingBlueprintFields = validateMcaBlueprint(parsedBlueprint, mcaReplyType ?? "general-mca");
       if (strictValidation && missingBlueprintFields.length > 0) {
         return new Response(JSON.stringify({
           error: `MCA blueprint incomplete: ${missingBlueprintFields.join(", ")}`,
@@ -845,7 +939,10 @@ Hard constraints:
         });
       }
 
-      firstDraft = buildMcaDraftFromBlueprint(parsedBlueprint);
+      firstDraft = buildMcaDraftFromBlueprint({
+        ...parsedBlueprint,
+        mca_reply_type: parsedBlueprint.mca_reply_type ?? (mcaReplyType ?? "general-mca"),
+      });
     } else {
       const draftResp = await aiRequest({
         apiKey: aiConfig.apiKey,
@@ -872,8 +969,8 @@ Hard constraints:
 Return ONLY improved final draft text (no commentary).
 Checklist:
 - exact ROC jurisdiction from notice, no multi-jurisdiction guess
-- chronology table with due date vs actual filing date for AOC-4 and MGT-7 with SRN/challan refs where available
-- sections 92, 137, 403 and 454 properly addressed
+- chronology table aligned to detected notice class (${mcaReplyType ?? "general-mca"}) with due/event dates and filing/action dates
+- invoked MCA sections and section 454 properly addressed
 - section 454 proviso submission framed as fact-dependent
 - officer-specific defense table present
 - section 446B included only if qualification basis is stated
@@ -983,7 +1080,7 @@ Schema:
 
     let domainGates: Record<string, boolean> = {};
     if (documentType === "mca-notice") {
-      const mcaGateResult = runMcaDomainGates(finalDraft);
+      const mcaGateResult = runMcaDomainGates(finalDraft, mcaReplyType ?? "general-mca");
       domainGates = mcaGateResult.gates;
       gateFailures.push(...mcaGateResult.failed);
     }
