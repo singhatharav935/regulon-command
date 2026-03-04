@@ -246,6 +246,54 @@ const safeJsonParse = <T,>(raw: string): T | null => {
   }
 };
 
+const extractAssistantText = (payload: any): string => {
+  const messageContent = payload?.choices?.[0]?.message?.content;
+  if (typeof messageContent === "string") return messageContent.trim();
+  if (Array.isArray(messageContent)) {
+    return messageContent
+      .map((part: any) => {
+        if (typeof part === "string") return part;
+        if (typeof part?.text === "string") return part.text;
+        if (typeof part?.content === "string") return part.content;
+        return "";
+      })
+      .join("")
+      .trim();
+  }
+
+  const outputText = payload?.output_text;
+  if (typeof outputText === "string") return outputText.trim();
+  if (Array.isArray(outputText)) return outputText.join("").trim();
+
+  return "";
+};
+
+const buildNoticeDetailsFallback = ({
+  documentType,
+  companyName,
+  industry,
+  noticeDetails,
+}: {
+  documentType: string;
+  companyName: string;
+  industry?: string;
+  noticeDetails?: string;
+}) => {
+  const base = (noticeDetails ?? "").trim();
+  const extractedDate = extractNoticeDateFromText(base) ?? "[To be filled by CA/Lawyer]";
+  const extractedNoticeNo = base.match(/(?:Notice\s*No\.?|Ref\.?\s*No\.?)\s*[:\-]?\s*([A-Z0-9\/\-.]+)/i)?.[1] ?? "[To be filled by CA/Lawyer]";
+  const extractedDin = base.match(/DIN\/?RFN?\s*[:\-]?\s*([A-Z0-9\/\-.]+)/i)?.[1] ?? "[To be filled by CA/Lawyer]";
+  const sections = Array.from(new Set((base.match(/\bSection\s+\d+(?:\(\d+\))?/gi) ?? []))).join(", ") || "[To be filled by CA/Lawyer]";
+  const amount = base.match(/(?:INR|Rs\.?|₹)\s*([0-9,]+(?:\.\d+)?)/i)?.[1] ?? "[To be filled by CA/Lawyer]";
+  const period = base.match(/FY\s*[0-9]{4}\s*-\s*[0-9]{2}|FY\s*[0-9]{4}-[0-9]{2}/i)?.[0] ?? "[To be filled by CA/Lawyer]";
+
+  const mcaBlock = documentType === "mca-notice"
+    ? `The matter concerns alleged delay in filing AOC-4 and MGT-7 for ${period}; AGM was held on [To be filled by CA/Lawyer], statutory due dates and actual filing dates with SRNs/challans are to be confirmed from MCA records, and the noticee position is that filings were completed with additional fees under Section 403 with no mala fide intent or stakeholder prejudice.`
+    : `The noticee contests the allegations on facts and law, seeks evidence-linked adjudication, and requests proportionate relief based on completed compliance actions and documentary record.`;
+
+  return `Notice/Order input summary for drafting: Authority has issued ${documentType} proceedings against ${companyName}${industry ? ` (${industry})` : ""}; notice reference is ${extractedNoticeNo}, dated ${extractedDate}, with DIN/RFN ${extractedDin}. Invoked provisions identified from available record are ${sections}. Proposed exposure/penalty includes amount marker ${amount} and relevant period ${period}. ${mcaBlock} The draft must include chronology anchors, allegation-wise legal response, annexure mapping, and hearing request, with placeholders only as [To be filled by CA/Lawyer] where records are pending confirmation.`;
+};
+
 type AIProvider = "lovable" | "openai";
 
 const resolveAIConfig = (): { provider: AIProvider; apiKey: string; model: string; endpoint: string } => {
@@ -882,7 +930,13 @@ ${noticeDetails || "None provided."}`;
       }
 
       const detailsData = await detailsResp.json();
-      const generatedNoticeDetails = detailsData.choices?.[0]?.message?.content?.trim() || "";
+      const generatedNoticeDetails = extractAssistantText(detailsData)
+        || buildNoticeDetailsFallback({
+          documentType,
+          companyName,
+          industry,
+          noticeDetails,
+        });
 
       return new Response(JSON.stringify({
         noticeDetails: generatedNoticeDetails,

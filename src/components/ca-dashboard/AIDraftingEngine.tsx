@@ -920,7 +920,10 @@ const AIDraftingEngine = ({ demoMode = false, includeLawyerReview = true }: AIDr
         stream: false,
       });
 
-      const aiNoticeDetails = (generated?.noticeDetails as string | undefined)?.trim();
+      const aiNoticeDetails = (
+        (generated?.noticeDetails as string | undefined) ||
+        (generated?.draft as string | undefined)
+      )?.trim();
       if (!aiNoticeDetails) {
         throw new Error("AI did not return notice details.");
       }
