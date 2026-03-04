@@ -138,6 +138,20 @@ const normalizeMcaReplyType = (value: string | null | undefined): McaReplyType |
   return (MCA_REPLY_TYPES as string[]).includes(cleaned) ? (cleaned as McaReplyType) : null;
 };
 
+const extractNoticeDateFromText = (noticeText?: string): string | null => {
+  const source = noticeText ?? "";
+  const matches = [
+    source.match(/dated\s+([0-9]{1,2}\s+[a-zA-Z]+\s+[0-9]{4})/i),
+    source.match(/dated\s+([0-9]{1,2}[\/-][0-9]{1,2}[\/-][0-9]{2,4})/i),
+    source.match(/notice\s+date\s*[:\-]\s*([0-9]{1,2}\s+[a-zA-Z]+\s+[0-9]{4})/i),
+  ];
+  for (const m of matches) {
+    const v = (m?.[1] ?? "").trim();
+    if (v) return v;
+  }
+  return null;
+};
+
 const inferMcaReplyType = (noticeDetails?: string, extractedNotice?: NoticeIntelligence | null): McaReplyType => {
   const corpus = `${noticeDetails ?? ""}\n${JSON.stringify(extractedNotice?.notice_snapshot?.invoked_provisions ?? [])}`.toLowerCase();
   if (/\bsection\s*92\b|\bsection\s*137\b|\bmgt-?7\b|\baoc-?4\b/.test(corpus)) return "annual-filing-92-137";
@@ -621,7 +635,19 @@ const buildMcaFallbackChronologyRows = (mcaReplyType: McaReplyType) => {
 | Compliance event 2 | [Invoked Section] | [To be filled by CA/Lawyer] | [To be filled by CA/Lawyer] | [To be filled by CA/Lawyer] | Completed |`;
 };
 
-const enforceMcaDraftMinimumStructure = (draft: string, mcaReplyType: McaReplyType): string => {
+const buildMca454ProvisoText = (noticeDate?: string | null) => {
+  const anchoredDate = (noticeDate ?? "").trim();
+  if (anchoredDate) {
+    return `Without prejudice, if the default stood rectified before issuance of notice dated ${anchoredDate}, or within 30 days from notice service, the Noticee seeks consideration under the proviso to Section 454, subject to statutory satisfaction.`;
+  }
+  return "Without prejudice, if the default stood rectified before issuance of notice, or within 30 days from notice service, the Noticee seeks consideration under the proviso to Section 454, subject to statutory satisfaction.";
+};
+
+const enforceMcaDraftMinimumStructure = (
+  draft: string,
+  mcaReplyType: McaReplyType,
+  noticeDate?: string | null,
+): string => {
   let fixed = draft;
 
   // Hard safety phrase replacement
@@ -643,7 +669,7 @@ const enforceMcaDraftMinimumStructure = (draft: string, mcaReplyType: McaReplyTy
   }
 
   if (!/proviso to section 454|within 30 days|before notice dated/i.test(fixed)) {
-    fixed += `\n\n### Section 454 Proviso (Fact-Dependent)\nWithout prejudice, if the default stood rectified before issuance of notice dated 15 January 2026, or within 30 days from notice service, the Noticee seeks consideration under the proviso to Section 454, subject to statutory satisfaction.`;
+    fixed += `\n\n### Section 454 Proviso (Fact-Dependent)\n${buildMca454ProvisoText(noticeDate)}`;
   }
 
   const hasChronologyTable = /\|\s*Particulars\s*\|\s*Section\s*\|\s*(Due Date|Due\/Event Date)\s*\|/i.test(fixed)
@@ -670,6 +696,18 @@ const enforceMcaDraftMinimumStructure = (draft: string, mcaReplyType: McaReplyTy
   }
 
   return fixed;
+};
+
+const runMcaRepairAndGate = (
+  initialDraft: string,
+  mcaReplyType: McaReplyType,
+  noticeDate?: string | null,
+) => {
+  // Multi-pass deterministic repair: first pass adds missing blocks, second pass normalizes prayer language.
+  const repairedOnce = enforceMcaDraftMinimumStructure(initialDraft, mcaReplyType, noticeDate);
+  const repairedTwice = enforceMcaDraftMinimumStructure(repairedOnce, mcaReplyType, noticeDate);
+  const gateResult = runMcaDomainGates(repairedTwice, mcaReplyType);
+  return { repairedDraft: repairedTwice, gateResult };
 };
 
 serve(async (req) => {
@@ -855,6 +893,7 @@ If notice data is missing, list specific missing items in critical_missing_field
     const mcaReplyType: McaReplyType | null = documentType === "mca-notice"
       ? (normalizeMcaReplyType(mcaReplyTypeOverride) ?? inferMcaReplyType(noticeDetails, extractedNotice))
       : null;
+    const extractedNoticeDate = extractNoticeDateFromText(noticeDetails);
 
     const systemPrompt = `ROLE & AUTHORITY
 You are a Senior Practicing Chartered Accountant & Regulatory Counsel with 15+ years experience in India.
@@ -1143,9 +1182,17 @@ Checklist:
 
     const reviewedData = await reviewerResp.json();
     const reviewedDraft = reviewedData.choices?.[0]?.message?.content || firstDraft;
-    const finalDraft = documentType === "mca-notice"
-      ? enforceMcaDraftMinimumStructure(reviewedDraft, mcaReplyType ?? "general-mca")
-      : reviewedDraft;
+    let finalDraft = reviewedDraft;
+    let repairedMcaGateResult: DomainGateResult | null = null;
+    if (documentType === "mca-notice") {
+      const repairResult = runMcaRepairAndGate(
+        reviewedDraft,
+        mcaReplyType ?? "general-mca",
+        extractedNoticeDate,
+      );
+      finalDraft = repairResult.repairedDraft;
+      repairedMcaGateResult = repairResult.gateResult;
+    }
 
     const qaSystemPrompt = `You are a legal QA auditor for filing readiness.
 Return STRICT JSON only, no markdown.
@@ -1217,7 +1264,7 @@ Schema:
 
     let domainGates: Record<string, boolean> = {};
     if (documentType === "mca-notice") {
-      const mcaGateResult = runMcaDomainGates(finalDraft, mcaReplyType ?? "general-mca");
+      const mcaGateResult = repairedMcaGateResult ?? runMcaDomainGates(finalDraft, mcaReplyType ?? "general-mca");
       domainGates = mcaGateResult.gates;
       gateFailures.push(...mcaGateResult.failed);
     }
