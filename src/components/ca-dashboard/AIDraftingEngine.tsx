@@ -135,6 +135,7 @@ interface DraftPackage {
 
 type McaIssueReport = {
   ok: boolean;
+  items: Array<{ issue: string; suggestion: string }>;
   issues: string[];
   checkedAt: string;
 };
@@ -496,6 +497,8 @@ const AIDraftingEngine = ({ demoMode = false, includeLawyerReview = true }: AIDr
   const [draftQA, setDraftQA] = useState<DraftQA | null>(null);
   const [draftPackage, setDraftPackage] = useState<DraftPackage | null>(null);
   const [mcaIssueReport, setMcaIssueReport] = useState<McaIssueReport | null>(null);
+  const [mcaFixNotes, setMcaFixNotes] = useState("");
+  const [isApplyingMcaFix, setIsApplyingMcaFix] = useState(false);
   const [currentSteps, setCurrentSteps] = useState<ReviewStep[]>(initialReviewSteps);
   const [generationError, setGenerationError] = useState<string | null>(null);
 
@@ -521,48 +524,60 @@ const AIDraftingEngine = ({ demoMode = false, includeLawyerReview = true }: AIDr
   );
   const supabaseAny = supabase as any;
 
-  const runMcaDraftIssueCheck = () => {
-    const issues: string[] = [];
-    const content = draftContent || "";
+  const runMcaDraftIssueCheck = (contentOverride?: string) => {
+    const items: Array<{ issue: string; suggestion: string }> = [];
+    const content = contentOverride ?? draftContent ?? "";
 
-    const addIssue = (condition: boolean, message: string) => {
-      if (condition) issues.push(message);
+    const addIssue = (condition: boolean, issue: string, suggestion: string) => {
+      if (condition) items.push({ issue, suggestion });
     };
 
     addIssue(
       !/section\s*454/i.test(content) || !/proviso to section 454|within 30 days|before issuance of notice/i.test(content),
       "Missing or weak Section 454 proviso submission.",
+      "Add a fact-dependent paragraph: if default was rectified before notice dated 15 January 2026 or within 30 days of service, seek proviso benefit under Section 454.",
     );
     addIssue(
       !(/\|\s*Particulars\s*\|\s*Section\s*\|/i.test(content) && /due date|due\/event date/i.test(content) && /actual filing|actual date|action date|filing date/i.test(content)),
       "Chronology table is missing or does not contain due vs actual filing/action fields.",
+      "Include a chronology table with columns: Particulars, Section, Due/Event Date, Actual Filing/Action Date, SRN/Challan/Reference, Status.",
     );
     addIssue(
       !(/\|\s*Officer\s*\|\s*Role Period\s*\|\s*Alleged Responsibility\s*\|\s*Mitigating Facts\s*\|/i.test(content)),
       "Officer-specific defense table is missing.",
+      "Add officer table: Officer | Role Period | Alleged Responsibility | Mitigating Facts, with no-willful-default basis.",
     );
     addIssue(
       /\bwaive\b[^.\n]{0,60}\bpenalt/i.test(content) || /\babsolve\b[^.\n]{0,120}\bofficer|personal liability/i.test(content),
       "Prayer wording is risky. Use 'drop or reduce penalty' language instead of 'waive/absolve'.",
+      "Rewrite prayer to: 'drop or reduce penalty on the Company and officers in default based on role, conduct, and mitigating facts.'",
     );
     addIssue(
       /double jeopardy|maximum sequestration of penalties|total waiver/i.test(content),
       "Over-strong legal rhetoric detected; use calibrated proportionality language.",
+      "Replace over-strong terms with proportionality wording tied to facts and rectification status.",
     );
 
     const badDomainGates = Object.entries(draftQA?.domain_gates || {})
       .filter(([, passed]) => !passed)
-      .map(([gate]) => `Domain gate failed: ${gate}`);
-    issues.push(...badDomainGates);
+      .map(([gate]) => ({
+        issue: `Domain gate failed: ${gate}`,
+        suggestion: "Regenerate with missing legal block and evidence-linked language for this gate.",
+      }));
+    items.push(...badDomainGates);
 
     const badMandatoryGates = Object.entries(draftQA?.mandatory_gates || {})
       .filter(([, passed]) => !passed)
-      .map(([gate]) => `Mandatory gate failed: ${gate}`);
-    issues.push(...badMandatoryGates);
+      .map(([gate]) => ({
+        issue: `Mandatory gate failed: ${gate}`,
+        suggestion: "Add the missing mandatory section and re-run draft checks.",
+      }));
+    items.push(...badMandatoryGates);
 
     setMcaIssueReport({
-      ok: issues.length === 0,
-      issues,
+      ok: items.length === 0,
+      items,
+      issues: items.map((item) => item.issue),
       checkedAt: new Date().toISOString(),
     });
   };
@@ -791,6 +806,143 @@ const AIDraftingEngine = ({ demoMode = false, includeLawyerReview = true }: AIDr
     }
   };
 
+  const getEffectiveAuthToken = async () => {
+    let authToken = supabasePublishableKey;
+    if (secureFunctionAuth) {
+      const {
+        data: { session },
+      } = await supabase.auth.getSession();
+      authToken = session?.access_token ?? authToken;
+    }
+    return authToken;
+  };
+
+  const requestDraftData = async (requestBody: Record<string, unknown>) => {
+    const authToken = await getEffectiveAuthToken();
+    const body = JSON.stringify(requestBody);
+
+    const tryRequest = async (withAuthHeaders: boolean) =>
+      fetch(DRAFT_URL, {
+        method: "POST",
+        headers: withAuthHeaders
+          ? {
+              "Content-Type": "application/json",
+              Authorization: `Bearer ${authToken}`,
+              apikey: supabasePublishableKey,
+            }
+          : {
+              "Content-Type": "application/json",
+            },
+        body,
+      });
+
+    let response: Response;
+    try {
+      response = await tryRequest(true);
+    } catch (networkError) {
+      if (secureFunctionAuth) throw networkError;
+      response = await tryRequest(false);
+    }
+
+    if (response.status === 429) throw new Error("Rate limit exceeded. Please try again in a moment.");
+    if (response.status === 402) throw new Error("AI credits exhausted. Please add credits to continue.");
+    if (!response.ok) {
+      let serverError = `Draft request failed (${response.status}).`;
+      try {
+        const data = await response.json();
+        serverError = data?.error ? `${serverError} ${data.error}` : serverError;
+      } catch {
+        const text = await response.text();
+        if (text) serverError = `${serverError} ${text.slice(0, 240)}`;
+      }
+      throw new Error(serverError);
+    }
+
+    return response.json();
+  };
+
+  const handleApplyMcaFix = async () => {
+    if (selectedDocType !== "mca-notice" || !draftContent.trim()) {
+      toast.error("Generate an MCA draft first.");
+      return;
+    }
+
+    if (!mcaIssueReport && !mcaFixNotes.trim()) {
+      toast.error("Run issue check or add fix notes first.");
+      return;
+    }
+
+    const client = clientOptions.find((c) => c.id === selectedClient);
+    const issueText = (mcaIssueReport?.items ?? [])
+      .map((item, idx) => `${idx + 1}. Issue: ${item.issue}\n   Suggestion: ${item.suggestion}`)
+      .join("\n");
+
+    const fixContext = `You are improving an MCA adjudication draft.
+Task: Regenerate a corrected final draft by merging the existing draft with required fixes.
+Non-negotiable fixes:
+1) Section 454 proviso submission (fact-dependent, date-aware)
+2) Chronology table with due vs actual and reference IDs
+3) Officer-specific defense table
+4) Safe prayer language using "drop or reduce" (never "waive/absolve")
+5) Remove over-strong rhetoric
+
+CURRENT DRAFT:
+${draftContent}
+
+DETECTED ISSUES:
+${issueText || "None provided"}
+
+CA/LAWYER ADDITIONAL FIX NOTES:
+${mcaFixNotes || "None"}
+
+Return only the revised final draft text.`;
+
+    setIsApplyingMcaFix(true);
+    setGenerationError(null);
+    try {
+      if (!hasDraftEndpoint) {
+        throw new Error("Draft endpoint is not configured. Set VITE_SUPABASE_URL correctly.");
+      }
+      const urlRef = getProjectRefFromUrl(supabaseUrl);
+      const keyRef = getProjectRefFromJwt(supabasePublishableKey);
+      if (urlRef && keyRef && urlRef !== keyRef) {
+        throw new Error(
+          `Supabase config mismatch: URL project (${urlRef}) and publishable key project (${keyRef}) are different. Update VITE_SUPABASE_PUBLISHABLE_KEY.`,
+        );
+      }
+
+      const data = await requestDraftData({
+        documentType: "mca-notice",
+        companyName: client?.name || "Company",
+        industry: client?.industry || "",
+        draftMode: selectedMode,
+        mcaReplyTypeOverride: mcaReplyTypeOverride !== "auto" ? mcaReplyTypeOverride : undefined,
+        advancedMode: true,
+        strictValidation: true,
+        context: fixContext,
+        noticeDetails: maskPII(noticeDetails) || undefined,
+        stream: false,
+      });
+
+      const content = data?.draft as string | undefined;
+      if (!content) {
+        throw new Error("AI fix regeneration returned empty content.");
+      }
+
+      setDraftContent(content);
+      setDraftQA((data?.qa ?? null) as DraftQA | null);
+      setDraftPackage((data?.package ?? null) as DraftPackage | null);
+      runMcaDraftIssueCheck(content);
+      toast.success("MCA draft corrected and regenerated.");
+    } catch (error) {
+      const errorMessage = error instanceof Error ? error.message : "Failed to apply AI fix";
+      setGenerationError(errorMessage);
+      toast.error(errorMessage);
+    } finally {
+      setIsApplyingMcaFix(false);
+    }
+  };
+
   const handleGenerateDraft = async () => {
     if (!selectedClient || !selectedDocType) return;
 
@@ -818,6 +970,7 @@ const AIDraftingEngine = ({ demoMode = false, includeLawyerReview = true }: AIDr
     setDraftQA(null);
     setDraftPackage(null);
     setMcaIssueReport(null);
+    setMcaFixNotes("");
     
     const client = clientOptions.find(c => c.id === selectedClient);
     const maskedNoticeDetails = noticeDetails ? maskPII(noticeDetails) : undefined;
@@ -1434,15 +1587,49 @@ const AIDraftingEngine = ({ demoMode = false, includeLawyerReview = true }: AIDr
                       ) : (
                         <div className="space-y-2">
                           <p className="font-medium">Issues detected:</p>
-                          <ul className="list-disc pl-5 space-y-1">
-                            {mcaIssueReport.issues.map((item, idx) => (
-                              <li key={`${item}-${idx}`}>{item}</li>
+                          <ul className="list-disc pl-5 space-y-2">
+                            {mcaIssueReport.items.map((item, idx) => (
+                              <li key={`${item.issue}-${idx}`}>
+                                <p>{item.issue}</p>
+                                <p className="text-xs text-yellow-100/90 mt-1">
+                                  Suggestion: {item.suggestion}
+                                </p>
+                              </li>
                             ))}
                           </ul>
                         </div>
                       )}
                     </div>
                   )}
+
+                  <div className="p-3 rounded-lg border border-border/50 bg-background/30 space-y-2">
+                    <p className="text-sm font-medium text-foreground">AI Fix Assistant (MCA)</p>
+                    <p className="text-xs text-muted-foreground">
+                      Add what is missing from the issue report (or your own CA notes), then regenerate a corrected draft.
+                    </p>
+                    <Textarea
+                      value={mcaFixNotes}
+                      onChange={(e) => setMcaFixNotes(e.target.value)}
+                      placeholder="Example: Add officer-specific table with role period and mitigating facts; fix prayer wording to drop/reduce penalty; include Section 454 proviso with notice-date anchor."
+                      className="min-h-[90px] bg-background/50"
+                    />
+                    <Button
+                      type="button"
+                      variant="outline"
+                      className="w-full"
+                      onClick={handleApplyMcaFix}
+                      disabled={isApplyingMcaFix || !draftGenerated}
+                    >
+                      {isApplyingMcaFix ? (
+                        <>
+                          <Loader2 className="w-4 h-4 mr-2 animate-spin" />
+                          Applying AI Fix...
+                        </>
+                      ) : (
+                        "Apply AI Fix & Regenerate MCA Draft"
+                      )}
+                    </Button>
+                  </div>
                 </div>
               )}
 
