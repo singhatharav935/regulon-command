@@ -630,6 +630,8 @@ const enforceMcaDraftMinimumStructure = (draft: string, mcaReplyType: McaReplyTy
   fixed = fixed.replace(/waive\s+or\s+reduce(?:\s+the)?\s+proposed\s+penalty/gi, "drop or reduce penalty");
   fixed = fixed.replace(/\babsolve\b[^.\n]{0,60}\bofficer[s]?\s+in\s+default/gi, "drop or reduce penalty on officers in default based on role, conduct, and mitigating facts");
   fixed = fixed.replace(/\babsolve\b[^.\n]{0,120}\bpersonal liability/gi, "consider role-based mitigation for officers in default");
+  fixed = fixed.replace(/\bimpose\s+no\s+penalty\b/gi, "drop or reduce penalty");
+  fixed = fixed.replace(/\bdrop the adjudication proceedings against the company and its officers in default\b/gi, "drop or reduce penalty on the Company and officers in default based on role, conduct, and mitigating facts");
   fixed = fixed.replace(/waive penalty for officers/gi, "drop or reduce penalty on officers in default based on role, conduct, and mitigating facts");
   fixed = fixed.replace(/waive\s+the\s+penalty\s+on\s+the\s+officers\s+in\s+default/gi, "drop or reduce penalty on officers in default based on role, conduct, and mitigating facts");
   fixed = fixed.replace(/total waiver/gi, "substantial reduction");
@@ -644,14 +646,13 @@ const enforceMcaDraftMinimumStructure = (draft: string, mcaReplyType: McaReplyTy
     fixed += `\n\n### Section 454 Proviso (Fact-Dependent)\nWithout prejudice, if the default stood rectified before issuance of notice dated 15 January 2026, or within 30 days from notice service, the Noticee seeks consideration under the proviso to Section 454, subject to statutory satisfaction.`;
   }
 
-  const hasChronologyTable = /###\s*2\.\s*Chronology|Chronology of Compliance|Chronology/i.test(fixed)
-    && /\|\s*Particulars\s*\|\s*Section\s*\|\s*(Due Date|Due\/Event Date)\s*\|/i.test(fixed);
+  const hasChronologyTable = /\|\s*Particulars\s*\|\s*Section\s*\|\s*(Due Date|Due\/Event Date)\s*\|/i.test(fixed)
+    && /\|\s*---\s*\|\s*---\s*\|/i.test(fixed);
   if (!hasChronologyTable) {
     fixed += `\n\n### Chronology of Compliance\n| Particulars | Section | Due/Event Date | Actual Filing/Action Date | SRN/Challan/Reference | Status |\n|---|---|---|---|---|---|\n${buildMcaFallbackChronologyRows(mcaReplyType)}`;
   }
 
-  const hasOfficerTable = /Officer-Specific Defense|officer in default/i.test(fixed)
-    && /\|\s*Officer\s*\|\s*Role Period\s*\|/i.test(fixed);
+  const hasOfficerTable = /\|\s*Officer\s*\|\s*Role Period\s*\|\s*Alleged Responsibility\s*\|\s*Mitigating Facts\s*\|/i.test(fixed);
   if (!hasOfficerTable) {
     fixed += `\n\n### Officer-Specific Defense\n| Officer | Role Period | Alleged Responsibility | Mitigating Facts |\n|---|---|---|---|\n| [To be filled by CA/Lawyer] | [To be filled by CA/Lawyer] | [To be filled by CA/Lawyer] | No willful default; actions were bona fide and compliance-focused. |`;
   }
@@ -661,6 +662,7 @@ const enforceMcaDraftMinimumStructure = (draft: string, mcaReplyType: McaReplyTy
     block
       .replace(/\bwaive\b[^.\n]{0,60}\bpenalt/gi, "drop or reduce penalty")
       .replace(/\babsolve\b[^.\n]{0,80}\bofficer[s]?\b/gi, "drop or reduce penalty on officers in default")
+      .replace(/\bimpose\s+no\s+penalty\b/gi, "drop or reduce penalty")
   );
 
   if (!/personal hearing|hearing/i.test(fixed)) {
