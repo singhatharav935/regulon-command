@@ -61,6 +61,34 @@ const draftModes = [
   { id: "aggressive", label: "Assertive", description: "Legally defensible, assertive stance", color: "text-orange-500" },
 ];
 
+const mcaReplyTypeOptions = [
+  { id: "auto", label: "Auto-detect from notice" },
+  { id: "annual-filing-92-137", label: "Annual Filing (92/137)" },
+  { id: "board-reporting-117", label: "Board Resolution Filing (117)" },
+  { id: "charge-77-79", label: "Charge Registration (77/78/79)" },
+  { id: "beneficial-ownership-90", label: "SBO / Beneficial Ownership (90)" },
+  { id: "board-governance-173", label: "Board Meetings & Governance (173)" },
+  { id: "board-report-134", label: "Board Report Compliance (134)" },
+  { id: "related-party-188", label: "Related Party Transactions (188)" },
+  { id: "managerial-kmp-203", label: "KMP / Managerial Personnel (203)" },
+  { id: "deposits-73-76", label: "Deposits (73/74/76)" },
+  { id: "general-mca", label: "General MCA Adjudication" },
+];
+
+const inferMcaReplyTypeFromNotice = (noticeText: string): string => {
+  const corpus = (noticeText || "").toLowerCase();
+  if (/\bsection\s*92\b|\bsection\s*137\b|\bmgt-?7\b|\baoc-?4\b/.test(corpus)) return "annual-filing-92-137";
+  if (/\bsection\s*117\b|\bmgt-?14\b|\bboard resolution\b/.test(corpus)) return "board-reporting-117";
+  if (/\bsection\s*77\b|\bsection\s*78\b|\bsection\s*79\b|\bchg-?1\b|\bcharge\b/.test(corpus)) return "charge-77-79";
+  if (/\bsection\s*90\b|\bben-?2\b|\bbeneficial owner\b|\bsbo\b/.test(corpus)) return "beneficial-ownership-90";
+  if (/\bsection\s*173\b|\bboard meeting\b|\bminutes\b/.test(corpus)) return "board-governance-173";
+  if (/\bsection\s*134\b|\bboard'?s report\b/.test(corpus)) return "board-report-134";
+  if (/\bsection\s*188\b|\brelated party\b|\baoc-?2\b/.test(corpus)) return "related-party-188";
+  if (/\bsection\s*203\b|\bkmp\b|company secretary|managing director|whole-time director/.test(corpus)) return "managerial-kmp-203";
+  if (/\bsection\s*73\b|\bsection\s*74\b|\bsection\s*76\b|\bdeposit\b/.test(corpus)) return "deposits-73-76";
+  return "general-mca";
+};
+
 type StepStatus = "pending" | "completed" | "current";
 type WorkflowStatus = "generated" | "under_review" | "approved" | "signed_off";
 
@@ -447,6 +475,7 @@ const AIDraftingEngine = ({ demoMode = false, includeLawyerReview = true }: AIDr
   const [selectedDocType, setSelectedDocType] = useState<string>("");
   const [lastTemplateDocType, setLastTemplateDocType] = useState<string>("");
   const [selectedMode, setSelectedMode] = useState<string>("balanced");
+  const [mcaReplyTypeOverride, setMcaReplyTypeOverride] = useState<string>("auto");
   const [noticeDetails, setNoticeDetails] = useState<string>("");
   const [preferPiiMasking, setPreferPiiMasking] = useState(true);
   const [advancedMode, setAdvancedMode] = useState(true);
@@ -478,6 +507,10 @@ const AIDraftingEngine = ({ demoMode = false, includeLawyerReview = true }: AIDr
   const selectedDocLabel = documentTypes.find(doc => doc.id === selectedDocType)?.label || "Selected Draft";
   const docSpecificFormat = documentFormatModules[selectedDocType] || documentFormatModules["custom-draft"];
   const selectedTemplate = selectedDocType ? readyNoticeTemplates[selectedDocType] : "";
+  const inferredMcaReplyType = useMemo(
+    () => inferMcaReplyTypeFromNotice(noticeDetails),
+    [noticeDetails],
+  );
   const supabaseAny = supabase as any;
 
   const getProjectRefFromUrl = (url: string) => {
@@ -675,6 +708,12 @@ const AIDraftingEngine = ({ demoMode = false, includeLawyerReview = true }: AIDr
     }
   }, [selectedDocType, lastTemplateDocType, noticeDetails]);
 
+  useEffect(() => {
+    if (selectedDocType !== "mca-notice") {
+      setMcaReplyTypeOverride("auto");
+    }
+  }, [selectedDocType]);
+
   const handleInsertTemplate = () => {
     if (!selectedDocType || !selectedTemplate) {
       toast.error("Select a document type first.");
@@ -799,6 +838,9 @@ const AIDraftingEngine = ({ demoMode = false, includeLawyerReview = true }: AIDr
         companyName: client?.name || "Company",
         industry: client?.industry || "",
         draftMode: selectedMode,
+        mcaReplyTypeOverride: selectedDocType === "mca-notice" && mcaReplyTypeOverride !== "auto"
+          ? mcaReplyTypeOverride
+          : undefined,
         advancedMode,
         strictValidation: advancedMode,
         noticeDetails: maskedNoticeDetails || undefined,
@@ -1079,6 +1121,34 @@ const AIDraftingEngine = ({ demoMode = false, includeLawyerReview = true }: AIDr
                   </SelectContent>
                 </Select>
               </div>
+
+              {/* Draft Mode */}
+              {selectedDocType === "mca-notice" && (
+                <div>
+                  <label className="block text-sm font-medium text-foreground mb-2">
+                    <Book className="w-4 h-4 inline-block mr-2" />
+                    MCA Notice Class
+                  </label>
+                  <Select value={mcaReplyTypeOverride} onValueChange={setMcaReplyTypeOverride}>
+                    <SelectTrigger className="bg-background/50">
+                      <SelectValue placeholder="Choose MCA notice class..." />
+                    </SelectTrigger>
+                    <SelectContent>
+                      {mcaReplyTypeOptions.map((option) => (
+                        <SelectItem key={option.id} value={option.id}>
+                          {option.label}
+                        </SelectItem>
+                      ))}
+                    </SelectContent>
+                  </Select>
+                  <p className="text-xs text-muted-foreground mt-1">
+                    Auto-detected class:{" "}
+                    <span className="text-foreground font-medium">
+                      {mcaReplyTypeOptions.find((o) => o.id === inferredMcaReplyType)?.label || "General MCA Adjudication"}
+                    </span>
+                  </p>
+                </div>
+              )}
 
               {/* Draft Mode */}
               <div>
