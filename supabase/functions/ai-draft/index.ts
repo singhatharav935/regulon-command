@@ -294,6 +294,33 @@ const buildNoticeDetailsFallback = ({
   return `Notice/Order input summary for drafting: Authority has issued ${documentType} proceedings against ${companyName}${industry ? ` (${industry})` : ""}; notice reference is ${extractedNoticeNo}, dated ${extractedDate}, with DIN/RFN ${extractedDin}. Invoked provisions identified from available record are ${sections}. Proposed exposure/penalty includes amount marker ${amount} and relevant period ${period}. ${mcaBlock} The draft must include chronology anchors, allegation-wise legal response, annexure mapping, and hearing request, with placeholders only as [To be filled by CA/Lawyer] where records are pending confirmation.`;
 };
 
+const sanitizeNoticeDetailsInput = (raw: string, fallback: string) => {
+  const text = (raw ?? "").trim();
+  if (!text) return fallback;
+
+  const looksLikeReply =
+    /before the registrar|adjudicating officer|most respectfully|to,\s*the registrar|prayer|for and on behalf|authorized signatory|annexure/i.test(text) ||
+    /\*\*|###|\n\s*\d+\.\s+[A-Z]/.test(text);
+
+  // Remove markdown/salutation style noise and flatten into one dense paragraph.
+  let cleaned = text
+    .replace(/\*\*/g, "")
+    .replace(/^#{1,6}\s*/gm, "")
+    .replace(/^\s*[-*]\s+/gm, "")
+    .replace(/\s+/g, " ")
+    .trim();
+
+  const words = cleaned.split(/\s+/).filter(Boolean).length;
+
+  // If output still looks like a reply, or too short to be useful intake text, return deterministic fallback.
+  if (looksLikeReply || words < 140) {
+    return fallback;
+  }
+
+  // Keep notice-details intake concise and parser-friendly.
+  return cleaned;
+};
+
 type AIProvider = "lovable" | "openai";
 
 const resolveAIConfig = (): { provider: AIProvider; apiKey: string; model: string; endpoint: string } => {
@@ -898,7 +925,7 @@ Rules:
 2) One dense paragraph block with clear facts and numbers/dates where available.
 3) Include authority, notice reference, DIN/RFN, date, invoked sections/rules, period, proposed penalty/demand, and noticee position.
 4) For MCA annual filing notices, include AOC-4/MGT-7 chronology anchors and SRN/date placeholders only when unavailable.
-5) Do not include headings, markdown tables, prayer, or signature block.
+5) Do not include headings, salutations, captions, markdown tables, prayer, annexure list, or signature block.
 6) Do not fabricate; if unavailable, mark as "[To be filled by CA/Lawyer]".`;
 
       const noticeDetailsUserPrompt = `Prepare Notice/Order Details for:
@@ -930,13 +957,16 @@ ${noticeDetails || "None provided."}`;
       }
 
       const detailsData = await detailsResp.json();
-      const generatedNoticeDetails = extractAssistantText(detailsData)
-        || buildNoticeDetailsFallback({
-          documentType,
-          companyName,
-          industry,
-          noticeDetails,
-        });
+      const fallbackNoticeDetails = buildNoticeDetailsFallback({
+        documentType,
+        companyName,
+        industry,
+        noticeDetails,
+      });
+      const generatedNoticeDetails = sanitizeNoticeDetailsInput(
+        extractAssistantText(detailsData),
+        fallbackNoticeDetails,
+      );
 
       return new Response(JSON.stringify({
         noticeDetails: generatedNoticeDetails,
