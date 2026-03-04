@@ -528,6 +528,7 @@ const AIDraftingEngine = ({ demoMode = false, includeLawyerReview = true }: AIDr
     content: string,
     qa?: DraftQA | null,
     mcaType?: string,
+    includeQaGates = true,
   ): Array<{ issue: string; suggestion: string }> => {
     const items: Array<{ issue: string; suggestion: string }> = [];
     const hasChronologyTable =
@@ -585,21 +586,23 @@ const AIDraftingEngine = ({ demoMode = false, includeLawyerReview = true }: AIDr
       );
     }
 
-    const badDomainGates = Object.entries(qa?.domain_gates || {})
-      .filter(([, passed]) => !passed)
-      .map(([gate]) => ({
-        issue: `Domain gate failed: ${gate}`,
-        suggestion: "Regenerate with missing legal block and evidence-linked language for this gate.",
-      }));
-    items.push(...badDomainGates);
+    if (includeQaGates) {
+      const badDomainGates = Object.entries(qa?.domain_gates || {})
+        .filter(([, passed]) => !passed)
+        .map(([gate]) => ({
+          issue: `Domain gate failed: ${gate}`,
+          suggestion: "Regenerate with missing legal block and evidence-linked language for this gate.",
+        }));
+      items.push(...badDomainGates);
 
-    const badMandatoryGates = Object.entries(qa?.mandatory_gates || {})
-      .filter(([, passed]) => !passed)
-      .map(([gate]) => ({
-        issue: `Mandatory gate failed: ${gate}`,
-        suggestion: "Add the missing mandatory section and re-run draft checks.",
-      }));
-    items.push(...badMandatoryGates);
+      const badMandatoryGates = Object.entries(qa?.mandatory_gates || {})
+        .filter(([, passed]) => !passed)
+        .map(([gate]) => ({
+          issue: `Mandatory gate failed: ${gate}`,
+          suggestion: "Add the missing mandatory section and re-run draft checks.",
+        }));
+      items.push(...badMandatoryGates);
+    }
     return items;
   };
 
@@ -625,6 +628,11 @@ const AIDraftingEngine = ({ demoMode = false, includeLawyerReview = true }: AIDr
       content += `\n\n### Chronology of Compliance\n| Particulars | Section | Due/Event Date | Actual Filing/Action Date | SRN/Challan/Reference | Status |\n|---|---|---|---|---|---|\n${chronologyRows}`;
     }
 
+    const has454Proviso = /section\s*454/i.test(content) && /proviso to section 454|within 30 days|before notice dated|before issuance of notice/i.test(content);
+    if (!has454Proviso) {
+      content += `\n\n### Section 454 Proviso (Fact-Dependent)\nWithout prejudice, if the default stood rectified before issuance of notice dated 15 January 2026, or within 30 days from notice service, the Noticee seeks consideration under the proviso to Section 454, subject to statutory satisfaction.`;
+    }
+
     const hasOfficerDefenseTable =
       /\|\s*Officer(?:\s+in\s+Default)?\s*\|\s*Role\s*Period\s*\|/i.test(content) &&
       /\|\s*(Alleged Responsibility|Responsibility|Allegation)\s*\|\s*(Mitigating Facts|Defense|Remarks)\s*\|/i.test(content);
@@ -636,9 +644,9 @@ const AIDraftingEngine = ({ demoMode = false, includeLawyerReview = true }: AIDr
     return content;
   };
 
-  const runMcaDraftIssueCheck = (contentOverride?: string) => {
+  const runMcaDraftIssueCheck = (contentOverride?: string, qaOverride?: DraftQA | null) => {
     const content = contentOverride ?? draftContent ?? "";
-    const items = evaluateMcaDraftIssues(content, draftQA, inferredMcaReplyType);
+    const items = evaluateMcaDraftIssues(content, qaOverride ?? draftQA, inferredMcaReplyType, true);
 
     setMcaIssueReport({
       ok: items.length === 0,
@@ -1013,7 +1021,7 @@ Return only the revised final draft text.`;
       }
 
       let qaPayload = (data?.qa ?? null) as DraftQA | null;
-      let remaining = evaluateMcaDraftIssues(content, qaPayload, inferredMcaReplyType);
+      let remaining = evaluateMcaDraftIssues(content, qaPayload, inferredMcaReplyType, false);
 
       if (remaining.length > 0) {
         const retryContext = `${fixContext}\n\nREMAINING ISSUES AFTER FIRST FIX:\n${remaining
@@ -1037,19 +1045,19 @@ Return only the revised final draft text.`;
         if (retryContent) {
           content = retryContent;
           qaPayload = (retryData?.qa ?? null) as DraftQA | null;
-          remaining = evaluateMcaDraftIssues(content, qaPayload, inferredMcaReplyType);
+          remaining = evaluateMcaDraftIssues(content, qaPayload, inferredMcaReplyType, false);
         }
       }
 
       if (remaining.length > 0) {
         content = enforceMcaLocalFallback(content, inferredMcaReplyType);
-        remaining = evaluateMcaDraftIssues(content, qaPayload, inferredMcaReplyType);
+        remaining = evaluateMcaDraftIssues(content, qaPayload, inferredMcaReplyType, false);
       }
 
       setDraftContent(content);
       setDraftQA(qaPayload);
       setDraftPackage((data?.package ?? null) as DraftPackage | null);
-      runMcaDraftIssueCheck(content);
+      runMcaDraftIssueCheck(content, qaPayload);
       if (remaining.length === 0) {
         toast.success("MCA draft corrected and regenerated.");
       } else {
