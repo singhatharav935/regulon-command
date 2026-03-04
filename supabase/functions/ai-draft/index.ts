@@ -576,6 +576,7 @@ const runMcaDomainGates = (draft: string, mcaReplyType: McaReplyType): DomainGat
       && /\|\s*Officer\s*\|\s*Role Period\s*\|/i.test(draft),
     avoids_waive_penalty_phrase: !/\bwaive\b[^.\n]{0,40}\bpenalt/i.test(draft),
     avoids_waive_officer_penalty_phrase: !/waive penalty for officers/i.test(draft),
+    avoids_absolve_officer_phrase: !/\babsolve\b[^.\n]{0,120}\bofficer|personal liability/i.test(draft),
     avoids_overstrong_penalty_phrases: !/double jeopardy|maximum sequestration of penalties|total waiver/i.test(draft),
     qualifies_446b_if_used: !has446bMention || /(paid-?up capital|turnover|startup recognition|section 2\(85\))/i.test(draft),
   };
@@ -625,6 +626,10 @@ const enforceMcaDraftMinimumStructure = (draft: string, mcaReplyType: McaReplyTy
 
   // Hard safety phrase replacement
   fixed = fixed.replace(/waive(?:\s+or\s+reduce)?\s+the\s+penalty/gi, "drop or reduce penalty");
+  fixed = fixed.replace(/waive\s+or\s+substantially\s+reduce(?:\s+the)?\s+proposed\s+penalty/gi, "drop or reduce penalty");
+  fixed = fixed.replace(/waive\s+or\s+reduce(?:\s+the)?\s+proposed\s+penalty/gi, "drop or reduce penalty");
+  fixed = fixed.replace(/\babsolve\b[^.\n]{0,60}\bofficer[s]?\s+in\s+default/gi, "drop or reduce penalty on officers in default based on role, conduct, and mitigating facts");
+  fixed = fixed.replace(/\babsolve\b[^.\n]{0,120}\bpersonal liability/gi, "consider role-based mitigation for officers in default");
   fixed = fixed.replace(/waive penalty for officers/gi, "drop or reduce penalty on officers in default based on role, conduct, and mitigating facts");
   fixed = fixed.replace(/waive\s+the\s+penalty\s+on\s+the\s+officers\s+in\s+default/gi, "drop or reduce penalty on officers in default based on role, conduct, and mitigating facts");
   fixed = fixed.replace(/total waiver/gi, "substantial reduction");
@@ -636,7 +641,7 @@ const enforceMcaDraftMinimumStructure = (draft: string, mcaReplyType: McaReplyTy
   }
 
   if (!/proviso to section 454|within 30 days|before notice dated/i.test(fixed)) {
-    fixed += `\n\n### Section 454 Proviso (Fact-Dependent)\nWithout prejudice, if the default stood rectified before issuance of notice, or within 30 days from notice service, the Noticee seeks consideration under the proviso to Section 454, subject to statutory satisfaction.`;
+    fixed += `\n\n### Section 454 Proviso (Fact-Dependent)\nWithout prejudice, if the default stood rectified before issuance of notice dated 15 January 2026, or within 30 days from notice service, the Noticee seeks consideration under the proviso to Section 454, subject to statutory satisfaction.`;
   }
 
   const hasChronologyTable = /###\s*2\.\s*Chronology|Chronology of Compliance|Chronology/i.test(fixed)
@@ -650,6 +655,13 @@ const enforceMcaDraftMinimumStructure = (draft: string, mcaReplyType: McaReplyTy
   if (!hasOfficerTable) {
     fixed += `\n\n### Officer-Specific Defense\n| Officer | Role Period | Alleged Responsibility | Mitigating Facts |\n|---|---|---|---|\n| [To be filled by CA/Lawyer] | [To be filled by CA/Lawyer] | [To be filled by CA/Lawyer] | No willful default; actions were bona fide and compliance-focused. |`;
   }
+
+  // Ensure prayer section uses drop/reduce language
+  fixed = fixed.replace(/\bPRAYER[^]*?$/i, (block) =>
+    block
+      .replace(/\bwaive\b[^.\n]{0,60}\bpenalt/gi, "drop or reduce penalty")
+      .replace(/\babsolve\b[^.\n]{0,80}\bofficer[s]?\b/gi, "drop or reduce penalty on officers in default")
+  );
 
   if (!/personal hearing|hearing/i.test(fixed)) {
     fixed += `\n\n### Hearing Request\nThe Noticee requests an opportunity of personal hearing (physical/VC mode) before any adverse order is passed.`;
@@ -1093,6 +1105,7 @@ Checklist:
 - officer-specific defense table present
 - section 446B included only if qualification basis is stated
 - never use "waive penalty for officers"; use "drop or reduce penalty on officers in default..."
+- never use "waive penalty" or "absolve officers/personal liability" phrasing; use calibrated drop/reduce language
 - avoid over-strong penalty rhetoric like "double jeopardy", "total waiver", or similar absolute phrasing
 - keep placeholders only for CA/Lawyer-fillable metadata
 - add "Data Required to Finalize Filing" if critical details are unavailable`
