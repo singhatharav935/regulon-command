@@ -200,6 +200,7 @@ MCA ADJUDICATION HARD REQUIREMENTS (MANDATORY FOR MCA NOTICE DRAFTS):
 8. Use this output skeleton: heading + notice metadata + preliminary submissions + chronology table + legal submissions + officer-specific defense + 446B block (if eligible) + annexures + layered prayer + sign-off.
 9. If filing-critical data is unavailable, placeholders are allowed only as "[To be filled by CA/Lawyer]" or simple metadata placeholders (CIN/address/signatory fields).
 10. If critical details remain unavailable, append "Data Required to Finalize Filing".
+11. Ensure these five quality anchors are always covered where factually relevant: (a) Section 454 proviso request, (b) due-vs-actual chronology with reference IDs, (c) officer-specific defense table, (d) safe prayer wording using "drop/reduce" instead of "waive", and (e) no over-strong penalty rhetoric.
 ${getMcaTypeSpecificRequirements(mcaReplyType)}
 `;
 
@@ -568,10 +569,14 @@ const runMcaDomainGates = (draft: string, mcaReplyType: McaReplyType): DomainGat
     ...typeGates[mcaReplyType],
     mentions_454: /\bSection\s*454\b/i.test(draft),
     has_454_proviso_submission: /proviso to section 454|within 30 days|before notice dated/i.test(draft),
-    has_chronology_table: /due date|timeline|chronology/i.test(draft) && /actual|filing date|event date/i.test(draft),
-    has_officer_defense: /officer in default|officer-specific|role period|willful default/i.test(draft),
+    has_chronology_table: (/chronology of compliance|chronology|timeline/i.test(draft) || /\|\s*Particulars\s*\|\s*Section\s*\|/i.test(draft))
+      && /due date|due\/event date/i.test(draft)
+      && /actual filing|actual date|action date|filing date/i.test(draft),
+    has_officer_defense: /officer-specific defense|officer in default/i.test(draft)
+      && /\|\s*Officer\s*\|\s*Role Period\s*\|/i.test(draft),
     avoids_waive_penalty_phrase: !/\bwaive\b[^.\n]{0,40}\bpenalt/i.test(draft),
     avoids_waive_officer_penalty_phrase: !/waive penalty for officers/i.test(draft),
+    avoids_overstrong_penalty_phrases: !/double jeopardy|maximum sequestration of penalties|total waiver/i.test(draft),
     qualifies_446b_if_used: !has446bMention || /(paid-?up capital|turnover|startup recognition|section 2\(85\))/i.test(draft),
   };
 
@@ -621,6 +626,10 @@ const enforceMcaDraftMinimumStructure = (draft: string, mcaReplyType: McaReplyTy
   // Hard safety phrase replacement
   fixed = fixed.replace(/waive(?:\s+or\s+reduce)?\s+the\s+penalty/gi, "drop or reduce penalty");
   fixed = fixed.replace(/waive penalty for officers/gi, "drop or reduce penalty on officers in default based on role, conduct, and mitigating facts");
+  fixed = fixed.replace(/waive\s+the\s+penalty\s+on\s+the\s+officers\s+in\s+default/gi, "drop or reduce penalty on officers in default based on role, conduct, and mitigating facts");
+  fixed = fixed.replace(/total waiver/gi, "substantial reduction");
+  fixed = fixed.replace(/maximum sequestration of penalties/gi, "maximum penalties");
+  fixed = fixed.replace(/double jeopardy/gi, "disproportionate duplication of monetary burden for a procedural lapse");
 
   if (!/Section\s*454/i.test(fixed)) {
     fixed += `\n\n### Section 454 Submission\nThe Noticee seeks adjudicatory consideration under Section 454 based on rectification status, role-specific responsibility, and mitigating facts on record.`;
@@ -1084,6 +1093,7 @@ Checklist:
 - officer-specific defense table present
 - section 446B included only if qualification basis is stated
 - never use "waive penalty for officers"; use "drop or reduce penalty on officers in default..."
+- avoid over-strong penalty rhetoric like "double jeopardy", "total waiver", or similar absolute phrasing
 - keep placeholders only for CA/Lawyer-fillable metadata
 - add "Data Required to Finalize Filing" if critical details are unavailable`
       : `You are final quality control counsel.
