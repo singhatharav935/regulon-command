@@ -485,6 +485,7 @@ const AIDraftingEngine = ({ demoMode = false, includeLawyerReview = true }: AIDr
   const [selectedMode, setSelectedMode] = useState<string>("balanced");
   const [mcaReplyTypeOverride, setMcaReplyTypeOverride] = useState<string>("auto");
   const [noticeDetails, setNoticeDetails] = useState<string>("");
+  const [isGeneratingNoticeDetails, setIsGeneratingNoticeDetails] = useState(false);
   const [preferPiiMasking, setPreferPiiMasking] = useState(true);
   const [advancedMode, setAdvancedMode] = useState(true);
   const [isGenerating, setIsGenerating] = useState(false);
@@ -894,6 +895,43 @@ const AIDraftingEngine = ({ demoMode = false, includeLawyerReview = true }: AIDr
       toast.success("Template copied. Paste it in Notice / Order Details.");
     } catch {
       toast.error("Clipboard access failed. Use Insert Template instead.");
+    }
+  };
+
+  const handleGenerateNoticeDetailsAI = async () => {
+    if (!selectedDocType) {
+      toast.error("Select document type first.");
+      return;
+    }
+    const client = clientOptions.find((c) => c.id === selectedClient);
+    setIsGeneratingNoticeDetails(true);
+    try {
+      const generated = await requestDraftData({
+        operation: "notice-details",
+        documentType: selectedDocType,
+        companyName: client?.name || "Company",
+        industry: client?.industry || "",
+        draftMode: selectedMode,
+        mcaReplyTypeOverride: selectedDocType === "mca-notice" && mcaReplyTypeOverride !== "auto"
+          ? mcaReplyTypeOverride
+          : undefined,
+        context: `Generate precise Notice/Order Details for ${selectedDocLabel}. Ensure this is input-quality text for strict legal drafting checks.`,
+        noticeDetails: noticeDetails || undefined,
+        stream: false,
+      });
+
+      const aiNoticeDetails = (generated?.noticeDetails as string | undefined)?.trim();
+      if (!aiNoticeDetails) {
+        throw new Error("AI did not return notice details.");
+      }
+      setNoticeDetails(aiNoticeDetails);
+      setLastTemplateDocType(selectedDocType);
+      toast.success("AI Notice/Order Details generated.");
+    } catch (error) {
+      const msg = error instanceof Error ? error.message : "Failed to generate notice details.";
+      toast.error(msg);
+    } finally {
+      setIsGeneratingNoticeDetails(false);
     }
   };
 
@@ -1531,7 +1569,22 @@ Return only the revised final draft text.`;
                 <p className="text-xs text-muted-foreground mt-1">
                   Providing notice details enables point-by-point rebuttal. Procedural objections are raised only if evidence supports them.
                 </p>
-                <div className="mt-2 grid grid-cols-1 sm:grid-cols-2 gap-2">
+                <div className="mt-2 grid grid-cols-1 sm:grid-cols-3 gap-2">
+                  <Button
+                    type="button"
+                    variant="outline"
+                    onClick={handleGenerateNoticeDetailsAI}
+                    disabled={!selectedDocType || isGeneratingNoticeDetails}
+                  >
+                    {isGeneratingNoticeDetails ? (
+                      <>
+                        <Loader2 className="w-4 h-4 mr-2 animate-spin" />
+                        Generating...
+                      </>
+                    ) : (
+                      "Generate AI Notice Details"
+                    )}
+                  </Button>
                   <Button
                     type="button"
                     variant="outline"
