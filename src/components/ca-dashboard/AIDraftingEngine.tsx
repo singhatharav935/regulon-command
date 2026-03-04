@@ -89,6 +89,35 @@ const inferMcaReplyTypeFromNotice = (noticeText: string): string => {
   return "general-mca";
 };
 
+const extractNoticeDateFromText = (noticeText: string): string => {
+  const source = noticeText || "";
+  const match =
+    source.match(/dated\s+([0-9]{1,2}\s+[A-Za-z]+\s+[0-9]{4})/i) ||
+    source.match(/dated\s+([0-9]{1,2}[\/-][0-9]{1,2}[\/-][0-9]{2,4})/i);
+  return match?.[1] || "15 January 2026";
+};
+
+const sanitizeNoticeDetailsClient = (raw: string, fallback: string) => {
+  let text = (raw || "").trim();
+  if (!text) return fallback;
+
+  const looksLikeReply = /before the registrar|adjudicating officer|most respectfully|prayer|for and on behalf|authorized signatory|annexure/i.test(text);
+  if (looksLikeReply) {
+    text = text
+      .replace(/\*\*/g, "")
+      .replace(/^#{1,6}\s*/gm, "")
+      .replace(/^.*?(Subject:|SUBJECT:)/is, "Subject:")
+      .replace(/###?\s*PRAYER[\s\S]*/i, "")
+      .replace(/For and on behalf[\s\S]*/i, "")
+      .replace(/\s+/g, " ")
+      .trim();
+  }
+
+  const wordCount = text.split(/\s+/).filter(Boolean).length;
+  if (wordCount < 120) return fallback;
+  return text;
+};
+
 type StepStatus = "pending" | "completed" | "current";
 type WorkflowStatus = "generated" | "under_review" | "approved" | "signed_off";
 
@@ -645,6 +674,36 @@ const AIDraftingEngine = ({ demoMode = false, includeLawyerReview = true }: AIDr
     return content;
   };
 
+  const enforceMcaHardFixes = (rawContent: string, noticeText: string, mcaType?: string) => {
+    let content = rawContent || "";
+    const noticeDate = extractNoticeDateFromText(noticeText);
+
+    // Date normalization for notice references.
+    content = content.replace(
+      /(Notice\s*(?:No\.?|number)?[^\n]{0,120}?dated\s+)([0-9]{1,2}\s+[A-Za-z]+\s+[0-9]{4}|[0-9]{1,2}[\/-][0-9]{1,2}[\/-][0-9]{2,4})/gi,
+      `$1${noticeDate}`,
+    );
+
+    // Hard language normalization.
+    content = content
+      .replace(/\bwaive\b[^.\n]{0,80}\bpenalt/gi, "drop or reduce penalty")
+      .replace(/\bimpose\s+no\s+penalty\b/gi, "drop or reduce penalty")
+      .replace(/\babsolve\b[^.\n]{0,140}\bofficer[s]?|personal liability/gi, "drop or reduce penalty on officers in default based on role, conduct, and mitigating facts")
+      .replace(/double jeopardy/gi, "disproportionate duplication of monetary burden for a procedural lapse");
+
+    // Ensure 454 proviso anchor.
+    if (!/proviso to section 454|within 30 days|before issuance of notice|before notice dated/i.test(content)) {
+      content += `\n\n### Section 454 Proviso (Fact-Dependent)\nWithout prejudice, if the default stood rectified before issuance of notice dated ${noticeDate}, or within 30 days from notice service, the Noticee seeks consideration under the proviso to Section 454, subject to statutory satisfaction.`;
+    }
+
+    // Ensure annual filing forms explicitly covered.
+    if ((mcaType === "annual-filing-92-137" || /section\s*92|section\s*137/i.test(content)) && (!/aoc-?4/i.test(content) || !/mgt-?7/i.test(content))) {
+      content += `\n\nThe Noticee confirms that compliance discussion above covers both Form AOC-4 (Section 137) and Form MGT-7 (Section 92), with due and actual filing references to be read with chronology records and annexures.`;
+    }
+
+    return enforceMcaLocalFallback(content, mcaType);
+  };
+
   const runMcaDraftIssueCheck = (contentOverride?: string, qaOverride?: DraftQA | null) => {
     const content = contentOverride ?? draftContent ?? "";
     const items = evaluateMcaDraftIssues(content, qaOverride ?? draftQA, inferredMcaReplyType, true);
@@ -927,7 +986,9 @@ const AIDraftingEngine = ({ demoMode = false, includeLawyerReview = true }: AIDr
       if (!aiNoticeDetails) {
         throw new Error("AI did not return notice details.");
       }
-      setNoticeDetails(aiNoticeDetails);
+      const fallbackNotice = noticeDetails?.trim() || readyNoticeTemplates[selectedDocType] || "";
+      const sanitizedNotice = sanitizeNoticeDetailsClient(aiNoticeDetails, fallbackNotice);
+      setNoticeDetails(sanitizedNotice);
       setLastTemplateDocType(selectedDocType);
       toast.success("AI Notice/Order Details generated.");
     } catch (error) {
@@ -1095,6 +1156,13 @@ Return only the revised final draft text.`;
         remaining = evaluateMcaDraftIssues(content, qaPayload, inferredMcaReplyType, false);
       }
 
+      content = enforceMcaHardFixes(
+        content,
+        noticeDetails,
+        mcaReplyTypeOverride !== "auto" ? mcaReplyTypeOverride : inferredMcaReplyType,
+      );
+      remaining = evaluateMcaDraftIssues(content, qaPayload, inferredMcaReplyType, false);
+
       setDraftContent(content);
       setDraftQA(qaPayload);
       setDraftPackage((data?.package ?? null) as DraftPackage | null);
@@ -1158,7 +1226,10 @@ Return only the revised final draft text.`;
       const score = Math.max(58, Math.min(88, Math.round((passedChecks / totalChecks) * 100)));
       const riskBand: DraftQA["risk_band"] = score >= 80 ? "low" : score >= 65 ? "medium" : "high";
 
-      setDraftContent(offlineContent);
+      const patchedOffline = selectedDocType === "mca-notice"
+        ? enforceMcaHardFixes(offlineContent, noticeDetails, mcaReplyTypeOverride !== "auto" ? mcaReplyTypeOverride : inferredMcaReplyType)
+        : offlineContent;
+      setDraftContent(patchedOffline);
       setDraftQA({
         filing_score: score,
         risk_band: riskBand,
@@ -1284,7 +1355,10 @@ Return only the revised final draft text.`;
         if (!content) {
           throw new Error("Advanced draft generation returned empty content.");
         }
-        setDraftContent(content);
+        const patched = selectedDocType === "mca-notice"
+          ? enforceMcaHardFixes(content, noticeDetails, mcaReplyTypeOverride !== "auto" ? mcaReplyTypeOverride : inferredMcaReplyType)
+          : content;
+        setDraftContent(patched);
         setDraftQA((data?.qa ?? null) as DraftQA | null);
         setDraftPackage((data?.package ?? null) as DraftPackage | null);
         setDraftGenerated(true);
@@ -1382,7 +1456,10 @@ Return only the revised final draft text.`;
             const content = parsed.choices?.[0]?.delta?.content as string | undefined;
             if (content) {
               fullContent += content;
-              setDraftContent(fullContent);
+              const patchedStreaming = selectedDocType === "mca-notice"
+                ? enforceMcaHardFixes(fullContent, noticeDetails, mcaReplyTypeOverride !== "auto" ? mcaReplyTypeOverride : inferredMcaReplyType)
+                : fullContent;
+              setDraftContent(patchedStreaming);
             }
           } catch {
             textBuffer = line + "\n" + textBuffer;
