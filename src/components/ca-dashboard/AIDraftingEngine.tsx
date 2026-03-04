@@ -524,24 +524,22 @@ const AIDraftingEngine = ({ demoMode = false, includeLawyerReview = true }: AIDr
   );
   const supabaseAny = supabase as any;
 
-  const runMcaDraftIssueCheck = (contentOverride?: string) => {
+  const evaluateMcaDraftIssues = (
+    content: string,
+    qa?: DraftQA | null,
+    mcaType?: string,
+  ): Array<{ issue: string; suggestion: string }> => {
     const items: Array<{ issue: string; suggestion: string }> = [];
-    const content = contentOverride ?? draftContent ?? "";
     const hasChronologyTable =
-      (
-        /\|\s*(Particulars|Event|Date)\s*\|\s*(Section|Provision)\s*\|/i.test(content) ||
-        /chronology of compliance|compliance chronology|timeline of events/i.test(content)
-      ) &&
+      /\|\s*(Particulars|Event|Date)\s*\|\s*(Section|Provision)\s*\|/i.test(content) &&
       /due date|due\/event date|statutory due date/i.test(content) &&
-      /actual filing|actual date|action date|date of filing|filing date/i.test(content);
+      /actual filing|actual date|action date|date of filing|filing date/i.test(content) &&
+      /\|\s*[-:]+\s*\|\s*[-:]+\s*\|/.test(content);
 
     const hasOfficerDefenseTable =
-      (
-        /\|\s*Officer(?:\s+in\s+Default)?\s*\|\s*Role\s*Period\s*\|/i.test(content) &&
-        /\|\s*(Alleged Responsibility|Responsibility|Allegation)\s*\|\s*(Mitigating Facts|Defense|Remarks)\s*\|/i.test(content)
-      ) ||
-      (/officer-specific defense|officers in default/i.test(content) &&
-        /role period|willful default|mitigating facts/i.test(content));
+      /\|\s*Officer(?:\s+in\s+Default)?\s*\|\s*Role\s*Period\s*\|/i.test(content) &&
+      /\|\s*(Alleged Responsibility|Responsibility|Allegation)\s*\|\s*(Mitigating Facts|Defense|Remarks)\s*\|/i.test(content) &&
+      /\|\s*[-:]+\s*\|\s*[-:]+\s*\|/.test(content);
 
     const addIssue = (condition: boolean, issue: string, suggestion: string) => {
       if (condition) items.push({ issue, suggestion });
@@ -573,7 +571,21 @@ const AIDraftingEngine = ({ demoMode = false, includeLawyerReview = true }: AIDr
       "Replace over-strong terms with proportionality wording tied to facts and rectification status.",
     );
 
-    const badDomainGates = Object.entries(draftQA?.domain_gates || {})
+    addIssue(
+      /dated\s+15\s+january\s+2024/i.test(content),
+      "Notice date mismatch detected (2024 found for this 2026 notice pattern).",
+      "Correct all notice-date references to the actual notice date from the notice text.",
+    );
+
+    if (mcaType === "annual-filing-92-137" || /section\s*92|section\s*137|aoc-?4|mgt-?7/i.test(content)) {
+      addIssue(
+        !/aoc-?4/i.test(content) || !/mgt-?7/i.test(content),
+        "Annual filing draft must explicitly cover both AOC-4 and MGT-7.",
+        "Ensure chronology and legal submissions include both forms with due vs actual filing details.",
+      );
+    }
+
+    const badDomainGates = Object.entries(qa?.domain_gates || {})
       .filter(([, passed]) => !passed)
       .map(([gate]) => ({
         issue: `Domain gate failed: ${gate}`,
@@ -581,13 +593,19 @@ const AIDraftingEngine = ({ demoMode = false, includeLawyerReview = true }: AIDr
       }));
     items.push(...badDomainGates);
 
-    const badMandatoryGates = Object.entries(draftQA?.mandatory_gates || {})
+    const badMandatoryGates = Object.entries(qa?.mandatory_gates || {})
       .filter(([, passed]) => !passed)
       .map(([gate]) => ({
         issue: `Mandatory gate failed: ${gate}`,
         suggestion: "Add the missing mandatory section and re-run draft checks.",
       }));
     items.push(...badMandatoryGates);
+    return items;
+  };
+
+  const runMcaDraftIssueCheck = (contentOverride?: string) => {
+    const content = contentOverride ?? draftContent ?? "";
+    const items = evaluateMcaDraftIssues(content, draftQA, inferredMcaReplyType);
 
     setMcaIssueReport({
       ok: items.length === 0,
@@ -939,16 +957,49 @@ Return only the revised final draft text.`;
         stream: false,
       });
 
-      const content = data?.draft as string | undefined;
+      let content = data?.draft as string | undefined;
       if (!content) {
         throw new Error("AI fix regeneration returned empty content.");
       }
 
+      let qaPayload = (data?.qa ?? null) as DraftQA | null;
+      let remaining = evaluateMcaDraftIssues(content, qaPayload, inferredMcaReplyType);
+
+      if (remaining.length > 0) {
+        const retryContext = `${fixContext}\n\nREMAINING ISSUES AFTER FIRST FIX:\n${remaining
+          .map((item, idx) => `${idx + 1}. ${item.issue}\n   Suggestion: ${item.suggestion}`)
+          .join("\n")}\n\nRegenerate again and fully resolve remaining issues.`;
+
+        const retryData = await requestDraftData({
+          documentType: "mca-notice",
+          companyName: client?.name || "Company",
+          industry: client?.industry || "",
+          draftMode: selectedMode,
+          mcaReplyTypeOverride: mcaReplyTypeOverride !== "auto" ? mcaReplyTypeOverride : undefined,
+          advancedMode: true,
+          strictValidation: true,
+          context: retryContext,
+          noticeDetails: maskPII(noticeDetails) || undefined,
+          stream: false,
+        });
+
+        const retryContent = retryData?.draft as string | undefined;
+        if (retryContent) {
+          content = retryContent;
+          qaPayload = (retryData?.qa ?? null) as DraftQA | null;
+          remaining = evaluateMcaDraftIssues(content, qaPayload, inferredMcaReplyType);
+        }
+      }
+
       setDraftContent(content);
-      setDraftQA((data?.qa ?? null) as DraftQA | null);
+      setDraftQA(qaPayload);
       setDraftPackage((data?.package ?? null) as DraftPackage | null);
       runMcaDraftIssueCheck(content);
-      toast.success("MCA draft corrected and regenerated.");
+      if (remaining.length === 0) {
+        toast.success("MCA draft corrected and regenerated.");
+      } else {
+        toast.warning("MCA draft regenerated, but some issues still need CA review.");
+      }
     } catch (error) {
       const errorMessage = error instanceof Error ? error.message : "Failed to apply AI fix";
       setGenerationError(errorMessage);
