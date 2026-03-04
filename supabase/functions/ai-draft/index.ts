@@ -119,6 +119,25 @@ type McaReplyType =
   | "deposits-73-76"
   | "general-mca";
 
+const MCA_REPLY_TYPES: McaReplyType[] = [
+  "annual-filing-92-137",
+  "board-reporting-117",
+  "charge-77-79",
+  "beneficial-ownership-90",
+  "board-governance-173",
+  "board-report-134",
+  "related-party-188",
+  "managerial-kmp-203",
+  "deposits-73-76",
+  "general-mca",
+];
+
+const normalizeMcaReplyType = (value: string | null | undefined): McaReplyType | null => {
+  if (!value) return null;
+  const cleaned = value.trim().toLowerCase();
+  return (MCA_REPLY_TYPES as string[]).includes(cleaned) ? (cleaned as McaReplyType) : null;
+};
+
 const inferMcaReplyType = (noticeDetails?: string, extractedNotice?: NoticeIntelligence | null): McaReplyType => {
   const corpus = `${noticeDetails ?? ""}\n${JSON.stringify(extractedNotice?.notice_snapshot?.invoked_provisions ?? [])}`.toLowerCase();
   if (/\bsection\s*92\b|\bsection\s*137\b|\bmgt-?7\b|\baoc-?4\b/.test(corpus)) return "annual-filing-92-137";
@@ -676,6 +695,7 @@ serve(async (req) => {
       industry,
       context,
       noticeDetails,
+      mcaReplyTypeOverride,
       advancedMode = false,
       strictValidation = false,
       stream = false,
@@ -767,7 +787,7 @@ If notice data is missing, list specific missing items in critical_missing_field
     }
 
     const mcaReplyType: McaReplyType | null = documentType === "mca-notice"
-      ? inferMcaReplyType(noticeDetails, extractedNotice)
+      ? (normalizeMcaReplyType(mcaReplyTypeOverride) ?? inferMcaReplyType(noticeDetails, extractedNotice))
       : null;
 
     const systemPrompt = `ROLE & AUTHORITY
@@ -871,6 +891,7 @@ Avoid unsupported case law. Use controlled placeholders only where unavoidable.`
           companyName,
           draftMode,
           industry,
+          mcaReplyType,
           advancedMode,
           generatedAt: new Date().toISOString(),
           version: "2.0",
@@ -1153,6 +1174,7 @@ Schema:
         companyName,
         draftMode,
         industry,
+        mcaReplyType,
         advancedMode,
         userId,
         generatedAt: new Date().toISOString(),
