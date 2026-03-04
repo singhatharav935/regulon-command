@@ -643,6 +643,30 @@ const buildMca454ProvisoText = (noticeDate?: string | null) => {
   return "Without prejudice, if the default stood rectified before issuance of notice, or within 30 days from notice service, the Noticee seeks consideration under the proviso to Section 454, subject to statutory satisfaction.";
 };
 
+const normalizeMcaNoticeDateMentions = (draft: string, noticeDate?: string | null) => {
+  const anchoredDate = (noticeDate ?? "").trim();
+  if (!anchoredDate) return draft;
+
+  let fixed = draft;
+  const datePattern = "([0-9]{1,2}\\s+[A-Za-z]+\\s+[0-9]{4}|[0-9]{1,2}[/-][0-9]{1,2}[/-][0-9]{2,4})";
+
+  // Normalize explicit notice-reference date phrases to the extracted notice date.
+  fixed = fixed.replace(
+    new RegExp(`(Notice\\s*(?:No\\.?|number)?[^\\n]{0,120}?dated\\s+)${datePattern}`, "gi"),
+    `$1${anchoredDate}`,
+  );
+  fixed = fixed.replace(
+    new RegExp(`(Adjudication\\s+Notice[^\\n]{0,120}?dated\\s+)${datePattern}`, "gi"),
+    `$1${anchoredDate}`,
+  );
+  fixed = fixed.replace(
+    new RegExp(`(SUBJECT:[^\\n]{0,180}?dated\\s+)${datePattern}`, "gi"),
+    `$1${anchoredDate}`,
+  );
+
+  return fixed;
+};
+
 const enforceMcaDraftMinimumStructure = (
   draft: string,
   mcaReplyType: McaReplyType,
@@ -657,6 +681,9 @@ const enforceMcaDraftMinimumStructure = (
   fixed = fixed.replace(/\babsolve\b[^.\n]{0,60}\bofficer[s]?\s+in\s+default/gi, "drop or reduce penalty on officers in default based on role, conduct, and mitigating facts");
   fixed = fixed.replace(/\babsolve\b[^.\n]{0,120}\bpersonal liability/gi, "consider role-based mitigation for officers in default");
   fixed = fixed.replace(/\bimpose\s+no\s+penalty\b/gi, "drop or reduce penalty");
+  fixed = fixed.replace(/\bwaive\s+or\s+substantially\s+reduce\s+the\s+proposed\s+penalty\b/gi, "drop or reduce penalty on the Company and officers in default based on role, conduct, and mitigating facts");
+  fixed = fixed.replace(/\bwaive\s+or\s+substantially\s+reduce\s+the\s+penalty\b/gi, "drop or reduce penalty on the Company and officers in default based on role, conduct, and mitigating facts");
+  fixed = fixed.replace(/\bwaive\s+or\s+reduce\s+the\s+penalty\b/gi, "drop or reduce penalty on the Company and officers in default based on role, conduct, and mitigating facts");
   fixed = fixed.replace(/\bdrop the adjudication proceedings against the company and its officers in default\b/gi, "drop or reduce penalty on the Company and officers in default based on role, conduct, and mitigating facts");
   fixed = fixed.replace(/waive penalty for officers/gi, "drop or reduce penalty on officers in default based on role, conduct, and mitigating facts");
   fixed = fixed.replace(/waive\s+the\s+penalty\s+on\s+the\s+officers\s+in\s+default/gi, "drop or reduce penalty on officers in default based on role, conduct, and mitigating facts");
@@ -690,6 +717,8 @@ const enforceMcaDraftMinimumStructure = (
       .replace(/\babsolve\b[^.\n]{0,80}\bofficer[s]?\b/gi, "drop or reduce penalty on officers in default")
       .replace(/\bimpose\s+no\s+penalty\b/gi, "drop or reduce penalty")
   );
+
+  fixed = normalizeMcaNoticeDateMentions(fixed, noticeDate);
 
   if (!/personal hearing|hearing/i.test(fixed)) {
     fixed += `\n\n### Hearing Request\nThe Noticee requests an opportunity of personal hearing (physical/VC mode) before any adverse order is passed.`;
