@@ -122,6 +122,42 @@ const sanitizeNoticeDetailsClient = (raw: string, fallback: string) => {
   return text;
 };
 
+const normalizeForComparison = (value: string) =>
+  (value || "").replace(/\s+/g, " ").trim().toLowerCase();
+
+const buildStructuredNoticeDetailsFallback = (
+  documentType: string,
+  sourceText: string,
+  authorityLabel: string,
+  mcaType?: string,
+) => {
+  const src = sourceText || "";
+  const noticeNo =
+    src.match(/(?:notice\s*(?:no\.?|number)?|ref\.?\s*no\.?|reference\s*no\.?)\s*[:\-]?\s*([a-z0-9\/\-_]+)/i)?.[1] ||
+    "[To be filled by CA/Lawyer]";
+  const dinOrRfn =
+    src.match(/\b(?:din|rfn)\s*[:\-]?\s*([a-z0-9\/\-_]+)/i)?.[1] || "[To be filled by CA/Lawyer]";
+  const noticeDate =
+    src.match(/dated\s+([0-9]{1,2}\s+[A-Za-z]+\s+[0-9]{4})/i)?.[1] ||
+    src.match(/dated\s+([0-9]{1,2}[\/-][0-9]{1,2}[\/-][0-9]{2,4})/i)?.[1] ||
+    "[To be filled by CA/Lawyer]";
+  const amount =
+    src.match(/(?:inr|rs\.?|₹)\s*([0-9,]+(?:\.\d+)?)/i)?.[1] || "[To be filled by CA/Lawyer]";
+  const sections = Array.from(new Set((src.match(/section\s*\d+[a-z]*/gi) || []).map((s) => s.replace(/\s+/g, " ").trim()))).slice(0, 6);
+  const rules = Array.from(new Set((src.match(/rule\s*\d+[a-z]*/gi) || []).map((s) => s.replace(/\s+/g, " ").trim()))).slice(0, 4);
+  const fy =
+    src.match(/\bfy\s*[0-9]{4}\s*-\s*[0-9]{2,4}\b/i)?.[0] ||
+    src.match(/\bfinancial year\s*[0-9]{4}\s*-\s*[0-9]{2,4}\b/i)?.[0] ||
+    "[To be filled by CA/Lawyer]";
+
+  const mcaSpecificLine =
+    documentType === "mca-notice"
+      ? `Auto-detected MCA class is ${mcaType || "general-mca"}. Ensure draft explicitly covers allegation-wise legal response, chronology evidence, officer-wise defense, and calibrated prayer language.`
+      : "Ensure the draft remains allegation-wise, evidence-linked, and proportionate in relief prayer.";
+
+  return `Notice/Order Details Summary for ${authorityLabel}: Reference ${noticeNo}, dated ${noticeDate}, DIN/RFN ${dinOrRfn}. The notice indicates alleged non-compliance under ${sections.length ? sections.join(", ") : "[To be filled by CA/Lawyer]"}${rules.length ? ` read with ${rules.join(", ")}` : ""}, for period ${fy}. Proposed exposure/penalty marker captured from notice text is INR ${amount}. ${mcaSpecificLine} Drafting requirements: include chronology with due/event date vs actual action date, section-wise legal submissions, annexure mapping with document anchors, and hearing request. Keep pending factual fields as [To be filled by CA/Lawyer] only.`;
+};
+
 type StepStatus = "pending" | "completed" | "current";
 type WorkflowStatus = "generated" | "under_review" | "approved" | "signed_off";
 
@@ -980,6 +1016,7 @@ const AIDraftingEngine = ({ demoMode = false, includeLawyerReview = true }: AIDr
     const client = clientOptions.find((c) => c.id === selectedClient);
     setIsGeneratingNoticeDetails(true);
     try {
+      const sourceNotice = noticeDetails.trim() || readyNoticeTemplates[selectedDocType] || "";
       const generated = await requestDraftData({
         operation: "notice-details",
         documentType: selectedDocType,
@@ -990,7 +1027,7 @@ const AIDraftingEngine = ({ demoMode = false, includeLawyerReview = true }: AIDr
           ? mcaReplyTypeOverride
           : undefined,
         context: `Generate precise Notice/Order Details for ${selectedDocLabel}. Ensure this is input-quality text for strict legal drafting checks.`,
-        noticeDetails: noticeDetails || undefined,
+        noticeDetails: sourceNotice || undefined,
         stream: false,
       });
 
@@ -1001,14 +1038,52 @@ const AIDraftingEngine = ({ demoMode = false, includeLawyerReview = true }: AIDr
       if (!aiNoticeDetails) {
         throw new Error("AI did not return notice details.");
       }
-      const fallbackNotice = noticeDetails?.trim() || readyNoticeTemplates[selectedDocType] || "";
+      const fallbackNotice = sourceNotice;
       const sanitizedNotice = sanitizeNoticeDetailsClient(aiNoticeDetails, fallbackNotice);
-      setNoticeDetails(sanitizedNotice);
+      const normalizedSanitized = normalizeForComparison(sanitizedNotice);
+      const normalizedCurrent = normalizeForComparison(noticeDetails);
+      const normalizedTemplate = normalizeForComparison(readyNoticeTemplates[selectedDocType] || "");
+      const shouldUseStructuredFallback =
+        normalizedSanitized.length === 0 ||
+        normalizedSanitized === normalizedCurrent ||
+        normalizedSanitized === normalizedTemplate;
+
+      const finalNoticeDetails = shouldUseStructuredFallback
+        ? buildStructuredNoticeDetailsFallback(
+            selectedDocType,
+            sourceNotice,
+            selectedDocLabel,
+            selectedDocType === "mca-notice"
+              ? (mcaReplyTypeOverride !== "auto" ? mcaReplyTypeOverride : inferredMcaReplyType)
+              : undefined,
+          )
+        : sanitizedNotice;
+
+      setNoticeDetails(finalNoticeDetails);
       setLastTemplateDocType(selectedDocType);
-      toast.success("AI Notice/Order Details generated.");
+      toast.success(
+        shouldUseStructuredFallback
+          ? "Notice/Order Details generated with structured AI-safe fallback."
+          : "AI Notice/Order Details generated.",
+      );
     } catch (error) {
       const msg = error instanceof Error ? error.message : "Failed to generate notice details.";
-      toast.error(msg);
+      const sourceNotice = noticeDetails.trim() || readyNoticeTemplates[selectedDocType] || "";
+      if (sourceNotice) {
+        const fallbackText = buildStructuredNoticeDetailsFallback(
+          selectedDocType,
+          sourceNotice,
+          selectedDocLabel,
+          selectedDocType === "mca-notice"
+            ? (mcaReplyTypeOverride !== "auto" ? mcaReplyTypeOverride : inferredMcaReplyType)
+            : undefined,
+        );
+        setNoticeDetails(fallbackText);
+        setLastTemplateDocType(selectedDocType);
+        toast.warning(`AI notice details failed; inserted structured fallback. ${msg}`);
+      } else {
+        toast.error(msg);
+      }
     } finally {
       setIsGeneratingNoticeDetails(false);
     }
