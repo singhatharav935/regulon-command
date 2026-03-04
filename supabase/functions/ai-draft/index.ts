@@ -116,7 +116,9 @@ MCA ADJUDICATION HARD REQUIREMENTS (MANDATORY FOR MCA NOTICE DRAFTS):
 5. If rectification occurred before notice OR within 30 days of notice, include a specific Section 454 proviso submission seeking no-penalty treatment (fact-dependent, no over-claim).
 6. Mention Section 446B only when factual qualification is shown in the draft (e.g., paid-up capital/turnover/startup recognition date).
 7. Never use "waive penalty for officers"; instead use "drop or reduce penalty on officers in default based on role, conduct, and mitigating facts."
-8. If any filing-critical data is unavailable (dates, SRNs, officer details), append "Data Required to Finalize Filing".
+8. Use this output skeleton: heading + notice metadata + preliminary submissions + chronology table + legal submissions + officer-specific defense + 446B block (if eligible) + annexures + layered prayer + sign-off.
+9. If filing-critical data is unavailable, placeholders are allowed only as "[To be filled by CA/Lawyer]" or simple metadata placeholders (CIN/address/signatory fields).
+10. If critical details remain unavailable, append "Data Required to Finalize Filing".
 `;
 
 const getAdvancedDraftingRequirements = () => `
@@ -222,8 +224,31 @@ interface NoticeIntelligence {
   critical_missing_fields: string[];
 }
 
-const hasPlaceholders = (content: string) =>
-  /\[insert[^\]]*\]|\[to be filled\]|<insert|placeholder/i.test(content);
+const hasPlaceholderMarkers = (content: string) =>
+  /\[insert[^\]]*\]|\[to be filled[^\]]*\]|<insert|placeholder/i.test(content);
+
+const hasDisallowedMcaPlaceholders = (content: string) => {
+  const placeholderTokens = (content.match(/\[[^\]]+\]|<insert[^>]*>/gi) ?? []).filter((token) =>
+    /(insert|to be filled|placeholder)/i.test(token)
+  );
+
+  if (placeholderTokens.length === 0) return false;
+
+  const allowedPatterns = [
+    /^\[\s*to be filled by ca\/lawyer\s*\]$/i,
+    /^\[\s*insert\s+(cin|full address|office address|name|designation|din\/membership no\.?|date|place|city|srn|filing date|received on)\s*\]$/i,
+  ];
+
+  return placeholderTokens.some((token) => !allowedPatterns.some((pattern) => pattern.test(token)));
+};
+
+const isNoPlaceholderGatePassed = (content: string, documentType: string) => {
+  if (documentType === "mca-notice") {
+    if (!hasPlaceholderMarkers(content)) return true;
+    return !hasDisallowedMcaPlaceholders(content);
+  }
+  return !hasPlaceholderMarkers(content);
+};
 
 const buildRiskBand = (score: number): "low" | "medium" | "high" => {
   if (score >= 75) return "low";
@@ -475,7 +500,21 @@ ${extractedNotice ? `EXTRACTED NOTICE INTELLIGENCE (use as primary structure sou
 ${noticeDetails ? `RAW NOTICE DETAILS:\n${noticeDetails}` : ""}
 `;
 
-    const userMessage = context || `Generate a comprehensive, filing-ready ${documentType.replace(/-/g, " ")} for ${companyName}${industry ? ` (${industry} sector)` : ""}. Include SCN para-wise rebuttal matrix, allegation-wise computation challenge with accepted/disputed columns, annexure mapping per issue, calibrated legal language, and complete layered prayer.`;
+    const userMessage = context || (documentType === "mca-notice"
+      ? `Generate a final adjudication-ready MCA reply for ${companyName}${industry ? ` (${industry} sector)` : ""}.
+Mandatory structure:
+1) Heading + exact ROC jurisdiction from notice
+2) Notice metadata (notice no, date, DIN, company block, officers in default block)
+3) Preliminary submissions
+4) Chronology table with due date vs actual filing date and SRN/challan for AOC-4 and MGT-7
+5) Legal submissions under Sections 92, 137, 403, 454 (with fact-dependent proviso request)
+6) Officer-specific defense table
+7) Section 446B block only if factual qualification is shown
+8) Annexure index
+9) Layered prayer with hearing request
+10) Sign-off
+Avoid unsupported case law. Use controlled placeholders only where unavoidable.`
+      : `Generate a comprehensive, filing-ready ${documentType.replace(/-/g, " ")} for ${companyName}${industry ? ` (${industry} sector)` : ""}. Include SCN para-wise rebuttal matrix, allegation-wise computation challenge with accepted/disputed columns, annexure mapping per issue, calibrated legal language, and complete layered prayer.`);
 
     if (!advancedMode) {
       const response = await aiRequest({
@@ -634,7 +673,7 @@ Schema:
     }
 
     const fallbackGates = {
-      no_placeholders: !hasPlaceholders(finalDraft),
+      no_placeholders: isNoPlaceholderGatePassed(finalDraft, documentType),
       para_wise_matrix_present: /para[- ]wise rebuttal matrix|scn para/i.test(finalDraft),
       computation_table_present: /computation|reconciliation|accepted|disputed/i.test(finalDraft),
       annexure_mapping_present: /annexure/i.test(finalDraft),
@@ -642,7 +681,7 @@ Schema:
     };
 
     const mandatoryGates = qaPayload?.mandatory_gates ?? fallbackGates;
-    const noPlaceholderGate = mandatoryGates.no_placeholders && !hasPlaceholders(finalDraft);
+    const noPlaceholderGate = mandatoryGates.no_placeholders && isNoPlaceholderGatePassed(finalDraft, documentType);
 
     const gateFailures: string[] = [];
     if (!noPlaceholderGate) gateFailures.push("no_placeholders");
