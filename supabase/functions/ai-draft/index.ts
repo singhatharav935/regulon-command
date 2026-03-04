@@ -107,6 +107,18 @@ CUSTOM REGULATORY DRAFT:
   return prompts[documentType] || prompts["custom-draft"];
 };
 
+const getMcaHardRequirements = () => `
+MCA ADJUDICATION HARD REQUIREMENTS (MANDATORY FOR MCA NOTICE DRAFTS):
+1. Identify and use the exact ROC jurisdiction from notice facts (do not guess multiple jurisdictions).
+2. Include a chronology table with BOTH due dates and actual filing dates for AOC-4 and MGT-7, with SRNs/challan refs where available.
+3. Explicitly address Sections 92, 137, 403 and 454 in the legal analysis if these are part of notice facts.
+4. Add officer-specific defense: identify "officer in default", role period, and absence/presence of willful default based on records.
+5. If rectification occurred before notice OR within 30 days of notice, include a specific Section 454 proviso submission seeking no-penalty treatment (fact-dependent, no over-claim).
+6. Mention Section 446B only when factual qualification is shown in the draft (e.g., paid-up capital/turnover/startup recognition date).
+7. Never use "waive penalty for officers"; instead use "drop or reduce penalty on officers in default based on role, conduct, and mitigating facts."
+8. If any filing-critical data is unavailable (dates, SRNs, officer details), append "Data Required to Finalize Filing".
+`;
+
 const getAdvancedDraftingRequirements = () => `
 ADVANCED QUALITY GATES (MANDATORY):
 1. Notice Intelligence Snapshot with authority, notice no., DIN/RFN, period, invoked provisions, demand breakup, response deadline.
@@ -217,6 +229,32 @@ const buildRiskBand = (score: number): "low" | "medium" | "high" => {
   if (score >= 75) return "low";
   if (score >= 45) return "medium";
   return "high";
+};
+
+type DomainGateResult = {
+  gates: Record<string, boolean>;
+  failed: string[];
+};
+
+const runMcaDomainGates = (draft: string): DomainGateResult => {
+  const has446bMention = /\b446B\b/i.test(draft);
+  const gates: Record<string, boolean> = {
+    mentions_92_137: /\bSection\s*92\b/i.test(draft) && /\bSection\s*137\b/i.test(draft),
+    mentions_403: /\bSection\s*403\b/i.test(draft),
+    mentions_454: /\bSection\s*454\b/i.test(draft),
+    has_aoc4_mgt7: /\bAOC-?4\b/i.test(draft) && /\bMGT-?7\b/i.test(draft),
+    has_chronology_table: /due date/i.test(draft) && /actual date/i.test(draft),
+    has_officer_defense: /officer in default|officer-specific|role period|willful default/i.test(draft),
+    avoids_waive_officer_penalty_phrase: !/waive penalty for officers/i.test(draft),
+    qualifies_446b_if_used: !has446bMention || /(paid-?up capital|turnover|startup recognition|section 2\(85\))/i.test(draft),
+  };
+
+  return {
+    gates,
+    failed: Object.entries(gates)
+      .filter(([, passed]) => !passed)
+      .map(([name]) => name),
+  };
 };
 
 serve(async (req) => {
@@ -425,6 +463,7 @@ ${getAdvancedDraftingRequirements()}
 
 DOMAIN DIRECTIVES
 ${documentTypePrompt}
+${documentType === "mca-notice" ? getMcaHardRequirements() : ""}
 
 COMPANY CONTEXT
 - Company: ${companyName}
@@ -612,6 +651,13 @@ Schema:
     if (!mandatoryGates.annexure_mapping_present) gateFailures.push("annexure_mapping_present");
     if (!mandatoryGates.prayer_complete) gateFailures.push("prayer_complete");
 
+    let domainGates: Record<string, boolean> = {};
+    if (documentType === "mca-notice") {
+      const mcaGateResult = runMcaDomainGates(finalDraft);
+      domainGates = mcaGateResult.gates;
+      gateFailures.push(...mcaGateResult.failed);
+    }
+
     if (strictValidation && gateFailures.length > 0) {
       return new Response(JSON.stringify({
         error: `Filing gates not satisfied: ${gateFailures.join(", ")}`,
@@ -647,6 +693,7 @@ Schema:
           ...mandatoryGates,
           no_placeholders: noPlaceholderGate,
         },
+        domain_gates: domainGates,
         citation_review: qaPayload?.citation_review ?? [],
         explainability: qaPayload?.explainability ?? [],
         missing_for_final_filing: qaPayload?.missing_for_final_filing ?? [],
