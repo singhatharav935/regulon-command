@@ -216,6 +216,7 @@ type McaIssueReport = {
   ok: boolean;
   items: Array<{ issue: string; suggestion: string }>;
   issues: string[];
+  advancedSuggestions?: Array<{ title: string; suggestion: string }>;
   checkedAt: string;
 };
 
@@ -579,6 +580,7 @@ const AIDraftingEngine = ({ demoMode = false, includeLawyerReview = true }: AIDr
   const [mcaIssueReport, setMcaIssueReport] = useState<McaIssueReport | null>(null);
   const [mcaFixNotes, setMcaFixNotes] = useState("");
   const [isApplyingMcaFix, setIsApplyingMcaFix] = useState(false);
+  const [mcaAdvancedSuggestions, setMcaAdvancedSuggestions] = useState<Array<{ title: string; suggestion: string }>>([]);
   const [currentSteps, setCurrentSteps] = useState<ReviewStep[]>(initialReviewSteps);
   const [generationError, setGenerationError] = useState<string | null>(null);
 
@@ -692,6 +694,49 @@ const AIDraftingEngine = ({ demoMode = false, includeLawyerReview = true }: AIDr
     return items;
   };
 
+  const evaluateMcaAdvancedSuggestions = (
+    content: string,
+    mcaType?: string,
+    qa?: DraftQA | null,
+  ): Array<{ title: string; suggestion: string }> => {
+    const suggestions: Array<{ title: string; suggestion: string }> = [];
+    const addSuggestion = (condition: boolean, title: string, suggestion: string) => {
+      if (condition) suggestions.push({ title, suggestion });
+    };
+
+    addSuggestion(
+      !/section\s*454(3)/i.test(content),
+      "Strengthen Statutory Anchor",
+      "Add a focused paragraph on Section 454(3) discretion and proportionality linked to rectification facts.",
+    );
+    addSuggestion(
+      !/annexure[-\s]*(a|1|i)/i.test(content),
+      "Improve Evidence Mapping",
+      "Add annexure-to-issue mapping so each rebuttal paragraph has a direct document anchor.",
+    );
+    addSuggestion(
+      !/hearing/i.test(content),
+      "Add Hearing Strategy",
+      "Include preferred hearing mode (VC/physical), authorized representative details, and concise hearing ask.",
+    );
+    addSuggestion(
+      !/officer/i.test(content),
+      "Individual Officer Positioning",
+      "Add role-period responsibility breakup to separate company lapse from individual officer conduct.",
+    );
+    addSuggestion(
+      mcaType === "annual-filing-92-137" && !/section\s*403/i.test(content),
+      "Add Section 403 Framing",
+      "Explicitly tie delayed filing regularization to Section 403 with challan/SRN reference language.",
+    );
+    addSuggestion(
+      (qa?.filing_score ?? 100) < 95,
+      "Raise Filing-Readiness Score",
+      "Tighten chronology precision (exact due date vs actual date vs SRN) and prune generic statements.",
+    );
+    return suggestions;
+  };
+
   const enforceMcaLocalFallback = (rawContent: string, mcaType?: string) => {
     let content = rawContent || "";
 
@@ -763,19 +808,23 @@ const AIDraftingEngine = ({ demoMode = false, includeLawyerReview = true }: AIDr
   const runMcaDraftIssueCheck = (contentOverride?: string, qaOverride?: DraftQA | null) => {
     const content = contentOverride ?? draftContent ?? "";
     const effectiveQa = qaOverride ?? draftQA;
+    const advanced = evaluateMcaAdvancedSuggestions(content, inferredMcaReplyType, effectiveQa);
 
     // Detector must evaluate the raw visible draft text only.
     // Do not auto-inject fixes here, otherwise real issues get masked.
     const items = evaluateMcaDraftIssues(content, effectiveQa, inferredMcaReplyType, true);
+    setMcaAdvancedSuggestions(advanced);
 
     setMcaIssueReport({
       ok: items.length === 0,
       items,
       issues: items.map((item) => item.issue),
+      advancedSuggestions: advanced,
       checkedAt: new Date().toISOString(),
     });
     if (items.length === 0) {
-      setMcaFixNotes("");
+      const advancedNotes = advanced.map((item, idx) => `${idx + 1}. ${item.title}\nSuggestion: ${item.suggestion}`).join("\n\n");
+      setMcaFixNotes(advancedNotes);
     }
   };
 
@@ -787,11 +836,14 @@ const AIDraftingEngine = ({ demoMode = false, includeLawyerReview = true }: AIDr
 
   useEffect(() => {
     if (selectedDocType !== "mca-notice") return;
-    if (!mcaIssueReport || mcaIssueReport.ok || isApplyingMcaFix) return;
+    if (!mcaIssueReport || isApplyingMcaFix) return;
     if (mcaFixNotes.trim().length > 0) return;
 
-    const autoNotes = mcaIssueReport.items
-      .map((item, idx) => `${idx + 1}. ${item.issue}\nSuggestion: ${item.suggestion}`)
+    const issueNotes = mcaIssueReport.items
+      .map((item, idx) => `${idx + 1}. ${item.issue}\nSuggestion: ${item.suggestion}`);
+    const advancedNotes = (mcaIssueReport.advancedSuggestions || [])
+      .map((item, idx) => `${idx + 1 + issueNotes.length}. ${item.title}\nSuggestion: ${item.suggestion}`);
+    const autoNotes = [...issueNotes, ...advancedNotes]
       .join("\n\n");
     setMcaFixNotes(autoNotes);
   }, [selectedDocType, mcaIssueReport, mcaFixNotes, isApplyingMcaFix]);
@@ -1168,8 +1220,13 @@ const AIDraftingEngine = ({ demoMode = false, includeLawyerReview = true }: AIDr
 
     const client = clientOptions.find((c) => c.id === selectedClient);
     const effectiveIssueItems = mcaIssueReport?.items ?? evaluateMcaDraftIssues(draftContent, draftQA, inferredMcaReplyType);
+    const effectiveAdvancedSuggestions =
+      mcaIssueReport?.advancedSuggestions ?? evaluateMcaAdvancedSuggestions(draftContent, inferredMcaReplyType, draftQA);
     const issueText = effectiveIssueItems
       .map((item, idx) => `${idx + 1}. Issue: ${item.issue}\n   Suggestion: ${item.suggestion}`)
+      .join("\n");
+    const advancedSuggestionText = effectiveAdvancedSuggestions
+      .map((item, idx) => `${idx + 1}. Upgrade: ${item.title}\n   Suggestion: ${item.suggestion}`)
       .join("\n");
 
     const fixContext = `You are improving an MCA adjudication draft.
@@ -1186,6 +1243,9 @@ ${draftContent}
 
 DETECTED ISSUES:
 ${issueText || "None provided"}
+
+ADVANCED UPGRADE SUGGESTIONS:
+${advancedSuggestionText || "No additional upgrades detected."}
 
 CA/LAWYER ADDITIONAL FIX NOTES:
 ${mcaFixNotes || "Use the detected issues and suggestions above as mandatory corrections."}
@@ -1311,6 +1371,7 @@ Return only the revised final draft text.`;
     setDraftPackage(null);
     setMcaIssueReport(null);
     setMcaFixNotes("");
+    setMcaAdvancedSuggestions([]);
     
     const client = clientOptions.find(c => c.id === selectedClient);
     const maskedNoticeDetails = noticeDetails ? maskPII(noticeDetails) : undefined;
@@ -1963,6 +2024,19 @@ Return only the revised final draft text.`;
                           </ul>
                         </div>
                       )}
+                    </div>
+                  )}
+                  {mcaAdvancedSuggestions.length > 0 && (
+                    <div className="p-4 rounded-lg border border-cyan-500/30 bg-cyan-500/10 text-cyan-200 text-sm">
+                      <p className="font-medium mb-2">Advanced Suggestions:</p>
+                      <ul className="list-disc pl-5 space-y-2">
+                        {mcaAdvancedSuggestions.map((item, idx) => (
+                          <li key={`${item.title}-${idx}`}>
+                            <p>{item.title}</p>
+                            <p className="text-xs text-cyan-100/90 mt-1">Suggestion: {item.suggestion}</p>
+                          </li>
+                        ))}
+                      </ul>
                     </div>
                   )}
 
