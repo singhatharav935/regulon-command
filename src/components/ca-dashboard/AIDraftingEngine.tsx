@@ -216,7 +216,7 @@ type McaIssueReport = {
   ok: boolean;
   items: Array<{ issue: string; suggestion: string }>;
   issues: string[];
-  advancedSuggestions?: Array<{ title: string; suggestion: string }>;
+  advancedSuggestions?: Array<{ title: string; suggestion: string; implemented: boolean }>;
   checkedAt: string;
 };
 
@@ -580,7 +580,7 @@ const AIDraftingEngine = ({ demoMode = false, includeLawyerReview = true }: AIDr
   const [mcaIssueReport, setMcaIssueReport] = useState<McaIssueReport | null>(null);
   const [mcaFixNotes, setMcaFixNotes] = useState("");
   const [isApplyingMcaFix, setIsApplyingMcaFix] = useState(false);
-  const [mcaAdvancedSuggestions, setMcaAdvancedSuggestions] = useState<Array<{ title: string; suggestion: string }>>([]);
+  const [mcaAdvancedSuggestions, setMcaAdvancedSuggestions] = useState<Array<{ title: string; suggestion: string; implemented: boolean }>>([]);
   const [currentSteps, setCurrentSteps] = useState<ReviewStep[]>(initialReviewSteps);
   const [generationError, setGenerationError] = useState<string | null>(null);
 
@@ -698,43 +698,40 @@ const AIDraftingEngine = ({ demoMode = false, includeLawyerReview = true }: AIDr
     content: string,
     mcaType?: string,
     qa?: DraftQA | null,
-  ): Array<{ title: string; suggestion: string }> => {
-    const suggestions: Array<{ title: string; suggestion: string }> = [];
-    const addSuggestion = (condition: boolean, title: string, suggestion: string) => {
-      if (condition) suggestions.push({ title, suggestion });
-    };
-
-    addSuggestion(
-      !/section\s*454(3)/i.test(content),
-      "Strengthen Statutory Anchor",
-      "Add a focused paragraph on Section 454(3) discretion and proportionality linked to rectification facts.",
-    );
-    addSuggestion(
-      !/annexure[-\s]*(a|1|i)/i.test(content),
-      "Improve Evidence Mapping",
-      "Add annexure-to-issue mapping so each rebuttal paragraph has a direct document anchor.",
-    );
-    addSuggestion(
-      !/hearing/i.test(content),
-      "Add Hearing Strategy",
-      "Include preferred hearing mode (VC/physical), authorized representative details, and concise hearing ask.",
-    );
-    addSuggestion(
-      !/officer/i.test(content),
-      "Individual Officer Positioning",
-      "Add role-period responsibility breakup to separate company lapse from individual officer conduct.",
-    );
-    addSuggestion(
-      mcaType === "annual-filing-92-137" && !/section\s*403/i.test(content),
-      "Add Section 403 Framing",
-      "Explicitly tie delayed filing regularization to Section 403 with challan/SRN reference language.",
-    );
-    addSuggestion(
-      (qa?.filing_score ?? 100) < 95,
-      "Raise Filing-Readiness Score",
-      "Tighten chronology precision (exact due date vs actual date vs SRN) and prune generic statements.",
-    );
-    return suggestions;
+  ): Array<{ title: string; suggestion: string; implemented: boolean }> => {
+    const checks: Array<{ title: string; suggestion: string; implemented: boolean }> = [
+      {
+        title: "Strengthen Statutory Anchor",
+        suggestion: "Add a focused paragraph on Section 454(3) discretion and proportionality linked to rectification facts.",
+        implemented: /section\s*454(3)/i.test(content),
+      },
+      {
+        title: "Improve Evidence Mapping",
+        suggestion: "Add annexure-to-issue mapping so each rebuttal paragraph has a direct document anchor.",
+        implemented: /annexure[-\s]*(a|1|i)/i.test(content),
+      },
+      {
+        title: "Add Hearing Strategy",
+        suggestion: "Include preferred hearing mode (VC/physical), authorized representative details, and concise hearing ask.",
+        implemented: /hearing/i.test(content),
+      },
+      {
+        title: "Individual Officer Positioning",
+        suggestion: "Add role-period responsibility breakup to separate company lapse from individual officer conduct.",
+        implemented: /officer/i.test(content),
+      },
+      {
+        title: "Add Section 403 Framing",
+        suggestion: "Explicitly tie delayed filing regularization to Section 403 with challan/SRN reference language.",
+        implemented: mcaType !== "annual-filing-92-137" || /section\s*403/i.test(content),
+      },
+      {
+        title: "Raise Filing-Readiness Score",
+        suggestion: "Tighten chronology precision (exact due date vs actual date vs SRN) and prune generic statements.",
+        implemented: (qa?.filing_score ?? 100) >= 95,
+      },
+    ];
+    return checks;
   };
 
   const enforceMcaLocalFallback = (rawContent: string, mcaType?: string) => {
@@ -823,7 +820,10 @@ const AIDraftingEngine = ({ demoMode = false, includeLawyerReview = true }: AIDr
       checkedAt: new Date().toISOString(),
     });
     if (items.length === 0) {
-      const advancedNotes = advanced.map((item, idx) => `${idx + 1}. ${item.title}\nSuggestion: ${item.suggestion}`).join("\n\n");
+      const advancedNotes = advanced
+        .filter((item) => !item.implemented)
+        .map((item, idx) => `${idx + 1}. ${item.title}\nSuggestion: ${item.suggestion}`)
+        .join("\n\n");
       setMcaFixNotes(advancedNotes);
     }
   };
@@ -1226,6 +1226,7 @@ const AIDraftingEngine = ({ demoMode = false, includeLawyerReview = true }: AIDr
       .map((item, idx) => `${idx + 1}. Issue: ${item.issue}\n   Suggestion: ${item.suggestion}`)
       .join("\n");
     const advancedSuggestionText = effectiveAdvancedSuggestions
+      .filter((item) => !item.implemented)
       .map((item, idx) => `${idx + 1}. Upgrade: ${item.title}\n   Suggestion: ${item.suggestion}`)
       .join("\n");
 
@@ -2032,7 +2033,12 @@ Return only the revised final draft text.`;
                       <ul className="list-disc pl-5 space-y-2">
                         {mcaAdvancedSuggestions.map((item, idx) => (
                           <li key={`${item.title}-${idx}`}>
-                            <p>{item.title}</p>
+                            <p className={item.implemented ? "text-green-300" : "text-cyan-200"}>
+                              {item.implemented ? "✓ " : ""}{item.title}
+                              <span className={`ml-2 text-[11px] ${item.implemented ? "text-green-300" : "text-yellow-200"}`}>
+                                [{item.implemented ? "Implemented" : "Pending"}]
+                              </span>
+                            </p>
                             <p className="text-xs text-cyan-100/90 mt-1">Suggestion: {item.suggestion}</p>
                           </li>
                         ))}
