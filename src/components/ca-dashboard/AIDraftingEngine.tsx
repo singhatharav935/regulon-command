@@ -756,15 +756,9 @@ const AIDraftingEngine = ({ demoMode = false, includeLawyerReview = true }: AIDr
 
   const runMcaDraftIssueCheck = (contentOverride?: string, qaOverride?: DraftQA | null) => {
     const content = contentOverride ?? draftContent ?? "";
-    const normalizedContent = enforceMcaHardFixes(
-      content,
-      noticeDetails,
-      mcaReplyTypeOverride !== "auto" ? mcaReplyTypeOverride : inferredMcaReplyType,
-    );
-    if (normalizedContent !== content) {
-      setDraftContent(normalizedContent);
-    }
-    const items = evaluateMcaDraftIssues(normalizedContent, qaOverride ?? draftQA, inferredMcaReplyType, true);
+    // Detector must evaluate the raw visible draft text only.
+    // Do not auto-inject fixes here, otherwise real issues get masked.
+    const items = evaluateMcaDraftIssues(content, qaOverride ?? draftQA, inferredMcaReplyType, true);
 
     setMcaIssueReport({
       ok: items.length === 0,
