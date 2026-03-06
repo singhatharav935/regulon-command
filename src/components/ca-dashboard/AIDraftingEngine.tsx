@@ -135,6 +135,21 @@ const sanitizeNoticeDetailsClient = (raw: string, fallback: string) => {
 const normalizeForComparison = (value: string) =>
   (value || "").replace(/\s+/g, " ").trim().toLowerCase();
 
+const buildMcaCheckSignature = (
+  content: string,
+  qa: DraftQA | null | undefined,
+  mcaType: string,
+) => {
+  const mandatory = qa?.mandatory_gates || {};
+  const domain = qa?.domain_gates || {};
+  return JSON.stringify({
+    content: normalizeForComparison(content),
+    mcaType,
+    mandatory,
+    domain,
+  });
+};
+
 const buildStructuredNoticeDetailsFallback = (
   documentType: string,
   sourceText: string,
@@ -579,6 +594,7 @@ const AIDraftingEngine = ({ demoMode = false, includeLawyerReview = true }: AIDr
   const [mcaIssueReport, setMcaIssueReport] = useState<McaIssueReport | null>(null);
   const [mcaFixNotes, setMcaFixNotes] = useState("");
   const [isApplyingMcaFix, setIsApplyingMcaFix] = useState(false);
+  const [lastMcaPassingSignature, setLastMcaPassingSignature] = useState<string | null>(null);
   const [currentSteps, setCurrentSteps] = useState<ReviewStep[]>(initialReviewSteps);
   const [generationError, setGenerationError] = useState<string | null>(null);
 
@@ -756,9 +772,24 @@ const AIDraftingEngine = ({ demoMode = false, includeLawyerReview = true }: AIDr
 
   const runMcaDraftIssueCheck = (contentOverride?: string, qaOverride?: DraftQA | null) => {
     const content = contentOverride ?? draftContent ?? "";
+    const effectiveQa = qaOverride ?? draftQA;
+    const effectiveType = mcaReplyTypeOverride !== "auto" ? mcaReplyTypeOverride : inferredMcaReplyType;
+    const signature = buildMcaCheckSignature(content, effectiveQa, effectiveType);
+
+    if (lastMcaPassingSignature && lastMcaPassingSignature === signature) {
+      setMcaIssueReport({
+        ok: true,
+        items: [],
+        issues: [],
+        checkedAt: new Date().toISOString(),
+      });
+      setMcaFixNotes("");
+      return;
+    }
+
     // Detector must evaluate the raw visible draft text only.
     // Do not auto-inject fixes here, otherwise real issues get masked.
-    const items = evaluateMcaDraftIssues(content, qaOverride ?? draftQA, inferredMcaReplyType, true);
+    const items = evaluateMcaDraftIssues(content, effectiveQa, inferredMcaReplyType, true);
 
     setMcaIssueReport({
       ok: items.length === 0,
@@ -767,7 +798,10 @@ const AIDraftingEngine = ({ demoMode = false, includeLawyerReview = true }: AIDr
       checkedAt: new Date().toISOString(),
     });
     if (items.length === 0) {
+      setLastMcaPassingSignature(signature);
       setMcaFixNotes("");
+    } else if (lastMcaPassingSignature === signature) {
+      setLastMcaPassingSignature(null);
     }
   };
 
@@ -1303,6 +1337,7 @@ Return only the revised final draft text.`;
     setDraftPackage(null);
     setMcaIssueReport(null);
     setMcaFixNotes("");
+    setLastMcaPassingSignature(null);
     
     const client = clientOptions.find(c => c.id === selectedClient);
     const maskedNoticeDetails = noticeDetails ? maskPII(noticeDetails) : undefined;
