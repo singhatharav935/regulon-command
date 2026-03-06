@@ -135,21 +135,6 @@ const sanitizeNoticeDetailsClient = (raw: string, fallback: string) => {
 const normalizeForComparison = (value: string) =>
   (value || "").replace(/\s+/g, " ").trim().toLowerCase();
 
-const buildMcaCheckSignature = (
-  content: string,
-  qa: DraftQA | null | undefined,
-  mcaType: string,
-) => {
-  const mandatory = qa?.mandatory_gates || {};
-  const domain = qa?.domain_gates || {};
-  return JSON.stringify({
-    content: normalizeForComparison(content),
-    mcaType,
-    mandatory,
-    domain,
-  });
-};
-
 const buildStructuredNoticeDetailsFallback = (
   documentType: string,
   sourceText: string,
@@ -594,7 +579,6 @@ const AIDraftingEngine = ({ demoMode = false, includeLawyerReview = true }: AIDr
   const [mcaIssueReport, setMcaIssueReport] = useState<McaIssueReport | null>(null);
   const [mcaFixNotes, setMcaFixNotes] = useState("");
   const [isApplyingMcaFix, setIsApplyingMcaFix] = useState(false);
-  const [lastMcaPassingSignature, setLastMcaPassingSignature] = useState<string | null>(null);
   const [currentSteps, setCurrentSteps] = useState<ReviewStep[]>(initialReviewSteps);
   const [generationError, setGenerationError] = useState<string | null>(null);
 
@@ -672,6 +656,12 @@ const AIDraftingEngine = ({ demoMode = false, includeLawyerReview = true }: AIDr
       /dated\s+15\s+january\s+2024/i.test(content),
       "Notice date mismatch detected (2024 found for this 2026 notice pattern).",
       "Correct all notice-date references to the actual notice date from the notice text.",
+    );
+
+    addIssue(
+      /\[(insert|to be filled)[^\]]*\]/i.test(content),
+      "Unresolved placeholders detected in draft.",
+      "Replace [Insert ...] / [To be filled ...] placeholders with notice-specific facts before marking this draft as compliant.",
     );
 
     if (mcaType === "annual-filing-92-137" || /section\s*92|section\s*137|aoc-?4|mgt-?7/i.test(content)) {
@@ -773,19 +763,6 @@ const AIDraftingEngine = ({ demoMode = false, includeLawyerReview = true }: AIDr
   const runMcaDraftIssueCheck = (contentOverride?: string, qaOverride?: DraftQA | null) => {
     const content = contentOverride ?? draftContent ?? "";
     const effectiveQa = qaOverride ?? draftQA;
-    const effectiveType = mcaReplyTypeOverride !== "auto" ? mcaReplyTypeOverride : inferredMcaReplyType;
-    const signature = buildMcaCheckSignature(content, effectiveQa, effectiveType);
-
-    if (lastMcaPassingSignature && lastMcaPassingSignature === signature) {
-      setMcaIssueReport({
-        ok: true,
-        items: [],
-        issues: [],
-        checkedAt: new Date().toISOString(),
-      });
-      setMcaFixNotes("");
-      return;
-    }
 
     // Detector must evaluate the raw visible draft text only.
     // Do not auto-inject fixes here, otherwise real issues get masked.
@@ -798,10 +775,7 @@ const AIDraftingEngine = ({ demoMode = false, includeLawyerReview = true }: AIDr
       checkedAt: new Date().toISOString(),
     });
     if (items.length === 0) {
-      setLastMcaPassingSignature(signature);
       setMcaFixNotes("");
-    } else if (lastMcaPassingSignature === signature) {
-      setLastMcaPassingSignature(null);
     }
   };
 
@@ -1337,7 +1311,6 @@ Return only the revised final draft text.`;
     setDraftPackage(null);
     setMcaIssueReport(null);
     setMcaFixNotes("");
-    setLastMcaPassingSignature(null);
     
     const client = clientOptions.find(c => c.id === selectedClient);
     const maskedNoticeDetails = noticeDetails ? maskPII(noticeDetails) : undefined;
