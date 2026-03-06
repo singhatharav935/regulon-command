@@ -1,5 +1,6 @@
 import { serve } from "https://deno.land/std@0.168.0/http/server.ts";
 import { createClient } from "https://esm.sh/@supabase/supabase-js@2";
+import { getMcaKnowledgeBlock, getMcaPendingDataChecklist } from "./mca_knowledge/mca_law_knowledge.ts";
 
 const getCorsHeaders = (req: Request) => {
   const origin = req.headers.get("origin") ?? "";
@@ -216,6 +217,8 @@ MCA ADJUDICATION HARD REQUIREMENTS (MANDATORY FOR MCA NOTICE DRAFTS):
 10. If critical details remain unavailable, append "Data Required to Finalize Filing".
 11. Ensure these five quality anchors are always covered where factually relevant: (a) Section 454 proviso request, (b) due-vs-actual chronology with reference IDs, (c) officer-specific defense table, (d) safe prayer wording using "drop/reduce" instead of "waive", and (e) no over-strong penalty rhetoric.
 ${getMcaTypeSpecificRequirements(mcaReplyType)}
+
+${getMcaKnowledgeBlock(mcaReplyType)}
 `;
 
 const getAdvancedDraftingRequirements = () => `
@@ -917,6 +920,8 @@ serve(async (req) => {
       const mcaReplyType: McaReplyType | null = documentType === "mca-notice"
         ? (normalizeMcaReplyType(mcaReplyTypeOverride) ?? inferMcaReplyType(noticeDetails, null))
         : null;
+      const mcaKnowledge = mcaReplyType ? getMcaKnowledgeBlock(mcaReplyType) : "";
+      const mcaChecklist = mcaReplyType ? getMcaPendingDataChecklist(mcaReplyType).map((item) => `- ${item}`).join("\n") : "";
 
       const noticeDetailsSystemPrompt = `You are a legal intake drafting assistant for Indian regulatory replies.
 Generate ONLY "Notice / Order Details" input text to be pasted into a drafting engine.
@@ -926,7 +931,8 @@ Rules:
 3) Include authority, notice reference, DIN/RFN, date, invoked sections/rules, period, proposed penalty/demand, and noticee position.
 4) For MCA annual filing notices, include AOC-4/MGT-7 chronology anchors and SRN/date placeholders only when unavailable.
 5) Do not include headings, salutations, captions, markdown tables, prayer, annexure list, or signature block.
-6) Do not fabricate; if unavailable, mark as "[To be filled by CA/Lawyer]".`;
+6) Do not fabricate; if unavailable, mark as "[To be filled by CA/Lawyer]".
+${mcaReplyType ? `\nMCA KNOWLEDGE CONTEXT:\n${mcaKnowledge}\n\nMCA DATA CHECKLIST TO CAPTURE IN NOTICE DETAILS:\n${mcaChecklist}` : ""}`;
 
       const noticeDetailsUserPrompt = `Prepare Notice/Order Details for:
 - Document Type: ${documentType}
@@ -1070,6 +1076,9 @@ If notice data is missing, list specific missing items in critical_missing_field
       ? (normalizeMcaReplyType(mcaReplyTypeOverride) ?? inferMcaReplyType(noticeDetails, extractedNotice))
       : null;
     const extractedNoticeDate = extractNoticeDateFromText(noticeDetails);
+    const mcaPendingChecklistText = mcaReplyType
+      ? getMcaPendingDataChecklist(mcaReplyType).map((item) => `- ${item}`).join("\n")
+      : "";
 
     const systemPrompt = `ROLE & AUTHORITY
 You are a Senior Practicing Chartered Accountant & Regulatory Counsel with 15+ years experience in India.
@@ -1099,6 +1108,7 @@ ${getAdvancedDraftingRequirements()}
 DOMAIN DIRECTIVES
 ${documentTypePrompt}
 ${documentType === "mca-notice" && mcaReplyType ? getMcaHardRequirements(mcaReplyType) : ""}
+${documentType === "mca-notice" && mcaPendingChecklistText ? `\nMCA DATA-CAPTURE CHECKLIST (enforce where facts are available):\n${mcaPendingChecklistText}` : ""}
 
 COMPANY CONTEXT
 - Company: ${companyName}
@@ -1245,6 +1255,8 @@ Hard constraints:
 - Do not add unsupported case law.
 Detected notice class: ${mcaReplyType ?? "general-mca"}
 ${mcaReplyType ? getMcaTypeSpecificRequirements(mcaReplyType) : ""}
+${mcaReplyType ? getMcaKnowledgeBlock(mcaReplyType) : ""}
+${mcaPendingChecklistText ? `\nMCA CHECKLIST (ensure represented in object fields where data exists):\n${mcaPendingChecklistText}` : ""}
 `;
 
       const blueprintResp = await aiRequest({
@@ -1325,7 +1337,9 @@ Checklist:
 - never use "waive penalty" or "absolve officers/personal liability" phrasing; use calibrated drop/reduce language
 - avoid over-strong penalty rhetoric like "double jeopardy", "total waiver", or similar absolute phrasing
 - keep placeholders only for CA/Lawyer-fillable metadata
-- add "Data Required to Finalize Filing" if critical details are unavailable`
+- add "Data Required to Finalize Filing" if critical details are unavailable
+${mcaReplyType ? `\nMCA KNOWLEDGE ENFORCEMENT:\n${getMcaKnowledgeBlock(mcaReplyType)}` : ""}
+${mcaPendingChecklistText ? `\nMCA DATA CHECKLIST ENFORCEMENT:\n${mcaPendingChecklistText}` : ""}`
       : `You are final quality control counsel.
 Return ONLY improved final draft text (no commentary).
 Checklist:
@@ -1460,6 +1474,11 @@ Schema:
       Math.min(100, Number(qaPayload?.filing_score ?? (gateFailures.length === 0 ? 78 : 52)))
     );
     const riskBand = buildRiskBand(filingScore);
+    const mcaChecklistMissing = documentType === "mca-notice" && mcaReplyType
+      ? getMcaPendingDataChecklist(mcaReplyType)
+          .filter((item) => finalDraft.includes("[To be filled by CA/Lawyer]") || finalDraft.includes("[Insert"))
+      : [];
+    const mergedMissingForFiling = Array.from(new Set([...(qaPayload?.missing_for_final_filing ?? []), ...mcaChecklistMissing]));
 
     return new Response(JSON.stringify({
       draft: finalDraft,
@@ -1484,7 +1503,7 @@ Schema:
         domain_gates: domainGates,
         citation_review: qaPayload?.citation_review ?? [],
         explainability: qaPayload?.explainability ?? [],
-        missing_for_final_filing: qaPayload?.missing_for_final_filing ?? [],
+        missing_for_final_filing: mergedMissingForFiling,
       },
       package: {
         reply: finalDraft,
