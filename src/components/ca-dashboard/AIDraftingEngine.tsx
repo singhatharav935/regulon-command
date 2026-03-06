@@ -47,6 +47,16 @@ const demoClients = [
   { id: "2", name: "GlobalTrade India Ltd.", industry: "E-Commerce" },
   { id: "3", name: "SecurePay Solutions", industry: "Payments" },
   { id: "4", name: "DataSync Analytics", industry: "IT Services" },
+  { id: "5", name: "NovaRetail Ventures Pvt. Ltd.", industry: "Retail" },
+  { id: "6", name: "Orbit Health Systems Pvt. Ltd.", industry: "Healthcare" },
+  { id: "7", name: "Apex Logistics India Pvt. Ltd.", industry: "Logistics" },
+  { id: "8", name: "BluePeak Manufacturing Pvt. Ltd.", industry: "Manufacturing" },
+  { id: "9", name: "Vertex EduTech Solutions Pvt. Ltd.", industry: "EdTech" },
+  { id: "10", name: "GreenGrid Energy Pvt. Ltd.", industry: "Energy" },
+  { id: "11", name: "Skyline Infra Projects Pvt. Ltd.", industry: "Infrastructure" },
+  { id: "12", name: "Quantum Agro Foods Pvt. Ltd.", industry: "AgriTech" },
+  { id: "13", name: "MetroMed Devices Pvt. Ltd.", industry: "Medical Devices" },
+  { id: "14", name: "Zenith Media Labs Pvt. Ltd.", industry: "Media & Advertising" },
 ];
 
 type ClientOption = {
