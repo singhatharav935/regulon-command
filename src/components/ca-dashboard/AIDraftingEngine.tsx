@@ -220,6 +220,20 @@ type McaIssueReport = {
   checkedAt: string;
 };
 
+type McaRecheckFlag = {
+  severity: "high" | "medium" | "low";
+  issue: string;
+  fix: string;
+  source?: "rule" | "ai";
+};
+
+type McaRecheckReport = {
+  ok: boolean;
+  flags: McaRecheckFlag[];
+  summary?: string;
+  checkedAt?: string;
+};
+
 const buildOfflineDraft = ({
   documentType,
   authority,
@@ -581,6 +595,9 @@ const AIDraftingEngine = ({ demoMode = false, includeLawyerReview = true }: AIDr
   const [mcaUserFixNotes, setMcaUserFixNotes] = useState("");
   const [isApplyingMcaFix, setIsApplyingMcaFix] = useState(false);
   const [mcaAdvancedSuggestions, setMcaAdvancedSuggestions] = useState<Array<{ title: string; suggestion: string; implemented: boolean }>>([]);
+  const [mcaEvidenceContext, setMcaEvidenceContext] = useState("");
+  const [mcaRecheckReport, setMcaRecheckReport] = useState<McaRecheckReport | null>(null);
+  const [isRecheckingMca, setIsRecheckingMca] = useState(false);
   const [currentSteps, setCurrentSteps] = useState<ReviewStep[]>(initialReviewSteps);
   const [generationError, setGenerationError] = useState<string | null>(null);
 
@@ -777,6 +794,12 @@ const AIDraftingEngine = ({ demoMode = false, includeLawyerReview = true }: AIDr
     const advancedPending = liveMcaAdvancedSuggestions.filter((item) => !item.implemented).length;
     return issueCount + advancedPending;
   }, [liveMcaIssueItems, liveMcaAdvancedSuggestions]);
+  const mcaRecheckNotes = useMemo(
+    () => (mcaRecheckReport?.flags || [])
+      .map((flag, idx) => `${idx + 1}. [${flag.severity.toUpperCase()}] ${flag.issue}\nFix: ${flag.fix}`)
+      .join("\n\n"),
+    [mcaRecheckReport],
+  );
 
   const enforceMcaLocalFallback = (rawContent: string, mcaType?: string) => {
     let content = rawContent || "";
@@ -863,6 +886,42 @@ const AIDraftingEngine = ({ demoMode = false, includeLawyerReview = true }: AIDr
       advancedSuggestions: advanced,
       checkedAt: new Date().toISOString(),
     });
+  };
+
+  const handleRecheckMcaDraft = async () => {
+    if (selectedDocType !== "mca-notice" || !draftGenerated || !draftContent.trim()) {
+      toast.error("Generate and edit an MCA draft first.");
+      return;
+    }
+
+    setIsRecheckingMca(true);
+    try {
+      const data = await requestDraftData({
+        operation: "recheck",
+        documentType: "mca-notice",
+        noticeDetails: maskPII(noticeDetails) || undefined,
+        draftContent,
+        evidenceContext: mcaEvidenceContext || undefined,
+        mcaReplyTypeOverride: mcaReplyTypeOverride !== "auto" ? mcaReplyTypeOverride : undefined,
+        stream: false,
+      });
+
+      const report: McaRecheckReport = {
+        ok: Boolean(data?.ok),
+        flags: Array.isArray(data?.flags) ? data.flags : [],
+        summary: typeof data?.summary === "string" ? data.summary : undefined,
+        checkedAt: typeof data?.checkedAt === "string" ? data.checkedAt : new Date().toISOString(),
+      };
+      setMcaRecheckReport(report);
+
+      if (report.ok) toast.success("Recheck AI passed. No critical mismatches detected.");
+      else toast.warning(`Recheck AI flagged ${report.flags.length} item(s).`);
+    } catch (error) {
+      const msg = error instanceof Error ? error.message : "Recheck AI failed";
+      toast.error(msg);
+    } finally {
+      setIsRecheckingMca(false);
+    }
   };
 
   useEffect(() => {
@@ -1252,7 +1311,7 @@ const AIDraftingEngine = ({ demoMode = false, includeLawyerReview = true }: AIDr
       .map((item, idx) => `${idx + 1}. Upgrade: ${item.title}\n   Suggestion: ${item.suggestion}`)
       .join("\n");
 
-    const combinedFixNotes = [mcaAutoFixNotes, mcaUserFixNotes.trim()]
+    const combinedFixNotes = [mcaAutoFixNotes, mcaRecheckNotes, mcaUserFixNotes.trim()]
       .filter((entry) => entry && entry.trim().length > 0)
       .join("\n\n");
     const pendingPlaybookText = mcaPendingFixPlaybook
@@ -1406,6 +1465,7 @@ Return only the revised final draft text.`;
     setMcaIssueReport(null);
     setMcaUserFixNotes("");
     setMcaAdvancedSuggestions([]);
+    setMcaRecheckReport(null);
     
     const client = clientOptions.find(c => c.id === selectedClient);
     const maskedNoticeDetails = noticeDetails ? maskPII(noticeDetails) : undefined;
@@ -2084,6 +2144,48 @@ Return only the revised final draft text.`;
                     <p className="text-xs text-muted-foreground">
                       Auto-detected pending fixes are synced from Issue Detector. Add optional CA notes, then regenerate.
                     </p>
+                    <Textarea
+                      value={mcaEvidenceContext}
+                      onChange={(e) => setMcaEvidenceContext(e.target.value)}
+                      placeholder="Optional: paste key extracted PDF/evidence text here (SRN/challan, filing dates, officer role records) for Recheck AI cross-validation."
+                      className="min-h-[90px] bg-background/50"
+                    />
+                    <Button
+                      type="button"
+                      variant="outline"
+                      className="w-full"
+                      onClick={handleRecheckMcaDraft}
+                      disabled={isRecheckingMca || !draftGenerated}
+                    >
+                      {isRecheckingMca ? (
+                        <>
+                          <Loader2 className="w-4 h-4 mr-2 animate-spin" />
+                          Rechecking AI...
+                        </>
+                      ) : (
+                        "Recheck AI (Draft + Notice + Evidence)"
+                      )}
+                    </Button>
+                    {mcaRecheckReport && (
+                      <div className={`rounded-lg border p-3 text-xs space-y-2 ${
+                        mcaRecheckReport.ok
+                          ? "border-green-500/30 bg-green-500/10 text-green-300"
+                          : "border-rose-500/30 bg-rose-500/10 text-rose-200"
+                      }`}>
+                        <p className="font-medium">{mcaRecheckReport.ok ? "Recheck AI: Passed" : "Recheck AI: Flags Detected"}</p>
+                        {mcaRecheckReport.summary ? <p>{mcaRecheckReport.summary}</p> : null}
+                        {!mcaRecheckReport.ok && (
+                          <ul className="list-disc pl-4 space-y-2">
+                            {mcaRecheckReport.flags.map((flag, idx) => (
+                              <li key={`${flag.issue}-${idx}`}>
+                                <p>[{flag.severity.toUpperCase()}] {flag.issue}</p>
+                                <p className="text-rose-100/90">Fix: {flag.fix}</p>
+                              </li>
+                            ))}
+                          </ul>
+                        )}
+                      </div>
+                    )}
                     <p className="text-xs text-cyan-300">
                       Pending fixes: {mcaPendingFixCount}
                     </p>
