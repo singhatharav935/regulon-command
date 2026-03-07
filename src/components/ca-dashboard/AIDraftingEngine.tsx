@@ -578,7 +578,7 @@ const AIDraftingEngine = ({ demoMode = false, includeLawyerReview = true }: AIDr
   const [draftQA, setDraftQA] = useState<DraftQA | null>(null);
   const [draftPackage, setDraftPackage] = useState<DraftPackage | null>(null);
   const [mcaIssueReport, setMcaIssueReport] = useState<McaIssueReport | null>(null);
-  const [mcaFixNotes, setMcaFixNotes] = useState("");
+  const [mcaUserFixNotes, setMcaUserFixNotes] = useState("");
   const [isApplyingMcaFix, setIsApplyingMcaFix] = useState(false);
   const [mcaAdvancedSuggestions, setMcaAdvancedSuggestions] = useState<Array<{ title: string; suggestion: string; implemented: boolean }>>([]);
   const [currentSteps, setCurrentSteps] = useState<ReviewStep[]>(initialReviewSteps);
@@ -605,6 +605,21 @@ const AIDraftingEngine = ({ demoMode = false, includeLawyerReview = true }: AIDr
     [noticeDetails],
   );
   const supabaseAny = supabase as any;
+  const getMcaAutoFixNotes = (
+    report: McaIssueReport | null,
+    suggestions: Array<{ title: string; suggestion: string; implemented: boolean }>,
+  ) => {
+    if (!report) return "";
+    const issueNotes = report.items.map((item, idx) => `${idx + 1}. ${item.issue}\nSuggestion: ${item.suggestion}`);
+    const pendingAdvanced = suggestions
+      .filter((item) => !item.implemented)
+      .map((item, idx) => `${idx + 1 + issueNotes.length}. ${item.title}\nSuggestion: ${item.suggestion}`);
+    return [...issueNotes, ...pendingAdvanced].join("\n\n");
+  };
+  const mcaAutoFixNotes = useMemo(
+    () => getMcaAutoFixNotes(mcaIssueReport, mcaAdvancedSuggestions),
+    [mcaIssueReport, mcaAdvancedSuggestions],
+  );
 
   const evaluateMcaDraftIssues = (
     content: string,
@@ -819,13 +834,6 @@ const AIDraftingEngine = ({ demoMode = false, includeLawyerReview = true }: AIDr
       advancedSuggestions: advanced,
       checkedAt: new Date().toISOString(),
     });
-    if (items.length === 0) {
-      const advancedNotes = advanced
-        .filter((item) => !item.implemented)
-        .map((item, idx) => `${idx + 1}. ${item.title}\nSuggestion: ${item.suggestion}`)
-        .join("\n\n");
-      setMcaFixNotes(advancedNotes);
-    }
   };
 
   useEffect(() => {
@@ -833,20 +841,6 @@ const AIDraftingEngine = ({ demoMode = false, includeLawyerReview = true }: AIDr
     runMcaDraftIssueCheck(draftContent);
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [selectedDocType, draftGenerated, draftContent, draftQA]);
-
-  useEffect(() => {
-    if (selectedDocType !== "mca-notice") return;
-    if (!mcaIssueReport || isApplyingMcaFix) return;
-    if (mcaFixNotes.trim().length > 0) return;
-
-    const issueNotes = mcaIssueReport.items
-      .map((item, idx) => `${idx + 1}. ${item.issue}\nSuggestion: ${item.suggestion}`);
-    const advancedNotes = (mcaIssueReport.advancedSuggestions || [])
-      .map((item, idx) => `${idx + 1 + issueNotes.length}. ${item.title}\nSuggestion: ${item.suggestion}`);
-    const autoNotes = [...issueNotes, ...advancedNotes]
-      .join("\n\n");
-    setMcaFixNotes(autoNotes);
-  }, [selectedDocType, mcaIssueReport, mcaFixNotes, isApplyingMcaFix]);
 
   const getProjectRefFromUrl = (url: string) => {
     const match = url.match(/^https:\/\/([a-z0-9]+)\.supabase\.co/i);
@@ -1230,6 +1224,10 @@ const AIDraftingEngine = ({ demoMode = false, includeLawyerReview = true }: AIDr
       .map((item, idx) => `${idx + 1}. Upgrade: ${item.title}\n   Suggestion: ${item.suggestion}`)
       .join("\n");
 
+    const combinedFixNotes = [mcaAutoFixNotes, mcaUserFixNotes.trim()]
+      .filter((entry) => entry && entry.trim().length > 0)
+      .join("\n\n");
+
     const fixContext = `You are improving an MCA adjudication draft.
 Task: Regenerate a corrected final draft by merging the existing draft with required fixes.
 Non-negotiable fixes:
@@ -1249,7 +1247,7 @@ ADVANCED UPGRADE SUGGESTIONS:
 ${advancedSuggestionText || "No additional upgrades detected."}
 
 CA/LAWYER ADDITIONAL FIX NOTES:
-${mcaFixNotes || "Use the detected issues and suggestions above as mandatory corrections."}
+${combinedFixNotes || "Use the detected issues and suggestions above as mandatory corrections."}
 
 Return only the revised final draft text.`;
 
@@ -1371,7 +1369,7 @@ Return only the revised final draft text.`;
     setDraftQA(null);
     setDraftPackage(null);
     setMcaIssueReport(null);
-    setMcaFixNotes("");
+    setMcaUserFixNotes("");
     setMcaAdvancedSuggestions([]);
     
     const client = clientOptions.find(c => c.id === selectedClient);
@@ -2049,12 +2047,17 @@ Return only the revised final draft text.`;
                   <div className="p-3 rounded-lg border border-border/50 bg-background/30 space-y-2">
                     <p className="text-sm font-medium text-foreground">AI Fix Assistant (MCA)</p>
                     <p className="text-xs text-muted-foreground">
-                      Add what is missing from the issue report (or your own CA notes), then regenerate a corrected draft.
+                      Auto-detected pending fixes are synced from Issue Detector. Add optional CA notes, then regenerate.
                     </p>
                     <Textarea
-                      value={mcaFixNotes}
-                      onChange={(e) => setMcaFixNotes(e.target.value)}
-                      placeholder="Example: Add officer-specific table with role period and mitigating facts; fix prayer wording to drop/reduce penalty; include Section 454 proviso with notice-date anchor."
+                      value={mcaAutoFixNotes || "No pending issue-detector fixes right now."}
+                      readOnly
+                      className="min-h-[90px] bg-background/40 text-muted-foreground"
+                    />
+                    <Textarea
+                      value={mcaUserFixNotes}
+                      onChange={(e) => setMcaUserFixNotes(e.target.value)}
+                      placeholder="Optional CA note: add custom drafting instructions here."
                       className="min-h-[90px] bg-background/50"
                     />
                     <Button
