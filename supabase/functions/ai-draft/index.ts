@@ -453,6 +453,13 @@ interface McaDraftBlueprint {
   data_required_to_finalize_filing: string[];
 }
 
+interface RecheckFlag {
+  severity: "high" | "medium" | "low";
+  issue: string;
+  fix: string;
+  source: "rule" | "ai";
+}
+
 const ensureMcaValue = (value: string | null | undefined, fallback: string) => {
   const trimmed = (value ?? "").trim();
   return trimmed.length > 0 ? trimmed : fallback;
@@ -591,6 +598,83 @@ const hasDisallowedMcaPlaceholders = (content: string) => {
   ];
 
   return placeholderTokens.some((token) => !allowedPatterns.some((pattern) => pattern.test(token)));
+};
+
+const detectMcaRecheckFlags = (
+  draft: string,
+  noticeDetails: string,
+  mcaReplyType: McaReplyType,
+): RecheckFlag[] => {
+  const flags: RecheckFlag[] = [];
+  const addFlag = (condition: boolean, severity: RecheckFlag["severity"], issue: string, fix: string) => {
+    if (condition) flags.push({ severity, issue, fix, source: "rule" });
+  };
+
+  const hasChronology =
+    /\|\s*(Particulars|Event|Date|Compliance Event)\s*\|\s*(Section|Provision|Relevant Provision)\s*\|/i.test(draft) &&
+    /due\/event date|due date|statutory due date/i.test(draft) &&
+    /actual filing|actual date|action date|date of filing|filing date/i.test(draft);
+
+  const hasOfficerTable =
+    /\|\s*(Officer(?:\s+in\s+Default)?|Name of Officer)\s*\|\s*(Role\s*Period|Designation|Period of Responsibility)\s*\|/i.test(draft) &&
+    /\|\s*(Alleged Responsibility|Responsibility|Allegation|Role|Monitoring Compliance)\s*\|\s*(Mitigating Facts|Defense|Remarks|Explanation)\s*\|/i.test(draft);
+
+  addFlag(
+    !/section\s*454/i.test(draft) || !/proviso to section 454|within 30 days|rectified before notice|before issuance of notice/i.test(draft),
+    "high",
+    "Section 454 / proviso submission is missing or weak.",
+    "Add a fact-dependent Section 454 paragraph with rectification timing and proviso request.",
+  );
+  addFlag(
+    !hasChronology,
+    "high",
+    "Chronology table is missing or incomplete (due vs actual fields).",
+    "Include chronology columns: Particulars, Section, Due/Event Date, Actual Filing/Action Date, SRN/Challan/Reference, Status.",
+  );
+  addFlag(
+    !hasOfficerTable,
+    "high",
+    "Officer-specific defense table is missing.",
+    "Add officer-wise table with role period, alleged responsibility, and mitigating facts.",
+  );
+  addFlag(
+    /\bwaive\b[^.\n]{0,60}\bpenalt/i.test(draft) || /\babsolve\b[^.\n]{0,120}\bofficer|personal liability/i.test(draft),
+    "medium",
+    "Risky prayer wording detected (waive/absolve language).",
+    "Rewrite to calibrated wording: drop or reduce penalty based on role, conduct, and mitigating facts.",
+  );
+  addFlag(
+    /\[(insert|to be filled)[^\]]*\]/i.test(draft),
+    "medium",
+    "Unresolved placeholders remain in draft.",
+    "Replace remaining placeholders with actual facts and references before filing.",
+  );
+  if (mcaReplyType === "annual-filing-92-137") {
+    addFlag(
+      !/aoc-?4/i.test(draft) || !/mgt-?7/i.test(draft),
+      "high",
+      "Annual filing draft does not clearly cover both AOC-4 and MGT-7.",
+      "Explicitly include both forms in chronology and legal submissions with due vs actual dates.",
+    );
+    addFlag(
+      !/section\s*403/i.test(draft),
+      "medium",
+      "Section 403 delayed filing regularization submission is missing.",
+      "Add Section 403 submission with additional fee / SRN-challan references.",
+    );
+  }
+
+  const din = noticeDetails.match(/\b(?:DIN|RFN)\s*[:\-]?\s*([A-Z0-9\/\-.]+)/i)?.[1];
+  if (din) {
+    addFlag(
+      !new RegExp(din.replace(/[.*+?^${}()|[\]\\]/g, "\\$&"), "i").test(draft),
+      "low",
+      "Notice DIN/RFN from notice text is not reflected in draft metadata.",
+      "Insert the exact DIN/RFN from notice in heading/metadata block.",
+    );
+  }
+
+  return flags;
 };
 
 const isNoPlaceholderGatePassed = (content: string, documentType: string) => {
@@ -937,6 +1021,8 @@ serve(async (req) => {
       industry,
       context,
       noticeDetails,
+      draftContent,
+      evidenceContext,
       mcaReplyTypeOverride,
       advancedMode = false,
       strictValidation = false,
@@ -945,6 +1031,104 @@ serve(async (req) => {
 
     const normalizedOperation = typeof operation === "string" ? operation.trim().toLowerCase() : "draft";
     const aiConfig = resolveAIConfig();
+
+    if (normalizedOperation === "recheck") {
+      if (!draftContent || typeof draftContent !== "string" || draftContent.trim().length < 40) {
+        return new Response(JSON.stringify({ error: "Draft content is required for AI recheck." }), {
+          status: 400,
+          headers: { ...corsHeaders, "Content-Type": "application/json" },
+        });
+      }
+
+      const mcaReplyType: McaReplyType = documentType === "mca-notice"
+        ? (normalizeMcaReplyType(mcaReplyTypeOverride) ?? inferMcaReplyType(noticeDetails, null))
+        : "general-mca";
+
+      const ruleFlags = documentType === "mca-notice"
+        ? detectMcaRecheckFlags(draftContent, noticeDetails || "", mcaReplyType)
+        : [];
+
+      const recheckSystemPrompt = `You are a legal QA reviewer for Indian regulatory draft filings.
+Return STRICT JSON only:
+{
+  "flags": [
+    {
+      "severity": "high|medium|low",
+      "issue": "string",
+      "fix": "string"
+    }
+  ],
+  "summary": "string"
+}
+Rules:
+- Flag only material drafting/compliance issues.
+- Focus on factual mismatch risk, section mismatch, timeline inconsistency, risky prayer language, or evidence linkage gaps.
+- Keep fixes specific and actionable.
+- Do not repeat duplicate flags.`;
+
+      const recheckUserPrompt = `Recheck this draft for correctness and filing-readiness.
+Document Type: ${documentType}
+MCA Reply Type: ${mcaReplyType}
+
+NOTICE/ORDER DETAILS:
+${noticeDetails || "Not provided"}
+
+DRAFT TO RECHECK:
+${draftContent}
+
+SUPPORTING EVIDENCE / PDF EXTRACT NOTES (if provided):
+${evidenceContext || "None provided"}`;
+
+      let aiFlags: RecheckFlag[] = [];
+      let summary = "Recheck completed.";
+
+      const recheckResp = await aiRequest({
+        apiKey: aiConfig.apiKey,
+        model: aiConfig.model,
+        endpoint: aiConfig.endpoint,
+        stream: false,
+        messages: [
+          { role: "system", content: recheckSystemPrompt },
+          { role: "user", content: recheckUserPrompt },
+        ],
+      });
+
+      if (recheckResp.ok) {
+        const recheckData = await recheckResp.json();
+        const parsed = safeJsonParse<{ flags?: Array<{ severity?: string; issue?: string; fix?: string }>; summary?: string }>(
+          extractAssistantText(recheckData),
+        );
+        if (parsed?.flags?.length) {
+          aiFlags = parsed.flags
+            .filter((f) => f.issue && f.fix)
+            .map((f) => ({
+              severity: f.severity === "high" || f.severity === "medium" ? f.severity : "low",
+              issue: f.issue as string,
+              fix: f.fix as string,
+              source: "ai" as const,
+            }));
+        }
+        if (parsed?.summary) summary = parsed.summary;
+      }
+
+      const merged = [...ruleFlags, ...aiFlags];
+      const dedup = Array.from(
+        merged.reduce((acc, item) => {
+          const key = `${item.issue.toLowerCase()}::${item.fix.toLowerCase()}`;
+          if (!acc.has(key)) acc.set(key, item);
+          return acc;
+        }, new Map<string, RecheckFlag>()),
+      ).map(([, value]) => value);
+
+      return new Response(JSON.stringify({
+        ok: dedup.length === 0,
+        flags: dedup,
+        summary,
+        checkedAt: new Date().toISOString(),
+      }), {
+        headers: { ...corsHeaders, "Content-Type": "application/json" },
+      });
+    }
 
     if (normalizedOperation === "notice-details") {
       const mcaReplyType: McaReplyType | null = documentType === "mca-notice"
