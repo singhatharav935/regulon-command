@@ -591,10 +591,10 @@ const AIDraftingEngine = ({ demoMode = false, includeLawyerReview = true }: AIDr
   const [auditEvents, setAuditEvents] = useState<Array<{ event_type: string; created_at: string }>>([]);
   const [draftQA, setDraftQA] = useState<DraftQA | null>(null);
   const [draftPackage, setDraftPackage] = useState<DraftPackage | null>(null);
-  const [mcaIssueReport, setMcaIssueReport] = useState<McaIssueReport | null>(null);
+  const [mcaHasChecked, setMcaHasChecked] = useState(false);
+  const [mcaLastCheckedAt, setMcaLastCheckedAt] = useState<string | null>(null);
   const [mcaUserFixNotes, setMcaUserFixNotes] = useState("");
   const [isApplyingMcaFix, setIsApplyingMcaFix] = useState(false);
-  const [mcaAdvancedSuggestions, setMcaAdvancedSuggestions] = useState<Array<{ title: string; suggestion: string; implemented: boolean }>>([]);
   const [mcaEvidenceContext, setMcaEvidenceContext] = useState("");
   const [mcaRecheckReport, setMcaRecheckReport] = useState<McaRecheckReport | null>(null);
   const [isRecheckingMca, setIsRecheckingMca] = useState(false);
@@ -869,23 +869,20 @@ const AIDraftingEngine = ({ demoMode = false, includeLawyerReview = true }: AIDr
     return enforceMcaLocalFallback(content, mcaType);
   };
 
+  const mcaComputedIssueReport: McaIssueReport = useMemo(() => ({
+    ok: liveMcaIssueItems.length === 0,
+    items: liveMcaIssueItems,
+    issues: liveMcaIssueItems.map((item) => item.issue),
+    advancedSuggestions: liveMcaAdvancedSuggestions,
+    checkedAt: mcaLastCheckedAt || new Date().toISOString(),
+  }), [liveMcaIssueItems, liveMcaAdvancedSuggestions, mcaLastCheckedAt]);
+
   const runMcaDraftIssueCheck = (contentOverride?: string, qaOverride?: DraftQA | null) => {
     const content = contentOverride ?? draftContent ?? "";
     const effectiveQa = qaOverride ?? draftQA;
-    const advanced = evaluateMcaAdvancedSuggestions(content, inferredMcaReplyType, effectiveQa);
-
-    // Detector must evaluate the raw visible draft text only.
-    // Do not auto-inject fixes here, otherwise real issues get masked.
-    const items = evaluateMcaDraftIssues(content, effectiveQa, inferredMcaReplyType, true);
-    setMcaAdvancedSuggestions(advanced);
-
-    setMcaIssueReport({
-      ok: items.length === 0,
-      items,
-      issues: items.map((item) => item.issue),
-      advancedSuggestions: advanced,
-      checkedAt: new Date().toISOString(),
-    });
+    evaluateMcaDraftIssues(content, effectiveQa, inferredMcaReplyType, true);
+    setMcaHasChecked(true);
+    setMcaLastCheckedAt(new Date().toISOString());
   };
 
   const handleRecheckMcaDraft = async () => {
@@ -1296,7 +1293,7 @@ const AIDraftingEngine = ({ demoMode = false, includeLawyerReview = true }: AIDr
       return;
     }
 
-    if (!mcaIssueReport) {
+    if (!mcaHasChecked) {
       runMcaDraftIssueCheck();
     }
 
@@ -1462,9 +1459,9 @@ Return only the revised final draft text.`;
     setDraftContent("");
     setDraftQA(null);
     setDraftPackage(null);
-    setMcaIssueReport(null);
+    setMcaHasChecked(false);
+    setMcaLastCheckedAt(null);
     setMcaUserFixNotes("");
-    setMcaAdvancedSuggestions([]);
     setMcaRecheckReport(null);
     
     const client = clientOptions.find(c => c.id === selectedClient);
@@ -2093,21 +2090,21 @@ Return only the revised final draft text.`;
                   >
                     Check What Is Wrong In This MCA Draft
                   </Button>
-                  {mcaIssueReport && (
+                  {mcaHasChecked && (
                     <div
                       className={`p-4 rounded-lg border text-sm ${
-                        mcaIssueReport.ok
+                        mcaComputedIssueReport.ok
                           ? "border-green-500/30 bg-green-500/10 text-green-300"
                           : "border-yellow-500/30 bg-yellow-500/10 text-yellow-200"
                       }`}
                     >
-                      {mcaIssueReport.ok ? (
+                      {mcaComputedIssueReport.ok ? (
                         <p>All MCA checks passed. This draft is structurally aligned for CA review.</p>
                       ) : (
                         <div className="space-y-2">
                           <p className="font-medium">Issues detected:</p>
                           <ul className="list-disc pl-5 space-y-2">
-                            {mcaIssueReport.items.map((item, idx) => (
+                            {mcaComputedIssueReport.items.map((item, idx) => (
                               <li key={`${item.issue}-${idx}`}>
                                 <p>{item.issue}</p>
                                 <p className="text-xs text-yellow-100/90 mt-1">
@@ -2120,11 +2117,11 @@ Return only the revised final draft text.`;
                       )}
                     </div>
                   )}
-                  {mcaAdvancedSuggestions.length > 0 && (
+                  {liveMcaAdvancedSuggestions.length > 0 && (
                     <div className="p-4 rounded-lg border border-cyan-500/30 bg-cyan-500/10 text-cyan-200 text-sm">
                       <p className="font-medium mb-2">Advanced Suggestions:</p>
                       <ul className="list-disc pl-5 space-y-2">
-                        {mcaAdvancedSuggestions.map((item, idx) => (
+                        {liveMcaAdvancedSuggestions.map((item, idx) => (
                           <li key={`${item.title}-${idx}`}>
                             <p className={item.implemented ? "text-green-300" : "text-cyan-200"}>
                               {item.implemented ? "✓ " : ""}{item.title}
