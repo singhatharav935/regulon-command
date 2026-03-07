@@ -589,6 +589,79 @@ const captureMcaRecheckIssues = async ({
     .eq("user_id", userId);
 };
 
+const normalizeSimilarityText = (input: string) =>
+  (input || "")
+    .toLowerCase()
+    .replace(/[`*_#>|~]/g, " ")
+    .replace(/\s+/g, " ")
+    .trim();
+
+const buildNgramSet = (input: string, n = 3): Set<string> => {
+  const words = normalizeSimilarityText(input)
+    .split(" ")
+    .filter((w) => w.length > 1);
+  const grams = new Set<string>();
+  for (let i = 0; i <= words.length - n; i += 1) {
+    grams.add(words.slice(i, i + n).join(" "));
+  }
+  return grams;
+};
+
+const jaccard = (a: Set<string>, b: Set<string>): number => {
+  if (!a.size || !b.size) return 0;
+  let intersection = 0;
+  for (const item of a) {
+    if (b.has(item)) intersection += 1;
+  }
+  const union = a.size + b.size - intersection;
+  return union > 0 ? intersection / union : 0;
+};
+
+const assessMcaTrainingCopyRisk = async ({
+  authClient,
+  userId,
+  noticeClass,
+  draftText,
+  currentCaseId,
+}: {
+  authClient: any;
+  userId: string | null;
+  noticeClass: string;
+  draftText: string;
+  currentCaseId?: string | null;
+}): Promise<{ score: number; matchedCaseId: string | null }> => {
+  if (!userId || !draftText?.trim()) return { score: 0, matchedCaseId: null };
+
+  const { data, error } = await authClient
+    .from("mca_training_cases")
+    .select("id, generated_draft, corrected_draft")
+    .eq("user_id", userId)
+    .eq("notice_class", noticeClass)
+    .order("created_at", { ascending: false })
+    .limit(120);
+
+  if (error || !Array.isArray(data) || data.length === 0) {
+    return { score: 0, matchedCaseId: null };
+  }
+
+  const targetSet = buildNgramSet(draftText, 3);
+  let maxScore = 0;
+  let matchedCaseId: string | null = null;
+
+  for (const row of data) {
+    if (currentCaseId && row.id === currentCaseId) continue;
+    const candidate = (row.corrected_draft || row.generated_draft || "").toString();
+    if (!candidate.trim()) continue;
+    const score = jaccard(targetSet, buildNgramSet(candidate, 3));
+    if (score > maxScore) {
+      maxScore = score;
+      matchedCaseId = row.id as string;
+    }
+  }
+
+  return { score: maxScore, matchedCaseId };
+};
+
 const ensureMcaValue = (value: string | null | undefined, fallback: string) => {
   const trimmed = (value ?? "").trim();
   return trimmed.length > 0 ? trimmed : fallback;
@@ -1491,7 +1564,11 @@ Mandatory structure:
 8) Annexure index
 9) Layered prayer with hearing request
 10) Sign-off
-Avoid unsupported case law. Use controlled placeholders only where unavoidable.`
+Avoid unsupported case law. Use controlled placeholders only where unavoidable.
+Dataset policy:
+- Use prior dataset patterns only for structure and quality patterns.
+- Never reproduce long sentence blocks or paragraph chunks from prior stored drafts.
+- The output must be freshly written and specific to the current notice facts.`
       : `Generate a comprehensive, filing-ready ${documentType.replace(/-/g, " ")} for ${companyName}${industry ? ` (${industry} sector)` : ""}. Include SCN para-wise rebuttal matrix, allegation-wise computation challenge with accepted/disputed columns, annexure mapping per issue, calibrated legal language, and complete layered prayer.`);
 
     if (!advancedMode) {
@@ -1730,6 +1807,8 @@ Checklist:
     const reviewedDraft = reviewedData.choices?.[0]?.message?.content || firstDraft;
     let finalDraft = reviewedDraft;
     let repairedMcaGateResult: DomainGateResult | null = null;
+    let copyRiskScore = 0;
+    let copyRiskMatchedCaseId: string | null = null;
     if (documentType === "mca-notice") {
       const repairResult = runMcaRepairAndGate(
         reviewedDraft,
@@ -1738,6 +1817,62 @@ Checklist:
       );
       finalDraft = repairResult.repairedDraft;
       repairedMcaGateResult = repairResult.gateResult;
+
+      const similarity = await assessMcaTrainingCopyRisk({
+        authClient,
+        userId,
+        noticeClass: mcaReplyType ?? "general-mca",
+        draftText: finalDraft,
+        currentCaseId: typeof trainingCaseId === "string" ? trainingCaseId : null,
+      });
+      copyRiskScore = similarity.score;
+      copyRiskMatchedCaseId = similarity.matchedCaseId;
+
+      if (copyRiskScore >= 0.72) {
+        const antiCopyResp = await aiRequest({
+          apiKey: aiConfig.apiKey,
+          model: aiConfig.model,
+          endpoint: aiConfig.endpoint,
+          stream: false,
+          messages: [
+            {
+              role: "system",
+              content:
+                "Rewrite the draft to remain legally equivalent but freshly worded. " +
+                "Do not copy any long phrase blocks from prior drafts. " +
+                "Keep all facts, chronology anchors, section references, and prayer logic intact.",
+            },
+            {
+              role: "user",
+              content:
+                `NOTICE DETAILS:\n${noticeDetails || ""}\n\nDRAFT TO REWRITE (ANTI-COPY):\n${finalDraft}`,
+            },
+          ],
+        });
+
+        if (antiCopyResp.ok) {
+          const antiCopyData = await antiCopyResp.json();
+          const rewritten = extractAssistantText(antiCopyData).trim();
+          if (rewritten) {
+            const repairedRewrite = runMcaRepairAndGate(
+              rewritten,
+              mcaReplyType ?? "general-mca",
+              extractedNoticeDate,
+            );
+            finalDraft = repairedRewrite.repairedDraft;
+            repairedMcaGateResult = repairedRewrite.gateResult;
+            const postRewriteSimilarity = await assessMcaTrainingCopyRisk({
+              authClient,
+              userId,
+              noticeClass: mcaReplyType ?? "general-mca",
+              draftText: finalDraft,
+              currentCaseId: typeof trainingCaseId === "string" ? trainingCaseId : null,
+            });
+            copyRiskScore = postRewriteSimilarity.score;
+            copyRiskMatchedCaseId = postRewriteSimilarity.matchedCaseId;
+          }
+        }
+      }
     }
 
     const qaSystemPrompt = `You are a legal QA auditor for filing readiness.
@@ -1838,6 +1973,7 @@ Schema:
     const finalQaPayload = {
       filing_score: filingScore,
       risk_band: riskBand,
+      copy_risk_score: copyRiskScore,
       mandatory_gates: {
         ...mandatoryGates,
         no_placeholders: noPlaceholderGate,
@@ -1876,6 +2012,8 @@ Schema:
         advancedMode,
         userId,
         trainingCaseId: capturedTrainingCaseId,
+        copyRiskScore,
+        copyRiskMatchedCaseId,
         generatedAt: new Date().toISOString(),
         version: "3.0-advanced",
       },
