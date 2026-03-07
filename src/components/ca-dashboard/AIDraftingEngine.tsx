@@ -606,25 +606,15 @@ const AIDraftingEngine = ({ demoMode = false, includeLawyerReview = true }: AIDr
   );
   const supabaseAny = supabase as any;
   const getMcaAutoFixNotes = (
-    report: McaIssueReport | null,
+    issues: Array<{ issue: string; suggestion: string }>,
     suggestions: Array<{ title: string; suggestion: string; implemented: boolean }>,
   ) => {
-    if (!report) return "";
-    const issueNotes = report.items.map((item, idx) => `${idx + 1}. ${item.issue}\nSuggestion: ${item.suggestion}`);
+    const issueNotes = issues.map((item, idx) => `${idx + 1}. ${item.issue}\nSuggestion: ${item.suggestion}`);
     const pendingAdvanced = suggestions
       .filter((item) => !item.implemented)
       .map((item, idx) => `${idx + 1 + issueNotes.length}. ${item.title}\nSuggestion: ${item.suggestion}`);
     return [...issueNotes, ...pendingAdvanced].join("\n\n");
   };
-  const mcaAutoFixNotes = useMemo(
-    () => getMcaAutoFixNotes(mcaIssueReport, mcaAdvancedSuggestions),
-    [mcaIssueReport, mcaAdvancedSuggestions],
-  );
-  const mcaPendingFixCount = useMemo(() => {
-    const issueCount = mcaIssueReport?.items.length ?? 0;
-    const advancedPending = mcaAdvancedSuggestions.filter((item) => !item.implemented).length;
-    return issueCount + advancedPending;
-  }, [mcaIssueReport, mcaAdvancedSuggestions]);
 
   const evaluateMcaDraftIssues = (
     content: string,
@@ -753,6 +743,27 @@ const AIDraftingEngine = ({ demoMode = false, includeLawyerReview = true }: AIDr
     ];
     return checks;
   };
+
+  const liveMcaIssueItems = useMemo(
+    () => evaluateMcaDraftIssues(draftContent || "", draftQA, inferredMcaReplyType, true),
+    [draftContent, draftQA, inferredMcaReplyType],
+  );
+
+  const liveMcaAdvancedSuggestions = useMemo(
+    () => evaluateMcaAdvancedSuggestions(draftContent || "", inferredMcaReplyType, draftQA),
+    [draftContent, inferredMcaReplyType, draftQA],
+  );
+
+  const mcaAutoFixNotes = useMemo(
+    () => getMcaAutoFixNotes(liveMcaIssueItems, liveMcaAdvancedSuggestions),
+    [liveMcaIssueItems, liveMcaAdvancedSuggestions],
+  );
+
+  const mcaPendingFixCount = useMemo(() => {
+    const issueCount = liveMcaIssueItems.length;
+    const advancedPending = liveMcaAdvancedSuggestions.filter((item) => !item.implemented).length;
+    return issueCount + advancedPending;
+  }, [liveMcaIssueItems, liveMcaAdvancedSuggestions]);
 
   const enforceMcaLocalFallback = (rawContent: string, mcaType?: string) => {
     let content = rawContent || "";
@@ -1218,9 +1229,8 @@ const AIDraftingEngine = ({ demoMode = false, includeLawyerReview = true }: AIDr
     }
 
     const client = clientOptions.find((c) => c.id === selectedClient);
-    const effectiveIssueItems = mcaIssueReport?.items ?? evaluateMcaDraftIssues(draftContent, draftQA, inferredMcaReplyType);
-    const effectiveAdvancedSuggestions =
-      mcaIssueReport?.advancedSuggestions ?? evaluateMcaAdvancedSuggestions(draftContent, inferredMcaReplyType, draftQA);
+    const effectiveIssueItems = liveMcaIssueItems;
+    const effectiveAdvancedSuggestions = liveMcaAdvancedSuggestions;
     const issueText = effectiveIssueItems
       .map((item, idx) => `${idx + 1}. Issue: ${item.issue}\n   Suggestion: ${item.suggestion}`)
       .join("\n");
