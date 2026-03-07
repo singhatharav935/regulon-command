@@ -620,6 +620,11 @@ const AIDraftingEngine = ({ demoMode = false, includeLawyerReview = true }: AIDr
     () => getMcaAutoFixNotes(mcaIssueReport, mcaAdvancedSuggestions),
     [mcaIssueReport, mcaAdvancedSuggestions],
   );
+  const mcaPendingFixCount = useMemo(() => {
+    const issueCount = mcaIssueReport?.items.length ?? 0;
+    const advancedPending = mcaAdvancedSuggestions.filter((item) => !item.implemented).length;
+    return issueCount + advancedPending;
+  }, [mcaIssueReport, mcaAdvancedSuggestions]);
 
   const evaluateMcaDraftIssues = (
     content: string,
@@ -1328,6 +1333,7 @@ Return only the revised final draft text.`;
       setDraftQA(qaPayload);
       setDraftPackage((data?.package ?? null) as DraftPackage | null);
       runMcaDraftIssueCheck(content, qaPayload);
+      setMcaUserFixNotes("");
       if (remaining.length === 0) {
         toast.success("MCA draft corrected and regenerated.");
       } else {
@@ -2049,6 +2055,9 @@ Return only the revised final draft text.`;
                     <p className="text-xs text-muted-foreground">
                       Auto-detected pending fixes are synced from Issue Detector. Add optional CA notes, then regenerate.
                     </p>
+                    <p className="text-xs text-cyan-300">
+                      Pending fixes: {mcaPendingFixCount}
+                    </p>
                     <Textarea
                       value={mcaAutoFixNotes || "No pending issue-detector fixes right now."}
                       readOnly
@@ -2065,7 +2074,7 @@ Return only the revised final draft text.`;
                       variant="outline"
                       className="w-full"
                       onClick={handleApplyMcaFix}
-                      disabled={isApplyingMcaFix || !draftGenerated}
+                      disabled={isApplyingMcaFix || !draftGenerated || (mcaPendingFixCount === 0 && mcaUserFixNotes.trim().length === 0)}
                     >
                       {isApplyingMcaFix ? (
                         <>
