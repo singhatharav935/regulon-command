@@ -585,6 +585,7 @@ const AIDraftingEngine = ({ demoMode = false, includeLawyerReview = true }: AIDr
   const [isGenerating, setIsGenerating] = useState(false);
   const [draftGenerated, setDraftGenerated] = useState(false);
   const [draftContent, setDraftContent] = useState("");
+  const [mcaTrainingCaseId, setMcaTrainingCaseId] = useState<string | null>(null);
   const [showFormatDetails, setShowFormatDetails] = useState(false);
   const [currentDraftRunId, setCurrentDraftRunId] = useState<string | null>(null);
   const [workflowStatus, setWorkflowStatus] = useState<WorkflowStatus>("generated");
@@ -896,6 +897,9 @@ const AIDraftingEngine = ({ demoMode = false, includeLawyerReview = true }: AIDr
       const data = await requestDraftData({
         operation: "recheck",
         documentType: "mca-notice",
+        companyId: clientSource === "live" ? selectedClient : undefined,
+        draftRunId: currentDraftRunId || undefined,
+        trainingCaseId: mcaTrainingCaseId || undefined,
         noticeDetails: maskPII(noticeDetails) || undefined,
         draftContent,
         evidenceContext: mcaEvidenceContext || undefined,
@@ -1358,7 +1362,10 @@ Return only the revised final draft text.`;
       const data = await requestDraftData({
         documentType: "mca-notice",
         companyName: client?.name || "Company",
+        companyId: clientSource === "live" ? selectedClient : undefined,
         industry: client?.industry || "",
+        draftRunId: currentDraftRunId || undefined,
+        trainingCaseId: mcaTrainingCaseId || undefined,
         draftMode: selectedMode,
         mcaReplyTypeOverride: mcaReplyTypeOverride !== "auto" ? mcaReplyTypeOverride : undefined,
         advancedMode: true,
@@ -1384,7 +1391,10 @@ Return only the revised final draft text.`;
         const retryData = await requestDraftData({
           documentType: "mca-notice",
           companyName: client?.name || "Company",
+          companyId: clientSource === "live" ? selectedClient : undefined,
           industry: client?.industry || "",
+          draftRunId: currentDraftRunId || undefined,
+          trainingCaseId: mcaTrainingCaseId || undefined,
           draftMode: selectedMode,
           mcaReplyTypeOverride: mcaReplyTypeOverride !== "auto" ? mcaReplyTypeOverride : undefined,
           advancedMode: true,
@@ -1417,6 +1427,8 @@ Return only the revised final draft text.`;
       setDraftContent(content);
       setDraftQA(qaPayload);
       setDraftPackage((data?.package ?? null) as DraftPackage | null);
+      const nextCaseId = (data?.metadata as { trainingCaseId?: string } | undefined)?.trainingCaseId;
+      if (nextCaseId) setMcaTrainingCaseId(nextCaseId);
       runMcaDraftIssueCheck(content, qaPayload);
       setMcaUserFixNotes("");
       if (remaining.length === 0) {
@@ -1457,6 +1469,7 @@ Return only the revised final draft text.`;
     setIsGenerating(true);
     setGenerationError(null);
     setDraftContent("");
+    setMcaTrainingCaseId(null);
     setDraftQA(null);
     setDraftPackage(null);
     setMcaHasChecked(false);
@@ -1544,8 +1557,11 @@ Return only the revised final draft text.`;
       const requestBody = JSON.stringify({
         documentType: selectedDocType,
         companyName: client?.name || "Company",
+        companyId: clientSource === "live" ? selectedClient : undefined,
         industry: client?.industry || "",
         draftMode: selectedMode,
+        draftRunId: currentDraftRunId || undefined,
+        trainingCaseId: mcaTrainingCaseId || undefined,
         mcaReplyTypeOverride: selectedDocType === "mca-notice" && mcaReplyTypeOverride !== "auto"
           ? mcaReplyTypeOverride
           : undefined,
@@ -1615,6 +1631,8 @@ Return only the revised final draft text.`;
         setDraftContent(patched);
         setDraftQA((data?.qa ?? null) as DraftQA | null);
         setDraftPackage((data?.package ?? null) as DraftPackage | null);
+        const generatedCaseId = (data?.metadata as { trainingCaseId?: string } | undefined)?.trainingCaseId;
+        setMcaTrainingCaseId(generatedCaseId || null);
         setDraftGenerated(true);
         setShowFormatDetails(false);
         setWorkflowStatus("generated");
