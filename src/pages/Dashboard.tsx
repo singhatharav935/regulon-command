@@ -12,6 +12,7 @@ import QuickActions from "@/components/dashboard/QuickActions";
 import ComplianceGapSection from "@/components/dashboard/ComplianceGapSection";
 import UpcomingLawImpactSection from "@/components/dashboard/UpcomingLawImpactSection";
 import AuditEvidenceVault from "@/components/dashboard/AuditEvidenceVault";
+import AIBusinessIntelligencePanel from "@/components/dashboard/AIBusinessIntelligencePanel";
 
 // Demo data for the dashboard example
 const demoCompany = {
@@ -100,7 +101,16 @@ const Dashboard = () => {
           />
           
           <RegulatoryExposurePanel exposures={demoExposures} />
-          
+
+          <AIBusinessIntelligencePanel
+            companyName={demoCompany.name}
+            industry={demoCompany.industry}
+            complianceHealth={demoCompany.complianceHealth}
+            exposures={demoExposures}
+            tasks={demoTasks}
+            deadlines={demoDeadlines}
+          />
+
           {/* New Sections */}
           <ComplianceGapSection />
           <UpcomingLawImpactSection />

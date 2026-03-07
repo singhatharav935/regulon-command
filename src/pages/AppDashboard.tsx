@@ -13,6 +13,7 @@ import QuickActions from "@/components/dashboard/QuickActions";
 import ComplianceGapSection from "@/components/dashboard/ComplianceGapSection";
 import UpcomingLawImpactSection from "@/components/dashboard/UpcomingLawImpactSection";
 import AuditEvidenceVault from "@/components/dashboard/AuditEvidenceVault";
+import AIBusinessIntelligencePanel from "@/components/dashboard/AIBusinessIntelligencePanel";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { useToast } from "@/hooks/use-toast";
@@ -253,6 +254,15 @@ const AppDashboard = () => {
           />
 
           <RegulatoryExposurePanel exposures={mappedData.exposures} />
+
+          <AIBusinessIntelligencePanel
+            companyName={mappedData.company.name}
+            industry={mappedData.company.industry}
+            complianceHealth={mappedData.company.complianceHealth}
+            exposures={mappedData.exposures}
+            tasks={mappedData.tasks}
+            deadlines={mappedData.deadlines}
+          />
 
           <ComplianceGapSection />
           <UpcomingLawImpactSection />
