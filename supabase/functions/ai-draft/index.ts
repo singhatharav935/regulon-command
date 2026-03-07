@@ -745,6 +745,20 @@ const normalizeMcaNoticeDateMentions = (draft: string, noticeDate?: string | nul
   return fixed;
 };
 
+const removeDuplicateMarkdownSection = (input: string, heading: string) => {
+  const escaped = heading.replace(/[.*+?^${}()|[\]\\]/g, "\\$&");
+  const blockRegex = new RegExp(`(^###\\s+${escaped}[\\s\\S]*?)(?=\\n###\\s+|$)`, "gmi");
+  const matches = Array.from(input.matchAll(blockRegex));
+  if (matches.length <= 1) return input;
+
+  let fixed = input;
+  for (let i = 1; i < matches.length; i++) {
+    const full = matches[i]?.[0];
+    if (full) fixed = fixed.replace(full, "");
+  }
+  return fixed.replace(/\n{3,}/g, "\n\n").trim();
+};
+
 const enforceMcaDraftMinimumStructure = (
   draft: string,
   mcaReplyType: McaReplyType,
@@ -753,6 +767,7 @@ const enforceMcaDraftMinimumStructure = (
   let fixed = draft;
 
   // Hard safety phrase replacement
+  fixed = fixed.replace(/\bpenaltyy\b/gi, "penalty");
   fixed = fixed.replace(/waive(?:\s+or\s+reduce)?\s+the\s+penalty/gi, "drop or reduce penalty");
   fixed = fixed.replace(/waive\s+or\s+substantially\s+reduce(?:\s+the)?\s+proposed\s+penalty/gi, "drop or reduce penalty");
   fixed = fixed.replace(/waive\s+or\s+reduce(?:\s+the)?\s+proposed\s+penalty/gi, "drop or reduce penalty");
@@ -768,6 +783,14 @@ const enforceMcaDraftMinimumStructure = (
   fixed = fixed.replace(/total waiver/gi, "substantial reduction");
   fixed = fixed.replace(/maximum sequestration of penalties/gi, "maximum penalties");
   fixed = fixed.replace(/double jeopardy/gi, "disproportionate duplication of monetary burden for a procedural lapse");
+  fixed = fixed.replace(
+    /section\s*137\(\s*3\s*\)\s*provides\s*for\s*a\s*penalty\s*only\s*where\s*the\s*default\s*is\s*willful\.?/gi,
+    "Section 137 is addressed on facts, timeline, and rectification status; the Noticee seeks proportionate adjudication based on bona fide conduct and completed compliance.",
+  );
+  fixed = fixed.replace(
+    /no\s+further\s+prosecution\s+or\s+proceedings\s+be\s+initiated\s+against\s+the\s+company\s+or\s+its\s+officers?\s+in\s+default[^.\n]*/gi,
+    "drop or reduce penalty on the Company and officers in default based on role, conduct, and mitigating facts",
+  );
 
   if (!/Section\s*454/i.test(fixed)) {
     fixed += `\n\n### Section 454 Submission\nThe Noticee seeks adjudicatory consideration under Section 454 based on rectification status, role-specific responsibility, and mitigating facts on record.`;
@@ -796,7 +819,14 @@ const enforceMcaDraftMinimumStructure = (
       .replace(/\bimpose\s+no\s+penalty\b/gi, "drop or reduce penalty")
   );
 
+  if (mcaReplyType === "annual-filing-92-137" && !/\bSection\s*403\b/i.test(fixed)) {
+    fixed += `\n\n### Section 403 Submission\nThe Noticee submits that delayed filing, where applicable, was completed with prescribed additional fees under Section 403, and the filing records stand regularized on MCA portal subject to adjudication discretion under Section 454.`;
+  }
+
   fixed = normalizeMcaNoticeDateMentions(fixed, noticeDate);
+  fixed = removeDuplicateMarkdownSection(fixed, "Section 454 Proviso (Fact-Dependent)");
+  fixed = removeDuplicateMarkdownSection(fixed, "Chronology of Compliance");
+  fixed = removeDuplicateMarkdownSection(fixed, "Officer-Specific Defense");
 
   if (!/personal hearing|hearing/i.test(fixed)) {
     fixed += `\n\n### Hearing Request\nThe Noticee requests an opportunity of personal hearing (physical/VC mode) before any adverse order is passed.`;
