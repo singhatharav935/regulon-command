@@ -758,6 +758,19 @@ const AIDraftingEngine = ({ demoMode = false, includeLawyerReview = true }: AIDr
     () => getMcaAutoFixNotes(liveMcaIssueItems, liveMcaAdvancedSuggestions),
     [liveMcaIssueItems, liveMcaAdvancedSuggestions],
   );
+  const mcaPendingFixPlaybook = useMemo(() => {
+    const issuePlaybook = liveMcaIssueItems.map((item) => ({
+      title: item.issue,
+      solution: item.suggestion,
+    }));
+    const advancedPlaybook = liveMcaAdvancedSuggestions
+      .filter((item) => !item.implemented)
+      .map((item) => ({
+        title: item.title,
+        solution: item.suggestion,
+      }));
+    return [...issuePlaybook, ...advancedPlaybook];
+  }, [liveMcaIssueItems, liveMcaAdvancedSuggestions]);
 
   const mcaPendingFixCount = useMemo(() => {
     const issueCount = liveMcaIssueItems.length;
@@ -1242,6 +1255,9 @@ const AIDraftingEngine = ({ demoMode = false, includeLawyerReview = true }: AIDr
     const combinedFixNotes = [mcaAutoFixNotes, mcaUserFixNotes.trim()]
       .filter((entry) => entry && entry.trim().length > 0)
       .join("\n\n");
+    const pendingPlaybookText = mcaPendingFixPlaybook
+      .map((item, idx) => `${idx + 1}. Pending: ${item.title}\n   Solution: ${item.solution}`)
+      .join("\n");
 
     const fixContext = `You are improving an MCA adjudication draft.
 Task: Regenerate a corrected final draft by merging the existing draft with required fixes.
@@ -1260,6 +1276,9 @@ ${issueText || "None provided"}
 
 ADVANCED UPGRADE SUGGESTIONS:
 ${advancedSuggestionText || "No additional upgrades detected."}
+
+PENDING FIX PLAYBOOK (MANDATORY ACTION STEPS):
+${pendingPlaybookText || "No pending actions."}
 
 CA/LAWYER ADDITIONAL FIX NOTES:
 ${combinedFixNotes || "Use the detected issues and suggestions above as mandatory corrections."}
@@ -2073,6 +2092,21 @@ Return only the revised final draft text.`;
                       readOnly
                       className="min-h-[90px] bg-background/40 text-muted-foreground"
                     />
+                    <div className="rounded-lg border border-cyan-500/20 bg-cyan-500/5 p-3 text-xs space-y-2">
+                      <p className="font-medium text-cyan-200">Pending Fix Solutions (AI)</p>
+                      {mcaPendingFixPlaybook.length === 0 ? (
+                        <p className="text-cyan-100/80">No pending solutions. Draft is clear on current checks.</p>
+                      ) : (
+                        <ul className="list-disc pl-4 space-y-2 text-cyan-100/90">
+                          {mcaPendingFixPlaybook.map((item, idx) => (
+                            <li key={`${item.title}-${idx}`}>
+                              <p>{item.title}</p>
+                              <p className="text-cyan-100/75">How to fix: {item.solution}</p>
+                            </li>
+                          ))}
+                        </ul>
+                      )}
+                    </div>
                     <Textarea
                       value={mcaUserFixNotes}
                       onChange={(e) => setMcaUserFixNotes(e.target.value)}
