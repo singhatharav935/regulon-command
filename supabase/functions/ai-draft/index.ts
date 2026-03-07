@@ -460,6 +460,135 @@ interface RecheckFlag {
   source: "rule" | "ai";
 }
 
+const captureMcaTrainingCase = async ({
+  authClient,
+  userId,
+  companyId,
+  draftRunId,
+  noticeClass,
+  noticeDetails,
+  generatedDraft,
+  qaPayload,
+  companyName,
+  industry,
+  draftMode,
+  previousCaseId,
+}: {
+  authClient: any;
+  userId: string | null;
+  companyId?: string | null;
+  draftRunId?: string | null;
+  noticeClass: string;
+  noticeDetails?: string | null;
+  generatedDraft: string;
+  qaPayload?: unknown;
+  companyName?: string | null;
+  industry?: string | null;
+  draftMode?: string | null;
+  previousCaseId?: string | null;
+}): Promise<string | null> => {
+  if (!userId || !generatedDraft?.trim()) return null;
+
+  const payload = {
+    draft_run_id: draftRunId ?? null,
+    user_id: userId,
+    company_id: companyId ?? null,
+    notice_class: noticeClass || "general-mca",
+    notice_snapshot: (noticeDetails || "Notice details not provided.").slice(0, 16000),
+    generated_draft: generatedDraft.slice(0, 120000),
+    filing_score: typeof (qaPayload as any)?.filing_score === "number" ? (qaPayload as any).filing_score : null,
+    risk_band: (qaPayload as any)?.risk_band ?? null,
+    qa_payload: qaPayload ?? null,
+    metadata: {
+      source_operation: "draft",
+      company_name: companyName ?? null,
+      industry: industry ?? null,
+      draft_mode: draftMode ?? null,
+      captured_at: new Date().toISOString(),
+    },
+  };
+
+  if (previousCaseId) {
+    const { data, error } = await authClient
+      .from("mca_training_cases")
+      .update(payload)
+      .eq("id", previousCaseId)
+      .eq("user_id", userId)
+      .select("id")
+      .maybeSingle();
+    if (!error && data?.id) return data.id as string;
+  }
+
+  const { data, error } = await authClient
+    .from("mca_training_cases")
+    .insert(payload)
+    .select("id")
+    .maybeSingle();
+  if (error) {
+    console.error("MCA training capture failed:", error.message);
+    return null;
+  }
+  return (data?.id as string) ?? null;
+};
+
+const captureMcaRecheckIssues = async ({
+  authClient,
+  userId,
+  caseId,
+  flags,
+  summary,
+}: {
+  authClient: any;
+  userId: string | null;
+  caseId?: string | null;
+  flags: RecheckFlag[];
+  summary?: string;
+}) => {
+  if (!userId || !caseId) return;
+
+  if (!flags.length) {
+    await authClient
+      .from("mca_training_cases")
+      .update({
+        status: "reviewed",
+        metadata: {
+          recheck_summary: summary ?? "Recheck passed",
+          recheck_flags_count: 0,
+          rechecked_at: new Date().toISOString(),
+        },
+      })
+      .eq("id", caseId)
+      .eq("user_id", userId);
+    return;
+  }
+
+  const rows = flags.map((f) => ({
+    case_id: caseId,
+    severity: f.severity,
+    detector_source: f.source === "ai" ? "ai" : "rule",
+    issue_text: f.issue,
+    suggested_fix: f.fix,
+  }));
+
+  const { error } = await authClient.from("mca_training_issues").insert(rows);
+  if (error) {
+    console.error("MCA recheck issue capture failed:", error.message);
+  }
+
+  await authClient
+    .from("mca_training_cases")
+    .update({
+      status: "reviewed",
+      metadata: {
+        recheck_summary: summary ?? "Recheck completed",
+        recheck_flags_count: flags.length,
+        rechecked_at: new Date().toISOString(),
+      },
+    })
+    .eq("id", caseId)
+    .eq("user_id", userId);
+};
+
 const ensureMcaValue = (value: string | null | undefined, fallback: string) => {
   const trimmed = (value ?? "").trim();
   return trimmed.length > 0 ? trimmed : fallback;
@@ -1017,11 +1146,14 @@ serve(async (req) => {
       operation = "draft",
       documentType,
       companyName,
+      companyId,
       draftMode,
       industry,
       context,
       noticeDetails,
       draftContent,
+      draftRunId,
+      trainingCaseId,
       evidenceContext,
       mcaReplyTypeOverride,
       advancedMode = false,
@@ -1119,6 +1251,16 @@ ${evidenceContext || "None provided"}`;
           return acc;
         }, new Map<string, RecheckFlag>()),
       ).map(([, value]) => value);
+
+      if (documentType === "mca-notice") {
+        await captureMcaRecheckIssues({
+          authClient,
+          userId,
+          caseId: typeof trainingCaseId === "string" ? trainingCaseId : null,
+          flags: dedup,
+          summary,
+        });
+      }
 
       return new Response(JSON.stringify({
         ok: dedup.length === 0,
@@ -1693,6 +1835,35 @@ Schema:
           .filter((item) => finalDraft.includes("[To be filled by CA/Lawyer]") || finalDraft.includes("[Insert"))
       : [];
     const mergedMissingForFiling = Array.from(new Set([...(qaPayload?.missing_for_final_filing ?? []), ...mcaChecklistMissing]));
+    const finalQaPayload = {
+      filing_score: filingScore,
+      risk_band: riskBand,
+      mandatory_gates: {
+        ...mandatoryGates,
+        no_placeholders: noPlaceholderGate,
+      },
+      domain_gates: domainGates,
+      citation_review: qaPayload?.citation_review ?? [],
+      explainability: qaPayload?.explainability ?? [],
+      missing_for_final_filing: mergedMissingForFiling,
+    };
+
+    const capturedTrainingCaseId = documentType === "mca-notice"
+      ? await captureMcaTrainingCase({
+          authClient,
+          userId,
+          companyId: typeof companyId === "string" ? companyId : null,
+          draftRunId: typeof draftRunId === "string" ? draftRunId : null,
+          noticeClass: mcaReplyType ?? "general-mca",
+          noticeDetails: noticeDetails ?? null,
+          generatedDraft: finalDraft,
+          qaPayload: finalQaPayload,
+          companyName,
+          industry,
+          draftMode,
+          previousCaseId: typeof trainingCaseId === "string" ? trainingCaseId : null,
+        })
+      : null;
 
     return new Response(JSON.stringify({
       draft: finalDraft,
@@ -1704,20 +1875,12 @@ Schema:
         mcaReplyType,
         advancedMode,
         userId,
+        trainingCaseId: capturedTrainingCaseId,
         generatedAt: new Date().toISOString(),
         version: "3.0-advanced",
       },
       qa: {
-        filing_score: filingScore,
-        risk_band: riskBand,
-        mandatory_gates: {
-          ...mandatoryGates,
-          no_placeholders: noPlaceholderGate,
-        },
-        domain_gates: domainGates,
-        citation_review: qaPayload?.citation_review ?? [],
-        explainability: qaPayload?.explainability ?? [],
-        missing_for_final_filing: mergedMissingForFiling,
+        ...finalQaPayload,
       },
       package: {
         reply: finalDraft,
