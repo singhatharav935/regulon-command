@@ -1496,6 +1496,7 @@ serve(async (req) => {
       trainingCaseId,
       evidenceContext,
       mcaReplyTypeOverride,
+      gstReplyTypeOverride,
       advancedMode = false,
       strictValidation = false,
       stream = false,
@@ -1503,6 +1504,9 @@ serve(async (req) => {
 
     const normalizedOperation = typeof operation === "string" ? operation.trim().toLowerCase() : "draft";
     const aiConfig = resolveAIConfig();
+    const normalizedGstReplyType = typeof gstReplyTypeOverride === "string" && gstReplyTypeOverride.trim()
+      ? gstReplyTypeOverride.trim().toLowerCase()
+      : null;
 
     if (normalizedOperation === "recheck") {
       if (!draftContent || typeof draftContent !== "string" || draftContent.trim().length < 40) {
@@ -2295,7 +2299,7 @@ Schema:
         userId,
         companyId: typeof companyId === "string" ? companyId : null,
         draftRunId: typeof draftRunId === "string" ? draftRunId : null,
-        noticeClass: "gst-show-cause",
+        noticeClass: normalizedGstReplyType || "gst-show-cause",
         noticeDetails: noticeDetails ?? null,
         generatedDraft: finalDraft,
         qaPayload: finalQaPayload,
@@ -2314,6 +2318,7 @@ Schema:
         draftMode,
         industry,
         mcaReplyType,
+        gstReplyType: normalizedGstReplyType,
         advancedMode,
         userId,
         trainingCaseId: capturedTrainingCaseId,

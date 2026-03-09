@@ -85,6 +85,20 @@ const mcaReplyTypeOptions = [
   { id: "general-mca", label: "General MCA Adjudication" },
 ];
 
+const gstReplyTypeOptions = [
+  { id: "auto", label: "Auto-detect from notice" },
+  { id: "itc-mismatch", label: "ITC Mismatch / Ineligible Credit" },
+  { id: "section-73-short-payment", label: "Section 73 Short Payment" },
+  { id: "section-74-fraud-allegation", label: "Section 74 Fraud Allegation" },
+  { id: "rcm-dispute", label: "RCM Dispute" },
+  { id: "refund-recovery", label: "Refund Recovery / Wrong Refund" },
+  { id: "gstr-reconciliation", label: "GSTR Reconciliation Mismatch" },
+  { id: "classification-valuation", label: "Classification / Valuation" },
+  { id: "place-of-supply", label: "Place of Supply Dispute" },
+  { id: "interest-penalty-only", label: "Interest/Penalty Only" },
+  { id: "gst-general", label: "General GST Show Cause" },
+];
+
 const inferMcaReplyTypeFromNotice = (noticeText: string): string => {
   const corpus = (noticeText || "").toLowerCase();
   if (/\bsection\s*92\b|\bsection\s*137\b|\bmgt-?7\b|\baoc-?4\b/.test(corpus)) return "annual-filing-92-137";
@@ -97,6 +111,20 @@ const inferMcaReplyTypeFromNotice = (noticeText: string): string => {
   if (/\bsection\s*203\b|\bkmp\b|company secretary|managing director|whole-time director/.test(corpus)) return "managerial-kmp-203";
   if (/\bsection\s*73\b|\bsection\s*74\b|\bsection\s*76\b|\bdeposit\b/.test(corpus)) return "deposits-73-76";
   return "general-mca";
+};
+
+const inferGstReplyTypeFromNotice = (noticeText: string): string => {
+  const corpus = (noticeText || "").toLowerCase();
+  if (/\bitc\b|\bgstr-?2b\b|\bgstr-?3b\b|\bsection\s*16\b/.test(corpus)) return "itc-mismatch";
+  if (/\bsection\s*73\b/.test(corpus)) return "section-73-short-payment";
+  if (/\bsection\s*74\b|fraud|suppression|wilful/i.test(corpus)) return "section-74-fraud-allegation";
+  if (/\brcm\b|reverse charge|section\s*9\(3\)|section\s*9\(4\)/i.test(corpus)) return "rcm-dispute";
+  if (/\brefund\b|wrong refund|section\s*54/i.test(corpus)) return "refund-recovery";
+  if (/\breconciliation\b|mismatch|2a|2b|3b/i.test(corpus)) return "gstr-reconciliation";
+  if (/\bclassification\b|hsn|valuation|section\s*15/i.test(corpus)) return "classification-valuation";
+  if (/\bplace of supply\b|igst|cgst|sgst/i.test(corpus)) return "place-of-supply";
+  if (/\binterest\b|\bpenalty\b|\bsection\s*50\b/.test(corpus)) return "interest-penalty-only";
+  return "gst-general";
 };
 
 const extractNoticeDateFromText = (noticeText: string): string => {
@@ -599,6 +627,7 @@ const AIDraftingEngine = ({ demoMode = false, includeLawyerReview = true }: AIDr
   const [lastTemplateDocType, setLastTemplateDocType] = useState<string>("");
   const [selectedMode, setSelectedMode] = useState<string>("balanced");
   const [mcaReplyTypeOverride, setMcaReplyTypeOverride] = useState<string>("auto");
+  const [gstReplyTypeOverride, setGstReplyTypeOverride] = useState<string>("auto");
   const [noticeDetails, setNoticeDetails] = useState<string>("");
   const [isGeneratingNoticeDetails, setIsGeneratingNoticeDetails] = useState(false);
   const [preferPiiMasking, setPreferPiiMasking] = useState(true);
@@ -650,6 +679,10 @@ const AIDraftingEngine = ({ demoMode = false, includeLawyerReview = true }: AIDr
   const selectedTemplate = selectedDocType ? readyNoticeTemplates[selectedDocType] : "";
   const inferredMcaReplyType = useMemo(
     () => inferMcaReplyTypeFromNotice(noticeDetails),
+    [noticeDetails],
+  );
+  const inferredGstReplyType = useMemo(
+    () => inferGstReplyTypeFromNotice(noticeDetails),
     [noticeDetails],
   );
   const supabaseAny = supabase as any;
@@ -1040,6 +1073,7 @@ const AIDraftingEngine = ({ demoMode = false, includeLawyerReview = true }: AIDr
       const data = await requestDraftData({
         operation: "recheck",
         documentType: "gst-show-cause",
+        gstReplyTypeOverride: gstReplyTypeOverride !== "auto" ? gstReplyTypeOverride : undefined,
         companyName: client?.name || "Company",
         companyId: clientSource === "live" ? selectedClient : undefined,
         draftRunId: currentDraftRunId || undefined,
@@ -1281,6 +1315,12 @@ const AIDraftingEngine = ({ demoMode = false, includeLawyerReview = true }: AIDr
     }
   }, [selectedDocType]);
 
+  useEffect(() => {
+    if (selectedDocType !== "gst-show-cause") {
+      setGstReplyTypeOverride("auto");
+    }
+  }, [selectedDocType]);
+
   const handleInsertTemplate = () => {
     if (!selectedDocType || !selectedTemplate) {
       toast.error("Select a document type first.");
@@ -1321,6 +1361,9 @@ const AIDraftingEngine = ({ demoMode = false, includeLawyerReview = true }: AIDr
         draftMode: selectedMode,
         mcaReplyTypeOverride: selectedDocType === "mca-notice" && mcaReplyTypeOverride !== "auto"
           ? mcaReplyTypeOverride
+          : undefined,
+        gstReplyTypeOverride: selectedDocType === "gst-show-cause" && gstReplyTypeOverride !== "auto"
+          ? gstReplyTypeOverride
           : undefined,
         context: `Generate precise Notice/Order Details for ${selectedDocLabel}. Ensure this is input-quality text for strict legal drafting checks.`,
         noticeDetails: sourceNotice || undefined,
@@ -1639,6 +1682,7 @@ Return only revised final draft text.`;
     try {
       const data = await requestDraftData({
         documentType: "gst-show-cause",
+        gstReplyTypeOverride: gstReplyTypeOverride !== "auto" ? gstReplyTypeOverride : undefined,
         companyName: client?.name || "Company",
         companyId: clientSource === "live" ? selectedClient : undefined,
         industry: client?.industry || "",
@@ -1799,6 +1843,9 @@ Return only revised final draft text.`;
             : undefined,
         mcaReplyTypeOverride: selectedDocType === "mca-notice" && mcaReplyTypeOverride !== "auto"
           ? mcaReplyTypeOverride
+          : undefined,
+        gstReplyTypeOverride: selectedDocType === "gst-show-cause" && gstReplyTypeOverride !== "auto"
+          ? gstReplyTypeOverride
           : undefined,
         advancedMode,
         strictValidation: advancedMode,
@@ -2113,6 +2160,33 @@ Return only revised final draft text.`;
                     Auto-detected class:{" "}
                     <span className="text-foreground font-medium">
                       {mcaReplyTypeOptions.find((o) => o.id === inferredMcaReplyType)?.label || "General MCA Adjudication"}
+                    </span>
+                  </p>
+                </div>
+              )}
+
+              {selectedDocType === "gst-show-cause" && (
+                <div>
+                  <label className="block text-sm font-medium text-foreground mb-2">
+                    <Book className="w-4 h-4 inline-block mr-2" />
+                    GST Notice Class
+                  </label>
+                  <Select value={gstReplyTypeOverride} onValueChange={setGstReplyTypeOverride}>
+                    <SelectTrigger className="bg-background/50">
+                      <SelectValue placeholder="Choose GST notice class..." />
+                    </SelectTrigger>
+                    <SelectContent>
+                      {gstReplyTypeOptions.map((option) => (
+                        <SelectItem key={option.id} value={option.id}>
+                          {option.label}
+                        </SelectItem>
+                      ))}
+                    </SelectContent>
+                  </Select>
+                  <p className="text-xs text-muted-foreground mt-1">
+                    Auto-detected class:{" "}
+                    <span className="text-foreground font-medium">
+                      {gstReplyTypeOptions.find((o) => o.id === inferredGstReplyType)?.label || "General GST Show Cause"}
                     </span>
                   </p>
                 </div>
