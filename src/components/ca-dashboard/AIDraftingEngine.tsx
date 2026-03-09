@@ -868,6 +868,11 @@ const AIDraftingEngine = ({ demoMode = false, includeLawyerReview = true }: AIDr
     [draftContent, draftQA],
   );
 
+  const liveGstAdvancedSuggestions = useMemo(
+    () => evaluateGstAdvancedSuggestions(draftContent || "", draftQA),
+    [draftContent, draftQA],
+  );
+
   const gstComputedIssueReport: GstIssueReport = useMemo(() => ({
     ok: liveGstIssueItems.length === 0,
     items: liveGstIssueItems,
@@ -875,14 +880,31 @@ const AIDraftingEngine = ({ demoMode = false, includeLawyerReview = true }: AIDr
     checkedAt: gstLastCheckedAt || new Date().toISOString(),
   }), [liveGstIssueItems, gstLastCheckedAt]);
 
-  const gstAutoFixNotes = useMemo(
-    () => liveGstIssueItems.map((item, idx) => `${idx + 1}. ${item.issue}\nSuggestion: ${item.suggestion}`).join("\n\n"),
-    [liveGstIssueItems],
-  );
+  const gstAutoFixNotes = useMemo(() => {
+    const issueNotes = liveGstIssueItems.map((item, idx) => `${idx + 1}. ${item.issue}\nSuggestion: ${item.suggestion}`);
+    const pendingAdvanced = liveGstAdvancedSuggestions
+      .filter((item) => !item.implemented)
+      .map((item, idx) => `${idx + 1 + issueNotes.length}. ${item.title}\nSuggestion: ${item.suggestion}`);
+    return [...issueNotes, ...pendingAdvanced].join("\n\n");
+  }, [liveGstIssueItems, liveGstAdvancedSuggestions]);
+
+  const gstPendingFixPlaybook = useMemo(() => {
+    const issuePlaybook = liveGstIssueItems.map((item) => ({
+      title: item.issue,
+      solution: item.suggestion,
+    }));
+    const advancedPlaybook = liveGstAdvancedSuggestions
+      .filter((item) => !item.implemented)
+      .map((item) => ({
+        title: item.title,
+        solution: item.suggestion,
+      }));
+    return [...issuePlaybook, ...advancedPlaybook];
+  }, [liveGstIssueItems, liveGstAdvancedSuggestions]);
 
   const gstPendingFixCount = useMemo(
-    () => liveGstIssueItems.length,
-    [liveGstIssueItems],
+    () => liveGstIssueItems.length + liveGstAdvancedSuggestions.filter((item) => !item.implemented).length,
+    [liveGstIssueItems, liveGstAdvancedSuggestions],
   );
 
   const enforceMcaLocalFallback = (rawContent: string, mcaType?: string) => {
@@ -1022,6 +1044,40 @@ const AIDraftingEngine = ({ demoMode = false, includeLawyerReview = true }: AIDr
     }
 
     return items;
+  }
+
+  function evaluateGstAdvancedSuggestions(
+    content: string,
+    qa?: DraftQA | null,
+  ): Array<{ title: string; suggestion: string; implemented: boolean }> {
+    const checks: Array<{ title: string; suggestion: string; implemented: boolean }> = [
+      {
+        title: "Strengthen Statutory Section Anchor",
+        suggestion: "Explicitly anchor invoked sections/rules with allegation-wise legal analysis.",
+        implemented: /(section\s*73|section\s*74|section\s*16|section\s*50|rule\s*36|rule\s*42)/i.test(content),
+      },
+      {
+        title: "Improve GST Return Linkage",
+        suggestion: "Map allegations to GSTR-3B, GSTR-2B, ITC trail, and DRC references where applicable.",
+        implemented: /\bGSTR-?3B\b|\bGSTR-?2B\b|\bITC\b|\bDRC-?01\b/i.test(content),
+      },
+      {
+        title: "Evidence-Anchored Rebuttal",
+        suggestion: "Add annexure-linked evidence anchors for each major rebuttal point.",
+        implemented: /annexure[-\s]*(a|1|i)/i.test(content),
+      },
+      {
+        title: "Hearing Strategy",
+        suggestion: "Include explicit personal hearing request and authority to submit further records.",
+        implemented: /personal hearing|grant hearing|opportunity of hearing/i.test(content),
+      },
+      {
+        title: "Raise Filing-Readiness Score",
+        suggestion: "Tighten accepted-vs-disputed computation table and remove generic repetitive language.",
+        implemented: (qa?.filing_score ?? 100) >= 95,
+      },
+    ];
+    return checks;
   }
 
   const runGstDraftIssueCheck = (contentOverride?: string, qaOverride?: DraftQA | null) => {
@@ -1661,12 +1717,19 @@ Return only the revised final draft text.`;
     const issueText = issueItems
       .map((item, idx) => `${idx + 1}. Issue: ${item.issue}\n   Suggestion: ${item.suggestion}`)
       .join("\n");
+    const advancedSuggestionText = liveGstAdvancedSuggestions
+      .filter((item) => !item.implemented)
+      .map((item, idx) => `${idx + 1}. Upgrade: ${item.title}\n   Suggestion: ${item.suggestion}`)
+      .join("\n");
     const recheckNotes = (gstRecheckReport?.flags || [])
       .map((flag, idx) => `${idx + 1}. [${flag.severity.toUpperCase()}] ${flag.issue}\n   Fix: ${flag.fix}`)
       .join("\n");
     const combinedFixNotes = [gstAutoFixNotes, recheckNotes, gstUserFixNotes.trim()]
       .filter((entry) => entry && entry.trim().length > 0)
       .join("\n\n");
+    const pendingPlaybookText = gstPendingFixPlaybook
+      .map((item, idx) => `${idx + 1}. Pending: ${item.title}\n   Solution: ${item.solution}`)
+      .join("\n");
 
     const fixContext = `You are improving a GST show-cause reply draft.
 Task: Regenerate a corrected final draft by merging current draft with required fixes.
@@ -1683,8 +1746,14 @@ ${draftContent}
 DETECTED ISSUES:
 ${issueText || "No local issue detector items."}
 
+ADVANCED UPGRADE SUGGESTIONS:
+${advancedSuggestionText || "No additional upgrades detected."}
+
 RECHECK FLAGS:
 ${recheckNotes || "No recheck flags."}
+
+PENDING FIX PLAYBOOK (MANDATORY ACTION STEPS):
+${pendingPlaybookText || "No pending actions."}
 
 CA NOTES:
 ${combinedFixNotes || "None"}
@@ -2608,6 +2677,25 @@ Return only revised final draft text.`;
                     </div>
                   )}
 
+                  {liveGstAdvancedSuggestions.length > 0 && (
+                    <div className="p-4 rounded-lg border border-cyan-500/30 bg-cyan-500/10 text-cyan-200 text-sm">
+                      <p className="font-medium mb-2">Advanced Suggestions:</p>
+                      <ul className="list-disc pl-5 space-y-2">
+                        {liveGstAdvancedSuggestions.map((item, idx) => (
+                          <li key={`${item.title}-${idx}`}>
+                            <p className={item.implemented ? "text-green-300" : "text-cyan-200"}>
+                              {item.implemented ? "✓ " : ""}{item.title}
+                              <span className={`ml-2 text-[11px] ${item.implemented ? "text-green-300" : "text-yellow-200"}`}>
+                                [{item.implemented ? "Implemented" : "Pending"}]
+                              </span>
+                            </p>
+                            <p className="text-xs text-cyan-100/90 mt-1">Suggestion: {item.suggestion}</p>
+                          </li>
+                        ))}
+                      </ul>
+                    </div>
+                  )}
+
                   <div className="p-3 rounded-lg border border-border/50 bg-background/30 space-y-2">
                     <p className="text-sm font-medium text-foreground">AI Fix Assistant (GST)</p>
                     <p className="text-xs text-muted-foreground">
@@ -2661,6 +2749,21 @@ Return only revised final draft text.`;
                       readOnly
                       className="min-h-[90px] bg-background/40 text-muted-foreground"
                     />
+                    <div className="rounded-lg border border-cyan-500/20 bg-cyan-500/5 p-3 text-xs space-y-2">
+                      <p className="font-medium text-cyan-200">Pending Fix Solutions (AI)</p>
+                      {gstPendingFixPlaybook.length === 0 ? (
+                        <p className="text-cyan-100/80">No pending solutions. Draft is clear on current checks.</p>
+                      ) : (
+                        <ul className="list-disc pl-4 space-y-2 text-cyan-100/90">
+                          {gstPendingFixPlaybook.map((item, idx) => (
+                            <li key={`${item.title}-${idx}`}>
+                              <p>{item.title}</p>
+                              <p className="text-cyan-100/75">How to fix: {item.solution}</p>
+                            </li>
+                          ))}
+                        </ul>
+                      )}
+                    </div>
                     <Textarea
                       value={gstUserFixNotes}
                       onChange={(e) => setGstUserFixNotes(e.target.value)}
