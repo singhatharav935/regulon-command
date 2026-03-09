@@ -11,7 +11,8 @@
     "preview": "vite preview",
     "test": "vitest run",
     "test:watch": "vitest",
-    "mca:bootstrap": "node scripts/bootstrap-mca-training.mjs"
+    "mca:bootstrap": "node scripts/bootstrap-mca-training.mjs",
+    "gst:bootstrap": "node scripts/bootstrap-gst-training.mjs"
   },
   "dependencies": {
     "@hookform/resolvers": "^3.10.0",

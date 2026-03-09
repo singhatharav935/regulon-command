@@ -234,6 +234,27 @@ type McaRecheckReport = {
   checkedAt?: string;
 };
 
+type GstIssueReport = {
+  ok: boolean;
+  items: Array<{ issue: string; suggestion: string }>;
+  issues: string[];
+  checkedAt: string;
+};
+
+type GstRecheckFlag = {
+  severity: "high" | "medium" | "low";
+  issue: string;
+  fix: string;
+  source?: "rule" | "ai";
+};
+
+type GstRecheckReport = {
+  ok: boolean;
+  flags: GstRecheckFlag[];
+  summary?: string;
+  checkedAt?: string;
+};
+
 const buildOfflineDraft = ({
   documentType,
   authority,
@@ -586,6 +607,7 @@ const AIDraftingEngine = ({ demoMode = false, includeLawyerReview = true }: AIDr
   const [draftGenerated, setDraftGenerated] = useState(false);
   const [draftContent, setDraftContent] = useState("");
   const [mcaTrainingCaseId, setMcaTrainingCaseId] = useState<string | null>(null);
+  const [gstTrainingCaseId, setGstTrainingCaseId] = useState<string | null>(null);
   const [showFormatDetails, setShowFormatDetails] = useState(false);
   const [currentDraftRunId, setCurrentDraftRunId] = useState<string | null>(null);
   const [workflowStatus, setWorkflowStatus] = useState<WorkflowStatus>("generated");
@@ -599,6 +621,14 @@ const AIDraftingEngine = ({ demoMode = false, includeLawyerReview = true }: AIDr
   const [mcaEvidenceContext, setMcaEvidenceContext] = useState("");
   const [mcaRecheckReport, setMcaRecheckReport] = useState<McaRecheckReport | null>(null);
   const [isRecheckingMca, setIsRecheckingMca] = useState(false);
+  const [gstHasChecked, setGstHasChecked] = useState(false);
+  const [gstLastCheckedAt, setGstLastCheckedAt] = useState<string | null>(null);
+  const [gstIssueReport, setGstIssueReport] = useState<GstIssueReport | null>(null);
+  const [gstUserFixNotes, setGstUserFixNotes] = useState("");
+  const [gstEvidenceContext, setGstEvidenceContext] = useState("");
+  const [gstRecheckReport, setGstRecheckReport] = useState<GstRecheckReport | null>(null);
+  const [isRecheckingGst, setIsRecheckingGst] = useState(false);
+  const [isApplyingGstFix, setIsApplyingGstFix] = useState(false);
   const [currentSteps, setCurrentSteps] = useState<ReviewStep[]>(initialReviewSteps);
   const [generationError, setGenerationError] = useState<string | null>(null);
 
@@ -801,6 +831,10 @@ const AIDraftingEngine = ({ demoMode = false, includeLawyerReview = true }: AIDr
       .join("\n\n"),
     [mcaRecheckReport],
   );
+  const gstPendingFixCount = useMemo(
+    () => gstIssueReport?.items.length || 0,
+    [gstIssueReport],
+  );
 
   const enforceMcaLocalFallback = (rawContent: string, mcaType?: string) => {
     let content = rawContent || "";
@@ -886,6 +920,75 @@ const AIDraftingEngine = ({ demoMode = false, includeLawyerReview = true }: AIDr
     setMcaLastCheckedAt(new Date().toISOString());
   };
 
+  const evaluateGstDraftIssues = (
+    content: string,
+    qa?: DraftQA | null,
+    includeQaGates = true,
+  ): Array<{ issue: string; suggestion: string }> => {
+    const items: Array<{ issue: string; suggestion: string }> = [];
+    const addIssue = (condition: boolean, issue: string, suggestion: string) => {
+      if (condition) items.push({ issue, suggestion });
+    };
+
+    const hasParaWise = /para[-\s]*wise rebuttal|allegation[-\s]*wise rebuttal/i.test(content)
+      || /\|\s*Allegation\s*\|\s*Department Position\s*\|\s*Noticee Rebuttal\s*\|/i.test(content);
+    const hasComputation = /accepted\s*\|\s*disputed|computation|reconciliation/i.test(content)
+      && /\|\s*[-:]+\s*\|\s*[-:]+\s*\|/.test(content);
+    const hasGstContext = /\bGSTR-?3B\b|\bGSTR-?2B\b|\bITC\b|\bDRC-?01\b/i.test(content);
+
+    addIssue(
+      !hasParaWise,
+      "GST para-wise rebuttal matrix is missing.",
+      "Add allegation-wise matrix: Allegation | Department Position | Noticee Rebuttal | Evidence.",
+    );
+    addIssue(
+      !hasComputation,
+      "GST computation/reconciliation table is missing.",
+      "Add accepted vs disputed table for tax, interest, and penalty with reconciliation basis.",
+    );
+    addIssue(
+      !hasGstContext,
+      "GST context (GSTR/ITC/DRC references) is weak.",
+      "Add GSTR-3B/GSTR-2B/ITC or DRC references where relevant to allegations.",
+    );
+    addIssue(
+      /\bwaive\b[^.\n]{0,70}\bpenalt/i.test(content) || /\babsolve\b/i.test(content),
+      "Risky prayer wording detected.",
+      "Use calibrated wording: drop or reduce unsustainable penalty based on facts and law.",
+    );
+    addIssue(
+      /\[(insert|to be filled)[^\]]*\]/i.test(content),
+      "Unresolved placeholders detected in GST draft.",
+      "Replace placeholders with notice-specific data before final filing.",
+    );
+
+    if (includeQaGates) {
+      const badMandatoryGates = Object.entries(qa?.mandatory_gates || {})
+        .filter(([, passed]) => !passed)
+        .map(([gate]) => ({
+          issue: `Mandatory gate failed: ${gate}`,
+          suggestion: "Add the missing mandatory section and re-run draft checks.",
+        }));
+      items.push(...badMandatoryGates);
+    }
+
+    return items;
+  };
+
+  const runGstDraftIssueCheck = (contentOverride?: string, qaOverride?: DraftQA | null) => {
+    const content = contentOverride ?? draftContent ?? "";
+    const effectiveQa = qaOverride ?? draftQA;
+    const items = evaluateGstDraftIssues(content, effectiveQa, true);
+    setGstIssueReport({
+      ok: items.length === 0,
+      items,
+      issues: items.map((item) => item.issue),
+      checkedAt: new Date().toISOString(),
+    });
+    setGstHasChecked(true);
+    setGstLastCheckedAt(new Date().toISOString());
+  };
+
   const handleRecheckMcaDraft = async () => {
     if (selectedDocType !== "mca-notice" || !draftGenerated || !draftContent.trim()) {
       toast.error("Generate and edit an MCA draft first.");
@@ -925,9 +1028,55 @@ const AIDraftingEngine = ({ demoMode = false, includeLawyerReview = true }: AIDr
     }
   };
 
+  const handleRecheckGstDraft = async () => {
+    if (selectedDocType !== "gst-show-cause" || !draftGenerated || !draftContent.trim()) {
+      toast.error("Generate and edit a GST draft first.");
+      return;
+    }
+
+    setIsRecheckingGst(true);
+    try {
+      const client = clientOptions.find((c) => c.id === selectedClient);
+      const data = await requestDraftData({
+        operation: "recheck",
+        documentType: "gst-show-cause",
+        companyName: client?.name || "Company",
+        companyId: clientSource === "live" ? selectedClient : undefined,
+        draftRunId: currentDraftRunId || undefined,
+        trainingCaseId: gstTrainingCaseId || undefined,
+        noticeDetails: maskPII(noticeDetails) || undefined,
+        draftContent,
+        evidenceContext: gstEvidenceContext || undefined,
+        stream: false,
+      });
+
+      const report: GstRecheckReport = {
+        ok: Boolean(data?.ok),
+        flags: Array.isArray(data?.flags) ? data.flags : [],
+        summary: typeof data?.summary === "string" ? data.summary : undefined,
+        checkedAt: typeof data?.checkedAt === "string" ? data.checkedAt : new Date().toISOString(),
+      };
+      setGstRecheckReport(report);
+
+      if (report.ok) toast.success("GST Recheck AI passed. No critical mismatches detected.");
+      else toast.warning(`GST Recheck AI flagged ${report.flags.length} item(s).`);
+    } catch (error) {
+      const msg = error instanceof Error ? error.message : "GST Recheck AI failed";
+      toast.error(msg);
+    } finally {
+      setIsRecheckingGst(false);
+    }
+  };
+
   useEffect(() => {
     if (selectedDocType !== "mca-notice" || !draftGenerated || !draftContent.trim()) return;
     runMcaDraftIssueCheck(draftContent);
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [selectedDocType, draftGenerated, draftContent, draftQA]);
+
+  useEffect(() => {
+    if (selectedDocType !== "gst-show-cause" || !draftGenerated || !draftContent.trim()) return;
+    runGstDraftIssueCheck(draftContent, draftQA);
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [selectedDocType, draftGenerated, draftContent, draftQA]);
 
@@ -1445,6 +1594,82 @@ Return only the revised final draft text.`;
     }
   };
 
+  const handleApplyGstFix = async () => {
+    if (selectedDocType !== "gst-show-cause" || !draftContent.trim()) {
+      toast.error("Generate a GST draft first.");
+      return;
+    }
+    if (!gstHasChecked) {
+      runGstDraftIssueCheck();
+    }
+
+    const client = clientOptions.find((c) => c.id === selectedClient);
+    const issueItems = evaluateGstDraftIssues(draftContent, draftQA, false);
+    const issueText = issueItems
+      .map((item, idx) => `${idx + 1}. Issue: ${item.issue}\n   Suggestion: ${item.suggestion}`)
+      .join("\n");
+    const recheckNotes = (gstRecheckReport?.flags || [])
+      .map((flag, idx) => `${idx + 1}. [${flag.severity.toUpperCase()}] ${flag.issue}\n   Fix: ${flag.fix}`)
+      .join("\n");
+
+    const fixContext = `You are improving a GST show-cause reply draft.
+Task: Regenerate a corrected final draft by merging current draft with required fixes.
+Mandatory fixes:
+1) Add para-wise/allegation-wise rebuttal matrix if missing
+2) Add accepted vs disputed computation/reconciliation table
+3) Ensure GSTR/ITC/DRC references are present where factually relevant
+4) Use safe prayer wording (drop/reduce), avoid waive/absolve language
+5) Keep output notice-specific and filing-ready
+
+CURRENT DRAFT:
+${draftContent}
+
+DETECTED ISSUES:
+${issueText || "No local issue detector items."}
+
+RECHECK FLAGS:
+${recheckNotes || "No recheck flags."}
+
+CA NOTES:
+${gstUserFixNotes.trim() || "None"}
+
+Return only revised final draft text.`;
+
+    setIsApplyingGstFix(true);
+    try {
+      const data = await requestDraftData({
+        documentType: "gst-show-cause",
+        companyName: client?.name || "Company",
+        companyId: clientSource === "live" ? selectedClient : undefined,
+        industry: client?.industry || "",
+        draftRunId: currentDraftRunId || undefined,
+        trainingCaseId: gstTrainingCaseId || undefined,
+        draftMode: selectedMode,
+        advancedMode: true,
+        strictValidation: true,
+        context: fixContext,
+        noticeDetails: maskPII(noticeDetails) || undefined,
+        stream: false,
+      });
+
+      const content = (data?.draft as string | undefined) || "";
+      if (!content) throw new Error("GST AI fix regeneration returned empty content.");
+      setDraftContent(content);
+      setDraftQA((data?.qa ?? null) as DraftQA | null);
+      setDraftPackage((data?.package ?? null) as DraftPackage | null);
+      const nextCaseId = (data?.metadata as { trainingCaseId?: string } | undefined)?.trainingCaseId;
+      if (nextCaseId) setGstTrainingCaseId(nextCaseId);
+      setGstUserFixNotes("");
+      runGstDraftIssueCheck(content, (data?.qa ?? null) as DraftQA | null);
+      toast.success("GST draft corrected and regenerated.");
+    } catch (error) {
+      const msg = error instanceof Error ? error.message : "Failed to apply GST AI fix";
+      toast.error(msg);
+    } finally {
+      setIsApplyingGstFix(false);
+    }
+  };
+
   const handleGenerateDraft = async () => {
     if (!selectedClient || !selectedDocType) return;
 
@@ -1470,12 +1695,18 @@ Return only the revised final draft text.`;
     setGenerationError(null);
     setDraftContent("");
     setMcaTrainingCaseId(null);
+    setGstTrainingCaseId(null);
     setDraftQA(null);
     setDraftPackage(null);
     setMcaHasChecked(false);
     setMcaLastCheckedAt(null);
     setMcaUserFixNotes("");
     setMcaRecheckReport(null);
+    setGstHasChecked(false);
+    setGstLastCheckedAt(null);
+    setGstIssueReport(null);
+    setGstUserFixNotes("");
+    setGstRecheckReport(null);
     
     const client = clientOptions.find(c => c.id === selectedClient);
     const maskedNoticeDetails = noticeDetails ? maskPII(noticeDetails) : undefined;
@@ -1561,7 +1792,11 @@ Return only the revised final draft text.`;
         industry: client?.industry || "",
         draftMode: selectedMode,
         draftRunId: currentDraftRunId || undefined,
-        trainingCaseId: mcaTrainingCaseId || undefined,
+        trainingCaseId: selectedDocType === "mca-notice"
+          ? (mcaTrainingCaseId || undefined)
+          : selectedDocType === "gst-show-cause"
+            ? (gstTrainingCaseId || undefined)
+            : undefined,
         mcaReplyTypeOverride: selectedDocType === "mca-notice" && mcaReplyTypeOverride !== "auto"
           ? mcaReplyTypeOverride
           : undefined,
@@ -1632,7 +1867,8 @@ Return only the revised final draft text.`;
         setDraftQA((data?.qa ?? null) as DraftQA | null);
         setDraftPackage((data?.package ?? null) as DraftPackage | null);
         const generatedCaseId = (data?.metadata as { trainingCaseId?: string } | undefined)?.trainingCaseId;
-        setMcaTrainingCaseId(generatedCaseId || null);
+        if (selectedDocType === "mca-notice") setMcaTrainingCaseId(generatedCaseId || null);
+        if (selectedDocType === "gst-show-cause") setGstTrainingCaseId(generatedCaseId || null);
         setDraftGenerated(true);
         setShowFormatDetails(false);
         setWorkflowStatus("generated");
@@ -2244,6 +2480,116 @@ Return only the revised final draft text.`;
                         </>
                       ) : (
                         "Apply AI Fix & Regenerate MCA Draft"
+                      )}
+                    </Button>
+                  </div>
+                </div>
+              )}
+
+              {draftGenerated && selectedDocType === "gst-show-cause" && (
+                <div className="mt-3 space-y-2">
+                  <Button
+                    type="button"
+                    variant="outline"
+                    className="w-full"
+                    onClick={runGstDraftIssueCheck}
+                  >
+                    Check What Is Wrong In This GST Draft
+                  </Button>
+                  {gstHasChecked && gstIssueReport && (
+                    <div
+                      className={`p-4 rounded-lg border text-sm ${
+                        gstIssueReport.ok
+                          ? "border-green-500/30 bg-green-500/10 text-green-300"
+                          : "border-yellow-500/30 bg-yellow-500/10 text-yellow-200"
+                      }`}
+                    >
+                      {gstIssueReport.ok ? (
+                        <p>All GST checks passed. This draft is structurally aligned for CA review.</p>
+                      ) : (
+                        <div className="space-y-2">
+                          <p className="font-medium">Issues detected:</p>
+                          <ul className="list-disc pl-5 space-y-2">
+                            {gstIssueReport.items.map((item, idx) => (
+                              <li key={`${item.issue}-${idx}`}>
+                                <p>{item.issue}</p>
+                                <p className="text-xs text-yellow-100/90 mt-1">Suggestion: {item.suggestion}</p>
+                              </li>
+                            ))}
+                          </ul>
+                        </div>
+                      )}
+                    </div>
+                  )}
+
+                  <div className="p-3 rounded-lg border border-border/50 bg-background/30 space-y-2">
+                    <p className="text-sm font-medium text-foreground">AI Fix Assistant (GST)</p>
+                    <p className="text-xs text-muted-foreground">
+                      GST issue detector and recheck are separate from MCA. Add optional notes, then regenerate.
+                    </p>
+                    <Textarea
+                      value={gstEvidenceContext}
+                      onChange={(e) => setGstEvidenceContext(e.target.value)}
+                      placeholder="Optional: paste GST evidence text (DRC/GSTR/ITC reconciliation extracts) for Recheck AI."
+                      className="min-h-[90px] bg-background/50"
+                    />
+                    <Button
+                      type="button"
+                      variant="outline"
+                      className="w-full"
+                      onClick={handleRecheckGstDraft}
+                      disabled={isRecheckingGst || !draftGenerated}
+                    >
+                      {isRecheckingGst ? (
+                        <>
+                          <Loader2 className="w-4 h-4 mr-2 animate-spin" />
+                          Rechecking GST AI...
+                        </>
+                      ) : (
+                        "Recheck AI (GST Draft + Notice + Evidence)"
+                      )}
+                    </Button>
+                    {gstRecheckReport && (
+                      <div className={`rounded-lg border p-3 text-xs space-y-2 ${
+                        gstRecheckReport.ok
+                          ? "border-green-500/30 bg-green-500/10 text-green-300"
+                          : "border-rose-500/30 bg-rose-500/10 text-rose-200"
+                      }`}>
+                        <p className="font-medium">{gstRecheckReport.ok ? "GST Recheck AI: Passed" : "GST Recheck AI: Flags Detected"}</p>
+                        {gstRecheckReport.summary ? <p>{gstRecheckReport.summary}</p> : null}
+                        {!gstRecheckReport.ok && (
+                          <ul className="list-disc pl-4 space-y-2">
+                            {gstRecheckReport.flags.map((flag, idx) => (
+                              <li key={`${flag.issue}-${idx}`}>
+                                <p>[{flag.severity.toUpperCase()}] {flag.issue}</p>
+                                <p className="text-rose-100/90">Fix: {flag.fix}</p>
+                              </li>
+                            ))}
+                          </ul>
+                        )}
+                      </div>
+                    )}
+                    <p className="text-xs text-cyan-300">Pending GST fixes: {gstPendingFixCount}</p>
+                    <Textarea
+                      value={gstUserFixNotes}
+                      onChange={(e) => setGstUserFixNotes(e.target.value)}
+                      placeholder="Optional CA note for GST AI fix."
+                      className="min-h-[90px] bg-background/50"
+                    />
+                    <Button
+                      type="button"
+                      variant="outline"
+                      className="w-full"
+                      onClick={handleApplyGstFix}
+                      disabled={isApplyingGstFix || !draftGenerated || (gstPendingFixCount === 0 && gstUserFixNotes.trim().length === 0)}
+                    >
+                      {isApplyingGstFix ? (
+                        <>
+                          <Loader2 className="w-4 h-4 mr-2 animate-spin" />
+                          Applying GST AI Fix...
+                        </>
+                      ) : (
+                        "Apply AI Fix & Regenerate GST Draft"
                       )}
                     </Button>
                   </div>
