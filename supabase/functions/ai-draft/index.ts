@@ -1045,15 +1045,92 @@ const removeDuplicateMarkdownSection = (input: string, heading: string) => {
   return fixed.replace(/\n{3,}/g, "\n\n").trim();
 };
 
+const enforceUniversalDraftLanguage = (draft: string) => {
+  let fixed = draft || "";
+  fixed = fixed.replace(/\bwe\s+contextually\s+submit\b/gi, "we respectfully submit");
+  fixed = fixed.replace(/\bcontextually\s+submit\b/gi, "respectfully submit");
+  fixed = fixed.replace(/\[Select\s*:[^\]]+\]/gi, "[To be filled by CA/Lawyer]");
+  fixed = fixed.replace(/\bpenaltyy\b/gi, "penalty");
+  fixed = fixed.replace(/\n{3,}/g, "\n\n").trim();
+  return fixed;
+};
+
+const enforceCrossRegulatorySafetyLanguage = (draft: string, documentType: string) => {
+  let fixed = enforceUniversalDraftLanguage(draft);
+  const isRegulatory = [
+    "mca-notice",
+    "gst-show-cause",
+    "income-tax-response",
+    "rbi-filing",
+    "sebi-compliance",
+    "customs-response",
+    "custom-draft",
+  ].includes(documentType);
+
+  if (!isRegulatory) return fixed;
+
+  fixed = fixed.replace(/\bwaive\b[^.\n]{0,80}\bpenalt/gi, "drop or reduce penalty");
+  fixed = fixed.replace(/\babsolve\b[^.\n]{0,120}\bofficer[s]?/gi, "apply role-based mitigation for officers in default");
+  fixed = fixed.replace(/\bimpose\s+no\s+penalty\b/gi, "drop or reduce penalty");
+  fixed = fixed.replace(/\bdrop\s+the\s+proceedings[^.\n]*in\s+entirety\b/gi, "drop the proceedings, or alternatively reduce penalty based on facts and rectification status");
+  fixed = fixed.replace(/\bdouble jeopardy\b/gi, "disproportionate duplication of monetary burden");
+  fixed = fixed.replace(/\btotal waiver\b/gi, "substantial reduction");
+  return enforceUniversalDraftLanguage(fixed);
+};
+
+const buildGstFallbackParaWiseMatrix = () => `| Allegation | Department Position | Noticee Rebuttal | Evidence |
+|---|---|---|---|
+| ITC mismatch / ineligible credit | Proposed disallowance based on mismatch indicators | Eligibility must be tested on invoice, receipt of goods/services, tax payment trail, and return records | Annexure A/B |
+| Demand computation | Aggregate demand proposed | Recompute after invoice-wise reconciliation and timing alignment | Annexure C |
+| Interest and penalty | Consequential levy proposed | Contingent on sustainable principal demand and statutory conditions | Annexure D |`;
+
+const buildGstFallbackComputationTable = () => `| Particulars | Department Figure | Accepted | Disputed | Basis of Dispute |
+|---|---:|---:|---:|---|
+| Principal tax demand | [To be filled by CA/Lawyer] | [To be filled by CA/Lawyer] | [To be filled by CA/Lawyer] | Invoice-wise reconciliation required |
+| Interest | [To be filled by CA/Lawyer] | [To be filled by CA/Lawyer] | [To be filled by CA/Lawyer] | Depends on sustainable principal amount |
+| Penalty | [To be filled by CA/Lawyer] | [To be filled by CA/Lawyer] | [To be filled by CA/Lawyer] | Challenge on facts, intent, and proportionality |`;
+
+const enforceGstDraftMinimumStructure = (draft: string) => {
+  let fixed = enforceCrossRegulatorySafetyLanguage(draft, "gst-show-cause");
+
+  if (!/without prejudice/i.test(fixed)) {
+    fixed = `Without prejudice to all rights and remedies, the Noticee submits as under.\n\n${fixed}`;
+  }
+
+  const hasParaWiseMatrix = /para[-\s]*wise rebuttal|allegation[-\s]*wise rebuttal/i.test(fixed)
+    || /\|\s*Allegation\s*\|\s*Department Position\s*\|\s*Noticee Rebuttal\s*\|/i.test(fixed);
+  if (!hasParaWiseMatrix) {
+    fixed += `\n\n### Para-Wise Rebuttal Matrix\n${buildGstFallbackParaWiseMatrix()}`;
+  }
+
+  const hasComputationTable = /accepted\s*\|\s*disputed|computation|reconciliation/i.test(fixed)
+    && /\|\s*[-:]+\s*\|\s*[-:]+\s*\|/.test(fixed);
+  if (!hasComputationTable) {
+    fixed += `\n\n### Computation Reconciliation Table\n${buildGstFallbackComputationTable()}`;
+  }
+
+  if (!/prayer|relief/i.test(fixed)) {
+    fixed += `\n\n### Prayer\n1. Drop unsustainable demand components after reconciliation.\n2. Drop or reduce interest and penalty to the extent not legally sustainable.\n3. Grant personal hearing and permit additional submissions.\n4. Pass any other order deemed fit in the interest of justice.`;
+  }
+
+  if (!/hearing/i.test(fixed)) {
+    fixed += `\n\n### Hearing Request\nThe Noticee requests an opportunity of personal hearing before any adverse order is passed.`;
+  }
+
+  fixed = removeDuplicateMarkdownSection(fixed, "Para-Wise Rebuttal Matrix");
+  fixed = removeDuplicateMarkdownSection(fixed, "Computation Reconciliation Table");
+  fixed = removeDuplicateMarkdownSection(fixed, "Prayer");
+  return enforceCrossRegulatorySafetyLanguage(fixed, "gst-show-cause");
+};
+
 const enforceMcaDraftMinimumStructure = (
   draft: string,
   mcaReplyType: McaReplyType,
   noticeDate?: string | null,
 ): string => {
-  let fixed = draft;
+  let fixed = enforceUniversalDraftLanguage(draft);
 
   // Hard safety phrase replacement
-  fixed = fixed.replace(/\bpenaltyy\b/gi, "penalty");
   fixed = fixed.replace(/waive(?:\s+or\s+reduce)?\s+the\s+penalty/gi, "drop or reduce penalty");
   fixed = fixed.replace(/waive\s+or\s+substantially\s+reduce(?:\s+the)?\s+proposed\s+penalty/gi, "drop or reduce penalty");
   fixed = fixed.replace(/waive\s+or\s+reduce(?:\s+the)?\s+proposed\s+penalty/gi, "drop or reduce penalty");
@@ -1066,6 +1143,8 @@ const enforceMcaDraftMinimumStructure = (
   fixed = fixed.replace(/\bdrop the adjudication proceedings against the company and its officers in default\b/gi, "drop or reduce penalty on the Company and officers in default based on role, conduct, and mitigating facts");
   fixed = fixed.replace(/waive penalty for officers/gi, "drop or reduce penalty on officers in default based on role, conduct, and mitigating facts");
   fixed = fixed.replace(/waive\s+the\s+penalty\s+on\s+the\s+officers\s+in\s+default/gi, "drop or reduce penalty on officers in default based on role, conduct, and mitigating facts");
+  fixed = fixed.replace(/\bdrop\s+the\s+adjudication\s+proceedings[^.\n]*in\s+entirety\b/gi, "drop the adjudication proceedings, or alternatively reduce penalty based on rectification and mitigating facts");
+  fixed = fixed.replace(/\bdrop\s+the\s+proceedings[^.\n]*in\s+entirety\b/gi, "drop the proceedings, or alternatively reduce penalty based on rectification and mitigating facts");
   fixed = fixed.replace(/total waiver/gi, "substantial reduction");
   fixed = fixed.replace(/maximum sequestration of penalties/gi, "maximum penalties");
   fixed = fixed.replace(/double jeopardy/gi, "disproportionate duplication of monetary burden for a procedural lapse");
@@ -1118,7 +1197,7 @@ const enforceMcaDraftMinimumStructure = (
     fixed += `\n\n### Hearing Request\nThe Noticee requests an opportunity of personal hearing (physical/VC mode) before any adverse order is passed.`;
   }
 
-  return fixed;
+  return enforceUniversalDraftLanguage(fixed);
 };
 
 const runMcaRepairAndGate = (
@@ -1607,7 +1686,12 @@ Dataset policy:
       }
 
       const data = await response.json();
-      const draftContent = data.choices?.[0]?.message?.content || "";
+      let draftContent = enforceUniversalDraftLanguage(data.choices?.[0]?.message?.content || "");
+      if (documentType === "gst-show-cause") {
+        draftContent = enforceGstDraftMinimumStructure(draftContent);
+      } else {
+        draftContent = enforceCrossRegulatorySafetyLanguage(draftContent, documentType);
+      }
       return new Response(JSON.stringify({
         draft: draftContent,
         metadata: {
@@ -1805,7 +1889,7 @@ Checklist:
 
     const reviewedData = await reviewerResp.json();
     const reviewedDraft = reviewedData.choices?.[0]?.message?.content || firstDraft;
-    let finalDraft = reviewedDraft;
+    let finalDraft = enforceUniversalDraftLanguage(reviewedDraft);
     let repairedMcaGateResult: DomainGateResult | null = null;
     let copyRiskScore = 0;
     let copyRiskMatchedCaseId: string | null = null;
@@ -1873,6 +1957,13 @@ Checklist:
           }
         }
       }
+    }
+    if (documentType === "gst-show-cause") {
+      finalDraft = enforceGstDraftMinimumStructure(finalDraft);
+    } else if (documentType !== "mca-notice") {
+      finalDraft = enforceCrossRegulatorySafetyLanguage(finalDraft, documentType);
+    } else {
+      finalDraft = enforceUniversalDraftLanguage(finalDraft);
     }
 
     const qaSystemPrompt = `You are a legal QA auditor for filing readiness.
