@@ -969,11 +969,11 @@ const AIDraftingEngine = ({ demoMode = false, includeLawyerReview = true }: AIDr
     setMcaLastCheckedAt(new Date().toISOString());
   };
 
-  const evaluateGstDraftIssues = (
+  function evaluateGstDraftIssues(
     content: string,
     qa?: DraftQA | null,
     includeQaGates = true,
-  ): Array<{ issue: string; suggestion: string }> => {
+  ): Array<{ issue: string; suggestion: string }> {
     const items: Array<{ issue: string; suggestion: string }> = [];
     const addIssue = (condition: boolean, issue: string, suggestion: string) => {
       if (condition) items.push({ issue, suggestion });
@@ -1022,7 +1022,7 @@ const AIDraftingEngine = ({ demoMode = false, includeLawyerReview = true }: AIDr
     }
 
     return items;
-  };
+  }
 
   const runGstDraftIssueCheck = (contentOverride?: string, qaOverride?: DraftQA | null) => {
     const content = contentOverride ?? draftContent ?? "";
