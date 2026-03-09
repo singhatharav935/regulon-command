@@ -589,6 +589,135 @@ const captureMcaRecheckIssues = async ({
     .eq("user_id", userId);
 };
 
+const captureGstTrainingCase = async ({
+  authClient,
+  userId,
+  companyId,
+  draftRunId,
+  noticeClass,
+  noticeDetails,
+  generatedDraft,
+  qaPayload,
+  companyName,
+  industry,
+  draftMode,
+  previousCaseId,
+}: {
+  authClient: any;
+  userId: string | null;
+  companyId?: string | null;
+  draftRunId?: string | null;
+  noticeClass: string;
+  noticeDetails?: string | null;
+  generatedDraft: string;
+  qaPayload?: unknown;
+  companyName?: string | null;
+  industry?: string | null;
+  draftMode?: string | null;
+  previousCaseId?: string | null;
+}): Promise<string | null> => {
+  if (!userId || !generatedDraft?.trim()) return null;
+
+  const payload = {
+    draft_run_id: draftRunId ?? null,
+    user_id: userId,
+    company_id: companyId ?? null,
+    notice_class: noticeClass || "gst-general",
+    notice_snapshot: (noticeDetails || "Notice details not provided.").slice(0, 16000),
+    generated_draft: generatedDraft.slice(0, 120000),
+    filing_score: typeof (qaPayload as any)?.filing_score === "number" ? (qaPayload as any).filing_score : null,
+    risk_band: (qaPayload as any)?.risk_band ?? null,
+    qa_payload: qaPayload ?? null,
+    metadata: {
+      source_operation: "draft",
+      company_name: companyName ?? null,
+      industry: industry ?? null,
+      draft_mode: draftMode ?? null,
+      captured_at: new Date().toISOString(),
+    },
+  };
+
+  if (previousCaseId) {
+    const { data, error } = await authClient
+      .from("gst_training_cases")
+      .update(payload)
+      .eq("id", previousCaseId)
+      .eq("user_id", userId)
+      .select("id")
+      .maybeSingle();
+    if (!error && data?.id) return data.id as string;
+  }
+
+  const { data, error } = await authClient
+    .from("gst_training_cases")
+    .insert(payload)
+    .select("id")
+    .maybeSingle();
+  if (error) {
+    console.error("GST training capture failed:", error.message);
+    return null;
+  }
+  return (data?.id as string) ?? null;
+};
+
+const captureGstRecheckIssues = async ({
+  authClient,
+  userId,
+  caseId,
+  flags,
+  summary,
+}: {
+  authClient: any;
+  userId: string | null;
+  caseId?: string | null;
+  flags: RecheckFlag[];
+  summary?: string;
+}) => {
+  if (!userId || !caseId) return;
+
+  if (!flags.length) {
+    await authClient
+      .from("gst_training_cases")
+      .update({
+        status: "reviewed",
+        metadata: {
+          recheck_summary: summary ?? "Recheck passed",
+          recheck_flags_count: 0,
+          rechecked_at: new Date().toISOString(),
+        },
+      })
+      .eq("id", caseId)
+      .eq("user_id", userId);
+    return;
+  }
+
+  const rows = flags.map((f) => ({
+    case_id: caseId,
+    severity: f.severity,
+    detector_source: f.source === "ai" ? "ai" : "rule",
+    issue_text: f.issue,
+    suggested_fix: f.fix,
+  }));
+
+  const { error } = await authClient.from("gst_training_issues").insert(rows);
+  if (error) {
+    console.error("GST recheck issue capture failed:", error.message);
+  }
+
+  await authClient
+    .from("gst_training_cases")
+    .update({
+      status: "reviewed",
+      metadata: {
+        recheck_summary: summary ?? "Recheck completed",
+        recheck_flags_count: flags.length,
+        rechecked_at: new Date().toISOString(),
+      },
+    })
+    .eq("id", caseId)
+    .eq("user_id", userId);
+};
+
 const normalizeSimilarityText = (input: string) =>
   (input || "")
     .toLowerCase()
@@ -873,6 +1002,65 @@ const detectMcaRecheckFlags = (
       "low",
       "Notice DIN/RFN from notice text is not reflected in draft metadata.",
       "Insert the exact DIN/RFN from notice in heading/metadata block.",
+    );
+  }
+
+  return flags;
+};
+
+const detectGstRecheckFlags = (
+  draft: string,
+  noticeDetails: string,
+): RecheckFlag[] => {
+  const flags: RecheckFlag[] = [];
+  const addFlag = (condition: boolean, severity: RecheckFlag["severity"], issue: string, fix: string) => {
+    if (condition) flags.push({ severity, issue, fix, source: "rule" });
+  };
+
+  const hasParaWiseMatrix = /para[-\s]*wise rebuttal|allegation[-\s]*wise rebuttal/i.test(draft)
+    || /\|\s*Allegation\s*\|\s*Department Position\s*\|\s*Noticee Rebuttal\s*\|/i.test(draft);
+  const hasComputation = /accepted\s*\|\s*disputed|computation|reconciliation/i.test(draft)
+    && /\|\s*[-:]+\s*\|\s*[-:]+\s*\|/.test(draft);
+  const hasGstrContext = /\bGSTR-?3B\b|\bGSTR-?2B\b|\bITC\b|\bDRC-?01\b/i.test(draft);
+
+  addFlag(
+    !hasParaWiseMatrix,
+    "high",
+    "GST para-wise / allegation-wise rebuttal matrix is missing.",
+    "Add a para-wise matrix with allegation, department position, noticee rebuttal, and evidence mapping.",
+  );
+  addFlag(
+    !hasComputation,
+    "high",
+    "GST computation/reconciliation table is missing.",
+    "Add accepted vs disputed computation table for tax, interest, and penalty with reconciliation basis.",
+  );
+  addFlag(
+    !hasGstrContext,
+    "medium",
+    "GST return context (GSTR/ITC/DRC) is weak or missing.",
+    "Add GSTR-3B/GSTR-2B/ITC or DRC context where relevant to notice allegations.",
+  );
+  addFlag(
+    /\bwaive\b[^.\n]{0,80}\bpenalt/i.test(draft) || /\babsolve\b/i.test(draft),
+    "medium",
+    "Risky prayer wording detected (waive/absolve).",
+    "Use calibrated prayer language: drop or reduce unsustainable penalty based on facts and legal position.",
+  );
+  addFlag(
+    /\[(insert|to be filled)[^\]]*\]/i.test(draft),
+    "medium",
+    "Unresolved placeholders remain in GST draft.",
+    "Replace remaining placeholders with notice-specific facts before filing.",
+  );
+
+  const dinOrRfn = noticeDetails.match(/\b(?:DIN|RFN)\s*[:\-]?\s*([A-Z0-9\/\-.]+)/i)?.[1];
+  if (dinOrRfn) {
+    addFlag(
+      !new RegExp(dinOrRfn.replace(/[.*+?^${}()|[\]\\]/g, "\\$&"), "i").test(draft),
+      "low",
+      "DIN/RFN from GST notice is not reflected in draft metadata.",
+      "Insert exact DIN/RFN in heading or metadata block.",
     );
   }
 
@@ -1330,7 +1518,9 @@ serve(async (req) => {
 
       const ruleFlags = documentType === "mca-notice"
         ? detectMcaRecheckFlags(draftContent, noticeDetails || "", mcaReplyType)
-        : [];
+        : documentType === "gst-show-cause"
+          ? detectGstRecheckFlags(draftContent, noticeDetails || "")
+          : [];
 
       const recheckSystemPrompt = `You are a legal QA reviewer for Indian regulatory draft filings.
 Return STRICT JSON only:
@@ -1406,6 +1596,14 @@ ${evidenceContext || "None provided"}`;
 
       if (documentType === "mca-notice") {
         await captureMcaRecheckIssues({
+          authClient,
+          userId,
+          caseId: typeof trainingCaseId === "string" ? trainingCaseId : null,
+          flags: dedup,
+          summary,
+        });
+      } else if (documentType === "gst-show-cause") {
+        await captureGstRecheckIssues({
           authClient,
           userId,
           caseId: typeof trainingCaseId === "string" ? trainingCaseId : null,
@@ -2075,22 +2273,38 @@ Schema:
       missing_for_final_filing: mergedMissingForFiling,
     };
 
-    const capturedTrainingCaseId = documentType === "mca-notice"
-      ? await captureMcaTrainingCase({
-          authClient,
-          userId,
-          companyId: typeof companyId === "string" ? companyId : null,
-          draftRunId: typeof draftRunId === "string" ? draftRunId : null,
-          noticeClass: mcaReplyType ?? "general-mca",
-          noticeDetails: noticeDetails ?? null,
-          generatedDraft: finalDraft,
-          qaPayload: finalQaPayload,
-          companyName,
-          industry,
-          draftMode,
-          previousCaseId: typeof trainingCaseId === "string" ? trainingCaseId : null,
-        })
-      : null;
+    let capturedTrainingCaseId: string | null = null;
+    if (documentType === "mca-notice") {
+      capturedTrainingCaseId = await captureMcaTrainingCase({
+        authClient,
+        userId,
+        companyId: typeof companyId === "string" ? companyId : null,
+        draftRunId: typeof draftRunId === "string" ? draftRunId : null,
+        noticeClass: mcaReplyType ?? "general-mca",
+        noticeDetails: noticeDetails ?? null,
+        generatedDraft: finalDraft,
+        qaPayload: finalQaPayload,
+        companyName,
+        industry,
+        draftMode,
+        previousCaseId: typeof trainingCaseId === "string" ? trainingCaseId : null,
+      });
+    } else if (documentType === "gst-show-cause") {
+      capturedTrainingCaseId = await captureGstTrainingCase({
+        authClient,
+        userId,
+        companyId: typeof companyId === "string" ? companyId : null,
+        draftRunId: typeof draftRunId === "string" ? draftRunId : null,
+        noticeClass: "gst-show-cause",
+        noticeDetails: noticeDetails ?? null,
+        generatedDraft: finalDraft,
+        qaPayload: finalQaPayload,
+        companyName,
+        industry,
+        draftMode,
+        previousCaseId: typeof trainingCaseId === "string" ? trainingCaseId : null,
+      });
+    }
 
     return new Response(JSON.stringify({
       draft: finalDraft,
