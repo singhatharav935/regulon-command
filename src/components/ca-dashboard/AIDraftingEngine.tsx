@@ -652,7 +652,6 @@ const AIDraftingEngine = ({ demoMode = false, includeLawyerReview = true }: AIDr
   const [isRecheckingMca, setIsRecheckingMca] = useState(false);
   const [gstHasChecked, setGstHasChecked] = useState(false);
   const [gstLastCheckedAt, setGstLastCheckedAt] = useState<string | null>(null);
-  const [gstIssueReport, setGstIssueReport] = useState<GstIssueReport | null>(null);
   const [gstUserFixNotes, setGstUserFixNotes] = useState("");
   const [gstEvidenceContext, setGstEvidenceContext] = useState("");
   const [gstRecheckReport, setGstRecheckReport] = useState<GstRecheckReport | null>(null);
@@ -864,9 +863,26 @@ const AIDraftingEngine = ({ demoMode = false, includeLawyerReview = true }: AIDr
       .join("\n\n"),
     [mcaRecheckReport],
   );
+  const liveGstIssueItems = useMemo(
+    () => evaluateGstDraftIssues(draftContent || "", draftQA, true),
+    [draftContent, draftQA],
+  );
+
+  const gstComputedIssueReport: GstIssueReport = useMemo(() => ({
+    ok: liveGstIssueItems.length === 0,
+    items: liveGstIssueItems,
+    issues: liveGstIssueItems.map((item) => item.issue),
+    checkedAt: gstLastCheckedAt || new Date().toISOString(),
+  }), [liveGstIssueItems, gstLastCheckedAt]);
+
+  const gstAutoFixNotes = useMemo(
+    () => liveGstIssueItems.map((item, idx) => `${idx + 1}. ${item.issue}\nSuggestion: ${item.suggestion}`).join("\n\n"),
+    [liveGstIssueItems],
+  );
+
   const gstPendingFixCount = useMemo(
-    () => gstIssueReport?.items.length || 0,
-    [gstIssueReport],
+    () => liveGstIssueItems.length,
+    [liveGstIssueItems],
   );
 
   const enforceMcaLocalFallback = (rawContent: string, mcaType?: string) => {
@@ -1011,13 +1027,7 @@ const AIDraftingEngine = ({ demoMode = false, includeLawyerReview = true }: AIDr
   const runGstDraftIssueCheck = (contentOverride?: string, qaOverride?: DraftQA | null) => {
     const content = contentOverride ?? draftContent ?? "";
     const effectiveQa = qaOverride ?? draftQA;
-    const items = evaluateGstDraftIssues(content, effectiveQa, true);
-    setGstIssueReport({
-      ok: items.length === 0,
-      items,
-      issues: items.map((item) => item.issue),
-      checkedAt: new Date().toISOString(),
-    });
+    evaluateGstDraftIssues(content, effectiveQa, true);
     setGstHasChecked(true);
     setGstLastCheckedAt(new Date().toISOString());
   };
@@ -1647,13 +1657,16 @@ Return only the revised final draft text.`;
     }
 
     const client = clientOptions.find((c) => c.id === selectedClient);
-    const issueItems = evaluateGstDraftIssues(draftContent, draftQA, false);
+    const issueItems = liveGstIssueItems;
     const issueText = issueItems
       .map((item, idx) => `${idx + 1}. Issue: ${item.issue}\n   Suggestion: ${item.suggestion}`)
       .join("\n");
     const recheckNotes = (gstRecheckReport?.flags || [])
       .map((flag, idx) => `${idx + 1}. [${flag.severity.toUpperCase()}] ${flag.issue}\n   Fix: ${flag.fix}`)
       .join("\n");
+    const combinedFixNotes = [gstAutoFixNotes, recheckNotes, gstUserFixNotes.trim()]
+      .filter((entry) => entry && entry.trim().length > 0)
+      .join("\n\n");
 
     const fixContext = `You are improving a GST show-cause reply draft.
 Task: Regenerate a corrected final draft by merging current draft with required fixes.
@@ -1674,7 +1687,7 @@ RECHECK FLAGS:
 ${recheckNotes || "No recheck flags."}
 
 CA NOTES:
-${gstUserFixNotes.trim() || "None"}
+${combinedFixNotes || "None"}
 
 Return only revised final draft text.`;
 
@@ -1748,7 +1761,6 @@ Return only revised final draft text.`;
     setMcaRecheckReport(null);
     setGstHasChecked(false);
     setGstLastCheckedAt(null);
-    setGstIssueReport(null);
     setGstUserFixNotes("");
     setGstRecheckReport(null);
     
@@ -2570,21 +2582,21 @@ Return only revised final draft text.`;
                   >
                     Check What Is Wrong In This GST Draft
                   </Button>
-                  {gstHasChecked && gstIssueReport && (
+                  {gstHasChecked && (
                     <div
                       className={`p-4 rounded-lg border text-sm ${
-                        gstIssueReport.ok
+                        gstComputedIssueReport.ok
                           ? "border-green-500/30 bg-green-500/10 text-green-300"
                           : "border-yellow-500/30 bg-yellow-500/10 text-yellow-200"
                       }`}
                     >
-                      {gstIssueReport.ok ? (
+                      {gstComputedIssueReport.ok ? (
                         <p>All GST checks passed. This draft is structurally aligned for CA review.</p>
                       ) : (
                         <div className="space-y-2">
                           <p className="font-medium">Issues detected:</p>
                           <ul className="list-disc pl-5 space-y-2">
-                            {gstIssueReport.items.map((item, idx) => (
+                            {gstComputedIssueReport.items.map((item, idx) => (
                               <li key={`${item.issue}-${idx}`}>
                                 <p>{item.issue}</p>
                                 <p className="text-xs text-yellow-100/90 mt-1">Suggestion: {item.suggestion}</p>
@@ -2644,6 +2656,11 @@ Return only revised final draft text.`;
                       </div>
                     )}
                     <p className="text-xs text-cyan-300">Pending GST fixes: {gstPendingFixCount}</p>
+                    <Textarea
+                      value={gstAutoFixNotes || "No pending issue-detector fixes right now."}
+                      readOnly
+                      className="min-h-[90px] bg-background/40 text-muted-foreground"
+                    />
                     <Textarea
                       value={gstUserFixNotes}
                       onChange={(e) => setGstUserFixNotes(e.target.value)}
