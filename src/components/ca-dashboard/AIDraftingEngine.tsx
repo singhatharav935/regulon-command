@@ -74,12 +74,22 @@ const draftModes = [
 const mcaReplyTypeOptions = [
   { id: "auto", label: "Auto-detect from notice" },
   { id: "annual-filing-92-137", label: "Annual Filing (92/137)" },
+  { id: "commencement-10a", label: "Commencement of Business (10A)" },
+  { id: "registered-office-12", label: "Registered Office Compliance (12)" },
+  { id: "agm-96", label: "AGM Compliance (96)" },
   { id: "board-reporting-117", label: "Board Resolution Filing (117)" },
+  { id: "auditor-139-140", label: "Auditor Appointment/Removal (139/140)" },
+  { id: "director-appointment-152-170", label: "Director Appointment/Registers (152/170)" },
+  { id: "director-kyc", label: "Director KYC / Disqualification-linked (DIR-3 KYC / 164/167 context)" },
   { id: "charge-77-79", label: "Charge Registration (77/78/79)" },
+  { id: "allotment-39-42", label: "Allotment / PAS-3 / Private Placement (39/42)" },
+  { id: "registers-88", label: "Registers / MGT-1 / MGT-7A context (88)" },
   { id: "beneficial-ownership-90", label: "SBO / Beneficial Ownership (90)" },
   { id: "board-governance-173", label: "Board Meetings & Governance (173)" },
   { id: "board-report-134", label: "Board Report Compliance (134)" },
+  { id: "csr-135", label: "CSR Compliance (135)" },
   { id: "related-party-188", label: "Related Party Transactions (188)" },
+  { id: "loans-investments-185-186", label: "Loans/Guarantees/Investments (185/186)" },
   { id: "managerial-kmp-203", label: "KMP / Managerial Personnel (203)" },
   { id: "deposits-73-76", label: "Deposits (73/74/76)" },
   { id: "general-mca", label: "General MCA Adjudication" },
@@ -87,27 +97,91 @@ const mcaReplyTypeOptions = [
 
 const gstReplyTypeOptions = [
   { id: "auto", label: "Auto-detect from notice" },
+  { id: "drc-01-scn-73-74", label: "DRC-01 SCN (73/74)" },
+  { id: "drc-01a-pre-scn", label: "DRC-01A (Pre-SCN Intimation)" },
+  { id: "asmt-10-discrepancy", label: "ASMT-10 Discrepancy Notice" },
   { id: "itc-mismatch", label: "ITC Mismatch / Ineligible Credit" },
   { id: "section-73-short-payment", label: "Section 73 Short Payment" },
   { id: "section-74-fraud-allegation", label: "Section 74 Fraud Allegation" },
+  { id: "reg-17-cancellation-scn", label: "REG-17 Cancellation SCN" },
+  { id: "registration-cancellation-29", label: "Registration Cancellation (29)" },
+  { id: "reg-23-cancellation-reply", label: "REG-23 Cancellation Reply" },
+  { id: "revocation-30", label: "Revocation of Cancellation (30)" },
   { id: "rcm-dispute", label: "RCM Dispute" },
+  { id: "detention-seizure-129-130", label: "Detention/Seizure/Confiscation (129/130)" },
+  { id: "e-way-bill-122-125", label: "E-way Bill / Penalty (122/125)" },
+  { id: "drc-07-demand-order", label: "DRC-07 Demand Order" },
   { id: "refund-recovery", label: "Refund Recovery / Wrong Refund" },
+  { id: "refund-rejection-54", label: "Refund Rejection (54)" },
   { id: "gstr-reconciliation", label: "GSTR Reconciliation Mismatch" },
+  { id: "annual-return-44-80", label: "Annual Return / Reconciliation (44/80)" },
+  { id: "tds-tcs-51-52", label: "TDS/TCS Credit Dispute (51/52)" },
   { id: "classification-valuation", label: "Classification / Valuation" },
   { id: "place-of-supply", label: "Place of Supply Dispute" },
+  { id: "anti-profiteering-171", label: "Anti-Profiteering (171)" },
+  { id: "transitional-credit-140", label: "Transitional Credit (140)" },
   { id: "interest-penalty-only", label: "Interest/Penalty Only" },
   { id: "gst-general", label: "General GST Show Cause" },
+];
+
+const incomeTaxReplyTypeOptions = [
+  { id: "auto", label: "Auto-detect from notice" },
+  { id: "intimation-143-1", label: "Intimation / Summary Assessment (143(1))" },
+  { id: "defective-return-139-9", label: "Defective Return Notice (139(9))" },
+  { id: "inquiry-142-1", label: "Inquiry Before Assessment (142(1))" },
+  { id: "scrutiny-143-2", label: "Scrutiny Notice (143(2))" },
+  { id: "best-judgment-144", label: "Best Judgment (144)" },
+  { id: "reassessment-147-148", label: "Reassessment (147/148)" },
+  { id: "reassessment-148a", label: "148A Proceedings (148A(b)/148A(d))" },
+  { id: "rectification-154", label: "Rectification Notice (154)" },
+  { id: "demand-156", label: "Notice of Demand (156)" },
+  { id: "refund-adjustment-245", label: "Refund Adjustment Notice (245)" },
+  { id: "tds-default-201", label: "TDS Default (201)" },
+  { id: "tcs-default-206c", label: "TCS Default (206C)" },
+  { id: "tds-disallowance-40a-ia", label: "TDS Disallowance (40(a)(ia))" },
+  { id: "cash-deposit-69-69a", label: "Cash Deposit / Unexplained (69/69A)" },
+  { id: "transfer-pricing-92", label: "Transfer Pricing (92/ALP)" },
+  { id: "penalty-270a", label: "Penalty Proceedings (270A)" },
+  { id: "faceless-appeal-250", label: "Faceless Appeal (250)" },
+  { id: "income-tax-general", label: "General Income-tax Response" },
+];
+
+const rbiReplyTypeOptions = [
+  { id: "auto", label: "Auto-detect from notice" },
+  { id: "fema-13-delay-reporting", label: "FEMA Section 13 Delay/Contravention" },
+  { id: "fema-30-odi-reporting", label: "ODI Reporting (FEMA 120 / Reg 30 context)" },
+  { id: "fema-20-fdi-pricing", label: "FDI / Pricing / Valuation (FEMA 20)" },
+  { id: "fema-3-ecb-reporting", label: "ECB Reporting (FEMA 3)" },
+  { id: "fla-return-delay", label: "FLA Return Delay" },
+  { id: "apr-delay", label: "APR Delay" },
+  { id: "fc-gpr-delay", label: "FC-GPR Delay" },
+  { id: "fc-trs-delay", label: "FC-TRS Delay" },
+  { id: "lsf-compounding-advisory", label: "LSF / Compounding Advisory" },
+  { id: "kyc-aml-pmla-observation", label: "KYC / AML / PMLA Observation" },
+  { id: "payment-aggregator-authorization", label: "Payment Aggregator Authorization" },
+  { id: "nbfc-returns-delay", label: "NBFC Return / DNBR Delay" },
+  { id: "rbi-general", label: "General RBI / FEMA Reply" },
 ];
 
 const inferMcaReplyTypeFromNotice = (noticeText: string): string => {
   const corpus = (noticeText || "").toLowerCase();
   if (/\bsection\s*92\b|\bsection\s*137\b|\bmgt-?7\b|\baoc-?4\b/.test(corpus)) return "annual-filing-92-137";
+  if (/\bsection\s*10a\b|\binc-?20a\b|commencement of business/i.test(corpus)) return "commencement-10a";
+  if (/\bsection\s*12\b|\binc-?22\b|registered office/i.test(corpus)) return "registered-office-12";
+  if (/\bsection\s*96\b|annual general meeting|\bagm\b/i.test(corpus)) return "agm-96";
   if (/\bsection\s*117\b|\bmgt-?14\b|\bboard resolution\b/.test(corpus)) return "board-reporting-117";
+  if (/\bsection\s*139\b|\bsection\s*140\b|\badt-?1\b|\badt-?2\b|auditor appointment|auditor removal/i.test(corpus)) return "auditor-139-140";
+  if (/\bsection\s*152\b|\bsection\s*170\b|\bdir-?12\b|director appointment|register of directors/i.test(corpus)) return "director-appointment-152-170";
+  if (/dir-?3 kyc|section\s*164|section\s*167|director kyc|disqualification/i.test(corpus)) return "director-kyc";
   if (/\bsection\s*77\b|\bsection\s*78\b|\bsection\s*79\b|\bchg-?1\b|\bcharge\b/.test(corpus)) return "charge-77-79";
+  if (/\bsection\s*39\b|\bsection\s*42\b|\bpas-?3\b|allotment|private placement/i.test(corpus)) return "allotment-39-42";
+  if (/\bsection\s*88\b|\bmgt-?1\b|register of members|register maintenance/i.test(corpus)) return "registers-88";
   if (/\bsection\s*90\b|\bben-?2\b|\bbeneficial owner\b|\bsbo\b/.test(corpus)) return "beneficial-ownership-90";
   if (/\bsection\s*173\b|\bboard meeting\b|\bminutes\b/.test(corpus)) return "board-governance-173";
   if (/\bsection\s*134\b|\bboard'?s report\b/.test(corpus)) return "board-report-134";
+  if (/\bsection\s*135\b|\bcsr\b|corporate social responsibility/i.test(corpus)) return "csr-135";
   if (/\bsection\s*188\b|\brelated party\b|\baoc-?2\b/.test(corpus)) return "related-party-188";
+  if (/\bsection\s*185\b|\bsection\s*186\b|loan to director|inter-corporate loan|guarantee|investment limit/i.test(corpus)) return "loans-investments-185-186";
   if (/\bsection\s*203\b|\bkmp\b|company secretary|managing director|whole-time director/.test(corpus)) return "managerial-kmp-203";
   if (/\bsection\s*73\b|\bsection\s*74\b|\bsection\s*76\b|\bdeposit\b/.test(corpus)) return "deposits-73-76";
   return "general-mca";
@@ -115,16 +189,70 @@ const inferMcaReplyTypeFromNotice = (noticeText: string): string => {
 
 const inferGstReplyTypeFromNotice = (noticeText: string): string => {
   const corpus = (noticeText || "").toLowerCase();
+  if (/\bdrc-?01\b|show cause notice|form gst drc-?01/i.test(corpus)) return "drc-01-scn-73-74";
+  if (/\bdrc-?01a\b|pre[-\s]*scn|intimation before show cause/i.test(corpus)) return "drc-01a-pre-scn";
+  if (/\basmt-?10\b|discrepancy notice/i.test(corpus)) return "asmt-10-discrepancy";
   if (/\bitc\b|\bgstr-?2b\b|\bgstr-?3b\b|\bsection\s*16\b/.test(corpus)) return "itc-mismatch";
   if (/\bsection\s*73\b/.test(corpus)) return "section-73-short-payment";
   if (/\bsection\s*74\b|fraud|suppression|wilful/i.test(corpus)) return "section-74-fraud-allegation";
+  if (/\breg-?17\b|show cause.*cancellation of registration/i.test(corpus)) return "reg-17-cancellation-scn";
+  if (/\bsection\s*29\b|registration cancellation|cancel registration/i.test(corpus)) return "registration-cancellation-29";
+  if (/\breg-?23\b|reply for revocation|reply to cancellation notice/i.test(corpus)) return "reg-23-cancellation-reply";
+  if (/\bsection\s*30\b|revocation of cancellation|revocation application/i.test(corpus)) return "revocation-30";
   if (/\brcm\b|reverse charge|section\s*9\(3\)|section\s*9\(4\)/i.test(corpus)) return "rcm-dispute";
+  if (/\bsection\s*129\b|\bsection\s*130\b|detention|seizure|confiscation/i.test(corpus)) return "detention-seizure-129-130";
+  if (/\be-?way bill\b|\bsection\s*122\b|\bsection\s*125\b|mov-0?\d+/i.test(corpus)) return "e-way-bill-122-125";
+  if (/\bdrc-?07\b|summary of order|demand order/i.test(corpus)) return "drc-07-demand-order";
+  if (/\brefund rejection\b|rfd-?06|rfd-?08|deficiency memo/i.test(corpus)) return "refund-rejection-54";
   if (/\brefund\b|wrong refund|section\s*54/i.test(corpus)) return "refund-recovery";
   if (/\breconciliation\b|mismatch|2a|2b|3b/i.test(corpus)) return "gstr-reconciliation";
+  if (/\bgstr-?9\b|\bgstr-?9c\b|section\s*44|rule\s*80|annual return/i.test(corpus)) return "annual-return-44-80";
+  if (/\bsection\s*51\b|\bsection\s*52\b|tds|tcs credit|gstr-?7|gstr-?8/i.test(corpus)) return "tds-tcs-51-52";
   if (/\bclassification\b|hsn|valuation|section\s*15/i.test(corpus)) return "classification-valuation";
   if (/\bplace of supply\b|igst|cgst|sgst/i.test(corpus)) return "place-of-supply";
+  if (/\bsection\s*171\b|anti[-\s]*profiteering/i.test(corpus)) return "anti-profiteering-171";
+  if (/\bsection\s*140\b|transitional credit|tran-?1|tran-?2/i.test(corpus)) return "transitional-credit-140";
   if (/\binterest\b|\bpenalty\b|\bsection\s*50\b/.test(corpus)) return "interest-penalty-only";
   return "gst-general";
+};
+
+const inferIncomeTaxReplyTypeFromNotice = (noticeText: string): string => {
+  const corpus = (noticeText || "").toLowerCase();
+  if (/\b143\(?1\)?\b|intimation|summary assessment/i.test(corpus)) return "intimation-143-1";
+  if (/\b139\(?9\)?\b|defective return/i.test(corpus)) return "defective-return-139-9";
+  if (/\b142\(?1\)?\b|inquiry before assessment|details called for/i.test(corpus)) return "inquiry-142-1";
+  if (/\b143\(?2\)?\b|scrutiny|questionnaire|notice u\/s 143/i.test(corpus)) return "scrutiny-143-2";
+  if (/\b144\b|best judgment/i.test(corpus)) return "best-judgment-144";
+  if (/\b147\b|\b148\b|reassessment|income escaping/i.test(corpus)) return "reassessment-147-148";
+  if (/\b148a\b|\b148a\(?b\)?\b|\b148a\(?d\)?\b|show cause before issue of notice under 148/i.test(corpus)) return "reassessment-148a";
+  if (/\b154\b|rectification/i.test(corpus)) return "rectification-154";
+  if (/\b156\b|notice of demand|demand notice/i.test(corpus)) return "demand-156";
+  if (/\b245\b|refund adjustment|set off refund/i.test(corpus)) return "refund-adjustment-245";
+  if (/\b201\b|tds default|assessee in default/i.test(corpus)) return "tds-default-201";
+  if (/\b206c\b|tcs default|collector in default/i.test(corpus)) return "tcs-default-206c";
+  if (/\b40\(a\)\(ia\)\b|40aia|tds disallowance/i.test(corpus)) return "tds-disallowance-40a-ia";
+  if (/\b69\b|\b69a\b|unexplained cash|cash deposit/i.test(corpus)) return "cash-deposit-69-69a";
+  if (/\b92\b|transfer pricing|alp|arm'?s length/i.test(corpus)) return "transfer-pricing-92";
+  if (/\b270a\b|under-reporting|misreporting|penalty proceeding/i.test(corpus)) return "penalty-270a";
+  if (/\b250\b|faceless appeal|cita|appeal proceeding/i.test(corpus)) return "faceless-appeal-250";
+  return "income-tax-general";
+};
+
+const inferRbiReplyTypeFromNotice = (noticeText: string): string => {
+  const corpus = (noticeText || "").toLowerCase();
+  if (/\bfema\b[^.\n]{0,80}\bsection\s*13\b|section\s*13\b[^.\n]{0,80}\bfema\b|contravention.*fema|delay in reporting/i.test(corpus)) return "fema-13-delay-reporting";
+  if (/\bodi\b|overseas direct investment|fema\s*120|schedule\s*i|form odi/i.test(corpus)) return "fema-30-odi-reporting";
+  if (/\bfdi\b|fc-gpr|pricing guidelines|valuation certificate|fema\s*20/i.test(corpus)) return "fema-20-fdi-pricing";
+  if (/\becb\b|external commercial borrowing|form ecb|fema\s*3/i.test(corpus)) return "fema-3-ecb-reporting";
+  if (/\bfla\b|foreign liabilities and assets|fla return/i.test(corpus)) return "fla-return-delay";
+  if (/\bapr\b|annual performance report/i.test(corpus)) return "apr-delay";
+  if (/\bfc-?gpr\b|foreign currency-gpr|gpr filing/i.test(corpus)) return "fc-gpr-delay";
+  if (/\bfc-?trs\b|share transfer.*non[-\s]*resident|trs filing/i.test(corpus)) return "fc-trs-delay";
+  if (/\blsf\b|late submission fee|compounding advisory|compounding proceedings/i.test(corpus)) return "lsf-compounding-advisory";
+  if (/\bkyc\b|\baml\b|\bpmla\b|suspicious transaction|cdd|due diligence/i.test(corpus)) return "kyc-aml-pmla-observation";
+  if (/\bpayment aggregator\b|\bpa[-\s]*pg\b|authorization|rbi digital payments/i.test(corpus)) return "payment-aggregator-authorization";
+  if (/\bnbfc\b|dnbr|nbs[-\s]*\d+|prudential return|xbrl return/i.test(corpus)) return "nbfc-returns-delay";
+  return "rbi-general";
 };
 
 const extractNoticeDateFromText = (noticeText: string): string => {
@@ -279,6 +407,48 @@ type GstRecheckFlag = {
 type GstRecheckReport = {
   ok: boolean;
   flags: GstRecheckFlag[];
+  summary?: string;
+  checkedAt?: string;
+};
+
+type IncomeTaxIssueReport = {
+  ok: boolean;
+  items: Array<{ issue: string; suggestion: string }>;
+  issues: string[];
+  checkedAt: string;
+};
+
+type IncomeTaxRecheckFlag = {
+  severity: "high" | "medium" | "low";
+  issue: string;
+  fix: string;
+  source?: "rule" | "ai";
+};
+
+type IncomeTaxRecheckReport = {
+  ok: boolean;
+  flags: IncomeTaxRecheckFlag[];
+  summary?: string;
+  checkedAt?: string;
+};
+
+type RbiIssueReport = {
+  ok: boolean;
+  items: Array<{ issue: string; suggestion: string }>;
+  issues: string[];
+  checkedAt: string;
+};
+
+type RbiRecheckFlag = {
+  severity: "high" | "medium" | "low";
+  issue: string;
+  fix: string;
+  source?: "rule" | "ai";
+};
+
+type RbiRecheckReport = {
+  ok: boolean;
+  flags: RbiRecheckFlag[];
   summary?: string;
   checkedAt?: string;
 };
@@ -628,6 +798,8 @@ const AIDraftingEngine = ({ demoMode = false, includeLawyerReview = true }: AIDr
   const [selectedMode, setSelectedMode] = useState<string>("balanced");
   const [mcaReplyTypeOverride, setMcaReplyTypeOverride] = useState<string>("auto");
   const [gstReplyTypeOverride, setGstReplyTypeOverride] = useState<string>("auto");
+  const [incomeTaxReplyTypeOverride, setIncomeTaxReplyTypeOverride] = useState<string>("auto");
+  const [rbiReplyTypeOverride, setRbiReplyTypeOverride] = useState<string>("auto");
   const [noticeDetails, setNoticeDetails] = useState<string>("");
   const [isGeneratingNoticeDetails, setIsGeneratingNoticeDetails] = useState(false);
   const [preferPiiMasking, setPreferPiiMasking] = useState(true);
@@ -637,6 +809,8 @@ const AIDraftingEngine = ({ demoMode = false, includeLawyerReview = true }: AIDr
   const [draftContent, setDraftContent] = useState("");
   const [mcaTrainingCaseId, setMcaTrainingCaseId] = useState<string | null>(null);
   const [gstTrainingCaseId, setGstTrainingCaseId] = useState<string | null>(null);
+  const [incomeTaxTrainingCaseId, setIncomeTaxTrainingCaseId] = useState<string | null>(null);
+  const [rbiTrainingCaseId, setRbiTrainingCaseId] = useState<string | null>(null);
   const [showFormatDetails, setShowFormatDetails] = useState(false);
   const [currentDraftRunId, setCurrentDraftRunId] = useState<string | null>(null);
   const [workflowStatus, setWorkflowStatus] = useState<WorkflowStatus>("generated");
@@ -657,6 +831,20 @@ const AIDraftingEngine = ({ demoMode = false, includeLawyerReview = true }: AIDr
   const [gstRecheckReport, setGstRecheckReport] = useState<GstRecheckReport | null>(null);
   const [isRecheckingGst, setIsRecheckingGst] = useState(false);
   const [isApplyingGstFix, setIsApplyingGstFix] = useState(false);
+  const [incomeTaxHasChecked, setIncomeTaxHasChecked] = useState(false);
+  const [incomeTaxLastCheckedAt, setIncomeTaxLastCheckedAt] = useState<string | null>(null);
+  const [incomeTaxUserFixNotes, setIncomeTaxUserFixNotes] = useState("");
+  const [incomeTaxEvidenceContext, setIncomeTaxEvidenceContext] = useState("");
+  const [incomeTaxRecheckReport, setIncomeTaxRecheckReport] = useState<IncomeTaxRecheckReport | null>(null);
+  const [isRecheckingIncomeTax, setIsRecheckingIncomeTax] = useState(false);
+  const [isApplyingIncomeTaxFix, setIsApplyingIncomeTaxFix] = useState(false);
+  const [rbiHasChecked, setRbiHasChecked] = useState(false);
+  const [rbiLastCheckedAt, setRbiLastCheckedAt] = useState<string | null>(null);
+  const [rbiUserFixNotes, setRbiUserFixNotes] = useState("");
+  const [rbiEvidenceContext, setRbiEvidenceContext] = useState("");
+  const [rbiRecheckReport, setRbiRecheckReport] = useState<RbiRecheckReport | null>(null);
+  const [isRecheckingRbi, setIsRecheckingRbi] = useState(false);
+  const [isApplyingRbiFix, setIsApplyingRbiFix] = useState(false);
   const [currentSteps, setCurrentSteps] = useState<ReviewStep[]>(initialReviewSteps);
   const [generationError, setGenerationError] = useState<string | null>(null);
 
@@ -682,6 +870,14 @@ const AIDraftingEngine = ({ demoMode = false, includeLawyerReview = true }: AIDr
   );
   const inferredGstReplyType = useMemo(
     () => inferGstReplyTypeFromNotice(noticeDetails),
+    [noticeDetails],
+  );
+  const inferredIncomeTaxReplyType = useMemo(
+    () => inferIncomeTaxReplyTypeFromNotice(noticeDetails),
+    [noticeDetails],
+  );
+  const inferredRbiReplyType = useMemo(
+    () => inferRbiReplyTypeFromNotice(noticeDetails),
     [noticeDetails],
   );
   const supabaseAny = supabase as any;
@@ -907,6 +1103,187 @@ const AIDraftingEngine = ({ demoMode = false, includeLawyerReview = true }: AIDr
     [liveGstIssueItems, liveGstAdvancedSuggestions],
   );
 
+  const liveIncomeTaxIssueItems = useMemo(
+    () => evaluateIncomeTaxDraftIssues(draftContent || "", draftQA, true),
+    [draftContent, draftQA],
+  );
+
+  const liveIncomeTaxAdvancedSuggestions = useMemo(
+    () => evaluateIncomeTaxAdvancedSuggestions(draftContent || "", draftQA),
+    [draftContent, draftQA],
+  );
+
+  const incomeTaxComputedIssueReport: IncomeTaxIssueReport = useMemo(() => ({
+    ok: liveIncomeTaxIssueItems.length === 0,
+    items: liveIncomeTaxIssueItems,
+    issues: liveIncomeTaxIssueItems.map((item) => item.issue),
+    checkedAt: incomeTaxLastCheckedAt || new Date().toISOString(),
+  }), [liveIncomeTaxIssueItems, incomeTaxLastCheckedAt]);
+
+  const incomeTaxAutoFixNotes = useMemo(() => {
+    const issueNotes = liveIncomeTaxIssueItems.map((item, idx) => `${idx + 1}. ${item.issue}\nSuggestion: ${item.suggestion}`);
+    const pendingAdvanced = liveIncomeTaxAdvancedSuggestions
+      .filter((item) => !item.implemented)
+      .map((item, idx) => `${idx + 1 + issueNotes.length}. ${item.title}\nSuggestion: ${item.suggestion}`);
+    return [...issueNotes, ...pendingAdvanced].join("\n\n");
+  }, [liveIncomeTaxIssueItems, liveIncomeTaxAdvancedSuggestions]);
+
+  const incomeTaxPendingFixPlaybook = useMemo(() => {
+    const issuePlaybook = liveIncomeTaxIssueItems.map((item) => ({
+      title: item.issue,
+      solution: item.suggestion,
+    }));
+    const advancedPlaybook = liveIncomeTaxAdvancedSuggestions
+      .filter((item) => !item.implemented)
+      .map((item) => ({
+        title: item.title,
+        solution: item.suggestion,
+      }));
+    return [...issuePlaybook, ...advancedPlaybook];
+  }, [liveIncomeTaxIssueItems, liveIncomeTaxAdvancedSuggestions]);
+
+  const incomeTaxPendingFixCount = useMemo(
+    () => liveIncomeTaxIssueItems.length + liveIncomeTaxAdvancedSuggestions.filter((item) => !item.implemented).length,
+    [liveIncomeTaxIssueItems, liveIncomeTaxAdvancedSuggestions],
+  );
+
+  function evaluateRbiDraftIssues(
+    content: string,
+    qa?: DraftQA | null,
+    includeQaGates = true,
+  ): Array<{ issue: string; suggestion: string }> {
+    const items: Array<{ issue: string; suggestion: string }> = [];
+    const addIssue = (condition: boolean, issue: string, suggestion: string) => {
+      if (condition) items.push({ issue, suggestion });
+    };
+
+    const hasTimelineTable = /timeline|chronology/i.test(content) && /\|\s*[-:]+\s*\|\s*[-:]+\s*\|/.test(content);
+    const hasRegulationAnchors = /\bfema\b|\brbi\b|regulation\s*\d+|master direction|authorized dealer/i.test(content);
+    const hasComputation = /accepted\s*\|\s*disputed|computation|exposure|lsf|penalty/i.test(content)
+      && /\|\s*[-:]+\s*\|\s*[-:]+\s*\|/.test(content);
+    const hasEvidenceMapping = /annexure|ad bank|utr|board resolution|filing acknowledgement|return acknowledgement/i.test(content);
+
+    addIssue(
+      !hasTimelineTable,
+      "RBI/FEMA chronology timeline table is missing.",
+      "Add timeline table: Compliance Event | Invoked Regulation | Due/Event Date | Actual Filing/Action Date | Reference ID | Status.",
+    );
+    addIssue(
+      !hasRegulationAnchors,
+      "RBI/FEMA regulation anchors are weak or missing.",
+      "Map each allegation to invoked FEMA/RBI regulation/circular with concise legal framing.",
+    );
+    addIssue(
+      !hasComputation,
+      "Exposure/penalty/LSF computation table is missing.",
+      "Add accepted vs disputed exposure table and recomputation rationale.",
+    );
+    addIssue(
+      !hasEvidenceMapping,
+      "Evidence mapping is weak for RBI draft.",
+      "Add annexure mapping with AD bank certificates, filing acknowledgements, and control records.",
+    );
+    addIssue(
+      /\bwaive\b[^.\n]{0,70}\bpenalt/i.test(content) || /\babsolve\b/i.test(content),
+      "Risky prayer wording detected.",
+      "Use calibrated wording: drop or reduce unsustainable penalty based on facts and proportionality.",
+    );
+    addIssue(
+      /\[(insert|to be filled)[^\]]*\]/i.test(content),
+      "Unresolved placeholders detected in RBI draft.",
+      "Replace placeholders with notice-specific data before final filing.",
+    );
+
+    if (includeQaGates) {
+      const badMandatoryGates = Object.entries(qa?.mandatory_gates || {})
+        .filter(([, passed]) => !passed)
+        .map(([gate]) => ({
+          issue: `Mandatory gate failed: ${gate}`,
+          suggestion: "Add the missing mandatory section and re-run draft checks.",
+        }));
+      items.push(...badMandatoryGates);
+    }
+
+    return items;
+  }
+
+  function evaluateRbiAdvancedSuggestions(
+    content: string,
+    qa?: DraftQA | null,
+  ): Array<{ title: string; suggestion: string; implemented: boolean }> {
+    return [
+      {
+        title: "Strengthen FEMA/RBI Regulation Anchoring",
+        suggestion: "Tie each allegation to specific FEMA regulation/RBI circular text used in notice.",
+        implemented: /\bfema\b|\brbi\b|regulation\s*\d+|master direction/i.test(content),
+      },
+      {
+        title: "Improve Timeline Precision",
+        suggestion: "Add due/event date vs actual filing/action dates with reference IDs.",
+        implemented: /timeline|chronology/i.test(content) && /\|\s*[-:]+\s*\|\s*[-:]+\s*\|/.test(content),
+      },
+      {
+        title: "Exposure Reconciliation Quality",
+        suggestion: "Add accepted vs disputed exposure/LSF/penalty computation table.",
+        implemented: /accepted\s*\|\s*disputed|computation|lsf|exposure/i.test(content),
+      },
+      {
+        title: "Evidence-Anchored Defense",
+        suggestion: "Map AD bank records, acknowledgements, and board/control docs to each rebuttal.",
+        implemented: /annexure|ad bank|utr|acknowledgement|board resolution/i.test(content),
+      },
+      {
+        title: "Raise Filing-Readiness Score",
+        suggestion: "Tighten regulation-wise factual mapping and remove generic repetitive language.",
+        implemented: (qa?.filing_score ?? 100) >= 95,
+      },
+    ];
+  }
+
+  const liveRbiIssueItems = useMemo(
+    () => evaluateRbiDraftIssues(draftContent || "", draftQA, true),
+    [draftContent, draftQA],
+  );
+
+  const liveRbiAdvancedSuggestions = useMemo(
+    () => evaluateRbiAdvancedSuggestions(draftContent || "", draftQA),
+    [draftContent, draftQA],
+  );
+
+  const rbiComputedIssueReport: RbiIssueReport = useMemo(() => ({
+    ok: liveRbiIssueItems.length === 0,
+    items: liveRbiIssueItems,
+    issues: liveRbiIssueItems.map((item) => item.issue),
+    checkedAt: rbiLastCheckedAt || new Date().toISOString(),
+  }), [liveRbiIssueItems, rbiLastCheckedAt]);
+
+  const rbiAutoFixNotes = useMemo(() => {
+    const issueNotes = liveRbiIssueItems.map((item, idx) => `${idx + 1}. ${item.issue}\nSuggestion: ${item.suggestion}`);
+    const pendingAdvanced = liveRbiAdvancedSuggestions
+      .filter((item) => !item.implemented)
+      .map((item, idx) => `${idx + 1 + issueNotes.length}. ${item.title}\nSuggestion: ${item.suggestion}`);
+    return [...issueNotes, ...pendingAdvanced].join("\n\n");
+  }, [liveRbiIssueItems, liveRbiAdvancedSuggestions]);
+
+  const rbiPendingFixPlaybook = useMemo(() => {
+    const issuePlaybook = liveRbiIssueItems.map((item) => ({
+      title: item.issue,
+      solution: item.suggestion,
+    }));
+    const advancedPlaybook = liveRbiAdvancedSuggestions
+      .filter((item) => !item.implemented)
+      .map((item) => ({
+        title: item.title,
+        solution: item.suggestion,
+      }));
+    return [...issuePlaybook, ...advancedPlaybook];
+  }, [liveRbiIssueItems, liveRbiAdvancedSuggestions]);
+
+  const rbiPendingFixCount = useMemo(
+    () => liveRbiIssueItems.length + liveRbiAdvancedSuggestions.filter((item) => !item.implemented).length,
+    [liveRbiIssueItems, liveRbiAdvancedSuggestions],
+  );
+
   const enforceMcaLocalFallback = (rawContent: string, mcaType?: string) => {
     let content = rawContent || "";
 
@@ -1080,12 +1457,116 @@ const AIDraftingEngine = ({ demoMode = false, includeLawyerReview = true }: AIDr
     return checks;
   }
 
+  function evaluateIncomeTaxDraftIssues(
+    content: string,
+    qa?: DraftQA | null,
+    includeQaGates = true,
+  ): Array<{ issue: string; suggestion: string }> {
+    const items: Array<{ issue: string; suggestion: string }> = [];
+    const addIssue = (condition: boolean, issue: string, suggestion: string) => {
+      if (condition) items.push({ issue, suggestion });
+    };
+
+    const hasIssueMatrix = /issue[-\s]*wise|addition\/disallowance matrix|para[-\s]*wise rebuttal/i.test(content)
+      || /\|\s*(Issue|Addition|Disallowance)\s*\|\s*(AO\/Department Position|Department Position)\s*\|\s*(Assessee Rebuttal|Noticee Rebuttal)\s*\|/i.test(content);
+    const hasComputation = /tax effect|addition amount|accepted\s*\|\s*disputed|computation|reconciliation/i.test(content)
+      && /\|\s*[-:]+\s*\|\s*[-:]+\s*\|/.test(content);
+    const hasIncomeTaxContext = /\b143\(?2\)?\b|\b147\b|\b148\b|\b139\b|\b40\(a\)\(ia\)\b|\b201\b|\b270a\b|\b69a?\b|\bassessee\b|\bao\b/i.test(content);
+
+    addIssue(
+      !hasIssueMatrix,
+      "Income-tax issue-wise rebuttal matrix is missing.",
+      "Add matrix: Issue/Addition | AO Position | Assessee Rebuttal | Evidence | Relief Sought.",
+    );
+    addIssue(
+      !hasComputation,
+      "Income-tax computation/tax-effect table is missing.",
+      "Add accepted vs disputed computation table with addition amount, tax effect, and basis of dispute.",
+    );
+    addIssue(
+      !hasIncomeTaxContext,
+      "Income-tax statutory context is weak.",
+      "Add invoked section anchors (143(2)/147/148/201/40(a)(ia)/270A etc.) as applicable from notice.",
+    );
+    addIssue(
+      /\bwaive\b[^.\n]{0,70}\bpenalt/i.test(content) || /\babsolve\b/i.test(content),
+      "Risky prayer wording detected.",
+      "Use calibrated wording: drop or reduce unsustainable additions/penalty based on facts and law.",
+    );
+    addIssue(
+      /\[(insert|to be filled)[^\]]*\]/i.test(content),
+      "Unresolved placeholders detected in income-tax draft.",
+      "Replace placeholders with notice-specific data before final filing.",
+    );
+
+    if (includeQaGates) {
+      const badMandatoryGates = Object.entries(qa?.mandatory_gates || {})
+        .filter(([, passed]) => !passed)
+        .map(([gate]) => ({
+          issue: `Mandatory gate failed: ${gate}`,
+          suggestion: "Add the missing mandatory section and re-run draft checks.",
+        }));
+      items.push(...badMandatoryGates);
+    }
+
+    return items;
+  }
+
+  function evaluateIncomeTaxAdvancedSuggestions(
+    content: string,
+    qa?: DraftQA | null,
+  ): Array<{ title: string; suggestion: string; implemented: boolean }> {
+    return [
+      {
+        title: "Strengthen Invoked Section Anchoring",
+        suggestion: "Explicitly tie each addition/disallowance to invoked Income-tax section and factual rebuttal.",
+        implemented: /\b143\(?2\)?\b|\b147\b|\b148\b|\b201\b|\b40\(a\)\(ia\)\b|\b270a\b/i.test(content),
+      },
+      {
+        title: "Evidence-Anchored Additions Rebuttal",
+        suggestion: "Add annexure links for each issue-wise rebuttal point and tax-effect challenge.",
+        implemented: /annexure[-\s]*(a|1|i)/i.test(content),
+      },
+      {
+        title: "Tax-Effect Precision",
+        suggestion: "Add accepted vs disputed table for additions, tax impact, interest, and penalty.",
+        implemented: /tax effect|accepted\s*\|\s*disputed|computation|reconciliation/i.test(content),
+      },
+      {
+        title: "Hearing Strategy",
+        suggestion: "Include explicit personal hearing request and right to submit additional evidence.",
+        implemented: /personal hearing|grant hearing|opportunity of hearing/i.test(content),
+      },
+      {
+        title: "Raise Filing-Readiness Score",
+        suggestion: "Remove repetitive generic language and tighten issue-wise factual/legal mapping.",
+        implemented: (qa?.filing_score ?? 100) >= 95,
+      },
+    ];
+  }
+
   const runGstDraftIssueCheck = (contentOverride?: string, qaOverride?: DraftQA | null) => {
     const content = contentOverride ?? draftContent ?? "";
     const effectiveQa = qaOverride ?? draftQA;
     evaluateGstDraftIssues(content, effectiveQa, true);
     setGstHasChecked(true);
     setGstLastCheckedAt(new Date().toISOString());
+  };
+
+  const runIncomeTaxDraftIssueCheck = (contentOverride?: string, qaOverride?: DraftQA | null) => {
+    const content = contentOverride ?? draftContent ?? "";
+    const effectiveQa = qaOverride ?? draftQA;
+    evaluateIncomeTaxDraftIssues(content, effectiveQa, true);
+    setIncomeTaxHasChecked(true);
+    setIncomeTaxLastCheckedAt(new Date().toISOString());
+  };
+
+  const runRbiDraftIssueCheck = (contentOverride?: string, qaOverride?: DraftQA | null) => {
+    const content = contentOverride ?? draftContent ?? "";
+    const effectiveQa = qaOverride ?? draftQA;
+    evaluateRbiDraftIssues(content, effectiveQa, true);
+    setRbiHasChecked(true);
+    setRbiLastCheckedAt(new Date().toISOString());
   };
 
   const handleRecheckMcaDraft = async () => {
@@ -1168,6 +1649,88 @@ const AIDraftingEngine = ({ demoMode = false, includeLawyerReview = true }: AIDr
     }
   };
 
+  const handleRecheckIncomeTaxDraft = async () => {
+    if (selectedDocType !== "income-tax-response" || !draftGenerated || !draftContent.trim()) {
+      toast.error("Generate and edit an Income-tax draft first.");
+      return;
+    }
+
+    setIsRecheckingIncomeTax(true);
+    try {
+      const client = clientOptions.find((c) => c.id === selectedClient);
+      const data = await requestDraftData({
+        operation: "recheck",
+        documentType: "income-tax-response",
+        incomeTaxReplyTypeOverride: incomeTaxReplyTypeOverride !== "auto" ? incomeTaxReplyTypeOverride : undefined,
+        companyName: client?.name || "Company",
+        companyId: clientSource === "live" ? selectedClient : undefined,
+        draftRunId: currentDraftRunId || undefined,
+        trainingCaseId: incomeTaxTrainingCaseId || undefined,
+        noticeDetails: maskPII(noticeDetails) || undefined,
+        draftContent,
+        evidenceContext: incomeTaxEvidenceContext || undefined,
+        stream: false,
+      });
+
+      const report: IncomeTaxRecheckReport = {
+        ok: Boolean(data?.ok),
+        flags: Array.isArray(data?.flags) ? data.flags : [],
+        summary: typeof data?.summary === "string" ? data.summary : undefined,
+        checkedAt: typeof data?.checkedAt === "string" ? data.checkedAt : new Date().toISOString(),
+      };
+      setIncomeTaxRecheckReport(report);
+
+      if (report.ok) toast.success("Income-tax Recheck AI passed. No critical mismatches detected.");
+      else toast.warning(`Income-tax Recheck AI flagged ${report.flags.length} item(s).`);
+    } catch (error) {
+      const msg = error instanceof Error ? error.message : "Income-tax Recheck AI failed";
+      toast.error(msg);
+    } finally {
+      setIsRecheckingIncomeTax(false);
+    }
+  };
+
+  const handleRecheckRbiDraft = async () => {
+    if (selectedDocType !== "rbi-filing" || !draftGenerated || !draftContent.trim()) {
+      toast.error("Generate and edit an RBI draft first.");
+      return;
+    }
+
+    setIsRecheckingRbi(true);
+    try {
+      const client = clientOptions.find((c) => c.id === selectedClient);
+      const data = await requestDraftData({
+        operation: "recheck",
+        documentType: "rbi-filing",
+        rbiReplyTypeOverride: rbiReplyTypeOverride !== "auto" ? rbiReplyTypeOverride : undefined,
+        companyName: client?.name || "Company",
+        companyId: clientSource === "live" ? selectedClient : undefined,
+        draftRunId: currentDraftRunId || undefined,
+        trainingCaseId: rbiTrainingCaseId || undefined,
+        noticeDetails: maskPII(noticeDetails) || undefined,
+        draftContent,
+        evidenceContext: rbiEvidenceContext || undefined,
+        stream: false,
+      });
+
+      const report: RbiRecheckReport = {
+        ok: Boolean(data?.ok),
+        flags: Array.isArray(data?.flags) ? data.flags : [],
+        summary: typeof data?.summary === "string" ? data.summary : undefined,
+        checkedAt: typeof data?.checkedAt === "string" ? data.checkedAt : new Date().toISOString(),
+      };
+      setRbiRecheckReport(report);
+
+      if (report.ok) toast.success("RBI Recheck AI passed. No critical mismatches detected.");
+      else toast.warning(`RBI Recheck AI flagged ${report.flags.length} item(s).`);
+    } catch (error) {
+      const msg = error instanceof Error ? error.message : "RBI Recheck AI failed";
+      toast.error(msg);
+    } finally {
+      setIsRecheckingRbi(false);
+    }
+  };
+
   useEffect(() => {
     if (selectedDocType !== "mca-notice" || !draftGenerated || !draftContent.trim()) return;
     runMcaDraftIssueCheck(draftContent);
@@ -1177,6 +1740,18 @@ const AIDraftingEngine = ({ demoMode = false, includeLawyerReview = true }: AIDr
   useEffect(() => {
     if (selectedDocType !== "gst-show-cause" || !draftGenerated || !draftContent.trim()) return;
     runGstDraftIssueCheck(draftContent, draftQA);
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [selectedDocType, draftGenerated, draftContent, draftQA]);
+
+  useEffect(() => {
+    if (selectedDocType !== "income-tax-response" || !draftGenerated || !draftContent.trim()) return;
+    runIncomeTaxDraftIssueCheck(draftContent, draftQA);
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [selectedDocType, draftGenerated, draftContent, draftQA]);
+
+  useEffect(() => {
+    if (selectedDocType !== "rbi-filing" || !draftGenerated || !draftContent.trim()) return;
+    runRbiDraftIssueCheck(draftContent, draftQA);
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [selectedDocType, draftGenerated, draftContent, draftQA]);
 
@@ -1387,6 +1962,18 @@ const AIDraftingEngine = ({ demoMode = false, includeLawyerReview = true }: AIDr
     }
   }, [selectedDocType]);
 
+  useEffect(() => {
+    if (selectedDocType !== "income-tax-response") {
+      setIncomeTaxReplyTypeOverride("auto");
+    }
+  }, [selectedDocType]);
+
+  useEffect(() => {
+    if (selectedDocType !== "rbi-filing") {
+      setRbiReplyTypeOverride("auto");
+    }
+  }, [selectedDocType]);
+
   const handleInsertTemplate = () => {
     if (!selectedDocType || !selectedTemplate) {
       toast.error("Select a document type first.");
@@ -1430,6 +2017,12 @@ const AIDraftingEngine = ({ demoMode = false, includeLawyerReview = true }: AIDr
           : undefined,
         gstReplyTypeOverride: selectedDocType === "gst-show-cause" && gstReplyTypeOverride !== "auto"
           ? gstReplyTypeOverride
+          : undefined,
+        incomeTaxReplyTypeOverride: selectedDocType === "income-tax-response" && incomeTaxReplyTypeOverride !== "auto"
+          ? incomeTaxReplyTypeOverride
+          : undefined,
+        rbiReplyTypeOverride: selectedDocType === "rbi-filing" && rbiReplyTypeOverride !== "auto"
+          ? rbiReplyTypeOverride
           : undefined,
         context: `Generate precise Notice/Order Details for ${selectedDocLabel}. Ensure this is input-quality text for strict legal drafting checks.`,
         noticeDetails: sourceNotice || undefined,
@@ -1796,6 +2389,190 @@ Return only revised final draft text.`;
     }
   };
 
+  const handleApplyIncomeTaxFix = async () => {
+    if (selectedDocType !== "income-tax-response" || !draftContent.trim()) {
+      toast.error("Generate an Income-tax draft first.");
+      return;
+    }
+    if (!incomeTaxHasChecked) {
+      runIncomeTaxDraftIssueCheck();
+    }
+
+    const client = clientOptions.find((c) => c.id === selectedClient);
+    const issueText = liveIncomeTaxIssueItems
+      .map((item, idx) => `${idx + 1}. Issue: ${item.issue}\n   Suggestion: ${item.suggestion}`)
+      .join("\n");
+    const advancedSuggestionText = liveIncomeTaxAdvancedSuggestions
+      .filter((item) => !item.implemented)
+      .map((item, idx) => `${idx + 1}. Upgrade: ${item.title}\n   Suggestion: ${item.suggestion}`)
+      .join("\n");
+    const recheckNotes = (incomeTaxRecheckReport?.flags || [])
+      .map((flag, idx) => `${idx + 1}. [${flag.severity.toUpperCase()}] ${flag.issue}\n   Fix: ${flag.fix}`)
+      .join("\n");
+    const combinedFixNotes = [incomeTaxAutoFixNotes, recheckNotes, incomeTaxUserFixNotes.trim()]
+      .filter((entry) => entry && entry.trim().length > 0)
+      .join("\n\n");
+    const pendingPlaybookText = incomeTaxPendingFixPlaybook
+      .map((item, idx) => `${idx + 1}. Pending: ${item.title}\n   Solution: ${item.solution}`)
+      .join("\n");
+
+    const fixContext = `You are improving an Income-tax response draft.
+Task: Regenerate a corrected final draft by merging current draft with required fixes.
+Mandatory fixes:
+1) Add issue-wise/addition-wise rebuttal matrix
+2) Add computation/tax-effect accepted-vs-disputed table
+3) Ensure invoked section context and legal framing are present
+4) Use safe prayer wording (drop/reduce), avoid waive/absolve language
+5) Keep output notice-specific and filing-ready
+
+CURRENT DRAFT:
+${draftContent}
+
+DETECTED ISSUES:
+${issueText || "No local issue detector items."}
+
+ADVANCED UPGRADE SUGGESTIONS:
+${advancedSuggestionText || "No additional upgrades detected."}
+
+RECHECK FLAGS:
+${recheckNotes || "No recheck flags."}
+
+PENDING FIX PLAYBOOK (MANDATORY ACTION STEPS):
+${pendingPlaybookText || "No pending actions."}
+
+CA NOTES:
+${combinedFixNotes || "None"}
+
+Return only revised final draft text.`;
+
+    setIsApplyingIncomeTaxFix(true);
+    try {
+      const data = await requestDraftData({
+        documentType: "income-tax-response",
+        incomeTaxReplyTypeOverride: incomeTaxReplyTypeOverride !== "auto" ? incomeTaxReplyTypeOverride : undefined,
+        companyName: client?.name || "Company",
+        companyId: clientSource === "live" ? selectedClient : undefined,
+        industry: client?.industry || "",
+        draftRunId: currentDraftRunId || undefined,
+        trainingCaseId: incomeTaxTrainingCaseId || undefined,
+        draftMode: selectedMode,
+        advancedMode: true,
+        strictValidation: true,
+        context: fixContext,
+        noticeDetails: maskPII(noticeDetails) || undefined,
+        stream: false,
+      });
+
+      const content = (data?.draft as string | undefined) || "";
+      if (!content) throw new Error("Income-tax AI fix regeneration returned empty content.");
+      setDraftContent(content);
+      setDraftQA((data?.qa ?? null) as DraftQA | null);
+      setDraftPackage((data?.package ?? null) as DraftPackage | null);
+      const nextCaseId = (data?.metadata as { trainingCaseId?: string } | undefined)?.trainingCaseId;
+      if (nextCaseId) setIncomeTaxTrainingCaseId(nextCaseId);
+      setIncomeTaxUserFixNotes("");
+      runIncomeTaxDraftIssueCheck(content, (data?.qa ?? null) as DraftQA | null);
+      toast.success("Income-tax draft corrected and regenerated.");
+    } catch (error) {
+      const msg = error instanceof Error ? error.message : "Failed to apply Income-tax AI fix";
+      toast.error(msg);
+    } finally {
+      setIsApplyingIncomeTaxFix(false);
+    }
+  };
+
+  const handleApplyRbiFix = async () => {
+    if (selectedDocType !== "rbi-filing" || !draftContent.trim()) {
+      toast.error("Generate an RBI draft first.");
+      return;
+    }
+    if (!rbiHasChecked) {
+      runRbiDraftIssueCheck();
+    }
+
+    const client = clientOptions.find((c) => c.id === selectedClient);
+    const issueText = liveRbiIssueItems
+      .map((item, idx) => `${idx + 1}. Issue: ${item.issue}\n   Suggestion: ${item.suggestion}`)
+      .join("\n");
+    const advancedSuggestionText = liveRbiAdvancedSuggestions
+      .filter((item) => !item.implemented)
+      .map((item, idx) => `${idx + 1}. Upgrade: ${item.title}\n   Suggestion: ${item.suggestion}`)
+      .join("\n");
+    const recheckNotes = (rbiRecheckReport?.flags || [])
+      .map((flag, idx) => `${idx + 1}. [${flag.severity.toUpperCase()}] ${flag.issue}\n   Fix: ${flag.fix}`)
+      .join("\n");
+    const combinedFixNotes = [rbiAutoFixNotes, recheckNotes, rbiUserFixNotes.trim()]
+      .filter((entry) => entry && entry.trim().length > 0)
+      .join("\n\n");
+    const pendingPlaybookText = rbiPendingFixPlaybook
+      .map((item, idx) => `${idx + 1}. Pending: ${item.title}\n   Solution: ${item.solution}`)
+      .join("\n");
+
+    const fixContext = `You are improving an RBI/FEMA response draft.
+Task: Regenerate a corrected final draft by merging current draft with required fixes.
+Mandatory fixes:
+1) Add regulation-wise legal response against notice allegations
+2) Add timeline/chronology (due/event vs actual action date + reference IDs)
+3) Add accepted vs disputed exposure/penalty/LSF table
+4) Add evidence/annexure mapping (AD bank, acknowledgements, board/control records)
+5) Use safe prayer wording (drop/reduce), avoid waive/absolve language
+
+CURRENT DRAFT:
+${draftContent}
+
+DETECTED ISSUES:
+${issueText || "No local issue detector items."}
+
+ADVANCED UPGRADE SUGGESTIONS:
+${advancedSuggestionText || "No additional upgrades detected."}
+
+RECHECK FLAGS:
+${recheckNotes || "No recheck flags."}
+
+PENDING FIX PLAYBOOK (MANDATORY ACTION STEPS):
+${pendingPlaybookText || "No pending actions."}
+
+CA NOTES:
+${combinedFixNotes || "None"}
+
+Return only revised final draft text.`;
+
+    setIsApplyingRbiFix(true);
+    try {
+      const data = await requestDraftData({
+        documentType: "rbi-filing",
+        rbiReplyTypeOverride: rbiReplyTypeOverride !== "auto" ? rbiReplyTypeOverride : undefined,
+        companyName: client?.name || "Company",
+        companyId: clientSource === "live" ? selectedClient : undefined,
+        industry: client?.industry || "",
+        draftRunId: currentDraftRunId || undefined,
+        trainingCaseId: rbiTrainingCaseId || undefined,
+        draftMode: selectedMode,
+        advancedMode: true,
+        strictValidation: true,
+        context: fixContext,
+        noticeDetails: maskPII(noticeDetails) || undefined,
+        stream: false,
+      });
+
+      const content = (data?.draft as string | undefined) || "";
+      if (!content) throw new Error("RBI AI fix regeneration returned empty content.");
+      setDraftContent(content);
+      setDraftQA((data?.qa ?? null) as DraftQA | null);
+      setDraftPackage((data?.package ?? null) as DraftPackage | null);
+      const nextCaseId = (data?.metadata as { trainingCaseId?: string } | undefined)?.trainingCaseId;
+      if (nextCaseId) setRbiTrainingCaseId(nextCaseId);
+      setRbiUserFixNotes("");
+      runRbiDraftIssueCheck(content, (data?.qa ?? null) as DraftQA | null);
+      toast.success("RBI draft corrected and regenerated.");
+    } catch (error) {
+      const msg = error instanceof Error ? error.message : "Failed to apply RBI AI fix";
+      toast.error(msg);
+    } finally {
+      setIsApplyingRbiFix(false);
+    }
+  };
+
   const handleGenerateDraft = async () => {
     if (!selectedClient || !selectedDocType) return;
 
@@ -1822,6 +2599,8 @@ Return only revised final draft text.`;
     setDraftContent("");
     setMcaTrainingCaseId(null);
     setGstTrainingCaseId(null);
+    setIncomeTaxTrainingCaseId(null);
+    setRbiTrainingCaseId(null);
     setDraftQA(null);
     setDraftPackage(null);
     setMcaHasChecked(false);
@@ -1832,6 +2611,14 @@ Return only revised final draft text.`;
     setGstLastCheckedAt(null);
     setGstUserFixNotes("");
     setGstRecheckReport(null);
+    setIncomeTaxHasChecked(false);
+    setIncomeTaxLastCheckedAt(null);
+    setIncomeTaxUserFixNotes("");
+    setIncomeTaxRecheckReport(null);
+    setRbiHasChecked(false);
+    setRbiLastCheckedAt(null);
+    setRbiUserFixNotes("");
+    setRbiRecheckReport(null);
     
     const client = clientOptions.find(c => c.id === selectedClient);
     const maskedNoticeDetails = noticeDetails ? maskPII(noticeDetails) : undefined;
@@ -1921,12 +2708,22 @@ Return only revised final draft text.`;
           ? (mcaTrainingCaseId || undefined)
           : selectedDocType === "gst-show-cause"
             ? (gstTrainingCaseId || undefined)
+            : selectedDocType === "income-tax-response"
+              ? (incomeTaxTrainingCaseId || undefined)
+              : selectedDocType === "rbi-filing"
+                ? (rbiTrainingCaseId || undefined)
             : undefined,
         mcaReplyTypeOverride: selectedDocType === "mca-notice" && mcaReplyTypeOverride !== "auto"
           ? mcaReplyTypeOverride
           : undefined,
         gstReplyTypeOverride: selectedDocType === "gst-show-cause" && gstReplyTypeOverride !== "auto"
           ? gstReplyTypeOverride
+          : undefined,
+        incomeTaxReplyTypeOverride: selectedDocType === "income-tax-response" && incomeTaxReplyTypeOverride !== "auto"
+          ? incomeTaxReplyTypeOverride
+          : undefined,
+        rbiReplyTypeOverride: selectedDocType === "rbi-filing" && rbiReplyTypeOverride !== "auto"
+          ? rbiReplyTypeOverride
           : undefined,
         advancedMode,
         strictValidation: advancedMode,
@@ -1997,6 +2794,8 @@ Return only revised final draft text.`;
         const generatedCaseId = (data?.metadata as { trainingCaseId?: string } | undefined)?.trainingCaseId;
         if (selectedDocType === "mca-notice") setMcaTrainingCaseId(generatedCaseId || null);
         if (selectedDocType === "gst-show-cause") setGstTrainingCaseId(generatedCaseId || null);
+        if (selectedDocType === "income-tax-response") setIncomeTaxTrainingCaseId(generatedCaseId || null);
+        if (selectedDocType === "rbi-filing") setRbiTrainingCaseId(generatedCaseId || null);
         setDraftGenerated(true);
         setShowFormatDetails(false);
         setWorkflowStatus("generated");
@@ -2268,6 +3067,60 @@ Return only revised final draft text.`;
                     Auto-detected class:{" "}
                     <span className="text-foreground font-medium">
                       {gstReplyTypeOptions.find((o) => o.id === inferredGstReplyType)?.label || "General GST Show Cause"}
+                    </span>
+                  </p>
+                </div>
+              )}
+
+              {selectedDocType === "income-tax-response" && (
+                <div>
+                  <label className="block text-sm font-medium text-foreground mb-2">
+                    <Book className="w-4 h-4 inline-block mr-2" />
+                    Income Tax Notice Class
+                  </label>
+                  <Select value={incomeTaxReplyTypeOverride} onValueChange={setIncomeTaxReplyTypeOverride}>
+                    <SelectTrigger className="bg-background/50">
+                      <SelectValue placeholder="Choose income-tax notice class..." />
+                    </SelectTrigger>
+                    <SelectContent>
+                      {incomeTaxReplyTypeOptions.map((option) => (
+                        <SelectItem key={option.id} value={option.id}>
+                          {option.label}
+                        </SelectItem>
+                      ))}
+                    </SelectContent>
+                  </Select>
+                  <p className="text-xs text-muted-foreground mt-1">
+                    Auto-detected class:{" "}
+                    <span className="text-foreground font-medium">
+                      {incomeTaxReplyTypeOptions.find((o) => o.id === inferredIncomeTaxReplyType)?.label || "General Income-tax Response"}
+                    </span>
+                  </p>
+                </div>
+              )}
+
+              {selectedDocType === "rbi-filing" && (
+                <div>
+                  <label className="block text-sm font-medium text-foreground mb-2">
+                    <Book className="w-4 h-4 inline-block mr-2" />
+                    RBI Notice Class
+                  </label>
+                  <Select value={rbiReplyTypeOverride} onValueChange={setRbiReplyTypeOverride}>
+                    <SelectTrigger className="bg-background/50">
+                      <SelectValue placeholder="Choose RBI notice class..." />
+                    </SelectTrigger>
+                    <SelectContent>
+                      {rbiReplyTypeOptions.map((option) => (
+                        <SelectItem key={option.id} value={option.id}>
+                          {option.label}
+                        </SelectItem>
+                      ))}
+                    </SelectContent>
+                  </Select>
+                  <p className="text-xs text-muted-foreground mt-1">
+                    Auto-detected class:{" "}
+                    <span className="text-foreground font-medium">
+                      {rbiReplyTypeOptions.find((o) => o.id === inferredRbiReplyType)?.label || "General RBI / FEMA Reply"}
                     </span>
                   </p>
                 </div>
@@ -2784,6 +3637,304 @@ Return only revised final draft text.`;
                         </>
                       ) : (
                         "Apply AI Fix & Regenerate GST Draft"
+                      )}
+                    </Button>
+                  </div>
+                </div>
+              )}
+
+              {draftGenerated && selectedDocType === "income-tax-response" && (
+                <div className="mt-3 space-y-2">
+                  <Button
+                    type="button"
+                    variant="outline"
+                    className="w-full"
+                    onClick={runIncomeTaxDraftIssueCheck}
+                  >
+                    Check What Is Wrong In This Income Tax Draft
+                  </Button>
+                  {incomeTaxHasChecked && (
+                    <div
+                      className={`p-4 rounded-lg border text-sm ${
+                        incomeTaxComputedIssueReport.ok
+                          ? "border-green-500/30 bg-green-500/10 text-green-300"
+                          : "border-yellow-500/30 bg-yellow-500/10 text-yellow-200"
+                      }`}
+                    >
+                      {incomeTaxComputedIssueReport.ok ? (
+                        <p>All Income-tax checks passed. This draft is structurally aligned for CA review.</p>
+                      ) : (
+                        <div className="space-y-2">
+                          <p className="font-medium">Issues detected:</p>
+                          <ul className="list-disc pl-5 space-y-2">
+                            {incomeTaxComputedIssueReport.items.map((item, idx) => (
+                              <li key={`${item.issue}-${idx}`}>
+                                <p>{item.issue}</p>
+                                <p className="text-xs text-yellow-100/90 mt-1">Suggestion: {item.suggestion}</p>
+                              </li>
+                            ))}
+                          </ul>
+                        </div>
+                      )}
+                    </div>
+                  )}
+
+                  {liveIncomeTaxAdvancedSuggestions.length > 0 && (
+                    <div className="p-4 rounded-lg border border-cyan-500/30 bg-cyan-500/10 text-cyan-200 text-sm">
+                      <p className="font-medium mb-2">Advanced Suggestions:</p>
+                      <ul className="list-disc pl-5 space-y-2">
+                        {liveIncomeTaxAdvancedSuggestions.map((item, idx) => (
+                          <li key={`${item.title}-${idx}`}>
+                            <p className={item.implemented ? "text-green-300" : "text-cyan-200"}>
+                              {item.implemented ? "✓ " : ""}{item.title}
+                              <span className={`ml-2 text-[11px] ${item.implemented ? "text-green-300" : "text-yellow-200"}`}>
+                                [{item.implemented ? "Implemented" : "Pending"}]
+                              </span>
+                            </p>
+                            <p className="text-xs text-cyan-100/90 mt-1">Suggestion: {item.suggestion}</p>
+                          </li>
+                        ))}
+                      </ul>
+                    </div>
+                  )}
+
+                  <div className="p-3 rounded-lg border border-border/50 bg-background/30 space-y-2">
+                    <p className="text-sm font-medium text-foreground">AI Fix Assistant (Income Tax)</p>
+                    <p className="text-xs text-muted-foreground">
+                      Income-tax issue detector and recheck are separate from MCA/GST. Add optional notes, then regenerate.
+                    </p>
+                    <Textarea
+                      value={incomeTaxEvidenceContext}
+                      onChange={(e) => setIncomeTaxEvidenceContext(e.target.value)}
+                      placeholder="Optional: paste assessment extracts, ledger/tax-effect sheets, or supporting evidence for Recheck AI."
+                      className="min-h-[90px] bg-background/50"
+                    />
+                    <Button
+                      type="button"
+                      variant="outline"
+                      className="w-full"
+                      onClick={handleRecheckIncomeTaxDraft}
+                      disabled={isRecheckingIncomeTax || !draftGenerated}
+                    >
+                      {isRecheckingIncomeTax ? (
+                        <>
+                          <Loader2 className="w-4 h-4 mr-2 animate-spin" />
+                          Rechecking Income-tax AI...
+                        </>
+                      ) : (
+                        "Recheck AI (Income Tax Draft + Notice + Evidence)"
+                      )}
+                    </Button>
+                    {incomeTaxRecheckReport && (
+                      <div className={`rounded-lg border p-3 text-xs space-y-2 ${
+                        incomeTaxRecheckReport.ok
+                          ? "border-green-500/30 bg-green-500/10 text-green-300"
+                          : "border-rose-500/30 bg-rose-500/10 text-rose-200"
+                      }`}>
+                        <p className="font-medium">{incomeTaxRecheckReport.ok ? "Income-tax Recheck AI: Passed" : "Income-tax Recheck AI: Flags Detected"}</p>
+                        {incomeTaxRecheckReport.summary ? <p>{incomeTaxRecheckReport.summary}</p> : null}
+                        {!incomeTaxRecheckReport.ok && (
+                          <ul className="list-disc pl-4 space-y-2">
+                            {incomeTaxRecheckReport.flags.map((flag, idx) => (
+                              <li key={`${flag.issue}-${idx}`}>
+                                <p>[{flag.severity.toUpperCase()}] {flag.issue}</p>
+                                <p className="text-rose-100/90">Fix: {flag.fix}</p>
+                              </li>
+                            ))}
+                          </ul>
+                        )}
+                      </div>
+                    )}
+                    <p className="text-xs text-cyan-300">Pending Income-tax fixes: {incomeTaxPendingFixCount}</p>
+                    <Textarea
+                      value={incomeTaxAutoFixNotes || "No pending issue-detector fixes right now."}
+                      readOnly
+                      className="min-h-[90px] bg-background/40 text-muted-foreground"
+                    />
+                    <div className="rounded-lg border border-cyan-500/20 bg-cyan-500/5 p-3 text-xs space-y-2">
+                      <p className="font-medium text-cyan-200">Pending Fix Solutions (AI)</p>
+                      {incomeTaxPendingFixPlaybook.length === 0 ? (
+                        <p className="text-cyan-100/80">No pending solutions. Draft is clear on current checks.</p>
+                      ) : (
+                        <ul className="list-disc pl-4 space-y-2 text-cyan-100/90">
+                          {incomeTaxPendingFixPlaybook.map((item, idx) => (
+                            <li key={`${item.title}-${idx}`}>
+                              <p>{item.title}</p>
+                              <p className="text-cyan-100/75">How to fix: {item.solution}</p>
+                            </li>
+                          ))}
+                        </ul>
+                      )}
+                    </div>
+                    <Textarea
+                      value={incomeTaxUserFixNotes}
+                      onChange={(e) => setIncomeTaxUserFixNotes(e.target.value)}
+                      placeholder="Optional CA note for Income-tax AI fix."
+                      className="min-h-[90px] bg-background/50"
+                    />
+                    <Button
+                      type="button"
+                      variant="outline"
+                      className="w-full"
+                      onClick={handleApplyIncomeTaxFix}
+                      disabled={isApplyingIncomeTaxFix || !draftGenerated || (incomeTaxPendingFixCount === 0 && incomeTaxUserFixNotes.trim().length === 0)}
+                    >
+                      {isApplyingIncomeTaxFix ? (
+                        <>
+                          <Loader2 className="w-4 h-4 mr-2 animate-spin" />
+                          Applying Income-tax AI Fix...
+                        </>
+                      ) : (
+                        "Apply AI Fix & Regenerate Income Tax Draft"
+                      )}
+                    </Button>
+                  </div>
+                </div>
+              )}
+
+              {draftGenerated && selectedDocType === "rbi-filing" && (
+                <div className="mt-3 space-y-2">
+                  <Button
+                    type="button"
+                    variant="outline"
+                    className="w-full"
+                    onClick={runRbiDraftIssueCheck}
+                  >
+                    Check What Is Wrong In This RBI Draft
+                  </Button>
+                  {rbiHasChecked && (
+                    <div
+                      className={`p-4 rounded-lg border text-sm ${
+                        rbiComputedIssueReport.ok
+                          ? "border-green-500/30 bg-green-500/10 text-green-300"
+                          : "border-yellow-500/30 bg-yellow-500/10 text-yellow-200"
+                      }`}
+                    >
+                      {rbiComputedIssueReport.ok ? (
+                        <p>All RBI checks passed. This draft is structurally aligned for CA review.</p>
+                      ) : (
+                        <div className="space-y-2">
+                          <p className="font-medium">Issues detected:</p>
+                          <ul className="list-disc pl-5 space-y-2">
+                            {rbiComputedIssueReport.items.map((item, idx) => (
+                              <li key={`${item.issue}-${idx}`}>
+                                <p>{item.issue}</p>
+                                <p className="text-xs text-yellow-100/90 mt-1">Suggestion: {item.suggestion}</p>
+                              </li>
+                            ))}
+                          </ul>
+                        </div>
+                      )}
+                    </div>
+                  )}
+
+                  {liveRbiAdvancedSuggestions.length > 0 && (
+                    <div className="p-4 rounded-lg border border-cyan-500/30 bg-cyan-500/10 text-cyan-200 text-sm">
+                      <p className="font-medium mb-2">Advanced Suggestions:</p>
+                      <ul className="list-disc pl-5 space-y-2">
+                        {liveRbiAdvancedSuggestions.map((item, idx) => (
+                          <li key={`${item.title}-${idx}`}>
+                            <p className={item.implemented ? "text-green-300" : "text-cyan-200"}>
+                              {item.implemented ? "✓ " : ""}{item.title}
+                              <span className={`ml-2 text-[11px] ${item.implemented ? "text-green-300" : "text-yellow-200"}`}>
+                                [{item.implemented ? "Implemented" : "Pending"}]
+                              </span>
+                            </p>
+                            <p className="text-xs text-cyan-100/90 mt-1">Suggestion: {item.suggestion}</p>
+                          </li>
+                        ))}
+                      </ul>
+                    </div>
+                  )}
+
+                  <div className="p-3 rounded-lg border border-border/50 bg-background/30 space-y-2">
+                    <p className="text-sm font-medium text-foreground">AI Fix Assistant (RBI)</p>
+                    <p className="text-xs text-muted-foreground">
+                      RBI issue detector and recheck are separate from MCA/GST/Income-tax. Add optional notes, then regenerate.
+                    </p>
+                    <Textarea
+                      value={rbiEvidenceContext}
+                      onChange={(e) => setRbiEvidenceContext(e.target.value)}
+                      placeholder="Optional: paste FEMA/RBI evidence text (AD bank records, acknowledgements, filing trail) for Recheck AI."
+                      className="min-h-[90px] bg-background/50"
+                    />
+                    <Button
+                      type="button"
+                      variant="outline"
+                      className="w-full"
+                      onClick={handleRecheckRbiDraft}
+                      disabled={isRecheckingRbi || !draftGenerated}
+                    >
+                      {isRecheckingRbi ? (
+                        <>
+                          <Loader2 className="w-4 h-4 mr-2 animate-spin" />
+                          Rechecking RBI AI...
+                        </>
+                      ) : (
+                        "Recheck AI (RBI Draft + Notice + Evidence)"
+                      )}
+                    </Button>
+                    {rbiRecheckReport && (
+                      <div className={`rounded-lg border p-3 text-xs space-y-2 ${
+                        rbiRecheckReport.ok
+                          ? "border-green-500/30 bg-green-500/10 text-green-300"
+                          : "border-rose-500/30 bg-rose-500/10 text-rose-200"
+                      }`}>
+                        <p className="font-medium">{rbiRecheckReport.ok ? "RBI Recheck AI: Passed" : "RBI Recheck AI: Flags Detected"}</p>
+                        {rbiRecheckReport.summary ? <p>{rbiRecheckReport.summary}</p> : null}
+                        {!rbiRecheckReport.ok && (
+                          <ul className="list-disc pl-4 space-y-2">
+                            {rbiRecheckReport.flags.map((flag, idx) => (
+                              <li key={`${flag.issue}-${idx}`}>
+                                <p>[{flag.severity.toUpperCase()}] {flag.issue}</p>
+                                <p className="text-rose-100/90">Fix: {flag.fix}</p>
+                              </li>
+                            ))}
+                          </ul>
+                        )}
+                      </div>
+                    )}
+                    <p className="text-xs text-cyan-300">Pending RBI fixes: {rbiPendingFixCount}</p>
+                    <Textarea
+                      value={rbiAutoFixNotes || "No pending issue-detector fixes right now."}
+                      readOnly
+                      className="min-h-[90px] bg-background/40 text-muted-foreground"
+                    />
+                    <div className="rounded-lg border border-cyan-500/20 bg-cyan-500/5 p-3 text-xs space-y-2">
+                      <p className="font-medium text-cyan-200">Pending Fix Solutions (AI)</p>
+                      {rbiPendingFixPlaybook.length === 0 ? (
+                        <p className="text-cyan-100/80">No pending solutions. Draft is clear on current checks.</p>
+                      ) : (
+                        <ul className="list-disc pl-4 space-y-2 text-cyan-100/90">
+                          {rbiPendingFixPlaybook.map((item, idx) => (
+                            <li key={`${item.title}-${idx}`}>
+                              <p>{item.title}</p>
+                              <p className="text-cyan-100/75">How to fix: {item.solution}</p>
+                            </li>
+                          ))}
+                        </ul>
+                      )}
+                    </div>
+                    <Textarea
+                      value={rbiUserFixNotes}
+                      onChange={(e) => setRbiUserFixNotes(e.target.value)}
+                      placeholder="Optional CA note for RBI AI fix."
+                      className="min-h-[90px] bg-background/50"
+                    />
+                    <Button
+                      type="button"
+                      variant="outline"
+                      className="w-full"
+                      onClick={handleApplyRbiFix}
+                      disabled={isApplyingRbiFix || !draftGenerated || (rbiPendingFixCount === 0 && rbiUserFixNotes.trim().length === 0)}
+                    >
+                      {isApplyingRbiFix ? (
+                        <>
+                          <Loader2 className="w-4 h-4 mr-2 animate-spin" />
+                          Applying RBI AI Fix...
+                        </>
+                      ) : (
+                        "Apply AI Fix & Regenerate RBI Draft"
                       )}
                     </Button>
                   </div>
