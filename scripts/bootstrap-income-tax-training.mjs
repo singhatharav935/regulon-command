@@ -3,11 +3,11 @@ import { createClient } from "@supabase/supabase-js";
 
 const supabaseUrl = process.env.SUPABASE_URL;
 const serviceRoleKey = process.env.SUPABASE_SERVICE_ROLE_KEY;
-const userId = process.env.MCA_TRAIN_USER_ID;
-const totalCases = Number(process.env.MCA_BOOTSTRAP_CASES || "250");
+const userId = process.env.INCOME_TAX_TRAIN_USER_ID;
+const totalCases = Number(process.env.INCOME_TAX_BOOTSTRAP_CASES || "250");
 
 if (!supabaseUrl || !serviceRoleKey || !userId) {
-  console.error("Missing env. Required: SUPABASE_URL, SUPABASE_SERVICE_ROLE_KEY, MCA_TRAIN_USER_ID");
+  console.error("Missing env. Required: SUPABASE_URL, SUPABASE_SERVICE_ROLE_KEY, INCOME_TAX_TRAIN_USER_ID");
   process.exit(1);
 }
 
@@ -16,26 +16,24 @@ const supabase = createClient(supabaseUrl, serviceRoleKey, {
 });
 
 const noticeClasses = [
-  "annual-filing-92-137",
-  "commencement-10a",
-  "registered-office-12",
-  "agm-96",
-  "board-reporting-117",
-  "auditor-139-140",
-  "director-appointment-152-170",
-  "director-kyc",
-  "charge-77-79",
-  "allotment-39-42",
-  "registers-88",
-  "beneficial-ownership-90",
-  "board-governance-173",
-  "board-report-134",
-  "csr-135",
-  "related-party-188",
-  "loans-investments-185-186",
-  "managerial-kmp-203",
-  "deposits-73-76",
-  "general-mca",
+  "intimation-143-1",
+  "defective-return-139-9",
+  "inquiry-142-1",
+  "scrutiny-143-2",
+  "best-judgment-144",
+  "reassessment-147-148",
+  "reassessment-148a",
+  "rectification-154",
+  "demand-156",
+  "refund-adjustment-245",
+  "tds-default-201",
+  "tcs-default-206c",
+  "tds-disallowance-40a-ia",
+  "cash-deposit-69-69a",
+  "transfer-pricing-92",
+  "penalty-270a",
+  "faceless-appeal-250",
+  "income-tax-general",
 ];
 
 const buildCase = (index) => {
@@ -45,17 +43,17 @@ const buildCase = (index) => {
   return {
     user_id: userId,
     notice_class: noticeClass,
-    notice_reference: `BOOT/ROC/2026/${String(index + 1).padStart(4, "0")}`,
+    notice_reference: `BOOT/IT/2026/${String(index + 1).padStart(4, "0")}`,
     notice_date: `2026-${month}-${day}`,
     notice_snapshot:
-      `Bootstrap synthetic MCA notice summary (${noticeClass}). ` +
-      `Ref BOOT/ROC/2026/${String(index + 1).padStart(4, "0")} alleging procedural non-compliance. ` +
+      `Bootstrap synthetic income-tax notice summary (${noticeClass}). ` +
+      `Ref BOOT/IT/2026/${String(index + 1).padStart(4, "0")} alleging addition/disallowance and consequential levy. ` +
       `This record is for pipeline calibration only and must be superseded by real CA-reviewed cases.`,
     generated_draft:
-      `Synthetic training draft for ${noticeClass}. Contains structured chronology, legal submissions, ` +
-      `officer-specific defense, and calibrated prayer wording for testing ingestion and coverage metrics.`,
+      `Synthetic income-tax training draft for ${noticeClass}. Includes issue-wise rebuttal matrix, ` +
+      `tax-effect computation challenge table, and calibrated prayer for testing ingestion and quality gates.`,
     status: "captured",
-    filing_score: 70 + (index % 25),
+    filing_score: 68 + (index % 28),
     risk_band: index % 3 === 0 ? "low" : index % 3 === 1 ? "medium" : "high",
     outcome_label: "pending",
     qa_payload: {
@@ -72,15 +70,14 @@ const buildCase = (index) => {
 };
 
 const run = async () => {
-  console.log(`Creating ${totalCases} MCA bootstrap cases for user ${userId}...`);
+  console.log(`Creating ${totalCases} Income-tax bootstrap cases for user ${userId}...`);
   const rows = Array.from({ length: totalCases }, (_, i) => buildCase(i));
 
   const chunkSize = 100;
   let inserted = 0;
-
   for (let i = 0; i < rows.length; i += chunkSize) {
     const chunk = rows.slice(i, i + chunkSize);
-    const { error } = await supabase.from("mca_training_cases").insert(chunk);
+    const { error } = await supabase.from("income_tax_training_cases").insert(chunk);
     if (error) {
       console.error(`Insert failed at chunk ${i / chunkSize + 1}:`, error.message);
       process.exit(1);
@@ -88,7 +85,6 @@ const run = async () => {
     inserted += chunk.length;
     console.log(`Inserted ${inserted}/${totalCases}`);
   }
-
   console.log("Bootstrap done.");
   console.log("Important: these are synthetic calibration cases, not real adjudication outcomes.");
 };

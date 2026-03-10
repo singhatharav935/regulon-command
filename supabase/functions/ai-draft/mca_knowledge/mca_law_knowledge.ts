@@ -1,11 +1,21 @@
 export type McaReplyType =
   | "annual-filing-92-137"
+  | "commencement-10a"
+  | "registered-office-12"
+  | "agm-96"
   | "board-reporting-117"
+  | "auditor-139-140"
+  | "director-appointment-152-170"
+  | "director-kyc"
   | "charge-77-79"
+  | "allotment-39-42"
+  | "registers-88"
   | "beneficial-ownership-90"
   | "board-governance-173"
   | "board-report-134"
+  | "csr-135"
   | "related-party-188"
+  | "loans-investments-185-186"
   | "managerial-kmp-203"
   | "deposits-73-76"
   | "general-mca";
@@ -76,6 +86,72 @@ const MCA_TYPE_KNOWLEDGE: Record<McaReplyType, McaKnowledgeUnit> = {
       "Ensure notice date consistency across heading, facts, and prayer.",
     ],
   },
+  "commencement-10a": {
+    statutoryFramework: [
+      "Section 10A commencement-of-business requirement and applicable filing context (INC-20A).",
+      "Section 454 adjudication framework for procedural filing defaults.",
+    ],
+    legalPositioning: [
+      "Separate substantive commencement status from filing/timeline delay allegations.",
+      "Tie chronology to incorporation date, commencement due date, and action completion.",
+    ],
+    mandatoryEvidence: [
+      "Incorporation data, commencement filing record, SRN/challan references.",
+      "Board/management records explaining delay and corrective action timeline.",
+    ],
+    mandatoryDraftBlocks: [
+      "Commencement chronology matrix.",
+      "Section 10A and Section 454 legal analysis block.",
+    ],
+    riskControls: [
+      "Do not claim commencement compliance without documentary anchors.",
+      "Avoid assumptions on condonation unless order/facts support it.",
+    ],
+  },
+  "registered-office-12": {
+    statutoryFramework: [
+      "Section 12 registered-office obligations and related filing duties.",
+      "Section 454 adjudication principles.",
+    ],
+    legalPositioning: [
+      "Distinguish office-maintenance obligations from filing timeline breaches.",
+      "Use event-date vs filing-date comparison with references.",
+    ],
+    mandatoryEvidence: [
+      "Registered office records, change/intimation filings, SRN/challan details.",
+      "Address proofs/board approvals where relied upon.",
+    ],
+    mandatoryDraftBlocks: [
+      "Registered-office chronology table.",
+      "Issue-wise legal rebuttal with evidence mapping.",
+    ],
+    riskControls: [
+      "Avoid generic office-compliance claims without record support.",
+      "Ensure address facts are internally consistent.",
+    ],
+  },
+  "agm-96": {
+    statutoryFramework: [
+      "Section 96 AGM timeline obligations and related compliance context.",
+      "Section 454 adjudication and proportionality standards.",
+    ],
+    legalPositioning: [
+      "Separate delay cause from willful default allegations.",
+      "Present timeline from FY close to AGM action with exact anchors.",
+    ],
+    mandatoryEvidence: [
+      "AGM notice/minutes and relevant date records.",
+      "Supporting records for delay cause and rectification actions.",
+    ],
+    mandatoryDraftBlocks: [
+      "AGM timeline matrix.",
+      "Mitigation and proportionality submissions.",
+    ],
+    riskControls: [
+      "Do not assert AGM compliance status without documentary basis.",
+      "Avoid vague 'administrative reasons' without factual pointers.",
+    ],
+  },
   "board-reporting-117": {
     statutoryFramework: [
       "Section 117 and applicable rules for filing resolutions/agreements (including form/timeline context).",
@@ -98,6 +174,72 @@ const MCA_TYPE_KNOWLEDGE: Record<McaReplyType, McaKnowledgeUnit> = {
       "Avoid generic text; map each allegation to documentary proof.",
     ],
   },
+  "auditor-139-140": {
+    statutoryFramework: [
+      "Sections 139/140 auditor appointment/removal/resignation framework.",
+      "Section 454 adjudication principles.",
+    ],
+    legalPositioning: [
+      "Separate appointment/removal event facts from filing timeline allegations.",
+      "Use event-wise chronology and role-specific conduct submissions.",
+    ],
+    mandatoryEvidence: [
+      "Board/shareholder records, auditor communication, filing acknowledgments.",
+      "Relevant form references and SRN/challan details.",
+    ],
+    mandatoryDraftBlocks: [
+      "Auditor-event chronology table.",
+      "Section-wise analysis + officer-specific defense.",
+    ],
+    riskControls: [
+      "No assumptions about auditor status changes without records.",
+      "Avoid claiming form completeness unless verified.",
+    ],
+  },
+  "director-appointment-152-170": {
+    statutoryFramework: [
+      "Sections 152/170 appointment/cessation and register obligations.",
+      "Section 454 adjudication framework.",
+    ],
+    legalPositioning: [
+      "Map each director event to timeline and register impact.",
+      "Clarify officer role periods around the alleged default window.",
+    ],
+    mandatoryEvidence: [
+      "Appointment/cessation records, register extracts, filing references.",
+      "Board/shareholder approvals and date anchors.",
+    ],
+    mandatoryDraftBlocks: [
+      "Director-event chronology matrix.",
+      "Role-period officer defense block.",
+    ],
+    riskControls: [
+      "Avoid broad compliance claims if register extracts are unavailable.",
+      "Keep director-specific facts segregated and precise.",
+    ],
+  },
+  "director-kyc": {
+    statutoryFramework: [
+      "DIR-3 KYC and related compliance framework; include 164/167 only where invoked in notice.",
+      "Section 454 adjudication principles.",
+    ],
+    legalPositioning: [
+      "Frame delay/defect as procedural unless contrary facts are shown.",
+      "Use director-wise timeline and rectification evidence.",
+    ],
+    mandatoryEvidence: [
+      "KYC completion records and portal acknowledgments.",
+      "Director-wise status references for the relevant period.",
+    ],
+    mandatoryDraftBlocks: [
+      "Director-wise KYC status table.",
+      "Officer responsibility and mitigation submissions.",
+    ],
+    riskControls: [
+      "Do not include disqualification conclusions unless notice explicitly alleges them.",
+      "Avoid mixing KYC compliance with unrelated director defaults.",
+    ],
+  },
   "charge-77-79": {
     statutoryFramework: [
       "Sections 77/78/79 charge registration/modification/satisfaction framework.",
@@ -118,6 +260,50 @@ const MCA_TYPE_KNOWLEDGE: Record<McaReplyType, McaKnowledgeUnit> = {
     riskControls: [
       "Avoid unsupported assertions about condonation unless specific order/route exists.",
       "Keep event-wise facts precise to avoid contradictions.",
+    ],
+  },
+  "allotment-39-42": {
+    statutoryFramework: [
+      "Sections 39/42 allotment/private placement framework and filing context.",
+      "Section 454 adjudication framework.",
+    ],
+    legalPositioning: [
+      "Differentiate transaction event, approval process, and filing timeline.",
+      "Use allotment-date anchored chronology with references.",
+    ],
+    mandatoryEvidence: [
+      "Allotment records, approvals, and filing acknowledgments (PAS context where applicable).",
+      "SRN/challan references and supporting board records.",
+    ],
+    mandatoryDraftBlocks: [
+      "Allotment chronology matrix.",
+      "Issue-wise legal + evidence mapping block.",
+    ],
+    riskControls: [
+      "Avoid stating private-placement particulars without factual record.",
+      "No unsupported claim about investor impact neutrality.",
+    ],
+  },
+  "registers-88": {
+    statutoryFramework: [
+      "Section 88 register maintenance obligations and related compliance context.",
+      "Section 454 adjudication principles for procedural defaults.",
+    ],
+    legalPositioning: [
+      "Map allegation to exact register obligation and timeline.",
+      "Show curative update actions and current status.",
+    ],
+    mandatoryEvidence: [
+      "Register extracts, update chronology, and supporting records.",
+      "Board/secretarial records for update actions.",
+    ],
+    mandatoryDraftBlocks: [
+      "Register-compliance table.",
+      "Rectification status and evidence mapping.",
+    ],
+    riskControls: [
+      "Do not claim full register completeness without extracts.",
+      "Avoid conflating register issues with filing defaults unless linked.",
     ],
   },
   "beneficial-ownership-90": {
@@ -186,6 +372,28 @@ const MCA_TYPE_KNOWLEDGE: Record<McaReplyType, McaKnowledgeUnit> = {
       "Keep narrative tied to exact allegation language.",
     ],
   },
+  "csr-135": {
+    statutoryFramework: [
+      "Section 135 CSR applicability, governance, and disclosure obligations.",
+      "Section 454 adjudication framework.",
+    ],
+    legalPositioning: [
+      "Separate applicability trigger, spend/disclosure duties, and timeline issues.",
+      "Use committee/board action chronology where relevant.",
+    ],
+    mandatoryEvidence: [
+      "CSR committee/board records, spend/disclosure evidence, filing references.",
+      "Applicability basis for the relevant financial period.",
+    ],
+    mandatoryDraftBlocks: [
+      "CSR applicability + chronology matrix.",
+      "Mitigation and proportionality submissions.",
+    ],
+    riskControls: [
+      "Do not assert CSR non-applicability without financial threshold basis.",
+      "Avoid generic CSR statements without period-specific facts.",
+    ],
+  },
   "related-party-188": {
     statutoryFramework: [
       "Section 188 related party approval/disclosure framework.",
@@ -206,6 +414,28 @@ const MCA_TYPE_KNOWLEDGE: Record<McaReplyType, McaKnowledgeUnit> = {
     riskControls: [
       "No broad assertion of arm's-length compliance without transaction records.",
       "Avoid generic statements that skip transaction-level mapping.",
+    ],
+  },
+  "loans-investments-185-186": {
+    statutoryFramework: [
+      "Sections 185/186 loans/guarantees/investments framework as invoked.",
+      "Section 454 adjudication framework.",
+    ],
+    legalPositioning: [
+      "Differentiate approval, transaction, and disclosure allegations.",
+      "Use transaction-level chronology with threshold/approval context.",
+    ],
+    mandatoryEvidence: [
+      "Board/shareholder approvals, transaction records, and disclosure references.",
+      "Event-wise dates and filing/action references.",
+    ],
+    mandatoryDraftBlocks: [
+      "Transaction-wise compliance matrix.",
+      "Officer-specific role and mitigation block.",
+    ],
+    riskControls: [
+      "Avoid asserting arm's-length or exemption status without documentary basis.",
+      "No aggregate narrative when allegations are transaction-specific.",
     ],
   },
   "managerial-kmp-203": {
@@ -322,4 +552,3 @@ export const getMcaPendingDataChecklist = (mcaReplyType: McaReplyType): string[]
   const typeSpecific = MCA_TYPE_KNOWLEDGE[mcaReplyType].mandatoryEvidence;
   return Array.from(new Set([...common, ...typeSpecific]));
 };
-

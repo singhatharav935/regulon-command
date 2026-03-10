@@ -110,33 +110,173 @@ CUSTOM REGULATORY DRAFT:
 
 type McaReplyType =
   | "annual-filing-92-137"
+  | "commencement-10a"
+  | "registered-office-12"
+  | "agm-96"
   | "board-reporting-117"
+  | "auditor-139-140"
+  | "director-appointment-152-170"
+  | "director-kyc"
   | "charge-77-79"
+  | "allotment-39-42"
+  | "registers-88"
   | "beneficial-ownership-90"
   | "board-governance-173"
   | "board-report-134"
+  | "csr-135"
   | "related-party-188"
+  | "loans-investments-185-186"
   | "managerial-kmp-203"
   | "deposits-73-76"
   | "general-mca";
 
 const MCA_REPLY_TYPES: McaReplyType[] = [
   "annual-filing-92-137",
+  "commencement-10a",
+  "registered-office-12",
+  "agm-96",
   "board-reporting-117",
+  "auditor-139-140",
+  "director-appointment-152-170",
+  "director-kyc",
   "charge-77-79",
+  "allotment-39-42",
+  "registers-88",
   "beneficial-ownership-90",
   "board-governance-173",
   "board-report-134",
+  "csr-135",
   "related-party-188",
+  "loans-investments-185-186",
   "managerial-kmp-203",
   "deposits-73-76",
   "general-mca",
 ];
 
+type IncomeTaxReplyType =
+  | "intimation-143-1"
+  | "defective-return-139-9"
+  | "inquiry-142-1"
+  | "scrutiny-143-2"
+  | "best-judgment-144"
+  | "reassessment-147-148"
+  | "reassessment-148a"
+  | "rectification-154"
+  | "demand-156"
+  | "refund-adjustment-245"
+  | "tds-default-201"
+  | "tcs-default-206c"
+  | "tds-disallowance-40a-ia"
+  | "cash-deposit-69-69a"
+  | "transfer-pricing-92"
+  | "penalty-270a"
+  | "faceless-appeal-250"
+  | "income-tax-general";
+
+const INCOME_TAX_REPLY_TYPES: IncomeTaxReplyType[] = [
+  "intimation-143-1",
+  "defective-return-139-9",
+  "inquiry-142-1",
+  "scrutiny-143-2",
+  "best-judgment-144",
+  "reassessment-147-148",
+  "reassessment-148a",
+  "rectification-154",
+  "demand-156",
+  "refund-adjustment-245",
+  "tds-default-201",
+  "tcs-default-206c",
+  "tds-disallowance-40a-ia",
+  "cash-deposit-69-69a",
+  "transfer-pricing-92",
+  "penalty-270a",
+  "faceless-appeal-250",
+  "income-tax-general",
+];
+
+type RbiReplyType =
+  | "fema-13-delay-reporting"
+  | "fema-30-odi-reporting"
+  | "fema-20-fdi-pricing"
+  | "fema-3-ecb-reporting"
+  | "fla-return-delay"
+  | "apr-delay"
+  | "fc-gpr-delay"
+  | "fc-trs-delay"
+  | "lsf-compounding-advisory"
+  | "kyc-aml-pmla-observation"
+  | "payment-aggregator-authorization"
+  | "nbfc-returns-delay"
+  | "rbi-general";
+
+const RBI_REPLY_TYPES: RbiReplyType[] = [
+  "fema-13-delay-reporting",
+  "fema-30-odi-reporting",
+  "fema-20-fdi-pricing",
+  "fema-3-ecb-reporting",
+  "fla-return-delay",
+  "apr-delay",
+  "fc-gpr-delay",
+  "fc-trs-delay",
+  "lsf-compounding-advisory",
+  "kyc-aml-pmla-observation",
+  "payment-aggregator-authorization",
+  "nbfc-returns-delay",
+  "rbi-general",
+];
+
+const normalizeIncomeTaxReplyType = (value: string | null | undefined): IncomeTaxReplyType | null => {
+  if (!value) return null;
+  const cleaned = value.trim().toLowerCase();
+  return (INCOME_TAX_REPLY_TYPES as string[]).includes(cleaned) ? (cleaned as IncomeTaxReplyType) : null;
+};
+
+const normalizeRbiReplyType = (value: string | null | undefined): RbiReplyType | null => {
+  if (!value) return null;
+  const cleaned = value.trim().toLowerCase();
+  return (RBI_REPLY_TYPES as string[]).includes(cleaned) ? (cleaned as RbiReplyType) : null;
+};
+
 const normalizeMcaReplyType = (value: string | null | undefined): McaReplyType | null => {
   if (!value) return null;
   const cleaned = value.trim().toLowerCase();
   return (MCA_REPLY_TYPES as string[]).includes(cleaned) ? (cleaned as McaReplyType) : null;
+};
+
+const GST_REPLY_TYPES = [
+  "drc-01-scn-73-74",
+  "drc-01a-pre-scn",
+  "asmt-10-discrepancy",
+  "itc-mismatch",
+  "section-73-short-payment",
+  "section-74-fraud-allegation",
+  "reg-17-cancellation-scn",
+  "registration-cancellation-29",
+  "reg-23-cancellation-reply",
+  "revocation-30",
+  "rcm-dispute",
+  "detention-seizure-129-130",
+  "e-way-bill-122-125",
+  "drc-07-demand-order",
+  "refund-recovery",
+  "refund-rejection-54",
+  "gstr-reconciliation",
+  "annual-return-44-80",
+  "tds-tcs-51-52",
+  "classification-valuation",
+  "place-of-supply",
+  "anti-profiteering-171",
+  "transitional-credit-140",
+  "interest-penalty-only",
+  "gst-general",
+] as const;
+
+type GstReplyType = (typeof GST_REPLY_TYPES)[number];
+
+const normalizeGstReplyType = (value: string | null | undefined): GstReplyType | null => {
+  if (!value) return null;
+  const cleaned = value.trim().toLowerCase();
+  return (GST_REPLY_TYPES as readonly string[]).includes(cleaned) ? (cleaned as GstReplyType) : null;
 };
 
 const extractNoticeDateFromText = (noticeText?: string): string | null => {
@@ -156,15 +296,93 @@ const extractNoticeDateFromText = (noticeText?: string): string | null => {
 const inferMcaReplyType = (noticeDetails?: string, extractedNotice?: NoticeIntelligence | null): McaReplyType => {
   const corpus = `${noticeDetails ?? ""}\n${JSON.stringify(extractedNotice?.notice_snapshot?.invoked_provisions ?? [])}`.toLowerCase();
   if (/\bsection\s*92\b|\bsection\s*137\b|\bmgt-?7\b|\baoc-?4\b/.test(corpus)) return "annual-filing-92-137";
+  if (/\bsection\s*10a\b|\binc-?20a\b|commencement of business/i.test(corpus)) return "commencement-10a";
+  if (/\bsection\s*12\b|\binc-?22\b|registered office/i.test(corpus)) return "registered-office-12";
+  if (/\bsection\s*96\b|annual general meeting|\bagm\b/i.test(corpus)) return "agm-96";
   if (/\bsection\s*117\b|\bmgt-?14\b|\bboard resolution\b/.test(corpus)) return "board-reporting-117";
+  if (/\bsection\s*139\b|\bsection\s*140\b|\badt-?1\b|\badt-?2\b|auditor appointment|auditor removal/i.test(corpus)) return "auditor-139-140";
+  if (/\bsection\s*152\b|\bsection\s*170\b|\bdir-?12\b|director appointment|register of directors/i.test(corpus)) return "director-appointment-152-170";
+  if (/dir-?3 kyc|section\s*164|section\s*167|director kyc|disqualification/i.test(corpus)) return "director-kyc";
   if (/\bsection\s*77\b|\bsection\s*78\b|\bsection\s*79\b|\bchg-?1\b|\bcharge\b/.test(corpus)) return "charge-77-79";
+  if (/\bsection\s*39\b|\bsection\s*42\b|\bpas-?3\b|allotment|private placement/i.test(corpus)) return "allotment-39-42";
+  if (/\bsection\s*88\b|\bmgt-?1\b|register of members|register maintenance/i.test(corpus)) return "registers-88";
   if (/\bsection\s*90\b|\bben-?2\b|\bbeneficial owner\b|\bsbo\b/.test(corpus)) return "beneficial-ownership-90";
   if (/\bsection\s*173\b|\bboard meeting\b|\bminutes\b/.test(corpus)) return "board-governance-173";
   if (/\bsection\s*134\b|\bboard'?s report\b/.test(corpus)) return "board-report-134";
+  if (/\bsection\s*135\b|\bcsr\b|corporate social responsibility/i.test(corpus)) return "csr-135";
   if (/\bsection\s*188\b|\brelated party\b|\baoc-?2\b/.test(corpus)) return "related-party-188";
+  if (/\bsection\s*185\b|\bsection\s*186\b|loan to director|inter-corporate loan|guarantee|investment limit/i.test(corpus)) return "loans-investments-185-186";
   if (/\bsection\s*203\b|\bkmp\b|company secretary|managing director|whole-time director/.test(corpus)) return "managerial-kmp-203";
   if (/\bsection\s*73\b|\bsection\s*74\b|\bsection\s*76\b|\bdeposit\b/.test(corpus)) return "deposits-73-76";
   return "general-mca";
+};
+
+const inferIncomeTaxReplyType = (noticeDetails?: string, extractedNotice?: NoticeIntelligence | null): IncomeTaxReplyType => {
+  const corpus = `${noticeDetails ?? ""}\n${JSON.stringify(extractedNotice?.notice_snapshot?.invoked_provisions ?? [])}`.toLowerCase();
+  if (/\b143\(?1\)?\b|intimation|summary assessment/i.test(corpus)) return "intimation-143-1";
+  if (/\b139\(?9\)?\b|defective return/i.test(corpus)) return "defective-return-139-9";
+  if (/\b142\(?1\)?\b|inquiry before assessment|details called for/i.test(corpus)) return "inquiry-142-1";
+  if (/\b143\(?2\)?\b|scrutiny|questionnaire|notice u\/s 143/i.test(corpus)) return "scrutiny-143-2";
+  if (/\b144\b|best judgment/i.test(corpus)) return "best-judgment-144";
+  if (/\b147\b|\b148\b|reassessment|income escaping/i.test(corpus)) return "reassessment-147-148";
+  if (/\b148a\b|\b148a\(?b\)?\b|\b148a\(?d\)?\b|show cause before issue of notice under 148/i.test(corpus)) return "reassessment-148a";
+  if (/\b154\b|rectification/i.test(corpus)) return "rectification-154";
+  if (/\b156\b|notice of demand|demand notice/i.test(corpus)) return "demand-156";
+  if (/\b245\b|refund adjustment|set off refund/i.test(corpus)) return "refund-adjustment-245";
+  if (/\b201\b|tds default|assessee in default/i.test(corpus)) return "tds-default-201";
+  if (/\b206c\b|tcs default|collector in default/i.test(corpus)) return "tcs-default-206c";
+  if (/\b40\(a\)\(ia\)\b|40aia|tds disallowance/i.test(corpus)) return "tds-disallowance-40a-ia";
+  if (/\b69\b|\b69a\b|unexplained cash|cash deposit/i.test(corpus)) return "cash-deposit-69-69a";
+  if (/\b92\b|transfer pricing|alp|arm'?s length/i.test(corpus)) return "transfer-pricing-92";
+  if (/\b270a\b|under-reporting|misreporting/i.test(corpus)) return "penalty-270a";
+  if (/\b250\b|faceless appeal|cita|appeal proceedings/i.test(corpus)) return "faceless-appeal-250";
+  return "income-tax-general";
+};
+
+const inferRbiReplyType = (noticeDetails?: string, extractedNotice?: NoticeIntelligence | null): RbiReplyType => {
+  const corpus = `${noticeDetails ?? ""}\n${JSON.stringify(extractedNotice?.notice_snapshot?.invoked_provisions ?? [])}`.toLowerCase();
+  if (/\bfema\b[^.\n]{0,80}\bsection\s*13\b|section\s*13\b[^.\n]{0,80}\bfema\b|contravention.*fema|delay in reporting/i.test(corpus)) return "fema-13-delay-reporting";
+  if (/\bodi\b|overseas direct investment|fema\s*120|schedule\s*i|form odi/i.test(corpus)) return "fema-30-odi-reporting";
+  if (/\bfdi\b|fc-gpr|pricing guidelines|valuation certificate|fema\s*20/i.test(corpus)) return "fema-20-fdi-pricing";
+  if (/\becb\b|external commercial borrowing|form ecb|fema\s*3/i.test(corpus)) return "fema-3-ecb-reporting";
+  if (/\bfla\b|foreign liabilities and assets|fla return/i.test(corpus)) return "fla-return-delay";
+  if (/\bapr\b|annual performance report/i.test(corpus)) return "apr-delay";
+  if (/\bfc-?gpr\b|foreign currency-gpr|gpr filing/i.test(corpus)) return "fc-gpr-delay";
+  if (/\bfc-?trs\b|share transfer.*non[-\s]*resident|trs filing/i.test(corpus)) return "fc-trs-delay";
+  if (/\blsf\b|late submission fee|compounding advisory|compounding proceedings/i.test(corpus)) return "lsf-compounding-advisory";
+  if (/\bkyc\b|\baml\b|\bpmla\b|suspicious transaction|cdd|due diligence/i.test(corpus)) return "kyc-aml-pmla-observation";
+  if (/\bpayment aggregator\b|\bpa[-\s]*pg\b|authorization|rbi digital payments/i.test(corpus)) return "payment-aggregator-authorization";
+  if (/\bnbfc\b|dnbr|nbs[-\s]*\d+|prudential return|xbrl return/i.test(corpus)) return "nbfc-returns-delay";
+  return "rbi-general";
+};
+
+const inferGstReplyType = (noticeDetails?: string, extractedNotice?: NoticeIntelligence | null): GstReplyType => {
+  const corpus = `${noticeDetails ?? ""}\n${JSON.stringify(extractedNotice?.notice_snapshot?.invoked_provisions ?? [])}`.toLowerCase();
+  if (/\bdrc-?01\b|show cause notice|form gst drc-?01/i.test(corpus)) return "drc-01-scn-73-74";
+  if (/\bdrc-?01a\b|pre[-\s]*scn|intimation before show cause/i.test(corpus)) return "drc-01a-pre-scn";
+  if (/\basmt-?10\b|discrepancy notice/i.test(corpus)) return "asmt-10-discrepancy";
+  if (/\bitc\b|\bgstr-?2b\b|\bgstr-?3b\b|\bsection\s*16\b/.test(corpus)) return "itc-mismatch";
+  if (/\bsection\s*73\b/.test(corpus)) return "section-73-short-payment";
+  if (/\bsection\s*74\b|fraud|suppression|wilful/i.test(corpus)) return "section-74-fraud-allegation";
+  if (/\breg-?17\b|show cause.*cancellation of registration/i.test(corpus)) return "reg-17-cancellation-scn";
+  if (/\bsection\s*29\b|registration cancellation|cancel registration/i.test(corpus)) return "registration-cancellation-29";
+  if (/\breg-?23\b|reply for revocation|reply to cancellation notice/i.test(corpus)) return "reg-23-cancellation-reply";
+  if (/\bsection\s*30\b|revocation of cancellation|revocation application/i.test(corpus)) return "revocation-30";
+  if (/\brcm\b|reverse charge|section\s*9\(3\)|section\s*9\(4\)/i.test(corpus)) return "rcm-dispute";
+  if (/\bsection\s*129\b|\bsection\s*130\b|detention|seizure|confiscation/i.test(corpus)) return "detention-seizure-129-130";
+  if (/\be-?way bill\b|\bsection\s*122\b|\bsection\s*125\b|mov-0?\d+/i.test(corpus)) return "e-way-bill-122-125";
+  if (/\bdrc-?07\b|summary of order|demand order/i.test(corpus)) return "drc-07-demand-order";
+  if (/\brefund rejection\b|rfd-?06|rfd-?08|deficiency memo/i.test(corpus)) return "refund-rejection-54";
+  if (/\brefund\b|wrong refund|section\s*54/i.test(corpus)) return "refund-recovery";
+  if (/\breconciliation\b|mismatch|2a|2b|3b/i.test(corpus)) return "gstr-reconciliation";
+  if (/\bgstr-?9\b|\bgstr-?9c\b|section\s*44|rule\s*80|annual return/i.test(corpus)) return "annual-return-44-80";
+  if (/\bsection\s*51\b|\bsection\s*52\b|tds|tcs credit|gstr-?7|gstr-?8/i.test(corpus)) return "tds-tcs-51-52";
+  if (/\bclassification\b|hsn|valuation|section\s*15/i.test(corpus)) return "classification-valuation";
+  if (/\bplace of supply\b|igst|cgst|sgst/i.test(corpus)) return "place-of-supply";
+  if (/\bsection\s*171\b|anti[-\s]*profiteering/i.test(corpus)) return "anti-profiteering-171";
+  if (/\bsection\s*140\b|transitional credit|tran-?1|tran-?2/i.test(corpus)) return "transitional-credit-140";
+  if (/\binterest\b|\bpenalty\b|\bsection\s*50\b/.test(corpus)) return "interest-penalty-only";
+  return "gst-general";
 };
 
 const getMcaTypeSpecificRequirements = (mcaReplyType: McaReplyType) => {
@@ -172,12 +390,36 @@ const getMcaTypeSpecificRequirements = (mcaReplyType: McaReplyType) => {
     "annual-filing-92-137": `TYPE-SPECIFIC:
 - Cover Sections 92/137 with Section 403 and Section 454 framing.
 - Include chronology rows for AOC-4 and MGT-7 with due date, filing date, SRN/challan.`,
+    "commencement-10a": `TYPE-SPECIFIC:
+- Cover Section 10A and INC-20A commencement obligations.
+- Include chronology for incorporation date, commencement due date, and filing/action references.`,
+    "registered-office-12": `TYPE-SPECIFIC:
+- Cover Section 12 registered-office obligations and filing context (e.g., INC-22 where applicable).
+- Include chronology for office-shift/event date vs filing date with references.`,
+    "agm-96": `TYPE-SPECIFIC:
+- Cover Section 96 AGM timeline obligations and factual causation for delay/default.
+- Include chronology for FY close, AGM due date, AGM held date/action date, and supporting references.`,
     "board-reporting-117": `TYPE-SPECIFIC:
 - Cover Section 117 read with applicable rules and filing timeline.
 - Include chronology rows for resolution date, due date, filing date, SRN/challan (MGT-14 where applicable).`,
+    "auditor-139-140": `TYPE-SPECIFIC:
+- Cover Sections 139/140 (appointment/removal/resignation context) with event-wise chronology.
+- Include chronology for appointment/removal event, due date, filing date, and references (ADT forms where applicable).`,
+    "director-appointment-152-170": `TYPE-SPECIFIC:
+- Cover Sections 152/170 with appointment/cessation/register update obligations.
+- Include chronology for appointment/cessation date, filing timeline, and register-update evidence.`,
+    "director-kyc": `TYPE-SPECIFIC:
+- Cover DIR-3 KYC/related statutory context and any linked 164/167 allegations only if invoked in notice.
+- Include chronology for KYC due date, completion date, and evidence references.`,
     "charge-77-79": `TYPE-SPECIFIC:
 - Cover Sections 77/78/79 and charge-registration timeline.
 - Include chronology rows for charge creation/modification/satisfaction events, due dates, and filing references.`,
+    "allotment-39-42": `TYPE-SPECIFIC:
+- Cover Sections 39/42 and PAS-3/private placement filing context where invoked.
+- Include chronology for allotment date, due filing date, actual filing date, and reference IDs.`,
+    "registers-88": `TYPE-SPECIFIC:
+- Cover Section 88 register-maintenance obligations with record-level factual mapping.
+- Include chronology for register update events and evidentiary records.`,
     "beneficial-ownership-90": `TYPE-SPECIFIC:
 - Cover Section 90 and SBO reporting obligations.
 - Include chronology rows for declaration date, register update, filing date, and form references.`,
@@ -187,9 +429,15 @@ const getMcaTypeSpecificRequirements = (mcaReplyType: McaReplyType) => {
     "board-report-134": `TYPE-SPECIFIC:
 - Cover Section 134 obligations and board's report compliance context.
 - Include chronology rows for board approval date, circulation/adoption milestones, and filing references.`,
+    "csr-135": `TYPE-SPECIFIC:
+- Cover Section 135 CSR constitution/spend/disclosure obligations as invoked.
+- Include chronology for applicability trigger, committee/board actions, spend/disclosure events, and filing references.`,
     "related-party-188": `TYPE-SPECIFIC:
 - Cover Section 188 and related-party approval/disclosure framework.
 - Include chronology rows for approval, contract execution, disclosure, and supporting record references.`,
+    "loans-investments-185-186": `TYPE-SPECIFIC:
+- Cover Sections 185/186 for loans, guarantees, and investments with event-wise mapping.
+- Include chronology for board/shareholder approvals, transaction date, and disclosure/filing references.`,
     "managerial-kmp-203": `TYPE-SPECIFIC:
 - Cover Section 203 and KMP appointment/continuity obligations.
 - Include chronology rows for vacancy/appointment dates, board action dates, and filing references.`,
@@ -718,6 +966,264 @@ const captureGstRecheckIssues = async ({
     .eq("user_id", userId);
 };
 
+const captureIncomeTaxTrainingCase = async ({
+  authClient,
+  userId,
+  companyId,
+  draftRunId,
+  noticeClass,
+  noticeDetails,
+  generatedDraft,
+  qaPayload,
+  companyName,
+  industry,
+  draftMode,
+  previousCaseId,
+}: {
+  authClient: any;
+  userId: string | null;
+  companyId?: string | null;
+  draftRunId?: string | null;
+  noticeClass: string;
+  noticeDetails?: string | null;
+  generatedDraft: string;
+  qaPayload?: unknown;
+  companyName?: string | null;
+  industry?: string | null;
+  draftMode?: string | null;
+  previousCaseId?: string | null;
+}): Promise<string | null> => {
+  if (!userId || !generatedDraft?.trim()) return null;
+
+  const payload = {
+    draft_run_id: draftRunId ?? null,
+    user_id: userId,
+    company_id: companyId ?? null,
+    notice_class: noticeClass || "income-tax-general",
+    notice_snapshot: (noticeDetails || "Notice details not provided.").slice(0, 16000),
+    generated_draft: generatedDraft.slice(0, 120000),
+    filing_score: typeof (qaPayload as any)?.filing_score === "number" ? (qaPayload as any).filing_score : null,
+    risk_band: (qaPayload as any)?.risk_band ?? null,
+    qa_payload: qaPayload ?? null,
+    metadata: {
+      source_operation: "draft",
+      company_name: companyName ?? null,
+      industry: industry ?? null,
+      draft_mode: draftMode ?? null,
+      captured_at: new Date().toISOString(),
+    },
+  };
+
+  if (previousCaseId) {
+    const { data, error } = await authClient
+      .from("income_tax_training_cases")
+      .update(payload)
+      .eq("id", previousCaseId)
+      .eq("user_id", userId)
+      .select("id")
+      .maybeSingle();
+    if (!error && data?.id) return data.id as string;
+  }
+
+  const { data, error } = await authClient
+    .from("income_tax_training_cases")
+    .insert(payload)
+    .select("id")
+    .maybeSingle();
+  if (error) {
+    console.error("Income-tax training capture failed:", error.message);
+    return null;
+  }
+  return (data?.id as string) ?? null;
+};
+
+const captureIncomeTaxRecheckIssues = async ({
+  authClient,
+  userId,
+  caseId,
+  flags,
+  summary,
+}: {
+  authClient: any;
+  userId: string | null;
+  caseId?: string | null;
+  flags: RecheckFlag[];
+  summary?: string;
+}) => {
+  if (!userId || !caseId) return;
+
+  if (!flags.length) {
+    await authClient
+      .from("income_tax_training_cases")
+      .update({
+        status: "reviewed",
+        metadata: {
+          recheck_summary: summary ?? "Recheck passed",
+          recheck_flags_count: 0,
+          rechecked_at: new Date().toISOString(),
+        },
+      })
+      .eq("id", caseId)
+      .eq("user_id", userId);
+    return;
+  }
+
+  const rows = flags.map((f) => ({
+    case_id: caseId,
+    severity: f.severity,
+    detector_source: f.source === "ai" ? "ai" : "rule",
+    issue_text: f.issue,
+    suggested_fix: f.fix,
+  }));
+
+  const { error } = await authClient.from("income_tax_training_issues").insert(rows);
+  if (error) {
+    console.error("Income-tax recheck issue capture failed:", error.message);
+  }
+
+  await authClient
+    .from("income_tax_training_cases")
+    .update({
+      status: "reviewed",
+      metadata: {
+        recheck_summary: summary ?? "Recheck completed",
+        recheck_flags_count: flags.length,
+        rechecked_at: new Date().toISOString(),
+      },
+    })
+    .eq("id", caseId)
+    .eq("user_id", userId);
+};
+
+const captureRbiTrainingCase = async ({
+  authClient,
+  userId,
+  companyId,
+  draftRunId,
+  noticeClass,
+  noticeDetails,
+  generatedDraft,
+  qaPayload,
+  companyName,
+  industry,
+  draftMode,
+  previousCaseId,
+}: {
+  authClient: any;
+  userId: string | null;
+  companyId?: string | null;
+  draftRunId?: string | null;
+  noticeClass: string;
+  noticeDetails?: string | null;
+  generatedDraft: string;
+  qaPayload?: unknown;
+  companyName?: string | null;
+  industry?: string | null;
+  draftMode?: string | null;
+  previousCaseId?: string | null;
+}): Promise<string | null> => {
+  if (!userId || !generatedDraft?.trim()) return null;
+
+  const payload = {
+    draft_run_id: draftRunId ?? null,
+    user_id: userId,
+    company_id: companyId ?? null,
+    notice_class: noticeClass || "rbi-general",
+    notice_snapshot: (noticeDetails || "Notice details not provided.").slice(0, 16000),
+    generated_draft: generatedDraft.slice(0, 120000),
+    filing_score: typeof (qaPayload as any)?.filing_score === "number" ? (qaPayload as any).filing_score : null,
+    risk_band: (qaPayload as any)?.risk_band ?? null,
+    qa_payload: qaPayload ?? null,
+    metadata: {
+      source_operation: "draft",
+      company_name: companyName ?? null,
+      industry: industry ?? null,
+      draft_mode: draftMode ?? null,
+      captured_at: new Date().toISOString(),
+    },
+  };
+
+  if (previousCaseId) {
+    const { data, error } = await authClient
+      .from("rbi_training_cases")
+      .update(payload)
+      .eq("id", previousCaseId)
+      .eq("user_id", userId)
+      .select("id")
+      .maybeSingle();
+    if (!error && data?.id) return data.id as string;
+  }
+
+  const { data, error } = await authClient
+    .from("rbi_training_cases")
+    .insert(payload)
+    .select("id")
+    .maybeSingle();
+  if (error) {
+    console.error("RBI training capture failed:", error.message);
+    return null;
+  }
+  return (data?.id as string) ?? null;
+};
+
+const captureRbiRecheckIssues = async ({
+  authClient,
+  userId,
+  caseId,
+  flags,
+  summary,
+}: {
+  authClient: any;
+  userId: string | null;
+  caseId?: string | null;
+  flags: RecheckFlag[];
+  summary?: string;
+}) => {
+  if (!userId || !caseId) return;
+
+  if (!flags.length) {
+    await authClient
+      .from("rbi_training_cases")
+      .update({
+        status: "reviewed",
+        metadata: {
+          recheck_summary: summary ?? "Recheck passed",
+          recheck_flags_count: 0,
+          rechecked_at: new Date().toISOString(),
+        },
+      })
+      .eq("id", caseId)
+      .eq("user_id", userId);
+    return;
+  }
+
+  const rows = flags.map((f) => ({
+    case_id: caseId,
+    severity: f.severity,
+    detector_source: f.source === "ai" ? "ai" : "rule",
+    issue_text: f.issue,
+    suggested_fix: f.fix,
+  }));
+
+  const { error } = await authClient.from("rbi_training_issues").insert(rows);
+  if (error) {
+    console.error("RBI recheck issue capture failed:", error.message);
+  }
+
+  await authClient
+    .from("rbi_training_cases")
+    .update({
+      status: "reviewed",
+      metadata: {
+        recheck_summary: summary ?? "Recheck completed",
+        recheck_flags_count: flags.length,
+        rechecked_at: new Date().toISOString(),
+      },
+    })
+    .eq("id", caseId)
+    .eq("user_id", userId);
+};
+
 const normalizeSimilarityText = (input: string) =>
   (input || "")
     .toLowerCase()
@@ -1067,6 +1573,132 @@ const detectGstRecheckFlags = (
   return flags;
 };
 
+const detectIncomeTaxRecheckFlags = (
+  draft: string,
+  noticeDetails: string,
+): RecheckFlag[] => {
+  const flags: RecheckFlag[] = [];
+  const addFlag = (condition: boolean, severity: RecheckFlag["severity"], issue: string, fix: string) => {
+    if (condition) flags.push({ severity, issue, fix, source: "rule" });
+  };
+
+  const hasIssueMatrix = /issue[-\s]*wise|addition\/disallowance matrix|para[-\s]*wise rebuttal/i.test(draft)
+    || /\|\s*(Issue|Addition|Disallowance)\s*\|\s*(AO\/Department Position|Department Position)\s*\|\s*(Assessee Rebuttal|Noticee Rebuttal)\s*\|/i.test(draft);
+  const hasComputation = /tax effect|addition amount|accepted\s*\|\s*disputed|computation|reconciliation/i.test(draft)
+    && /\|\s*[-:]+\s*\|\s*[-:]+\s*\|/.test(draft);
+  const hasIncomeTaxContext = /\b143\(?2\)?\b|\b147\b|\b148\b|\b139\b|\b40\(a\)\(ia\)\b|\b201\b|\b270a\b|\b69a?\b|\bassessee\b|\bao\b/i.test(draft);
+
+  addFlag(
+    !hasIssueMatrix,
+    "high",
+    "Income-tax issue-wise rebuttal matrix is missing.",
+    "Add matrix: Issue/Addition | AO Position | Assessee Rebuttal | Evidence | Relief Sought.",
+  );
+  addFlag(
+    !hasComputation,
+    "high",
+    "Income-tax computation/tax-effect table is missing.",
+    "Add accepted vs disputed computation table with addition amount, tax effect, and basis of dispute.",
+  );
+  addFlag(
+    !hasIncomeTaxContext,
+    "medium",
+    "Income-tax statutory context is weak or missing.",
+    "Add invoked section anchors (e.g., 143(2)/147/148/201/40(a)(ia)/270A) as applicable from notice.",
+  );
+  addFlag(
+    /\bwaive\b[^.\n]{0,80}\bpenalt/i.test(draft) || /\babsolve\b/i.test(draft),
+    "medium",
+    "Risky prayer wording detected (waive/absolve).",
+    "Use calibrated prayer wording: drop or reduce unsustainable additions/penalty based on facts and law.",
+  );
+  addFlag(
+    /\[(insert|to be filled)[^\]]*\]/i.test(draft),
+    "medium",
+    "Unresolved placeholders remain in income-tax draft.",
+    "Replace remaining placeholders with notice-specific facts before filing.",
+  );
+
+  const dinOrRfn = noticeDetails.match(/\b(?:DIN|RFN)\s*[:\-]?\s*([A-Z0-9\/\-.]+)/i)?.[1]
+    || noticeDetails.match(/\b(?:Notice\s*No\.?|Ref\.?\s*No\.?)\s*[:\-]?\s*([A-Z0-9\/\-.]+)/i)?.[1];
+  if (dinOrRfn) {
+    addFlag(
+      !new RegExp(dinOrRfn.replace(/[.*+?^${}()|[\]\\]/g, "\\$&"), "i").test(draft),
+      "low",
+      "Income-tax notice reference/DIN is not reflected in draft metadata.",
+      "Insert exact Notice reference/DIN/RFN in heading or metadata block.",
+    );
+  }
+
+  return flags;
+};
+
+const detectRbiRecheckFlags = (
+  draft: string,
+  noticeDetails: string,
+): RecheckFlag[] => {
+  const flags: RecheckFlag[] = [];
+  const addFlag = (condition: boolean, severity: RecheckFlag["severity"], issue: string, fix: string) => {
+    if (condition) flags.push({ severity, issue, fix, source: "rule" });
+  };
+
+  const hasTimelineTable = /timeline|chronology/i.test(draft)
+    && /\|\s*[-:]+\s*\|\s*[-:]+\s*\|/.test(draft);
+  const hasRegulationAnchors = /\bfema\b|\brbi\b|regulation\s*\d+|master direction|authorized dealer/i.test(draft);
+  const hasComputation = /accepted\s*\|\s*disputed|computation|exposure|lsf|penalty/i.test(draft)
+    && /\|\s*[-:]+\s*\|\s*[-:]+\s*\|/.test(draft);
+  const hasEvidenceMapping = /annexure|ad bank|utr|board resolution|filing acknowledgement|return acknowledgement/i.test(draft);
+
+  addFlag(
+    !hasTimelineTable,
+    "high",
+    "RBI/FEMA chronology timeline table is missing.",
+    "Add a timeline table with due date vs actual filing/action date and reference IDs.",
+  );
+  addFlag(
+    !hasRegulationAnchors,
+    "high",
+    "RBI/FEMA regulation anchors are weak or missing.",
+    "Explicitly map allegations to invoked FEMA/RBI regulations or circulars from notice.",
+  );
+  addFlag(
+    !hasComputation,
+    "medium",
+    "Exposure/penalty/LSF computation challenge table is missing.",
+    "Add accepted vs disputed exposure table with penalty/LSF basis and recomputation ask.",
+  );
+  addFlag(
+    !hasEvidenceMapping,
+    "medium",
+    "Evidence mapping is weak for RBI draft.",
+    "Add annexure mapping with AD bank records, acknowledgements, and board/control evidence.",
+  );
+  addFlag(
+    /\bwaive\b[^.\n]{0,80}\bpenalt/i.test(draft) || /\babsolve\b/i.test(draft),
+    "medium",
+    "Risky prayer wording detected (waive/absolve).",
+    "Use calibrated prayer wording: drop or reduce unsustainable penalty based on facts and proportionality.",
+  );
+  addFlag(
+    /\[(insert|to be filled)[^\]]*\]/i.test(draft),
+    "medium",
+    "Unresolved placeholders remain in RBI draft.",
+    "Replace placeholders with notice-specific facts before final filing.",
+  );
+
+  const refNo = noticeDetails.match(/\b(?:DIN|RFN|Ref\.?\s*No\.?|Reference\s*No\.?)\s*[:\-]?\s*([A-Z0-9\/\-.]+)/i)?.[1];
+  if (refNo) {
+    addFlag(
+      !new RegExp(refNo.replace(/[.*+?^${}()|[\]\\]/g, "\\$&"), "i").test(draft),
+      "low",
+      "RBI notice reference/DIN/RFN is not reflected in draft metadata.",
+      "Insert exact notice reference in heading/metadata block.",
+    );
+  }
+
+  return flags;
+};
+
 const isNoPlaceholderGatePassed = (content: string, documentType: string) => {
   if (documentType === "mca-notice") {
     if (!hasPlaceholderMarkers(content)) return true;
@@ -1311,6 +1943,98 @@ const enforceGstDraftMinimumStructure = (draft: string) => {
   return enforceCrossRegulatorySafetyLanguage(fixed, "gst-show-cause");
 };
 
+const buildIncomeTaxFallbackIssueMatrix = () => `| Issue / Addition | AO / Department Position | Assessee Rebuttal | Evidence | Relief Sought |
+|---|---|---|---|---|
+| Disallowance under invoked section | Addition proposed in assessment/show-cause | Addition is factually and legally unsustainable after record-level review | Annexure A/B | Delete addition |
+| Reconciliation / mismatch observation | Mismatch treated as adverse inference | Reconciliation explains timing/documentary variance with no concealment | Annexure C | Restrict or drop adjustment |
+| Penalty initiation | Penalty proceedings proposed | Penalty cannot survive where foundational addition is disputed/unsupported | Annexure D | Drop or reduce penalty |`;
+
+const buildIncomeTaxFallbackComputationTable = () => `| Particulars | Department Figure | Accepted | Disputed | Basis of Dispute |
+|---|---:|---:|---:|---|
+| Proposed addition/disallowance | [To be filled by CA/Lawyer] | [To be filled by CA/Lawyer] | [To be filled by CA/Lawyer] | Documentary and legal rebuttal |
+| Tax effect | [To be filled by CA/Lawyer] | [To be filled by CA/Lawyer] | [To be filled by CA/Lawyer] | Requires recomputation after evidence review |
+| Penalty exposure | [To be filled by CA/Lawyer] | [To be filled by CA/Lawyer] | [To be filled by CA/Lawyer] | Contingent on sustainable principal addition |`;
+
+const enforceIncomeTaxDraftMinimumStructure = (draft: string) => {
+  let fixed = enforceCrossRegulatorySafetyLanguage(draft, "income-tax-response");
+
+  if (!/without prejudice/i.test(fixed)) {
+    fixed = `Without prejudice to all rights and remedies, the Noticee/Assessee submits as under.\n\n${fixed}`;
+  }
+
+  const hasIssueMatrix = /issue[-\s]*wise|addition\/disallowance matrix|para[-\s]*wise rebuttal/i.test(fixed)
+    || /\|\s*(Issue|Addition|Disallowance)\s*\|\s*(AO\/Department Position|Department Position)\s*\|\s*(Assessee Rebuttal|Noticee Rebuttal)\s*\|/i.test(fixed);
+  if (!hasIssueMatrix) {
+    fixed += `\n\n### Issue-Wise Rebuttal Matrix\n${buildIncomeTaxFallbackIssueMatrix()}`;
+  }
+
+  const hasComputation = /tax effect|addition amount|accepted\s*\|\s*disputed|computation|reconciliation/i.test(fixed)
+    && /\|\s*[-:]+\s*\|\s*[-:]+\s*\|/.test(fixed);
+  if (!hasComputation) {
+    fixed += `\n\n### Computation / Tax-Effect Reconciliation\n${buildIncomeTaxFallbackComputationTable()}`;
+  }
+
+  if (!/prayer|relief/i.test(fixed)) {
+    fixed += `\n\n### Prayer\n1. Delete or substantially reduce unsustainable additions/disallowances.\n2. Drop or reduce consequential interest/penalty to the extent not legally sustainable.\n3. Grant personal hearing and permit additional documentary submissions.\n4. Pass any other order deemed fit in the interest of justice.`;
+  }
+
+  if (!/personal hearing|hearing/i.test(fixed)) {
+    fixed += `\n\n### Hearing Request\nThe Assessee requests an opportunity of personal hearing before any adverse order is passed.`;
+  }
+
+  fixed = removeDuplicateMarkdownSection(fixed, "Issue-Wise Rebuttal Matrix");
+  fixed = removeDuplicateMarkdownSection(fixed, "Computation / Tax-Effect Reconciliation");
+  fixed = removeDuplicateMarkdownSection(fixed, "Prayer");
+  return enforceCrossRegulatorySafetyLanguage(fixed, "income-tax-response");
+};
+
+const buildRbiFallbackTimelineTable = () => `| Compliance Event | Invoked Regulation / Circular | Due/Event Date | Actual Filing/Action Date | Reference ID | Status |
+|---|---|---|---|---|---|
+| Primary reporting obligation | [To be filled by CA/Lawyer] | [To be filled by CA/Lawyer] | [To be filled by CA/Lawyer] | [To be filled by CA/Lawyer] | Rectified/Explained |
+| Follow-up corrective filing/action | [To be filled by CA/Lawyer] | [To be filled by CA/Lawyer] | [To be filled by CA/Lawyer] | [To be filled by CA/Lawyer] | Completed |`;
+
+const buildRbiFallbackExposureTable = () => `| Particulars | Department Figure | Accepted | Disputed | Basis of Dispute |
+|---|---:|---:|---:|---|
+| Principal contravention/exposure | [To be filled by CA/Lawyer] | [To be filled by CA/Lawyer] | [To be filled by CA/Lawyer] | Regulation-wise factual/legal rebuttal |
+| LSF / monetary implication | [To be filled by CA/Lawyer] | [To be filled by CA/Lawyer] | [To be filled by CA/Lawyer] | Challenge on computation/proportionality |
+| Penalty/compounding implication | [To be filled by CA/Lawyer] | [To be filled by CA/Lawyer] | [To be filled by CA/Lawyer] | Depends on sustainable primary finding |`;
+
+const enforceRbiDraftMinimumStructure = (draft: string) => {
+  let fixed = enforceCrossRegulatorySafetyLanguage(draft, "rbi-filing");
+
+  if (!/without prejudice/i.test(fixed)) {
+    fixed = `Without prejudice to all rights and remedies, the Noticee submits as under.\n\n${fixed}`;
+  }
+
+  const hasTimeline = /timeline|chronology/i.test(fixed) && /\|\s*[-:]+\s*\|\s*[-:]+\s*\|/.test(fixed);
+  if (!hasTimeline) {
+    fixed += `\n\n### Timeline / Chronology\n${buildRbiFallbackTimelineTable()}`;
+  }
+
+  const hasExposureTable = /accepted\s*\|\s*disputed|lsf|exposure|penalty|computation/i.test(fixed)
+    && /\|\s*[-:]+\s*\|\s*[-:]+\s*\|/.test(fixed);
+  if (!hasExposureTable) {
+    fixed += `\n\n### Exposure / Penalty Reconciliation\n${buildRbiFallbackExposureTable()}`;
+  }
+
+  if (!/annexure|evidence/i.test(fixed)) {
+    fixed += `\n\n### Evidence & Annexure Mapping\n1. **Annexure A:** Notice set and reference trail.\n2. **Annexure B:** AD bank records / transaction trail.\n3. **Annexure C:** Filing acknowledgements and correction records.\n4. **Annexure D:** Internal control and board/authorization records.`;
+  }
+
+  if (!/prayer|relief/i.test(fixed)) {
+    fixed += `\n\n### Prayer\n1. Drop or reduce unsustainable allegations after full record reconciliation.\n2. Drop or reduce penalty/LSF implications to the extent not legally sustainable.\n3. Grant personal hearing and permit additional documentary submissions.\n4. Pass any other order deemed fit in the interest of justice.`;
+  }
+
+  if (!/personal hearing|hearing/i.test(fixed)) {
+    fixed += `\n\n### Hearing Request\nThe Noticee requests an opportunity of personal hearing before any adverse order is passed.`;
+  }
+
+  fixed = removeDuplicateMarkdownSection(fixed, "Timeline / Chronology");
+  fixed = removeDuplicateMarkdownSection(fixed, "Exposure / Penalty Reconciliation");
+  fixed = removeDuplicateMarkdownSection(fixed, "Prayer");
+  return enforceCrossRegulatorySafetyLanguage(fixed, "rbi-filing");
+};
+
 const enforceMcaDraftMinimumStructure = (
   draft: string,
   mcaReplyType: McaReplyType,
@@ -1497,6 +2221,8 @@ serve(async (req) => {
       evidenceContext,
       mcaReplyTypeOverride,
       gstReplyTypeOverride,
+      incomeTaxReplyTypeOverride,
+      rbiReplyTypeOverride,
       advancedMode = false,
       strictValidation = false,
       stream = false,
@@ -1504,9 +2230,20 @@ serve(async (req) => {
 
     const normalizedOperation = typeof operation === "string" ? operation.trim().toLowerCase() : "draft";
     const aiConfig = resolveAIConfig();
-    const normalizedGstReplyType = typeof gstReplyTypeOverride === "string" && gstReplyTypeOverride.trim()
-      ? gstReplyTypeOverride.trim().toLowerCase()
+    const normalizedGstReplyType: GstReplyType | null =
+      typeof gstReplyTypeOverride === "string" && gstReplyTypeOverride.trim()
+        ? normalizeGstReplyType(gstReplyTypeOverride)
+        : null;
+    const inferredGstReplyType = inferGstReplyType(noticeDetails, null);
+    const effectiveGstReplyType: GstReplyType = normalizedGstReplyType ?? inferredGstReplyType;
+    const normalizedIncomeTaxReplyType = typeof incomeTaxReplyTypeOverride === "string" && incomeTaxReplyTypeOverride.trim()
+      ? (normalizeIncomeTaxReplyType(incomeTaxReplyTypeOverride) ?? "income-tax-general")
       : null;
+    const normalizedRbiReplyType = typeof rbiReplyTypeOverride === "string" && rbiReplyTypeOverride.trim()
+      ? normalizeRbiReplyType(rbiReplyTypeOverride)
+      : null;
+    const inferredRbiReplyType = inferRbiReplyType(noticeDetails, null);
+    const effectiveRbiReplyType: RbiReplyType = normalizedRbiReplyType ?? inferredRbiReplyType;
 
     if (normalizedOperation === "recheck") {
       if (!draftContent || typeof draftContent !== "string" || draftContent.trim().length < 40) {
@@ -1519,11 +2256,21 @@ serve(async (req) => {
       const mcaReplyType: McaReplyType = documentType === "mca-notice"
         ? (normalizeMcaReplyType(mcaReplyTypeOverride) ?? inferMcaReplyType(noticeDetails, null))
         : "general-mca";
+      const incomeTaxReplyType: IncomeTaxReplyType = documentType === "income-tax-response"
+        ? (normalizeIncomeTaxReplyType(incomeTaxReplyTypeOverride) ?? inferIncomeTaxReplyType(noticeDetails, null))
+        : "income-tax-general";
+      const rbiReplyType: RbiReplyType = documentType === "rbi-filing"
+        ? (normalizeRbiReplyType(rbiReplyTypeOverride) ?? inferRbiReplyType(noticeDetails, null))
+        : "rbi-general";
 
       const ruleFlags = documentType === "mca-notice"
         ? detectMcaRecheckFlags(draftContent, noticeDetails || "", mcaReplyType)
         : documentType === "gst-show-cause"
           ? detectGstRecheckFlags(draftContent, noticeDetails || "")
+          : documentType === "income-tax-response"
+            ? detectIncomeTaxRecheckFlags(draftContent, noticeDetails || "")
+          : documentType === "rbi-filing"
+            ? detectRbiRecheckFlags(draftContent, noticeDetails || "")
           : [];
 
       const recheckSystemPrompt = `You are a legal QA reviewer for Indian regulatory draft filings.
@@ -1547,6 +2294,9 @@ Rules:
       const recheckUserPrompt = `Recheck this draft for correctness and filing-readiness.
 Document Type: ${documentType}
 MCA Reply Type: ${mcaReplyType}
+Income-tax Reply Type: ${incomeTaxReplyType}
+GST Reply Type: ${effectiveGstReplyType}
+RBI Reply Type: ${rbiReplyType}
 
 NOTICE/ORDER DETAILS:
 ${noticeDetails || "Not provided"}
@@ -1614,6 +2364,22 @@ ${evidenceContext || "None provided"}`;
           flags: dedup,
           summary,
         });
+      } else if (documentType === "income-tax-response") {
+        await captureIncomeTaxRecheckIssues({
+          authClient,
+          userId,
+          caseId: typeof trainingCaseId === "string" ? trainingCaseId : null,
+          flags: dedup,
+          summary,
+        });
+      } else if (documentType === "rbi-filing") {
+        await captureRbiRecheckIssues({
+          authClient,
+          userId,
+          caseId: typeof trainingCaseId === "string" ? trainingCaseId : null,
+          flags: dedup,
+          summary,
+        });
       }
 
       return new Response(JSON.stringify({
@@ -1629,6 +2395,15 @@ ${evidenceContext || "None provided"}`;
     if (normalizedOperation === "notice-details") {
       const mcaReplyType: McaReplyType | null = documentType === "mca-notice"
         ? (normalizeMcaReplyType(mcaReplyTypeOverride) ?? inferMcaReplyType(noticeDetails, null))
+        : null;
+      const incomeTaxReplyType: IncomeTaxReplyType | null = documentType === "income-tax-response"
+        ? (normalizeIncomeTaxReplyType(incomeTaxReplyTypeOverride) ?? inferIncomeTaxReplyType(noticeDetails, null))
+        : null;
+      const gstReplyType: GstReplyType | null = documentType === "gst-show-cause"
+        ? (normalizeGstReplyType(gstReplyTypeOverride) ?? inferGstReplyType(noticeDetails, null))
+        : null;
+      const rbiReplyType: RbiReplyType | null = documentType === "rbi-filing"
+        ? (normalizeRbiReplyType(rbiReplyTypeOverride) ?? inferRbiReplyType(noticeDetails, null))
         : null;
       const mcaKnowledge = mcaReplyType ? getMcaKnowledgeBlock(mcaReplyType) : "";
       const mcaChecklist = mcaReplyType ? getMcaPendingDataChecklist(mcaReplyType).map((item) => `- ${item}`).join("\n") : "";
@@ -1649,6 +2424,9 @@ ${mcaReplyType ? `\nMCA KNOWLEDGE CONTEXT:\n${mcaKnowledge}\n\nMCA DATA CHECKLIS
 - Company: ${companyName}
 - Industry: ${industry || "Not specified"}
 ${documentType === "mca-notice" && mcaReplyType ? `- MCA Reply Type: ${mcaReplyType}` : ""}
+${documentType === "income-tax-response" && incomeTaxReplyType ? `- Income-tax Reply Type: ${incomeTaxReplyType}` : ""}
+${documentType === "gst-show-cause" && gstReplyType ? `- GST Reply Type: ${gstReplyType}` : ""}
+${documentType === "rbi-filing" && rbiReplyType ? `- RBI Reply Type: ${rbiReplyType}` : ""}
 
 Use this context if provided:
 ${context || "No extra context provided."}
@@ -1692,6 +2470,8 @@ ${noticeDetails || "None provided."}`;
           companyName,
           industry,
           mcaReplyType,
+          incomeTaxReplyType,
+          rbiReplyType,
           generatedAt: new Date().toISOString(),
         },
       }), {
@@ -1785,6 +2565,12 @@ If notice data is missing, list specific missing items in critical_missing_field
     const mcaReplyType: McaReplyType | null = documentType === "mca-notice"
       ? (normalizeMcaReplyType(mcaReplyTypeOverride) ?? inferMcaReplyType(noticeDetails, extractedNotice))
       : null;
+    const incomeTaxReplyType: IncomeTaxReplyType | null = documentType === "income-tax-response"
+      ? (normalizeIncomeTaxReplyType(incomeTaxReplyTypeOverride) ?? inferIncomeTaxReplyType(noticeDetails, extractedNotice))
+      : null;
+    const rbiReplyType: RbiReplyType | null = documentType === "rbi-filing"
+      ? (normalizeRbiReplyType(rbiReplyTypeOverride) ?? inferRbiReplyType(noticeDetails, extractedNotice))
+      : null;
     const extractedNoticeDate = extractNoticeDateFromText(noticeDetails);
     const mcaPendingChecklistText = mcaReplyType
       ? getMcaPendingDataChecklist(mcaReplyType).map((item) => `- ${item}`).join("\n")
@@ -1825,6 +2611,8 @@ COMPANY CONTEXT
 - Industry: ${industry || "Not specified"}
 - Document Type: ${documentType}
 ${documentType === "mca-notice" && mcaReplyType ? `- MCA Reply Type: ${mcaReplyType}` : ""}
+${documentType === "income-tax-response" && incomeTaxReplyType ? `- Income-tax Reply Type: ${incomeTaxReplyType}` : ""}
+${documentType === "rbi-filing" && rbiReplyType ? `- RBI Reply Type: ${rbiReplyType}` : ""}
 
 ${extractedNotice ? `EXTRACTED NOTICE INTELLIGENCE (use as primary structure source):\n${JSON.stringify(extractedNotice, null, 2)}` : ""}
 
@@ -1845,6 +2633,42 @@ Mandatory structure:
 8) Annexure index
 9) Layered prayer with hearing request
 10) Sign-off
+Avoid unsupported case law. Use controlled placeholders only where unavoidable.
+Dataset policy:
+- Use prior dataset patterns only for structure and quality patterns.
+- Never reproduce long sentence blocks or paragraph chunks from prior stored drafts.
+- The output must be freshly written and specific to the current notice facts.`
+      : documentType === "income-tax-response"
+        ? `Generate a final adjudication-ready Income-tax response for ${companyName}${industry ? ` (${industry} sector)` : ""}.
+Detected income-tax notice class: ${incomeTaxReplyType ?? "income-tax-general"}.
+Mandatory structure:
+1) Heading + jurisdiction/office metadata from notice
+2) Notice metadata (notice no, date, DIN/RFN/ITBA ref, AY/FY/period)
+3) Preliminary submissions
+4) Issue-wise / addition-wise rebuttal matrix
+5) Section-wise legal submissions under invoked Income-tax provisions
+6) Computation / tax-effect challenge table (accepted vs disputed)
+7) Annexure mapping per issue
+8) Layered prayer with hearing request
+9) Sign-off
+Avoid unsupported case law. Use controlled placeholders only where unavoidable.
+Dataset policy:
+- Use prior dataset patterns only for structure and quality patterns.
+- Never reproduce long sentence blocks or paragraph chunks from prior stored drafts.
+- The output must be freshly written and specific to the current notice facts.`
+      : documentType === "rbi-filing"
+        ? `Generate a final adjudication-ready RBI/FEMA response for ${companyName}${industry ? ` (${industry} sector)` : ""}.
+Detected RBI notice class: ${rbiReplyType ?? "rbi-general"}.
+Mandatory structure:
+1) Heading + authority/office metadata from notice
+2) Notice metadata (reference no, DIN/RFN if available, date, period)
+3) Preliminary submissions
+4) Regulation-wise legal submissions mapped to notice allegations
+5) Timeline/chronology table (due/event vs actual action date + reference IDs)
+6) Exposure / penalty / LSF accepted-vs-disputed table
+7) Evidence and annexure mapping (AD bank, acknowledgements, board/control records)
+8) Layered prayer with personal hearing request
+9) Sign-off
 Avoid unsupported case law. Use controlled placeholders only where unavoidable.
 Dataset policy:
 - Use prior dataset patterns only for structure and quality patterns.
@@ -1891,6 +2715,10 @@ Dataset policy:
       let draftContent = enforceUniversalDraftLanguage(data.choices?.[0]?.message?.content || "");
       if (documentType === "gst-show-cause") {
         draftContent = enforceGstDraftMinimumStructure(draftContent);
+      } else if (documentType === "income-tax-response") {
+        draftContent = enforceIncomeTaxDraftMinimumStructure(draftContent);
+      } else if (documentType === "rbi-filing") {
+        draftContent = enforceRbiDraftMinimumStructure(draftContent);
       } else {
         draftContent = enforceCrossRegulatorySafetyLanguage(draftContent, documentType);
       }
@@ -1902,6 +2730,8 @@ Dataset policy:
           draftMode,
           industry,
           mcaReplyType,
+          incomeTaxReplyType,
+          rbiReplyType: effectiveRbiReplyType,
           advancedMode,
           generatedAt: new Date().toISOString(),
           version: "2.0",
@@ -2162,6 +2992,10 @@ Checklist:
     }
     if (documentType === "gst-show-cause") {
       finalDraft = enforceGstDraftMinimumStructure(finalDraft);
+    } else if (documentType === "income-tax-response") {
+      finalDraft = enforceIncomeTaxDraftMinimumStructure(finalDraft);
+    } else if (documentType === "rbi-filing") {
+      finalDraft = enforceRbiDraftMinimumStructure(finalDraft);
     } else if (documentType !== "mca-notice") {
       finalDraft = enforceCrossRegulatorySafetyLanguage(finalDraft, documentType);
     } else {
@@ -2299,7 +3133,37 @@ Schema:
         userId,
         companyId: typeof companyId === "string" ? companyId : null,
         draftRunId: typeof draftRunId === "string" ? draftRunId : null,
-        noticeClass: normalizedGstReplyType || "gst-show-cause",
+        noticeClass: effectiveGstReplyType,
+        noticeDetails: noticeDetails ?? null,
+        generatedDraft: finalDraft,
+        qaPayload: finalQaPayload,
+        companyName,
+        industry,
+        draftMode,
+        previousCaseId: typeof trainingCaseId === "string" ? trainingCaseId : null,
+      });
+    } else if (documentType === "income-tax-response") {
+      capturedTrainingCaseId = await captureIncomeTaxTrainingCase({
+        authClient,
+        userId,
+        companyId: typeof companyId === "string" ? companyId : null,
+        draftRunId: typeof draftRunId === "string" ? draftRunId : null,
+        noticeClass: incomeTaxReplyType ?? normalizedIncomeTaxReplyType ?? "income-tax-general",
+        noticeDetails: noticeDetails ?? null,
+        generatedDraft: finalDraft,
+        qaPayload: finalQaPayload,
+        companyName,
+        industry,
+        draftMode,
+        previousCaseId: typeof trainingCaseId === "string" ? trainingCaseId : null,
+      });
+    } else if (documentType === "rbi-filing") {
+      capturedTrainingCaseId = await captureRbiTrainingCase({
+        authClient,
+        userId,
+        companyId: typeof companyId === "string" ? companyId : null,
+        draftRunId: typeof draftRunId === "string" ? draftRunId : null,
+        noticeClass: rbiReplyType ?? normalizedRbiReplyType ?? effectiveRbiReplyType ?? "rbi-general",
         noticeDetails: noticeDetails ?? null,
         generatedDraft: finalDraft,
         qaPayload: finalQaPayload,
@@ -2318,7 +3182,9 @@ Schema:
         draftMode,
         industry,
         mcaReplyType,
-        gstReplyType: normalizedGstReplyType,
+        gstReplyType: effectiveGstReplyType,
+        incomeTaxReplyType: incomeTaxReplyType ?? normalizedIncomeTaxReplyType,
+        rbiReplyType: rbiReplyType ?? normalizedRbiReplyType ?? effectiveRbiReplyType,
         advancedMode,
         userId,
         trainingCaseId: capturedTrainingCaseId,
