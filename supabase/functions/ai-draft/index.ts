@@ -574,25 +574,43 @@ const sanitizeNoticeDetailsInput = (raw: string, fallback: string) => {
 
 type AIProvider = "lovable" | "openai";
 
-const resolveAIConfig = (): { provider: AIProvider; apiKey: string; model: string; endpoint: string } => {
+const resolveAIConfig = (
+  preferredProvider?: AIProvider,
+): { provider: AIProvider; apiKey: string; model: string; endpoint: string } => {
   const lovableApiKey = Deno.env.get("LOVABLE_API_KEY");
-  if (lovableApiKey) {
-    return {
-      provider: "lovable",
+  const openAiApiKey = Deno.env.get("OPENAI_API_KEY");
+
+  const lovableConfig = lovableApiKey
+    ? {
+      provider: "lovable" as const,
       apiKey: lovableApiKey,
       model: Deno.env.get("LOVABLE_MODEL") ?? "google/gemini-3-flash-preview",
       endpoint: "https://ai.gateway.lovable.dev/v1/chat/completions",
-    };
-  }
+    }
+    : null;
 
-  const openAiApiKey = Deno.env.get("OPENAI_API_KEY");
-  if (openAiApiKey) {
-    return {
-      provider: "openai",
+  const openAiConfig = openAiApiKey
+    ? {
+      provider: "openai" as const,
       apiKey: openAiApiKey,
       model: Deno.env.get("OPENAI_MODEL") ?? "gpt-4o-mini",
       endpoint: "https://api.openai.com/v1/chat/completions",
-    };
+    }
+    : null;
+
+  // Preferred routing:
+  // - notice-details intake -> Lovable first
+  // - draft/recheck/fix flows -> OpenAI first
+  if (preferredProvider === "lovable") {
+    if (lovableConfig) return lovableConfig;
+    if (openAiConfig) return openAiConfig;
+  } else if (preferredProvider === "openai") {
+    if (openAiConfig) return openAiConfig;
+    if (lovableConfig) return lovableConfig;
+  } else {
+    // Backward-compatible default: Lovable first, then OpenAI
+    if (lovableConfig) return lovableConfig;
+    if (openAiConfig) return openAiConfig;
   }
 
   throw new Error("No AI provider key configured. Set LOVABLE_API_KEY or OPENAI_API_KEY.");
@@ -2229,7 +2247,7 @@ serve(async (req) => {
     } = await req.json();
 
     const normalizedOperation = typeof operation === "string" ? operation.trim().toLowerCase() : "draft";
-    const aiConfig = resolveAIConfig();
+    const aiConfig = resolveAIConfig(normalizedOperation === "notice-details" ? "lovable" : "openai");
     const normalizedGstReplyType: GstReplyType | null =
       typeof gstReplyTypeOverride === "string" && gstReplyTypeOverride.trim()
         ? normalizeGstReplyType(gstReplyTypeOverride)
@@ -2386,6 +2404,7 @@ ${evidenceContext || "None provided"}`;
         ok: dedup.length === 0,
         flags: dedup,
         summary,
+        aiProvider: aiConfig.provider,
         checkedAt: new Date().toISOString(),
       }), {
         headers: { ...corsHeaders, "Content-Type": "application/json" },
@@ -2466,6 +2485,7 @@ ${noticeDetails || "None provided."}`;
         noticeDetails: generatedNoticeDetails,
         metadata: {
           operation: "notice-details",
+          aiProvider: aiConfig.provider,
           documentType,
           companyName,
           industry,
@@ -2725,6 +2745,7 @@ Dataset policy:
       return new Response(JSON.stringify({
         draft: draftContent,
         metadata: {
+          aiProvider: aiConfig.provider,
           documentType,
           companyName,
           draftMode,
@@ -3177,6 +3198,7 @@ Schema:
     return new Response(JSON.stringify({
       draft: finalDraft,
       metadata: {
+        aiProvider: aiConfig.provider,
         documentType,
         companyName,
         draftMode,
