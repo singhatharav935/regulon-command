@@ -167,12 +167,33 @@ const sebiReplyTypeOptions = [
   { id: "auto", label: "Auto-detect from notice" },
   { id: "lodr-30-disclosure-delay", label: "LODR Regulation 30 Disclosure Delay" },
   { id: "lodr-33-financial-results-delay", label: "LODR Regulation 33 Financial Results Delay" },
+  { id: "lodr-13-investor-grievance", label: "LODR Regulation 13 Investor Grievance" },
+  { id: "lodr-17-governance", label: "LODR Regulation 17 Corporate Governance" },
+  { id: "lodr-23-rpt", label: "LODR Regulation 23 Related Party Transactions" },
+  { id: "lodr-31-shareholding-pattern", label: "LODR Regulation 31 Shareholding Pattern" },
+  { id: "lodr-34-annual-report", label: "LODR Regulation 34 Annual Report" },
+  { id: "lodr-44-voting-results", label: "LODR Regulation 44 Voting Results" },
+  { id: "lodr-46-website-disclosure", label: "LODR Regulation 46 Website Disclosure" },
   { id: "pit-violation", label: "PIT Regulations Violation" },
+  { id: "pit-code-of-conduct", label: "PIT Code of Conduct / UPSI Controls" },
   { id: "sast-disclosure", label: "SAST Disclosure Violation" },
+  { id: "pfutp-market-manipulation", label: "PFUTP / Market Manipulation Allegation" },
+  { id: "icdr-disclosure-issue", label: "ICDR Disclosure / Issue Document Violation" },
   { id: "ia-research-analyst-compliance", label: "IA / Research Analyst Compliance" },
+  { id: "stock-broker-compliance", label: "Stock Broker Compliance" },
+  { id: "merchant-banker-compliance", label: "Merchant Banker Compliance" },
+  { id: "depository-participant-compliance", label: "Depository Participant Compliance" },
+  { id: "rta-compliance", label: "Registrar & Share Transfer Agent Compliance" },
+  { id: "credit-rating-agency-compliance", label: "Credit Rating Agency Compliance" },
   { id: "aif-pms-compliance", label: "AIF / PMS Compliance" },
+  { id: "mutual-fund-amc-compliance", label: "Mutual Fund / AMC Compliance" },
+  { id: "invit-reit-compliance", label: "InvIT / REIT Compliance" },
+  { id: "alternative-data-finfluencer-advisory", label: "Finfluencer / Advisory / Unregistered Activity" },
   { id: "icdr-takeover-issue", label: "ICDR / Takeover-related Issue" },
   { id: "mutual-fund-distributor-compliance", label: "Mutual Fund / Distributor Compliance" },
+  { id: "sebi-adjudication-ao", label: "SEBI Adjudication Officer Proceedings" },
+  { id: "sebi-settlement-proceedings", label: "SEBI Settlement Proceedings" },
+  { id: "sebi-summons-investigation", label: "SEBI Summons / Investigation Notice" },
   { id: "sebi-general", label: "General SEBI Compliance" },
 ];
 
@@ -272,12 +293,33 @@ const inferSebiReplyTypeFromNotice = (noticeText: string): string => {
   const corpus = (noticeText || "").toLowerCase();
   if (/\bregulation\s*30\b|\blodr\b|material event|disclosure delay/i.test(corpus)) return "lodr-30-disclosure-delay";
   if (/\bregulation\s*33\b|\bfinancial results\b|quarterly results|q[1-4]/i.test(corpus)) return "lodr-33-financial-results-delay";
+  if (/\bregulation\s*13\b|investor grievance|scores|complaint redressal/i.test(corpus)) return "lodr-13-investor-grievance";
+  if (/\bregulation\s*17\b|corporate governance|independent director|board composition/i.test(corpus)) return "lodr-17-governance";
+  if (/\bregulation\s*23\b|related party transaction|rpt/i.test(corpus)) return "lodr-23-rpt";
+  if (/\bregulation\s*31\b|shareholding pattern|promoter holding/i.test(corpus)) return "lodr-31-shareholding-pattern";
+  if (/\bregulation\s*34\b|annual report|business responsibility report|integrated report/i.test(corpus)) return "lodr-34-annual-report";
+  if (/\bregulation\s*44\b|voting results|e-voting/i.test(corpus)) return "lodr-44-voting-results";
+  if (/\bregulation\s*46\b|website disclosure|website compliance/i.test(corpus)) return "lodr-46-website-disclosure";
   if (/\bpit\b|insider trading|unpublished price sensitive information|upsi/i.test(corpus)) return "pit-violation";
+  if (/code of conduct|trading window closure|structured digital database|sdd/i.test(corpus)) return "pit-code-of-conduct";
   if (/\bsast\b|substantial acquisition|takeover disclosure|regulation\s*29/i.test(corpus)) return "sast-disclosure";
+  if (/\bpfutp\b|fraudulent and unfair trade|market manipulation|front running|circular trading/i.test(corpus)) return "pfutp-market-manipulation";
+  if (/\bicdr\b|issue document|prospectus|red herring|drhp|rhp/i.test(corpus)) return "icdr-disclosure-issue";
   if (/\binvestment adviser\b|\bresearch analyst\b|\bia regulations\b|\bra regulations\b/i.test(corpus)) return "ia-research-analyst-compliance";
+  if (/\bstock broker\b|broker regulations|client funds|margin reporting/i.test(corpus)) return "stock-broker-compliance";
+  if (/\bmerchant banker\b|mb regulations|due diligence certificate/i.test(corpus)) return "merchant-banker-compliance";
+  if (/\bdepository participant\b|\bdp regulations\b|demat account/i.test(corpus)) return "depository-participant-compliance";
+  if (/\bregistrar and share transfer|rta regulations|share transfer agent/i.test(corpus)) return "rta-compliance";
+  if (/\bcredit rating agency\b|\bcra regulations\b|rating rationale/i.test(corpus)) return "credit-rating-agency-compliance";
   if (/\baif\b|\bpms\b|portfolio management|alternative investment fund/i.test(corpus)) return "aif-pms-compliance";
+  if (/\bmutual fund\b|\bamc\b|scheme information document|sid|key information memorandum|kim/i.test(corpus)) return "mutual-fund-amc-compliance";
+  if (/\binvit\b|\breit\b|infrastructure investment trust|real estate investment trust/i.test(corpus)) return "invit-reit-compliance";
+  if (/finfluencer|unregistered adviser|unregistered analyst|digital advisory/i.test(corpus)) return "alternative-data-finfluencer-advisory";
   if (/\bicdr\b|issue of capital|preferential issue|rights issue|takeover/i.test(corpus)) return "icdr-takeover-issue";
   if (/\bmutual fund\b|distributor|arn|commission disclosure/i.test(corpus)) return "mutual-fund-distributor-compliance";
+  if (/adjudicating officer|ao proceedings|show cause under section 15/i.test(corpus)) return "sebi-adjudication-ao";
+  if (/settlement regulations|settlement application|chapter v/i.test(corpus)) return "sebi-settlement-proceedings";
+  if (/summons|investigation|section 11c|appearance before investigating authority/i.test(corpus)) return "sebi-summons-investigation";
   return "sebi-general";
 };
 
