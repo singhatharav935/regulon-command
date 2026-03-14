@@ -103,7 +103,7 @@ const RegulatorsSection = () => {
               whileInView={{ opacity: 1, y: 0 }}
               viewport={{ once: true }}
               transition={{ duration: 0.5, delay: index * 0.1 }}
-              className="h-[200px]"
+              className="h-[250px]"
               style={{ perspective: "1000px" }}
               onMouseEnter={() => handleMouseEnter(index)}
               onMouseLeave={() => handleMouseLeave(index)}
@@ -120,7 +120,7 @@ const RegulatorsSection = () => {
                 {/* Front */}
                 <div
                   className={cn(
-                    "absolute inset-0 w-full h-full glass-card-hover p-6 text-center",
+                    "absolute inset-0 w-full h-full glass-card-hover p-6 text-center overflow-hidden flex flex-col",
                     regulator.bgClass,
                     regulator.borderClass
                   )}
@@ -137,14 +137,14 @@ const RegulatorsSection = () => {
                     <regulator.icon className="w-7 h-7" style={{ color: `hsl(var(--regulator-${regulator.id.toLowerCase()}))` }} />
                   </div>
                   <h3 className="text-xl font-bold mb-1">{regulator.name}</h3>
-                  <p className="text-sm text-muted-foreground mb-3">{regulator.fullName}</p>
-                  <p className="text-xs text-muted-foreground/80">{regulator.description}</p>
+                  <p className="text-sm text-muted-foreground mb-3 leading-snug line-clamp-2">{regulator.fullName}</p>
+                  <p className="text-xs text-muted-foreground/80 leading-snug line-clamp-3 mt-auto">{regulator.description}</p>
                 </div>
                 
                 {/* Back */}
                 <div
                   className={cn(
-                    "absolute inset-0 w-full h-full glass-card p-4 flex flex-col items-center justify-center text-center",
+                    "absolute inset-0 w-full h-full glass-card p-4 flex flex-col items-center justify-center text-center overflow-hidden",
                     regulator.bgClass,
                     "border-2",
                     regulator.borderClass
@@ -157,7 +157,7 @@ const RegulatorsSection = () => {
                 >
                   <Info className="w-8 h-8 mb-3" style={{ color: `hsl(var(--regulator-${regulator.id.toLowerCase()}))` }} />
                   <h4 className="text-sm font-semibold mb-2">Coverage Details</h4>
-                  <p className="text-xs text-foreground/80">{regulator.backInfo}</p>
+                  <p className="text-xs text-foreground/80 leading-snug line-clamp-5">{regulator.backInfo}</p>
                 </div>
               </div>
             </motion.div>

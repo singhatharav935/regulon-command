@@ -163,6 +163,19 @@ const rbiReplyTypeOptions = [
   { id: "rbi-general", label: "General RBI / FEMA Reply" },
 ];
 
+const sebiReplyTypeOptions = [
+  { id: "auto", label: "Auto-detect from notice" },
+  { id: "lodr-30-disclosure-delay", label: "LODR Regulation 30 Disclosure Delay" },
+  { id: "lodr-33-financial-results-delay", label: "LODR Regulation 33 Financial Results Delay" },
+  { id: "pit-violation", label: "PIT Regulations Violation" },
+  { id: "sast-disclosure", label: "SAST Disclosure Violation" },
+  { id: "ia-research-analyst-compliance", label: "IA / Research Analyst Compliance" },
+  { id: "aif-pms-compliance", label: "AIF / PMS Compliance" },
+  { id: "icdr-takeover-issue", label: "ICDR / Takeover-related Issue" },
+  { id: "mutual-fund-distributor-compliance", label: "Mutual Fund / Distributor Compliance" },
+  { id: "sebi-general", label: "General SEBI Compliance" },
+];
+
 const inferMcaReplyTypeFromNotice = (noticeText: string): string => {
   const corpus = (noticeText || "").toLowerCase();
   if (/\bsection\s*92\b|\bsection\s*137\b|\bmgt-?7\b|\baoc-?4\b/.test(corpus)) return "annual-filing-92-137";
@@ -253,6 +266,19 @@ const inferRbiReplyTypeFromNotice = (noticeText: string): string => {
   if (/\bpayment aggregator\b|\bpa[-\s]*pg\b|authorization|rbi digital payments/i.test(corpus)) return "payment-aggregator-authorization";
   if (/\bnbfc\b|dnbr|nbs[-\s]*\d+|prudential return|xbrl return/i.test(corpus)) return "nbfc-returns-delay";
   return "rbi-general";
+};
+
+const inferSebiReplyTypeFromNotice = (noticeText: string): string => {
+  const corpus = (noticeText || "").toLowerCase();
+  if (/\bregulation\s*30\b|\blodr\b|material event|disclosure delay/i.test(corpus)) return "lodr-30-disclosure-delay";
+  if (/\bregulation\s*33\b|\bfinancial results\b|quarterly results|q[1-4]/i.test(corpus)) return "lodr-33-financial-results-delay";
+  if (/\bpit\b|insider trading|unpublished price sensitive information|upsi/i.test(corpus)) return "pit-violation";
+  if (/\bsast\b|substantial acquisition|takeover disclosure|regulation\s*29/i.test(corpus)) return "sast-disclosure";
+  if (/\binvestment adviser\b|\bresearch analyst\b|\bia regulations\b|\bra regulations\b/i.test(corpus)) return "ia-research-analyst-compliance";
+  if (/\baif\b|\bpms\b|portfolio management|alternative investment fund/i.test(corpus)) return "aif-pms-compliance";
+  if (/\bicdr\b|issue of capital|preferential issue|rights issue|takeover/i.test(corpus)) return "icdr-takeover-issue";
+  if (/\bmutual fund\b|distributor|arn|commission disclosure/i.test(corpus)) return "mutual-fund-distributor-compliance";
+  return "sebi-general";
 };
 
 const extractNoticeDateFromText = (noticeText: string): string => {
@@ -449,6 +475,27 @@ type RbiRecheckFlag = {
 type RbiRecheckReport = {
   ok: boolean;
   flags: RbiRecheckFlag[];
+  summary?: string;
+  checkedAt?: string;
+};
+
+type SebiIssueReport = {
+  ok: boolean;
+  items: Array<{ issue: string; suggestion: string }>;
+  issues: string[];
+  checkedAt: string;
+};
+
+type SebiRecheckFlag = {
+  severity: "high" | "medium" | "low";
+  issue: string;
+  fix: string;
+  source?: "rule" | "ai";
+};
+
+type SebiRecheckReport = {
+  ok: boolean;
+  flags: SebiRecheckFlag[];
   summary?: string;
   checkedAt?: string;
 };
@@ -800,6 +847,7 @@ const AIDraftingEngine = ({ demoMode = false, includeLawyerReview = true }: AIDr
   const [gstReplyTypeOverride, setGstReplyTypeOverride] = useState<string>("auto");
   const [incomeTaxReplyTypeOverride, setIncomeTaxReplyTypeOverride] = useState<string>("auto");
   const [rbiReplyTypeOverride, setRbiReplyTypeOverride] = useState<string>("auto");
+  const [sebiReplyTypeOverride, setSebiReplyTypeOverride] = useState<string>("auto");
   const [noticeDetails, setNoticeDetails] = useState<string>("");
   const [isGeneratingNoticeDetails, setIsGeneratingNoticeDetails] = useState(false);
   const [preferPiiMasking, setPreferPiiMasking] = useState(true);
@@ -811,6 +859,7 @@ const AIDraftingEngine = ({ demoMode = false, includeLawyerReview = true }: AIDr
   const [gstTrainingCaseId, setGstTrainingCaseId] = useState<string | null>(null);
   const [incomeTaxTrainingCaseId, setIncomeTaxTrainingCaseId] = useState<string | null>(null);
   const [rbiTrainingCaseId, setRbiTrainingCaseId] = useState<string | null>(null);
+  const [sebiTrainingCaseId, setSebiTrainingCaseId] = useState<string | null>(null);
   const [showFormatDetails, setShowFormatDetails] = useState(false);
   const [currentDraftRunId, setCurrentDraftRunId] = useState<string | null>(null);
   const [workflowStatus, setWorkflowStatus] = useState<WorkflowStatus>("generated");
@@ -845,6 +894,13 @@ const AIDraftingEngine = ({ demoMode = false, includeLawyerReview = true }: AIDr
   const [rbiRecheckReport, setRbiRecheckReport] = useState<RbiRecheckReport | null>(null);
   const [isRecheckingRbi, setIsRecheckingRbi] = useState(false);
   const [isApplyingRbiFix, setIsApplyingRbiFix] = useState(false);
+  const [sebiHasChecked, setSebiHasChecked] = useState(false);
+  const [sebiLastCheckedAt, setSebiLastCheckedAt] = useState<string | null>(null);
+  const [sebiUserFixNotes, setSebiUserFixNotes] = useState("");
+  const [sebiEvidenceContext, setSebiEvidenceContext] = useState("");
+  const [sebiRecheckReport, setSebiRecheckReport] = useState<SebiRecheckReport | null>(null);
+  const [isRecheckingSebi, setIsRecheckingSebi] = useState(false);
+  const [isApplyingSebiFix, setIsApplyingSebiFix] = useState(false);
   const [currentSteps, setCurrentSteps] = useState<ReviewStep[]>(initialReviewSteps);
   const [generationError, setGenerationError] = useState<string | null>(null);
 
@@ -878,6 +934,10 @@ const AIDraftingEngine = ({ demoMode = false, includeLawyerReview = true }: AIDr
   );
   const inferredRbiReplyType = useMemo(
     () => inferRbiReplyTypeFromNotice(noticeDetails),
+    [noticeDetails],
+  );
+  const inferredSebiReplyType = useMemo(
+    () => inferSebiReplyTypeFromNotice(noticeDetails),
     [noticeDetails],
   );
   const supabaseAny = supabase as any;
@@ -1284,6 +1344,144 @@ const AIDraftingEngine = ({ demoMode = false, includeLawyerReview = true }: AIDr
     [liveRbiIssueItems, liveRbiAdvancedSuggestions],
   );
 
+  function evaluateSebiDraftIssues(
+    content: string,
+    qa?: DraftQA | null,
+    includeQaGates = true,
+  ): Array<{ issue: string; suggestion: string }> {
+    const items: Array<{ issue: string; suggestion: string }> = [];
+    const addIssue = (condition: boolean, issue: string, suggestion: string) => {
+      if (condition) items.push({ issue, suggestion });
+    };
+
+    const hasAllegationMatrix = /allegation[-\s]*wise rebuttal|issue[-\s]*wise rebuttal/i.test(content)
+      || /\|\s*Allegation\s*\|\s*Department Position\s*\|\s*(Noticee|Entity) Rebuttal\s*\|/i.test(content);
+    const hasTimelineTable = /timeline|chronology/i.test(content) && /\|\s*[-:]+\s*\|\s*[-:]+\s*\|/.test(content);
+    const hasRegulationAnchors = /\bsebi\b|lodr|pit|sast|icdr|regulation\s*\d+/i.test(content);
+    const hasEvidenceMapping = /annexure|exchange filing|board minutes|disclosure copy|intimation/i.test(content);
+    const hasPrayerSafety = !/\bwaive\b[^.\n]{0,70}\bpenalt/i.test(content) && !/\babsolve\b/i.test(content);
+
+    addIssue(
+      !hasAllegationMatrix,
+      "SEBI allegation-wise rebuttal matrix is missing.",
+      "Add matrix: Allegation | Department Position | Noticee Rebuttal | Evidence | Relief Sought.",
+    );
+    addIssue(
+      !hasTimelineTable,
+      "SEBI compliance timeline table is missing.",
+      "Add timeline table: Compliance Event | Invoked Regulation | Due/Event Date | Actual Disclosure/Action Date | Reference | Status.",
+    );
+    addIssue(
+      !hasRegulationAnchors,
+      "SEBI regulation anchors are weak or missing.",
+      "Map each allegation to invoked SEBI regulation/circular (LODR/PIT/SAST/ICDR etc.) with concise legal framing.",
+    );
+    addIssue(
+      !hasEvidenceMapping,
+      "Evidence/annexure mapping is weak for SEBI draft.",
+      "Add annexure mapping to exchange filings, board records, disclosure proofs, and correspondence.",
+    );
+    addIssue(
+      !hasPrayerSafety,
+      "Risky prayer wording detected.",
+      "Use calibrated wording: drop or reduce proposed action/penalty based on facts and proportionality.",
+    );
+    addIssue(
+      /\[(insert|to be filled)[^\]]*\]/i.test(content),
+      "Unresolved placeholders detected in SEBI draft.",
+      "Replace placeholders with notice-specific data before final filing.",
+    );
+
+    if (includeQaGates) {
+      const badMandatoryGates = Object.entries(qa?.mandatory_gates || {})
+        .filter(([, passed]) => !passed)
+        .map(([gate]) => ({
+          issue: `Mandatory gate failed: ${gate}`,
+          suggestion: "Add the missing mandatory section and re-run draft checks.",
+        }));
+      items.push(...badMandatoryGates);
+    }
+
+    return items;
+  }
+
+  function evaluateSebiAdvancedSuggestions(
+    content: string,
+    qa?: DraftQA | null,
+  ): Array<{ title: string; suggestion: string; implemented: boolean }> {
+    return [
+      {
+        title: "Strengthen Regulation Mapping",
+        suggestion: "Tie each allegation to specific SEBI regulations invoked in notice with fact-led rebuttal.",
+        implemented: /\bsebi\b|lodr|pit|sast|icdr|regulation\s*\d+/i.test(content),
+      },
+      {
+        title: "Improve Disclosure Timeline Precision",
+        suggestion: "Add due/event vs actual disclosure/action dates with exchange reference IDs.",
+        implemented: /timeline|chronology/i.test(content) && /\|\s*[-:]+\s*\|\s*[-:]+\s*\|/.test(content),
+      },
+      {
+        title: "Add Governance-Control Narrative",
+        suggestion: "Include board-approved corrective controls and investor-impact mitigation framing.",
+        implemented: /governance|board|control|investor/i.test(content),
+      },
+      {
+        title: "Evidence-Anchored Defense",
+        suggestion: "Map each rebuttal to annexure evidence (exchange filing, board minutes, disclosure proofs).",
+        implemented: /annexure|exchange filing|board minutes|disclosure copy/i.test(content),
+      },
+      {
+        title: "Raise Filing-Readiness Score",
+        suggestion: "Tighten regulation-wise legal/factual mapping and remove repetitive generic language.",
+        implemented: (qa?.filing_score ?? 100) >= 95,
+      },
+    ];
+  }
+
+  const liveSebiIssueItems = useMemo(
+    () => evaluateSebiDraftIssues(draftContent || "", draftQA, true),
+    [draftContent, draftQA],
+  );
+
+  const liveSebiAdvancedSuggestions = useMemo(
+    () => evaluateSebiAdvancedSuggestions(draftContent || "", draftQA),
+    [draftContent, draftQA],
+  );
+
+  const sebiComputedIssueReport: SebiIssueReport = useMemo(() => ({
+    ok: liveSebiIssueItems.length === 0,
+    items: liveSebiIssueItems,
+    issues: liveSebiIssueItems.map((item) => item.issue),
+    checkedAt: sebiLastCheckedAt || new Date().toISOString(),
+  }), [liveSebiIssueItems, sebiLastCheckedAt]);
+
+  const sebiAutoFixNotes = useMemo(() => {
+    const issueNotes = liveSebiIssueItems.map((item, idx) => `${idx + 1}. ${item.issue}\nSuggestion: ${item.suggestion}`);
+    const pendingAdvanced = liveSebiAdvancedSuggestions
+      .filter((item) => !item.implemented)
+      .map((item, idx) => `${idx + 1 + issueNotes.length}. ${item.title}\nSuggestion: ${item.suggestion}`);
+    return [...issueNotes, ...pendingAdvanced].join("\n\n");
+  }, [liveSebiIssueItems, liveSebiAdvancedSuggestions]);
+
+  const sebiPendingFixPlaybook = useMemo(() => {
+    const issuePlaybook = liveSebiIssueItems.map((item) => ({
+      title: item.issue,
+      solution: item.suggestion,
+    }));
+    const advancedPlaybook = liveSebiAdvancedSuggestions
+      .filter((item) => !item.implemented)
+      .map((item) => ({
+        title: item.title,
+        solution: item.suggestion,
+      }));
+    return [...issuePlaybook, ...advancedPlaybook];
+  }, [liveSebiIssueItems, liveSebiAdvancedSuggestions]);
+
+  const sebiPendingFixCount = useMemo(
+    () => liveSebiIssueItems.length + liveSebiAdvancedSuggestions.filter((item) => !item.implemented).length,
+    [liveSebiIssueItems, liveSebiAdvancedSuggestions],
+  );
+
   const enforceMcaLocalFallback = (rawContent: string, mcaType?: string) => {
     let content = rawContent || "";
 
@@ -1569,6 +1767,14 @@ const AIDraftingEngine = ({ demoMode = false, includeLawyerReview = true }: AIDr
     setRbiLastCheckedAt(new Date().toISOString());
   };
 
+  const runSebiDraftIssueCheck = (contentOverride?: string, qaOverride?: DraftQA | null) => {
+    const content = contentOverride ?? draftContent ?? "";
+    const effectiveQa = qaOverride ?? draftQA;
+    evaluateSebiDraftIssues(content, effectiveQa, true);
+    setSebiHasChecked(true);
+    setSebiLastCheckedAt(new Date().toISOString());
+  };
+
   const handleRecheckMcaDraft = async () => {
     if (selectedDocType !== "mca-notice" || !draftGenerated || !draftContent.trim()) {
       toast.error("Generate and edit an MCA draft first.");
@@ -1731,6 +1937,47 @@ const AIDraftingEngine = ({ demoMode = false, includeLawyerReview = true }: AIDr
     }
   };
 
+  const handleRecheckSebiDraft = async () => {
+    if (selectedDocType !== "sebi-compliance" || !draftGenerated || !draftContent.trim()) {
+      toast.error("Generate and edit a SEBI draft first.");
+      return;
+    }
+
+    setIsRecheckingSebi(true);
+    try {
+      const client = clientOptions.find((c) => c.id === selectedClient);
+      const data = await requestDraftData({
+        operation: "recheck",
+        documentType: "sebi-compliance",
+        sebiReplyTypeOverride: sebiReplyTypeOverride !== "auto" ? sebiReplyTypeOverride : undefined,
+        companyName: client?.name || "Company",
+        companyId: clientSource === "live" ? selectedClient : undefined,
+        draftRunId: currentDraftRunId || undefined,
+        trainingCaseId: sebiTrainingCaseId || undefined,
+        noticeDetails: maskPII(noticeDetails) || undefined,
+        draftContent,
+        evidenceContext: sebiEvidenceContext || undefined,
+        stream: false,
+      });
+
+      const report: SebiRecheckReport = {
+        ok: Boolean(data?.ok),
+        flags: Array.isArray(data?.flags) ? data.flags : [],
+        summary: typeof data?.summary === "string" ? data.summary : undefined,
+        checkedAt: typeof data?.checkedAt === "string" ? data.checkedAt : new Date().toISOString(),
+      };
+      setSebiRecheckReport(report);
+
+      if (report.ok) toast.success("SEBI Recheck AI passed. No critical mismatches detected.");
+      else toast.warning(`SEBI Recheck AI flagged ${report.flags.length} item(s).`);
+    } catch (error) {
+      const msg = error instanceof Error ? error.message : "SEBI Recheck AI failed";
+      toast.error(msg);
+    } finally {
+      setIsRecheckingSebi(false);
+    }
+  };
+
   useEffect(() => {
     if (selectedDocType !== "mca-notice" || !draftGenerated || !draftContent.trim()) return;
     runMcaDraftIssueCheck(draftContent);
@@ -1752,6 +1999,12 @@ const AIDraftingEngine = ({ demoMode = false, includeLawyerReview = true }: AIDr
   useEffect(() => {
     if (selectedDocType !== "rbi-filing" || !draftGenerated || !draftContent.trim()) return;
     runRbiDraftIssueCheck(draftContent, draftQA);
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [selectedDocType, draftGenerated, draftContent, draftQA]);
+
+  useEffect(() => {
+    if (selectedDocType !== "sebi-compliance" || !draftGenerated || !draftContent.trim()) return;
+    runSebiDraftIssueCheck(draftContent, draftQA);
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [selectedDocType, draftGenerated, draftContent, draftQA]);
 
@@ -1974,6 +2227,12 @@ const AIDraftingEngine = ({ demoMode = false, includeLawyerReview = true }: AIDr
     }
   }, [selectedDocType]);
 
+  useEffect(() => {
+    if (selectedDocType !== "sebi-compliance") {
+      setSebiReplyTypeOverride("auto");
+    }
+  }, [selectedDocType]);
+
   const handleInsertTemplate = () => {
     if (!selectedDocType || !selectedTemplate) {
       toast.error("Select a document type first.");
@@ -2023,6 +2282,9 @@ const AIDraftingEngine = ({ demoMode = false, includeLawyerReview = true }: AIDr
           : undefined,
         rbiReplyTypeOverride: selectedDocType === "rbi-filing" && rbiReplyTypeOverride !== "auto"
           ? rbiReplyTypeOverride
+          : undefined,
+        sebiReplyTypeOverride: selectedDocType === "sebi-compliance" && sebiReplyTypeOverride !== "auto"
+          ? sebiReplyTypeOverride
           : undefined,
         context: `Generate precise Notice/Order Details for ${selectedDocLabel}. Ensure this is input-quality text for strict legal drafting checks.`,
         noticeDetails: sourceNotice || undefined,
@@ -2573,6 +2835,98 @@ Return only revised final draft text.`;
     }
   };
 
+  const handleApplySebiFix = async () => {
+    if (selectedDocType !== "sebi-compliance" || !draftContent.trim()) {
+      toast.error("Generate a SEBI draft first.");
+      return;
+    }
+    if (!sebiHasChecked) {
+      runSebiDraftIssueCheck();
+    }
+
+    const client = clientOptions.find((c) => c.id === selectedClient);
+    const issueText = liveSebiIssueItems
+      .map((item, idx) => `${idx + 1}. Issue: ${item.issue}\n   Suggestion: ${item.suggestion}`)
+      .join("\n");
+    const advancedSuggestionText = liveSebiAdvancedSuggestions
+      .filter((item) => !item.implemented)
+      .map((item, idx) => `${idx + 1}. Upgrade: ${item.title}\n   Suggestion: ${item.suggestion}`)
+      .join("\n");
+    const recheckNotes = (sebiRecheckReport?.flags || [])
+      .map((flag, idx) => `${idx + 1}. [${flag.severity.toUpperCase()}] ${flag.issue}\n   Fix: ${flag.fix}`)
+      .join("\n");
+    const combinedFixNotes = [sebiAutoFixNotes, recheckNotes, sebiUserFixNotes.trim()]
+      .filter((entry) => entry && entry.trim().length > 0)
+      .join("\n\n");
+    const pendingPlaybookText = sebiPendingFixPlaybook
+      .map((item, idx) => `${idx + 1}. Pending: ${item.title}\n   Solution: ${item.solution}`)
+      .join("\n");
+
+    const fixContext = `You are improving a SEBI compliance response draft.
+Task: Regenerate a corrected final draft by merging current draft with required fixes.
+Mandatory fixes:
+1) Add allegation-wise rebuttal matrix with regulation mapping
+2) Add compliance chronology table (due/event vs actual disclosure/action dates)
+3) Add evidence/annexure mapping (exchange filings, board records, disclosures)
+4) Keep legal framing proportional and defensible (no over-strong rhetoric)
+5) Use safe prayer wording (drop/reduce), avoid waive/absolve language
+
+CURRENT DRAFT:
+${draftContent}
+
+DETECTED ISSUES:
+${issueText || "No local issue detector items."}
+
+ADVANCED UPGRADE SUGGESTIONS:
+${advancedSuggestionText || "No additional upgrades detected."}
+
+RECHECK FLAGS:
+${recheckNotes || "No recheck flags."}
+
+PENDING FIX PLAYBOOK (MANDATORY ACTION STEPS):
+${pendingPlaybookText || "No pending actions."}
+
+CA NOTES:
+${combinedFixNotes || "None"}
+
+Return only revised final draft text.`;
+
+    setIsApplyingSebiFix(true);
+    try {
+      const data = await requestDraftData({
+        documentType: "sebi-compliance",
+        sebiReplyTypeOverride: sebiReplyTypeOverride !== "auto" ? sebiReplyTypeOverride : undefined,
+        companyName: client?.name || "Company",
+        companyId: clientSource === "live" ? selectedClient : undefined,
+        industry: client?.industry || "",
+        draftRunId: currentDraftRunId || undefined,
+        trainingCaseId: sebiTrainingCaseId || undefined,
+        draftMode: selectedMode,
+        advancedMode: true,
+        strictValidation: true,
+        context: fixContext,
+        noticeDetails: maskPII(noticeDetails) || undefined,
+        stream: false,
+      });
+
+      const content = (data?.draft as string | undefined) || "";
+      if (!content) throw new Error("SEBI AI fix regeneration returned empty content.");
+      setDraftContent(content);
+      setDraftQA((data?.qa ?? null) as DraftQA | null);
+      setDraftPackage((data?.package ?? null) as DraftPackage | null);
+      const nextCaseId = (data?.metadata as { trainingCaseId?: string } | undefined)?.trainingCaseId;
+      if (nextCaseId) setSebiTrainingCaseId(nextCaseId);
+      setSebiUserFixNotes("");
+      runSebiDraftIssueCheck(content, (data?.qa ?? null) as DraftQA | null);
+      toast.success("SEBI draft corrected and regenerated.");
+    } catch (error) {
+      const msg = error instanceof Error ? error.message : "Failed to apply SEBI AI fix";
+      toast.error(msg);
+    } finally {
+      setIsApplyingSebiFix(false);
+    }
+  };
+
   const handleGenerateDraft = async () => {
     if (!selectedClient || !selectedDocType) return;
 
@@ -2601,6 +2955,7 @@ Return only revised final draft text.`;
     setGstTrainingCaseId(null);
     setIncomeTaxTrainingCaseId(null);
     setRbiTrainingCaseId(null);
+    setSebiTrainingCaseId(null);
     setDraftQA(null);
     setDraftPackage(null);
     setMcaHasChecked(false);
@@ -2619,6 +2974,10 @@ Return only revised final draft text.`;
     setRbiLastCheckedAt(null);
     setRbiUserFixNotes("");
     setRbiRecheckReport(null);
+    setSebiHasChecked(false);
+    setSebiLastCheckedAt(null);
+    setSebiUserFixNotes("");
+    setSebiRecheckReport(null);
     
     const client = clientOptions.find(c => c.id === selectedClient);
     const maskedNoticeDetails = noticeDetails ? maskPII(noticeDetails) : undefined;
@@ -2712,6 +3071,8 @@ Return only revised final draft text.`;
               ? (incomeTaxTrainingCaseId || undefined)
               : selectedDocType === "rbi-filing"
                 ? (rbiTrainingCaseId || undefined)
+              : selectedDocType === "sebi-compliance"
+                ? (sebiTrainingCaseId || undefined)
             : undefined,
         mcaReplyTypeOverride: selectedDocType === "mca-notice" && mcaReplyTypeOverride !== "auto"
           ? mcaReplyTypeOverride
@@ -2724,6 +3085,9 @@ Return only revised final draft text.`;
           : undefined,
         rbiReplyTypeOverride: selectedDocType === "rbi-filing" && rbiReplyTypeOverride !== "auto"
           ? rbiReplyTypeOverride
+          : undefined,
+        sebiReplyTypeOverride: selectedDocType === "sebi-compliance" && sebiReplyTypeOverride !== "auto"
+          ? sebiReplyTypeOverride
           : undefined,
         advancedMode,
         strictValidation: advancedMode,
@@ -2796,6 +3160,7 @@ Return only revised final draft text.`;
         if (selectedDocType === "gst-show-cause") setGstTrainingCaseId(generatedCaseId || null);
         if (selectedDocType === "income-tax-response") setIncomeTaxTrainingCaseId(generatedCaseId || null);
         if (selectedDocType === "rbi-filing") setRbiTrainingCaseId(generatedCaseId || null);
+        if (selectedDocType === "sebi-compliance") setSebiTrainingCaseId(generatedCaseId || null);
         setDraftGenerated(true);
         setShowFormatDetails(false);
         setWorkflowStatus("generated");
@@ -3121,6 +3486,33 @@ Return only revised final draft text.`;
                     Auto-detected class:{" "}
                     <span className="text-foreground font-medium">
                       {rbiReplyTypeOptions.find((o) => o.id === inferredRbiReplyType)?.label || "General RBI / FEMA Reply"}
+                    </span>
+                  </p>
+                </div>
+              )}
+
+              {selectedDocType === "sebi-compliance" && (
+                <div>
+                  <label className="block text-sm font-medium text-foreground mb-2">
+                    <Book className="w-4 h-4 inline-block mr-2" />
+                    SEBI Notice Class
+                  </label>
+                  <Select value={sebiReplyTypeOverride} onValueChange={setSebiReplyTypeOverride}>
+                    <SelectTrigger className="bg-background/50">
+                      <SelectValue placeholder="Choose SEBI notice class..." />
+                    </SelectTrigger>
+                    <SelectContent>
+                      {sebiReplyTypeOptions.map((option) => (
+                        <SelectItem key={option.id} value={option.id}>
+                          {option.label}
+                        </SelectItem>
+                      ))}
+                    </SelectContent>
+                  </Select>
+                  <p className="text-xs text-muted-foreground mt-1">
+                    Auto-detected class:{" "}
+                    <span className="text-foreground font-medium">
+                      {sebiReplyTypeOptions.find((o) => o.id === inferredSebiReplyType)?.label || "General SEBI Compliance"}
                     </span>
                   </p>
                 </div>
@@ -3935,6 +4327,155 @@ Return only revised final draft text.`;
                         </>
                       ) : (
                         "Apply AI Fix & Regenerate RBI Draft"
+                      )}
+                    </Button>
+                  </div>
+                </div>
+              )}
+
+              {draftGenerated && selectedDocType === "sebi-compliance" && (
+                <div className="mt-3 space-y-2">
+                  <Button
+                    type="button"
+                    variant="outline"
+                    className="w-full"
+                    onClick={runSebiDraftIssueCheck}
+                  >
+                    Check What Is Wrong In This SEBI Draft
+                  </Button>
+                  {sebiHasChecked && (
+                    <div
+                      className={`p-4 rounded-lg border text-sm ${
+                        sebiComputedIssueReport.ok
+                          ? "border-green-500/30 bg-green-500/10 text-green-300"
+                          : "border-yellow-500/30 bg-yellow-500/10 text-yellow-200"
+                      }`}
+                    >
+                      {sebiComputedIssueReport.ok ? (
+                        <p>All SEBI checks passed. This draft is structurally aligned for CA review.</p>
+                      ) : (
+                        <div className="space-y-2">
+                          <p className="font-medium">Issues detected:</p>
+                          <ul className="list-disc pl-5 space-y-2">
+                            {sebiComputedIssueReport.items.map((item, idx) => (
+                              <li key={`${item.issue}-${idx}`}>
+                                <p>{item.issue}</p>
+                                <p className="text-xs text-yellow-100/90 mt-1">Suggestion: {item.suggestion}</p>
+                              </li>
+                            ))}
+                          </ul>
+                        </div>
+                      )}
+                    </div>
+                  )}
+
+                  {liveSebiAdvancedSuggestions.length > 0 && (
+                    <div className="p-4 rounded-lg border border-cyan-500/30 bg-cyan-500/10 text-cyan-200 text-sm">
+                      <p className="font-medium mb-2">Advanced Suggestions:</p>
+                      <ul className="list-disc pl-5 space-y-2">
+                        {liveSebiAdvancedSuggestions.map((item, idx) => (
+                          <li key={`${item.title}-${idx}`}>
+                            <p className={item.implemented ? "text-green-300" : "text-cyan-200"}>
+                              {item.implemented ? "✓ " : ""}{item.title}
+                              <span className={`ml-2 text-[11px] ${item.implemented ? "text-green-300" : "text-yellow-200"}`}>
+                                [{item.implemented ? "Implemented" : "Pending"}]
+                              </span>
+                            </p>
+                            <p className="text-xs text-cyan-100/90 mt-1">Suggestion: {item.suggestion}</p>
+                          </li>
+                        ))}
+                      </ul>
+                    </div>
+                  )}
+
+                  <div className="p-3 rounded-lg border border-border/50 bg-background/30 space-y-2">
+                    <p className="text-sm font-medium text-foreground">AI Fix Assistant (SEBI)</p>
+                    <p className="text-xs text-muted-foreground">
+                      SEBI issue detector and recheck are separate from MCA/GST/Income-tax/RBI. Add optional notes, then regenerate.
+                    </p>
+                    <Textarea
+                      value={sebiEvidenceContext}
+                      onChange={(e) => setSebiEvidenceContext(e.target.value)}
+                      placeholder="Optional: paste SEBI evidence text (exchange disclosures, board records, filing proofs) for Recheck AI."
+                      className="min-h-[90px] bg-background/50"
+                    />
+                    <Button
+                      type="button"
+                      variant="outline"
+                      className="w-full"
+                      onClick={handleRecheckSebiDraft}
+                      disabled={isRecheckingSebi || !draftGenerated}
+                    >
+                      {isRecheckingSebi ? (
+                        <>
+                          <Loader2 className="w-4 h-4 mr-2 animate-spin" />
+                          Rechecking SEBI AI...
+                        </>
+                      ) : (
+                        "Recheck AI (SEBI Draft + Notice + Evidence)"
+                      )}
+                    </Button>
+                    {sebiRecheckReport && (
+                      <div className={`rounded-lg border p-3 text-xs space-y-2 ${
+                        sebiRecheckReport.ok
+                          ? "border-green-500/30 bg-green-500/10 text-green-300"
+                          : "border-rose-500/30 bg-rose-500/10 text-rose-200"
+                      }`}>
+                        <p className="font-medium">{sebiRecheckReport.ok ? "SEBI Recheck AI: Passed" : "SEBI Recheck AI: Flags Detected"}</p>
+                        {sebiRecheckReport.summary ? <p>{sebiRecheckReport.summary}</p> : null}
+                        {!sebiRecheckReport.ok && (
+                          <ul className="list-disc pl-4 space-y-2">
+                            {sebiRecheckReport.flags.map((flag, idx) => (
+                              <li key={`${flag.issue}-${idx}`}>
+                                <p>[{flag.severity.toUpperCase()}] {flag.issue}</p>
+                                <p className="text-rose-100/90">Fix: {flag.fix}</p>
+                              </li>
+                            ))}
+                          </ul>
+                        )}
+                      </div>
+                    )}
+                    <p className="text-xs text-cyan-300">Pending SEBI fixes: {sebiPendingFixCount}</p>
+                    <Textarea
+                      value={sebiAutoFixNotes || "No pending issue-detector fixes right now."}
+                      readOnly
+                      className="min-h-[90px] bg-background/40 text-muted-foreground"
+                    />
+                    <div className="rounded-lg border border-cyan-500/20 bg-cyan-500/5 p-3 text-xs space-y-2">
+                      <p className="font-medium text-cyan-200">Pending Fix Solutions (AI)</p>
+                      {sebiPendingFixPlaybook.length === 0 ? (
+                        <p className="text-cyan-100/80">No pending solutions. Draft is clear on current checks.</p>
+                      ) : (
+                        <ul className="list-disc pl-4 space-y-2 text-cyan-100/90">
+                          {sebiPendingFixPlaybook.map((item, idx) => (
+                            <li key={`${item.title}-${idx}`}>
+                              <p>{item.title}</p>
+                              <p className="text-cyan-100/75">How to fix: {item.solution}</p>
+                            </li>
+                          ))}
+                        </ul>
+                      )}
+                    </div>
+                    <Textarea
+                      value={sebiUserFixNotes}
+                      onChange={(e) => setSebiUserFixNotes(e.target.value)}
+                      placeholder="Optional CA note for SEBI AI fix."
+                      className="min-h-[90px] bg-background/50"
+                    />
+                    <Button
+                      type="button"
+                      variant="outline"
+                      className="w-full"
+                      onClick={handleApplySebiFix}
+                      disabled={isApplyingSebiFix || !draftGenerated || (sebiPendingFixCount === 0 && sebiUserFixNotes.trim().length === 0)}
+                    >
+                      {isApplyingSebiFix ? (
+                        <>
+                          <Loader2 className="w-4 h-4 mr-2 animate-spin" />
+                          Applying SEBI AI Fix...
+                        </>
+                      ) : (
+                        "Apply AI Fix & Regenerate SEBI Draft"
                       )}
                     </Button>
                   </div>

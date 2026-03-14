@@ -225,6 +225,29 @@ const RBI_REPLY_TYPES: RbiReplyType[] = [
   "rbi-general",
 ];
 
+type SebiReplyType =
+  | "lodr-30-disclosure-delay"
+  | "lodr-33-financial-results-delay"
+  | "pit-violation"
+  | "sast-disclosure"
+  | "ia-research-analyst-compliance"
+  | "aif-pms-compliance"
+  | "icdr-takeover-issue"
+  | "mutual-fund-distributor-compliance"
+  | "sebi-general";
+
+const SEBI_REPLY_TYPES: SebiReplyType[] = [
+  "lodr-30-disclosure-delay",
+  "lodr-33-financial-results-delay",
+  "pit-violation",
+  "sast-disclosure",
+  "ia-research-analyst-compliance",
+  "aif-pms-compliance",
+  "icdr-takeover-issue",
+  "mutual-fund-distributor-compliance",
+  "sebi-general",
+];
+
 const normalizeIncomeTaxReplyType = (value: string | null | undefined): IncomeTaxReplyType | null => {
   if (!value) return null;
   const cleaned = value.trim().toLowerCase();
@@ -235,6 +258,12 @@ const normalizeRbiReplyType = (value: string | null | undefined): RbiReplyType |
   if (!value) return null;
   const cleaned = value.trim().toLowerCase();
   return (RBI_REPLY_TYPES as string[]).includes(cleaned) ? (cleaned as RbiReplyType) : null;
+};
+
+const normalizeSebiReplyType = (value: string | null | undefined): SebiReplyType | null => {
+  if (!value) return null;
+  const cleaned = value.trim().toLowerCase();
+  return (SEBI_REPLY_TYPES as string[]).includes(cleaned) ? (cleaned as SebiReplyType) : null;
 };
 
 const normalizeMcaReplyType = (value: string | null | undefined): McaReplyType | null => {
@@ -354,6 +383,19 @@ const inferRbiReplyType = (noticeDetails?: string, extractedNotice?: NoticeIntel
   if (/\bpayment aggregator\b|\bpa[-\s]*pg\b|authorization|rbi digital payments/i.test(corpus)) return "payment-aggregator-authorization";
   if (/\bnbfc\b|dnbr|nbs[-\s]*\d+|prudential return|xbrl return/i.test(corpus)) return "nbfc-returns-delay";
   return "rbi-general";
+};
+
+const inferSebiReplyType = (noticeDetails?: string, extractedNotice?: NoticeIntelligence | null): SebiReplyType => {
+  const corpus = `${noticeDetails ?? ""}\n${JSON.stringify(extractedNotice?.notice_snapshot?.invoked_provisions ?? [])}`.toLowerCase();
+  if (/\blodr\b[^.\n]{0,60}\bregulation\s*30\b|regulation\s*30[^.\n]{0,60}\blodr\b|material event disclosure/i.test(corpus)) return "lodr-30-disclosure-delay";
+  if (/\blodr\b[^.\n]{0,60}\bregulation\s*33\b|financial results disclosure|quarterly results/i.test(corpus)) return "lodr-33-financial-results-delay";
+  if (/\bpit\b|prohibition of insider trading|upsi|trading window/i.test(corpus)) return "pit-violation";
+  if (/\bsast\b|takeover regulations|regulation\s*29|regulation\s*31/i.test(corpus)) return "sast-disclosure";
+  if (/\binvestment adviser\b|\bresearch analyst\b|ia regulations|ra regulations/i.test(corpus)) return "ia-research-analyst-compliance";
+  if (/\baif\b|\bpms\b|portfolio management services|alternative investment fund/i.test(corpus)) return "aif-pms-compliance";
+  if (/\bicdr\b|preferential issue|rights issue|public issue|takeover/i.test(corpus)) return "icdr-takeover-issue";
+  if (/\bmutual fund\b|\bdistributor\b|\barn\b|amfi/i.test(corpus)) return "mutual-fund-distributor-compliance";
+  return "sebi-general";
 };
 
 const inferGstReplyType = (noticeDetails?: string, extractedNotice?: NoticeIntelligence | null): GstReplyType => {
@@ -1242,6 +1284,135 @@ const captureRbiRecheckIssues = async ({
     .eq("user_id", userId);
 };
 
+const captureSebiTrainingCase = async ({
+  authClient,
+  userId,
+  companyId,
+  draftRunId,
+  noticeClass,
+  noticeDetails,
+  generatedDraft,
+  qaPayload,
+  companyName,
+  industry,
+  draftMode,
+  previousCaseId,
+}: {
+  authClient: any;
+  userId: string | null;
+  companyId?: string | null;
+  draftRunId?: string | null;
+  noticeClass: string;
+  noticeDetails?: string | null;
+  generatedDraft: string;
+  qaPayload?: unknown;
+  companyName?: string | null;
+  industry?: string | null;
+  draftMode?: string | null;
+  previousCaseId?: string | null;
+}): Promise<string | null> => {
+  if (!userId || !generatedDraft?.trim()) return null;
+
+  const payload = {
+    draft_run_id: draftRunId ?? null,
+    user_id: userId,
+    company_id: companyId ?? null,
+    notice_class: noticeClass || "sebi-general",
+    notice_snapshot: (noticeDetails || "Notice details not provided.").slice(0, 16000),
+    generated_draft: generatedDraft.slice(0, 120000),
+    filing_score: typeof (qaPayload as any)?.filing_score === "number" ? (qaPayload as any).filing_score : null,
+    risk_band: (qaPayload as any)?.risk_band ?? null,
+    qa_payload: qaPayload ?? null,
+    metadata: {
+      source_operation: "draft",
+      company_name: companyName ?? null,
+      industry: industry ?? null,
+      draft_mode: draftMode ?? null,
+      captured_at: new Date().toISOString(),
+    },
+  };
+
+  if (previousCaseId) {
+    const { data, error } = await authClient
+      .from("sebi_training_cases")
+      .update(payload)
+      .eq("id", previousCaseId)
+      .eq("user_id", userId)
+      .select("id")
+      .maybeSingle();
+    if (!error && data?.id) return data.id as string;
+  }
+
+  const { data, error } = await authClient
+    .from("sebi_training_cases")
+    .insert(payload)
+    .select("id")
+    .maybeSingle();
+  if (error) {
+    console.error("SEBI training capture failed:", error.message);
+    return null;
+  }
+  return (data?.id as string) ?? null;
+};
+
+const captureSebiRecheckIssues = async ({
+  authClient,
+  userId,
+  caseId,
+  flags,
+  summary,
+}: {
+  authClient: any;
+  userId: string | null;
+  caseId?: string | null;
+  flags: RecheckFlag[];
+  summary?: string;
+}) => {
+  if (!userId || !caseId) return;
+
+  if (!flags.length) {
+    await authClient
+      .from("sebi_training_cases")
+      .update({
+        status: "reviewed",
+        metadata: {
+          recheck_summary: summary ?? "Recheck passed",
+          recheck_flags_count: 0,
+          rechecked_at: new Date().toISOString(),
+        },
+      })
+      .eq("id", caseId)
+      .eq("user_id", userId);
+    return;
+  }
+
+  const rows = flags.map((f) => ({
+    case_id: caseId,
+    severity: f.severity,
+    detector_source: f.source === "ai" ? "ai" : "rule",
+    issue_text: f.issue,
+    suggested_fix: f.fix,
+  }));
+
+  const { error } = await authClient.from("sebi_training_issues").insert(rows);
+  if (error) {
+    console.error("SEBI recheck issue capture failed:", error.message);
+  }
+
+  await authClient
+    .from("sebi_training_cases")
+    .update({
+      status: "reviewed",
+      metadata: {
+        recheck_summary: summary ?? "Recheck completed",
+        recheck_flags_count: flags.length,
+        rechecked_at: new Date().toISOString(),
+      },
+    })
+    .eq("id", caseId)
+    .eq("user_id", userId);
+};
+
 const normalizeSimilarityText = (input: string) =>
   (input || "")
     .toLowerCase()
@@ -1717,6 +1888,72 @@ const detectRbiRecheckFlags = (
   return flags;
 };
 
+const detectSebiRecheckFlags = (
+  draft: string,
+  noticeDetails: string,
+): RecheckFlag[] => {
+  const flags: RecheckFlag[] = [];
+  const addFlag = (condition: boolean, severity: RecheckFlag["severity"], issue: string, fix: string) => {
+    if (condition) flags.push({ severity, issue, fix, source: "rule" });
+  };
+
+  const hasAllegationMatrix = /para[-\s]*wise rebuttal|allegation[-\s]*wise rebuttal|issue[-\s]*wise/i.test(draft)
+    || /\|\s*Allegation\s*\|\s*Department Position\s*\|\s*Noticee Rebuttal\s*\|/i.test(draft);
+  const hasRegAnchor = /\bsebi\b|lodr|pit|sast|icdr|ia regulations|aif|pms|regulation\s*\d+/i.test(draft);
+  const hasTimeline = /timeline|chronology|disclosure date|filing date/i.test(draft)
+    && /\|\s*[-:]+\s*\|\s*[-:]+\s*\|/.test(draft);
+  const hasEvidence = /annexure|exchange filing|board minutes|disclosure record|email trail|acknowledgement/i.test(draft);
+
+  addFlag(
+    !hasAllegationMatrix,
+    "high",
+    "SEBI allegation-wise rebuttal matrix is missing.",
+    "Add matrix: Allegation | Department Position | Noticee Rebuttal | Evidence | Relief.",
+  );
+  addFlag(
+    !hasRegAnchor,
+    "high",
+    "SEBI regulation anchors are weak or missing.",
+    "Map each allegation to the exact invoked SEBI regulation/circular from notice.",
+  );
+  addFlag(
+    !hasTimeline,
+    "medium",
+    "SEBI disclosure/timeline table is missing.",
+    "Add chronology with event date, due date, actual disclosure/action date, and references.",
+  );
+  addFlag(
+    !hasEvidence,
+    "medium",
+    "SEBI evidence/annexure linkage is weak.",
+    "Add annexure mapping for exchange filings, board records, and disclosure proofs.",
+  );
+  addFlag(
+    /\bwaive\b[^.\n]{0,80}\bpenalt/i.test(draft) || /\babsolve\b/i.test(draft),
+    "medium",
+    "Risky prayer wording detected (waive/absolve).",
+    "Use calibrated prayer wording: drop or reduce unsustainable penalty based on facts and proportionality.",
+  );
+  addFlag(
+    /\[(insert|to be filled)[^\]]*\]/i.test(draft),
+    "medium",
+    "Unresolved placeholders remain in SEBI draft.",
+    "Replace placeholders with notice-specific facts before filing.",
+  );
+
+  const refNo = noticeDetails.match(/\b(?:DIN|RFN|Ref\.?\s*No\.?|Reference\s*No\.?)\s*[:\-]?\s*([A-Z0-9\/\-.]+)/i)?.[1];
+  if (refNo) {
+    addFlag(
+      !new RegExp(refNo.replace(/[.*+?^${}()|[\]\\]/g, "\\$&"), "i").test(draft),
+      "low",
+      "SEBI notice reference is not reflected in draft metadata.",
+      "Insert exact notice reference in heading/metadata block.",
+    );
+  }
+
+  return flags;
+};
+
 const isNoPlaceholderGatePassed = (content: string, documentType: string) => {
   if (documentType === "mca-notice") {
     if (!hasPlaceholderMarkers(content)) return true;
@@ -2053,6 +2290,55 @@ const enforceRbiDraftMinimumStructure = (draft: string) => {
   return enforceCrossRegulatorySafetyLanguage(fixed, "rbi-filing");
 };
 
+const buildSebiFallbackMatrix = () => `| Allegation | Department Position | Noticee Rebuttal | Evidence | Relief Sought |
+|---|---|---|---|---|
+| Disclosure/compliance lapse | Non-compliance alleged under invoked regulation | Allegation is disputed on facts, timeline, and context; requires evidence-linked adjudication | Annexure A/B | Drop or reduce action |
+| Quantification/penalty proposal | Penalty proposed | Penalty must be proportionate and based on sustainable finding | Annexure C | Reduce/Drop penalty |
+| Governance/control deficiency | Control weakness alleged | Corrective actions and governance controls have been strengthened and documented | Annexure D | Consider mitigation |
+`;
+
+const buildSebiFallbackTimeline = () => `| Compliance Event | Invoked Regulation | Due/Event Date | Actual Disclosure/Action Date | Reference | Status |
+|---|---|---|---|---|---|
+| Event disclosure/action 1 | [To be filled by CA/Lawyer] | [To be filled by CA/Lawyer] | [To be filled by CA/Lawyer] | [To be filled by CA/Lawyer] | Rectified/Explained |
+| Event disclosure/action 2 | [To be filled by CA/Lawyer] | [To be filled by CA/Lawyer] | [To be filled by CA/Lawyer] | [To be filled by CA/Lawyer] | Completed |
+`;
+
+const enforceSebiDraftMinimumStructure = (draft: string) => {
+  let fixed = enforceCrossRegulatorySafetyLanguage(draft, "sebi-compliance");
+
+  if (!/without prejudice/i.test(fixed)) {
+    fixed = `Without prejudice to all rights and remedies, the Noticee submits as under.\n\n${fixed}`;
+  }
+
+  const hasMatrix = /para[-\s]*wise rebuttal|allegation[-\s]*wise rebuttal|issue[-\s]*wise/i.test(fixed)
+    || /\|\s*Allegation\s*\|\s*Department Position\s*\|\s*Noticee Rebuttal\s*\|/i.test(fixed);
+  if (!hasMatrix) {
+    fixed += `\n\n### Allegation-Wise Rebuttal Matrix\n${buildSebiFallbackMatrix()}`;
+  }
+
+  const hasTimeline = /timeline|chronology|disclosure date|filing date/i.test(fixed) && /\|\s*[-:]+\s*\|\s*[-:]+\s*\|/.test(fixed);
+  if (!hasTimeline) {
+    fixed += `\n\n### Compliance Timeline\n${buildSebiFallbackTimeline()}`;
+  }
+
+  if (!/annexure|evidence/i.test(fixed)) {
+    fixed += `\n\n### Evidence and Annexure Mapping\n1. **Annexure A:** Notice set and reference metadata.\n2. **Annexure B:** Exchange/filing disclosures and acknowledgements.\n3. **Annexure C:** Computation/penalty challenge notes.\n4. **Annexure D:** Board/governance/control documentation.`;
+  }
+
+  if (!/prayer|relief/i.test(fixed)) {
+    fixed += `\n\n### Prayer\n1. Drop or reduce unsustainable allegations/action after full record review.\n2. Drop or reduce penalty/proposed action to the extent not legally sustainable.\n3. Grant personal hearing and permit additional documentary submissions.\n4. Pass any other order deemed fit in the interest of justice.`;
+  }
+
+  if (!/personal hearing|hearing/i.test(fixed)) {
+    fixed += `\n\n### Hearing Request\nThe Noticee requests an opportunity of personal hearing before any adverse order is passed.`;
+  }
+
+  fixed = removeDuplicateMarkdownSection(fixed, "Allegation-Wise Rebuttal Matrix");
+  fixed = removeDuplicateMarkdownSection(fixed, "Compliance Timeline");
+  fixed = removeDuplicateMarkdownSection(fixed, "Prayer");
+  return enforceCrossRegulatorySafetyLanguage(fixed, "sebi-compliance");
+};
+
 const enforceMcaDraftMinimumStructure = (
   draft: string,
   mcaReplyType: McaReplyType,
@@ -2241,6 +2527,7 @@ serve(async (req) => {
       gstReplyTypeOverride,
       incomeTaxReplyTypeOverride,
       rbiReplyTypeOverride,
+      sebiReplyTypeOverride,
       advancedMode = false,
       strictValidation = false,
       stream = false,
@@ -2262,6 +2549,11 @@ serve(async (req) => {
       : null;
     const inferredRbiReplyType = inferRbiReplyType(noticeDetails, null);
     const effectiveRbiReplyType: RbiReplyType = normalizedRbiReplyType ?? inferredRbiReplyType;
+    const normalizedSebiReplyType = typeof sebiReplyTypeOverride === "string" && sebiReplyTypeOverride.trim()
+      ? normalizeSebiReplyType(sebiReplyTypeOverride)
+      : null;
+    const inferredSebiReplyType = inferSebiReplyType(noticeDetails, null);
+    const effectiveSebiReplyType: SebiReplyType = normalizedSebiReplyType ?? inferredSebiReplyType;
 
     if (normalizedOperation === "recheck") {
       if (!draftContent || typeof draftContent !== "string" || draftContent.trim().length < 40) {
@@ -2280,6 +2572,9 @@ serve(async (req) => {
       const rbiReplyType: RbiReplyType = documentType === "rbi-filing"
         ? (normalizeRbiReplyType(rbiReplyTypeOverride) ?? inferRbiReplyType(noticeDetails, null))
         : "rbi-general";
+      const sebiReplyType: SebiReplyType = documentType === "sebi-compliance"
+        ? (normalizeSebiReplyType(sebiReplyTypeOverride) ?? inferSebiReplyType(noticeDetails, null))
+        : "sebi-general";
 
       const ruleFlags = documentType === "mca-notice"
         ? detectMcaRecheckFlags(draftContent, noticeDetails || "", mcaReplyType)
@@ -2289,6 +2584,8 @@ serve(async (req) => {
             ? detectIncomeTaxRecheckFlags(draftContent, noticeDetails || "")
           : documentType === "rbi-filing"
             ? detectRbiRecheckFlags(draftContent, noticeDetails || "")
+          : documentType === "sebi-compliance"
+            ? detectSebiRecheckFlags(draftContent, noticeDetails || "")
           : [];
 
       const recheckSystemPrompt = `You are a legal QA reviewer for Indian regulatory draft filings.
@@ -2315,6 +2612,7 @@ MCA Reply Type: ${mcaReplyType}
 Income-tax Reply Type: ${incomeTaxReplyType}
 GST Reply Type: ${effectiveGstReplyType}
 RBI Reply Type: ${rbiReplyType}
+SEBI Reply Type: ${sebiReplyType}
 
 NOTICE/ORDER DETAILS:
 ${noticeDetails || "Not provided"}
@@ -2398,6 +2696,14 @@ ${evidenceContext || "None provided"}`;
           flags: dedup,
           summary,
         });
+      } else if (documentType === "sebi-compliance") {
+        await captureSebiRecheckIssues({
+          authClient,
+          userId,
+          caseId: typeof trainingCaseId === "string" ? trainingCaseId : null,
+          flags: dedup,
+          summary,
+        });
       }
 
       return new Response(JSON.stringify({
@@ -2424,6 +2730,9 @@ ${evidenceContext || "None provided"}`;
       const rbiReplyType: RbiReplyType | null = documentType === "rbi-filing"
         ? (normalizeRbiReplyType(rbiReplyTypeOverride) ?? inferRbiReplyType(noticeDetails, null))
         : null;
+      const sebiReplyType: SebiReplyType | null = documentType === "sebi-compliance"
+        ? (normalizeSebiReplyType(sebiReplyTypeOverride) ?? inferSebiReplyType(noticeDetails, null))
+        : null;
       const mcaKnowledge = mcaReplyType ? getMcaKnowledgeBlock(mcaReplyType) : "";
       const mcaChecklist = mcaReplyType ? getMcaPendingDataChecklist(mcaReplyType).map((item) => `- ${item}`).join("\n") : "";
 
@@ -2446,6 +2755,7 @@ ${documentType === "mca-notice" && mcaReplyType ? `- MCA Reply Type: ${mcaReplyT
 ${documentType === "income-tax-response" && incomeTaxReplyType ? `- Income-tax Reply Type: ${incomeTaxReplyType}` : ""}
 ${documentType === "gst-show-cause" && gstReplyType ? `- GST Reply Type: ${gstReplyType}` : ""}
 ${documentType === "rbi-filing" && rbiReplyType ? `- RBI Reply Type: ${rbiReplyType}` : ""}
+${documentType === "sebi-compliance" && sebiReplyType ? `- SEBI Reply Type: ${sebiReplyType}` : ""}
 
 Use this context if provided:
 ${context || "No extra context provided."}
@@ -2492,6 +2802,7 @@ ${noticeDetails || "None provided."}`;
           mcaReplyType,
           incomeTaxReplyType,
           rbiReplyType,
+          sebiReplyType,
           generatedAt: new Date().toISOString(),
         },
       }), {
@@ -2591,6 +2902,9 @@ If notice data is missing, list specific missing items in critical_missing_field
     const rbiReplyType: RbiReplyType | null = documentType === "rbi-filing"
       ? (normalizeRbiReplyType(rbiReplyTypeOverride) ?? inferRbiReplyType(noticeDetails, extractedNotice))
       : null;
+    const sebiReplyType: SebiReplyType | null = documentType === "sebi-compliance"
+      ? (normalizeSebiReplyType(sebiReplyTypeOverride) ?? inferSebiReplyType(noticeDetails, extractedNotice))
+      : null;
     const extractedNoticeDate = extractNoticeDateFromText(noticeDetails);
     const mcaPendingChecklistText = mcaReplyType
       ? getMcaPendingDataChecklist(mcaReplyType).map((item) => `- ${item}`).join("\n")
@@ -2633,6 +2947,7 @@ COMPANY CONTEXT
 ${documentType === "mca-notice" && mcaReplyType ? `- MCA Reply Type: ${mcaReplyType}` : ""}
 ${documentType === "income-tax-response" && incomeTaxReplyType ? `- Income-tax Reply Type: ${incomeTaxReplyType}` : ""}
 ${documentType === "rbi-filing" && rbiReplyType ? `- RBI Reply Type: ${rbiReplyType}` : ""}
+${documentType === "sebi-compliance" ? `- SEBI Reply Type: ${effectiveSebiReplyType}` : ""}
 
 ${extractedNotice ? `EXTRACTED NOTICE INTELLIGENCE (use as primary structure source):\n${JSON.stringify(extractedNotice, null, 2)}` : ""}
 
@@ -2694,6 +3009,24 @@ Dataset policy:
 - Use prior dataset patterns only for structure and quality patterns.
 - Never reproduce long sentence blocks or paragraph chunks from prior stored drafts.
 - The output must be freshly written and specific to the current notice facts.`
+      : documentType === "sebi-compliance"
+        ? `Generate a final adjudication-ready SEBI compliance response for ${companyName}${industry ? ` (${industry} sector)` : ""}.
+Detected SEBI notice class: ${effectiveSebiReplyType}.
+Mandatory structure:
+1) Heading + SEBI office/department metadata from notice
+2) Notice metadata (reference no, DIN/RFN if available, date, period, noticee block)
+3) Preliminary submissions
+4) Allegation-wise rebuttal matrix linked to invoked regulations
+5) Regulation-wise legal submissions (LODR/PIT/SAST/ICDR/IA/AIF/PMS as applicable)
+6) Compliance chronology table (due/event vs actual disclosure/action date + reference)
+7) Evidence and annexure mapping (exchange disclosures, board records, filing proofs)
+8) Layered prayer with hearing request and calibrated proportionality language
+9) Sign-off
+Avoid unsupported case law. Use controlled placeholders only where unavoidable.
+Dataset policy:
+- Use prior dataset patterns only for structure and quality patterns.
+- Never reproduce long sentence blocks or paragraph chunks from prior stored drafts.
+- The output must be freshly written and specific to the current notice facts.`
       : `Generate a comprehensive, filing-ready ${documentType.replace(/-/g, " ")} for ${companyName}${industry ? ` (${industry} sector)` : ""}. Include SCN para-wise rebuttal matrix, allegation-wise computation challenge with accepted/disputed columns, annexure mapping per issue, calibrated legal language, and complete layered prayer.`);
 
     if (!advancedMode) {
@@ -2739,6 +3072,8 @@ Dataset policy:
         draftContent = enforceIncomeTaxDraftMinimumStructure(draftContent);
       } else if (documentType === "rbi-filing") {
         draftContent = enforceRbiDraftMinimumStructure(draftContent);
+      } else if (documentType === "sebi-compliance") {
+        draftContent = enforceSebiDraftMinimumStructure(draftContent);
       } else {
         draftContent = enforceCrossRegulatorySafetyLanguage(draftContent, documentType);
       }
@@ -2753,6 +3088,7 @@ Dataset policy:
           mcaReplyType,
           incomeTaxReplyType,
           rbiReplyType: effectiveRbiReplyType,
+          sebiReplyType: effectiveSebiReplyType,
           advancedMode,
           generatedAt: new Date().toISOString(),
           version: "2.0",
@@ -3017,6 +3353,8 @@ Checklist:
       finalDraft = enforceIncomeTaxDraftMinimumStructure(finalDraft);
     } else if (documentType === "rbi-filing") {
       finalDraft = enforceRbiDraftMinimumStructure(finalDraft);
+    } else if (documentType === "sebi-compliance") {
+      finalDraft = enforceSebiDraftMinimumStructure(finalDraft);
     } else if (documentType !== "mca-notice") {
       finalDraft = enforceCrossRegulatorySafetyLanguage(finalDraft, documentType);
     } else {
@@ -3193,6 +3531,21 @@ Schema:
         draftMode,
         previousCaseId: typeof trainingCaseId === "string" ? trainingCaseId : null,
       });
+    } else if (documentType === "sebi-compliance") {
+      capturedTrainingCaseId = await captureSebiTrainingCase({
+        authClient,
+        userId,
+        companyId: typeof companyId === "string" ? companyId : null,
+        draftRunId: typeof draftRunId === "string" ? draftRunId : null,
+        noticeClass: sebiReplyType ?? effectiveSebiReplyType ?? "sebi-general",
+        noticeDetails: noticeDetails ?? null,
+        generatedDraft: finalDraft,
+        qaPayload: finalQaPayload,
+        companyName,
+        industry,
+        draftMode,
+        previousCaseId: typeof trainingCaseId === "string" ? trainingCaseId : null,
+      });
     }
 
     return new Response(JSON.stringify({
@@ -3207,6 +3560,7 @@ Schema:
         gstReplyType: effectiveGstReplyType,
         incomeTaxReplyType: incomeTaxReplyType ?? normalizedIncomeTaxReplyType,
         rbiReplyType: rbiReplyType ?? normalizedRbiReplyType ?? effectiveRbiReplyType,
+        sebiReplyType: sebiReplyType ?? effectiveSebiReplyType,
         advancedMode,
         userId,
         trainingCaseId: capturedTrainingCaseId,
