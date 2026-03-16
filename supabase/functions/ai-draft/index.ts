@@ -290,6 +290,51 @@ const SEBI_REPLY_TYPES: SebiReplyType[] = [
   "sebi-general",
 ];
 
+type CustomsReplyType =
+  | "section-28-demand"
+  | "valuation-rule-12"
+  | "classification-cth"
+  | "exemption-denial"
+  | "svb-valuation"
+  | "anti-dumping-cvd-safeguard"
+  | "drawback-rodtep-recovery"
+  | "eou-epcg-noncompliance"
+  | "misdeclaration-111-112"
+  | "confiscation-redemption-125"
+  | "smuggling-123"
+  | "baggage-courier"
+  | "origin-fta-misuse"
+  | "provisional-assessment-18"
+  | "refund-rebate-27"
+  | "interest-penalty-only"
+  | "seizure-detention-110"
+  | "customs-audit-caap"
+  | "driu-investigation"
+  | "customs-general";
+
+const CUSTOMS_REPLY_TYPES: CustomsReplyType[] = [
+  "section-28-demand",
+  "valuation-rule-12",
+  "classification-cth",
+  "exemption-denial",
+  "svb-valuation",
+  "anti-dumping-cvd-safeguard",
+  "drawback-rodtep-recovery",
+  "eou-epcg-noncompliance",
+  "misdeclaration-111-112",
+  "confiscation-redemption-125",
+  "smuggling-123",
+  "baggage-courier",
+  "origin-fta-misuse",
+  "provisional-assessment-18",
+  "refund-rebate-27",
+  "interest-penalty-only",
+  "seizure-detention-110",
+  "customs-audit-caap",
+  "driu-investigation",
+  "customs-general",
+];
+
 const normalizeIncomeTaxReplyType = (value: string | null | undefined): IncomeTaxReplyType | null => {
   if (!value) return null;
   const cleaned = value.trim().toLowerCase();
@@ -306,6 +351,12 @@ const normalizeSebiReplyType = (value: string | null | undefined): SebiReplyType
   if (!value) return null;
   const cleaned = value.trim().toLowerCase();
   return (SEBI_REPLY_TYPES as string[]).includes(cleaned) ? (cleaned as SebiReplyType) : null;
+};
+
+const normalizeCustomsReplyType = (value: string | null | undefined): CustomsReplyType | null => {
+  if (!value) return null;
+  const cleaned = value.trim().toLowerCase();
+  return (CUSTOMS_REPLY_TYPES as string[]).includes(cleaned) ? (cleaned as CustomsReplyType) : null;
 };
 
 const normalizeMcaReplyType = (value: string | null | undefined): McaReplyType | null => {
@@ -459,6 +510,30 @@ const inferSebiReplyType = (noticeDetails?: string, extractedNotice?: NoticeInte
   if (/settlement regulations|settlement application|chapter v/i.test(corpus)) return "sebi-settlement-proceedings";
   if (/summons|investigation|section 11c|appearance before investigating authority/i.test(corpus)) return "sebi-summons-investigation";
   return "sebi-general";
+};
+
+const inferCustomsReplyType = (noticeDetails?: string, extractedNotice?: NoticeIntelligence | null): CustomsReplyType => {
+  const corpus = `${noticeDetails ?? ""}\n${JSON.stringify(extractedNotice?.notice_snapshot?.invoked_provisions ?? [])}`.toLowerCase();
+  if (/\bsection\s*28\b|differential duty|short levy|not levied/i.test(corpus)) return "section-28-demand";
+  if (/rule\s*12|customs valuation rules|transaction value rejection|valuation dispute/i.test(corpus)) return "valuation-rule-12";
+  if (/classification|cth|hsn|tariff heading/i.test(corpus)) return "classification-cth";
+  if (/exemption notification|benefit denied|notification no/i.test(corpus)) return "exemption-denial";
+  if (/\bsvb\b|related party import|special valuation branch/i.test(corpus)) return "svb-valuation";
+  if (/anti[-\s]*dumping|countervailing duty|safeguard duty|trade remedy/i.test(corpus)) return "anti-dumping-cvd-safeguard";
+  if (/drawback|rodtep|rosctl|export incentive recovery/i.test(corpus)) return "drawback-rodtep-recovery";
+  if (/\beou\b|\bepcg\b|advance authori[sz]ation|export obligation/i.test(corpus)) return "eou-epcg-noncompliance";
+  if (/\bsection\s*111\b|\bsection\s*112\b|misdeclaration|incorrect declaration/i.test(corpus)) return "misdeclaration-111-112";
+  if (/\bsection\s*125\b|redemption fine|confiscation/i.test(corpus)) return "confiscation-redemption-125";
+  if (/\bsection\s*123\b|smuggling|illicit import/i.test(corpus)) return "smuggling-123";
+  if (/baggage|courier import|courier regulations/i.test(corpus)) return "baggage-courier";
+  if (/certificate of origin|fta|preferential duty|origin criteria/i.test(corpus)) return "origin-fta-misuse";
+  if (/\bsection\s*18\b|provisional assessment/i.test(corpus)) return "provisional-assessment-18";
+  if (/\bsection\s*27\b|refund claim|rebate claim/i.test(corpus)) return "refund-rebate-27";
+  if (/interest|penalty only|section\s*28aa|section\s*114a/i.test(corpus)) return "interest-penalty-only";
+  if (/\bsection\s*110\b|seizure|detention/i.test(corpus)) return "seizure-detention-110";
+  if (/audit|post clearance audit|caap/i.test(corpus)) return "customs-audit-caap";
+  if (/dri|directorate of revenue intelligence|investigation summons/i.test(corpus)) return "driu-investigation";
+  return "customs-general";
 };
 
 const inferGstReplyType = (noticeDetails?: string, extractedNotice?: NoticeIntelligence | null): GstReplyType => {
@@ -1476,6 +1551,135 @@ const captureSebiRecheckIssues = async ({
     .eq("user_id", userId);
 };
 
+const captureCustomsTrainingCase = async ({
+  authClient,
+  userId,
+  companyId,
+  draftRunId,
+  noticeClass,
+  noticeDetails,
+  generatedDraft,
+  qaPayload,
+  companyName,
+  industry,
+  draftMode,
+  previousCaseId,
+}: {
+  authClient: any;
+  userId: string | null;
+  companyId?: string | null;
+  draftRunId?: string | null;
+  noticeClass: string;
+  noticeDetails?: string | null;
+  generatedDraft: string;
+  qaPayload?: unknown;
+  companyName?: string | null;
+  industry?: string | null;
+  draftMode?: string | null;
+  previousCaseId?: string | null;
+}): Promise<string | null> => {
+  if (!userId || !generatedDraft?.trim()) return null;
+
+  const payload = {
+    draft_run_id: draftRunId ?? null,
+    user_id: userId,
+    company_id: companyId ?? null,
+    notice_class: noticeClass || "customs-general",
+    notice_snapshot: (noticeDetails || "Notice details not provided.").slice(0, 16000),
+    generated_draft: generatedDraft.slice(0, 120000),
+    filing_score: typeof (qaPayload as any)?.filing_score === "number" ? (qaPayload as any).filing_score : null,
+    risk_band: (qaPayload as any)?.risk_band ?? null,
+    qa_payload: qaPayload ?? null,
+    metadata: {
+      source_operation: "draft",
+      company_name: companyName ?? null,
+      industry: industry ?? null,
+      draft_mode: draftMode ?? null,
+      captured_at: new Date().toISOString(),
+    },
+  };
+
+  if (previousCaseId) {
+    const { data, error } = await authClient
+      .from("customs_training_cases")
+      .update(payload)
+      .eq("id", previousCaseId)
+      .eq("user_id", userId)
+      .select("id")
+      .maybeSingle();
+    if (!error && data?.id) return data.id as string;
+  }
+
+  const { data, error } = await authClient
+    .from("customs_training_cases")
+    .insert(payload)
+    .select("id")
+    .maybeSingle();
+  if (error) {
+    console.error("Customs training capture failed:", error.message);
+    return null;
+  }
+  return (data?.id as string) ?? null;
+};
+
+const captureCustomsRecheckIssues = async ({
+  authClient,
+  userId,
+  caseId,
+  flags,
+  summary,
+}: {
+  authClient: any;
+  userId: string | null;
+  caseId?: string | null;
+  flags: RecheckFlag[];
+  summary?: string;
+}) => {
+  if (!userId || !caseId) return;
+
+  if (!flags.length) {
+    await authClient
+      .from("customs_training_cases")
+      .update({
+        status: "reviewed",
+        metadata: {
+          recheck_summary: summary ?? "Recheck passed",
+          recheck_flags_count: 0,
+          rechecked_at: new Date().toISOString(),
+        },
+      })
+      .eq("id", caseId)
+      .eq("user_id", userId);
+    return;
+  }
+
+  const rows = flags.map((f) => ({
+    case_id: caseId,
+    severity: f.severity,
+    detector_source: f.source === "ai" ? "ai" : "rule",
+    issue_text: f.issue,
+    suggested_fix: f.fix,
+  }));
+
+  const { error } = await authClient.from("customs_training_issues").insert(rows);
+  if (error) {
+    console.error("Customs recheck issue capture failed:", error.message);
+  }
+
+  await authClient
+    .from("customs_training_cases")
+    .update({
+      status: "reviewed",
+      metadata: {
+        recheck_summary: summary ?? "Recheck completed",
+        recheck_flags_count: flags.length,
+        rechecked_at: new Date().toISOString(),
+      },
+    })
+    .eq("id", caseId)
+    .eq("user_id", userId);
+};
+
 const normalizeSimilarityText = (input: string) =>
   (input || "")
     .toLowerCase()
@@ -2017,6 +2221,43 @@ const detectSebiRecheckFlags = (
   return flags;
 };
 
+const detectCustomsRecheckFlags = (
+  draft: string,
+  noticeDetails: string,
+): RecheckFlag[] => {
+  const flags: RecheckFlag[] = [];
+  const add = (severity: RecheckFlag["severity"], issue: string, fix: string) => {
+    if (!flags.some((f) => f.issue.toLowerCase() === issue.toLowerCase())) {
+      flags.push({ severity, issue, fix, source: "rule" });
+    }
+  };
+
+  const hasMatrix = /allegation[-\s]*wise rebuttal|issue[-\s]*wise rebuttal/i.test(draft)
+    || /\|\s*Allegation\s*\|\s*Department Position\s*\|\s*(Noticee|Entity) Rebuttal\s*\|/i.test(draft);
+  const hasTimeline = /timeline|chronology/i.test(draft) && /\|\s*[-:]+\s*\|\s*[-:]+\s*\|/.test(draft);
+  const hasSectionAnchors = /\bsection\s*28\b|\bsection\s*28aa\b|\bsection\s*111\b|\bsection\s*112\b|\bsection\s*114a\b|\bsection\s*125\b/i.test(draft);
+  const hasComputation = /duty|interest|penalty|redemption fine|accepted\s*\|\s*disputed|computation/i.test(draft);
+  const hasEvidenceMap = /annexure|bill of entry|boe|invoice|packing list|coo|test report/i.test(draft);
+
+  if (!hasMatrix) add("high", "Customs allegation-wise rebuttal matrix missing.", "Add allegation matrix: Allegation | Department Position | Noticee Rebuttal | Evidence | Relief Sought.");
+  if (!hasTimeline) add("medium", "Customs chronology/timeline table missing.", "Add chronology: Event | Provision | Due/Event Date | Actual Action Date | Reference | Status.");
+  if (!hasSectionAnchors) add("high", "Customs section anchors are weak/missing.", "Anchor submissions to invoked Customs Act sections from notice and link to facts.");
+  if (!hasComputation) add("high", "Duty/interest/penalty/redemption fine computation rebuttal missing.", "Add accepted-vs-disputed computation table with recalculation basis.");
+  if (!hasEvidenceMap) add("medium", "Evidence/annexure mapping is weak.", "Map each major rebuttal to documentary evidence (BoE/invoice/valuation docs/CoO/test reports).");
+  if (/\bwaive\b[^.\n]{0,70}\bpenalt/i.test(draft) || /\babsolve\b/i.test(draft)) {
+    add("medium", "Risky prayer wording detected.", "Use calibrated prayer: drop or reduce unsustainable demand/penalty based on facts and law.");
+  }
+  if (/\[(insert|to be filled)[^\]]*\]/i.test(draft)) {
+    add("low", "Unresolved placeholders detected.", "Replace unresolved placeholders before final filing.");
+  }
+
+  if (/section\s*28|section\s*111|section\s*112|section\s*114a|section\s*125/i.test(noticeDetails) && !hasSectionAnchors) {
+    add("high", "Draft does not reflect key invoked Customs sections from notice.", "Ensure legal submissions mirror invoked sections in notice and rebut each allegation.");
+  }
+
+  return flags;
+};
+
 const isNoPlaceholderGatePassed = (content: string, documentType: string) => {
   if (documentType === "mca-notice") {
     if (!hasPlaceholderMarkers(content)) return true;
@@ -2402,6 +2643,41 @@ const enforceSebiDraftMinimumStructure = (draft: string) => {
   return enforceCrossRegulatorySafetyLanguage(fixed, "sebi-compliance");
 };
 
+const buildCustomsFallbackMatrix = () => `| Allegation | Department Position | Noticee Rebuttal | Evidence | Relief Sought |
+|---|---|---|---|---|
+| Misclassification / valuation / exemption denial | [To be filled by CA/Lawyer] | [Noticee rebuttal with section-wise legal basis] | Annexure A/B | Drop or reduce unsustainable demand |
+| Duty / interest / penalty / fine computation | [To be filled by CA/Lawyer] | [Accepted vs disputed computation with recalculation basis] | Annexure C | Recompute and restrict liability proportionately |`;
+
+const buildCustomsFallbackTimeline = () => `| Compliance/Event | Invoked Provision | Due/Event Date | Actual Filing/Action Date | Reference | Status |
+|---|---|---|---|---|---|
+| Bill of Entry / import event | [To be filled by CA/Lawyer] | [To be filled by CA/Lawyer] | [To be filled by CA/Lawyer] | [To be filled by CA/Lawyer] | [To be filled by CA/Lawyer] |
+| Notice/SCN response action | [To be filled by CA/Lawyer] | [To be filled by CA/Lawyer] | [To be filled by CA/Lawyer] | [To be filled by CA/Lawyer] | [To be filled by CA/Lawyer] |`;
+
+const enforceCustomsDraftMinimumStructure = (draft: string) => {
+  let fixed = enforceCrossRegulatorySafetyLanguage(draft, "customs-response");
+
+  const hasMatrix = /allegation[-\s]*wise rebuttal|issue[-\s]*wise rebuttal/i.test(fixed)
+    || /\|\s*Allegation\s*\|\s*Department Position\s*\|\s*(Noticee|Entity) Rebuttal\s*\|/i.test(fixed);
+  const hasTimeline = /timeline|chronology/i.test(fixed) && /\|\s*[-:]+\s*\|\s*[-:]+\s*\|/.test(fixed);
+  const hasComputation = /accepted\s*\|\s*disputed|duty|interest|penalty|redemption fine|computation/i.test(fixed);
+  const hasEvidence = /annexure|bill of entry|boe|invoice|coo|test report/i.test(fixed);
+
+  if (!hasMatrix) {
+    fixed += `\n\n### Allegation-Wise Rebuttal Matrix\n${buildCustomsFallbackMatrix()}`;
+  }
+  if (!hasTimeline) {
+    fixed += `\n\n### Chronology / Timeline\n${buildCustomsFallbackTimeline()}`;
+  }
+  if (!hasComputation) {
+    fixed += `\n\n### Computation Reconciliation (Accepted vs Disputed)\n| Particulars | Department Position | Noticee Position | Remarks |\n|---|---|---|---|\n| Duty | [To be filled by CA/Lawyer] | [To be filled by CA/Lawyer] | [To be filled by CA/Lawyer] |\n| Interest | [To be filled by CA/Lawyer] | [To be filled by CA/Lawyer] | [To be filled by CA/Lawyer] |\n| Penalty / Fine | [To be filled by CA/Lawyer] | [To be filled by CA/Lawyer] | [To be filled by CA/Lawyer] |`;
+  }
+  if (!hasEvidence) {
+    fixed += `\n\n### Evidence / Annexure Mapping\n1. Annexure A: Notice set + reference IDs.\n2. Annexure B: BoE/invoice/valuation and import documents.\n3. Annexure C: Computation and reconciliation working papers.\n4. Annexure D: Supporting legal/documentary records.`;
+  }
+
+  return enforceCrossRegulatorySafetyLanguage(fixed, "customs-response");
+};
+
 const enforceMcaDraftMinimumStructure = (
   draft: string,
   mcaReplyType: McaReplyType,
@@ -2591,6 +2867,7 @@ serve(async (req) => {
       incomeTaxReplyTypeOverride,
       rbiReplyTypeOverride,
       sebiReplyTypeOverride,
+      customsReplyTypeOverride,
       advancedMode = false,
       strictValidation = false,
       stream = false,
@@ -2617,6 +2894,11 @@ serve(async (req) => {
       : null;
     const inferredSebiReplyType = inferSebiReplyType(noticeDetails, null);
     const effectiveSebiReplyType: SebiReplyType = normalizedSebiReplyType ?? inferredSebiReplyType;
+    const normalizedCustomsReplyType = typeof customsReplyTypeOverride === "string" && customsReplyTypeOverride.trim()
+      ? normalizeCustomsReplyType(customsReplyTypeOverride)
+      : null;
+    const inferredCustomsReplyType = inferCustomsReplyType(noticeDetails, null);
+    const effectiveCustomsReplyType: CustomsReplyType = normalizedCustomsReplyType ?? inferredCustomsReplyType;
 
     if (normalizedOperation === "recheck") {
       if (!draftContent || typeof draftContent !== "string" || draftContent.trim().length < 40) {
@@ -2638,6 +2920,9 @@ serve(async (req) => {
       const sebiReplyType: SebiReplyType = documentType === "sebi-compliance"
         ? (normalizeSebiReplyType(sebiReplyTypeOverride) ?? inferSebiReplyType(noticeDetails, null))
         : "sebi-general";
+      const customsReplyType: CustomsReplyType = documentType === "customs-response"
+        ? (normalizeCustomsReplyType(customsReplyTypeOverride) ?? inferCustomsReplyType(noticeDetails, null))
+        : "customs-general";
 
       const ruleFlags = documentType === "mca-notice"
         ? detectMcaRecheckFlags(draftContent, noticeDetails || "", mcaReplyType)
@@ -2649,6 +2934,8 @@ serve(async (req) => {
             ? detectRbiRecheckFlags(draftContent, noticeDetails || "")
           : documentType === "sebi-compliance"
             ? detectSebiRecheckFlags(draftContent, noticeDetails || "")
+            : documentType === "customs-response"
+              ? detectCustomsRecheckFlags(draftContent, noticeDetails || "")
           : [];
 
       const recheckSystemPrompt = `You are a legal QA reviewer for Indian regulatory draft filings.
@@ -2676,6 +2963,7 @@ Income-tax Reply Type: ${incomeTaxReplyType}
 GST Reply Type: ${effectiveGstReplyType}
 RBI Reply Type: ${rbiReplyType}
 SEBI Reply Type: ${sebiReplyType}
+Customs Reply Type: ${customsReplyType}
 
 NOTICE/ORDER DETAILS:
 ${noticeDetails || "Not provided"}
@@ -2767,6 +3055,14 @@ ${evidenceContext || "None provided"}`;
           flags: dedup,
           summary,
         });
+      } else if (documentType === "customs-response") {
+        await captureCustomsRecheckIssues({
+          authClient,
+          userId,
+          caseId: typeof trainingCaseId === "string" ? trainingCaseId : null,
+          flags: dedup,
+          summary,
+        });
       }
 
       return new Response(JSON.stringify({
@@ -2796,6 +3092,9 @@ ${evidenceContext || "None provided"}`;
       const sebiReplyType: SebiReplyType | null = documentType === "sebi-compliance"
         ? (normalizeSebiReplyType(sebiReplyTypeOverride) ?? inferSebiReplyType(noticeDetails, null))
         : null;
+      const customsReplyType: CustomsReplyType | null = documentType === "customs-response"
+        ? (normalizeCustomsReplyType(customsReplyTypeOverride) ?? inferCustomsReplyType(noticeDetails, null))
+        : null;
       const mcaKnowledge = mcaReplyType ? getMcaKnowledgeBlock(mcaReplyType) : "";
       const mcaChecklist = mcaReplyType ? getMcaPendingDataChecklist(mcaReplyType).map((item) => `- ${item}`).join("\n") : "";
 
@@ -2819,6 +3118,7 @@ ${documentType === "income-tax-response" && incomeTaxReplyType ? `- Income-tax R
 ${documentType === "gst-show-cause" && gstReplyType ? `- GST Reply Type: ${gstReplyType}` : ""}
 ${documentType === "rbi-filing" && rbiReplyType ? `- RBI Reply Type: ${rbiReplyType}` : ""}
 ${documentType === "sebi-compliance" && sebiReplyType ? `- SEBI Reply Type: ${sebiReplyType}` : ""}
+${documentType === "customs-response" && customsReplyType ? `- Customs Reply Type: ${customsReplyType}` : ""}
 
 Use this context if provided:
 ${context || "No extra context provided."}
@@ -2866,6 +3166,7 @@ ${noticeDetails || "None provided."}`;
           incomeTaxReplyType,
           rbiReplyType,
           sebiReplyType,
+          customsReplyType,
           generatedAt: new Date().toISOString(),
         },
       }), {
@@ -2968,6 +3269,9 @@ If notice data is missing, list specific missing items in critical_missing_field
     const sebiReplyType: SebiReplyType | null = documentType === "sebi-compliance"
       ? (normalizeSebiReplyType(sebiReplyTypeOverride) ?? inferSebiReplyType(noticeDetails, extractedNotice))
       : null;
+    const customsReplyType: CustomsReplyType | null = documentType === "customs-response"
+      ? (normalizeCustomsReplyType(customsReplyTypeOverride) ?? inferCustomsReplyType(noticeDetails, extractedNotice))
+      : null;
     const extractedNoticeDate = extractNoticeDateFromText(noticeDetails);
     const mcaPendingChecklistText = mcaReplyType
       ? getMcaPendingDataChecklist(mcaReplyType).map((item) => `- ${item}`).join("\n")
@@ -3011,6 +3315,7 @@ ${documentType === "mca-notice" && mcaReplyType ? `- MCA Reply Type: ${mcaReplyT
 ${documentType === "income-tax-response" && incomeTaxReplyType ? `- Income-tax Reply Type: ${incomeTaxReplyType}` : ""}
 ${documentType === "rbi-filing" && rbiReplyType ? `- RBI Reply Type: ${rbiReplyType}` : ""}
 ${documentType === "sebi-compliance" ? `- SEBI Reply Type: ${effectiveSebiReplyType}` : ""}
+${documentType === "customs-response" ? `- Customs Reply Type: ${effectiveCustomsReplyType}` : ""}
 
 ${extractedNotice ? `EXTRACTED NOTICE INTELLIGENCE (use as primary structure source):\n${JSON.stringify(extractedNotice, null, 2)}` : ""}
 
@@ -3090,6 +3395,25 @@ Dataset policy:
 - Use prior dataset patterns only for structure and quality patterns.
 - Never reproduce long sentence blocks or paragraph chunks from prior stored drafts.
 - The output must be freshly written and specific to the current notice facts.`
+      : documentType === "customs-response"
+        ? `Generate a final adjudication-ready Customs response for ${companyName}${industry ? ` (${industry} sector)` : ""}.
+Detected Customs notice class: ${customsReplyType ?? effectiveCustomsReplyType ?? "customs-general"}.
+Mandatory structure:
+1) Heading + customs authority/office metadata from notice
+2) Notice metadata (SCN/reference no, DIN/RFN if available, date, period)
+3) Preliminary submissions
+4) Allegation-wise rebuttal matrix (classification/valuation/exemption/misdeclaration as applicable)
+5) Section-wise legal submissions under invoked Customs provisions
+6) Duty/interest/penalty/redemption fine accepted-vs-disputed computation table
+7) Chronology/timeline table (event date vs filing/action date + reference IDs)
+8) Evidence and annexure mapping (BoE, invoices, CoO, test reports, correspondence)
+9) Layered prayer with hearing request and proportionality language
+10) Sign-off
+Avoid unsupported case law. Use controlled placeholders only where unavoidable.
+Dataset policy:
+- Use prior dataset patterns only for structure and quality patterns.
+- Never reproduce long sentence blocks or paragraph chunks from prior stored drafts.
+- The output must be freshly written and specific to the current notice facts.`
       : `Generate a comprehensive, filing-ready ${documentType.replace(/-/g, " ")} for ${companyName}${industry ? ` (${industry} sector)` : ""}. Include SCN para-wise rebuttal matrix, allegation-wise computation challenge with accepted/disputed columns, annexure mapping per issue, calibrated legal language, and complete layered prayer.`);
 
     if (!advancedMode) {
@@ -3137,6 +3461,8 @@ Dataset policy:
         draftContent = enforceRbiDraftMinimumStructure(draftContent);
       } else if (documentType === "sebi-compliance") {
         draftContent = enforceSebiDraftMinimumStructure(draftContent);
+      } else if (documentType === "customs-response") {
+        draftContent = enforceCustomsDraftMinimumStructure(draftContent);
       } else {
         draftContent = enforceCrossRegulatorySafetyLanguage(draftContent, documentType);
       }
@@ -3152,6 +3478,7 @@ Dataset policy:
           incomeTaxReplyType,
           rbiReplyType: effectiveRbiReplyType,
           sebiReplyType: effectiveSebiReplyType,
+          customsReplyType: customsReplyType ?? effectiveCustomsReplyType,
           advancedMode,
           generatedAt: new Date().toISOString(),
           version: "2.0",
@@ -3418,6 +3745,8 @@ Checklist:
       finalDraft = enforceRbiDraftMinimumStructure(finalDraft);
     } else if (documentType === "sebi-compliance") {
       finalDraft = enforceSebiDraftMinimumStructure(finalDraft);
+    } else if (documentType === "customs-response") {
+      finalDraft = enforceCustomsDraftMinimumStructure(finalDraft);
     } else if (documentType !== "mca-notice") {
       finalDraft = enforceCrossRegulatorySafetyLanguage(finalDraft, documentType);
     } else {
@@ -3609,6 +3938,21 @@ Schema:
         draftMode,
         previousCaseId: typeof trainingCaseId === "string" ? trainingCaseId : null,
       });
+    } else if (documentType === "customs-response") {
+      capturedTrainingCaseId = await captureCustomsTrainingCase({
+        authClient,
+        userId,
+        companyId: typeof companyId === "string" ? companyId : null,
+        draftRunId: typeof draftRunId === "string" ? draftRunId : null,
+        noticeClass: customsReplyType ?? effectiveCustomsReplyType ?? "customs-general",
+        noticeDetails: noticeDetails ?? null,
+        generatedDraft: finalDraft,
+        qaPayload: finalQaPayload,
+        companyName,
+        industry,
+        draftMode,
+        previousCaseId: typeof trainingCaseId === "string" ? trainingCaseId : null,
+      });
     }
 
     return new Response(JSON.stringify({
@@ -3624,6 +3968,7 @@ Schema:
         incomeTaxReplyType: incomeTaxReplyType ?? normalizedIncomeTaxReplyType,
         rbiReplyType: rbiReplyType ?? normalizedRbiReplyType ?? effectiveRbiReplyType,
         sebiReplyType: sebiReplyType ?? effectiveSebiReplyType,
+        customsReplyType: customsReplyType ?? effectiveCustomsReplyType,
         advancedMode,
         userId,
         trainingCaseId: capturedTrainingCaseId,

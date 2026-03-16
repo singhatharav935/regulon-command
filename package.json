@@ -15,7 +15,8 @@
     "gst:bootstrap": "node scripts/bootstrap-gst-training.mjs",
     "income-tax:bootstrap": "node scripts/bootstrap-income-tax-training.mjs",
     "rbi:bootstrap": "node scripts/bootstrap-rbi-training.mjs",
-    "sebi:bootstrap": "node scripts/bootstrap-sebi-training.mjs"
+    "sebi:bootstrap": "node scripts/bootstrap-sebi-training.mjs",
+    "customs:bootstrap": "node scripts/bootstrap-customs-training.mjs"
   },
   "dependencies": {
     "@hookform/resolvers": "^3.10.0",
