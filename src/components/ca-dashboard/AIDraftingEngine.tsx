@@ -1601,28 +1601,32 @@ const AIDraftingEngine = ({ demoMode = false, includeLawyerReview = true }: AIDr
     () => getTemplatePackOptionsBySelection(selectedDocType, effectiveNoticeClass),
     [selectedDocType, effectiveNoticeClass],
   );
+  const recommendedTemplateIds = useMemo(() => new Set<string>([
+    "auto",
+    "class-core",
+    "conservative",
+    "balanced",
+    "assertive",
+    `${`${selectedDocType}-${effectiveNoticeClass}`.replace(/[^a-z0-9-]/gi, "-").toLowerCase()}-facts-balanced-matrix`,
+    `${`${selectedDocType}-${effectiveNoticeClass}`.replace(/[^a-z0-9-]/gi, "-").toLowerCase()}-law-balanced-matrix`,
+    `${`${selectedDocType}-${effectiveNoticeClass}`.replace(/[^a-z0-9-]/gi, "-").toLowerCase()}-evidence-balanced-table-heavy`,
+    `${`${selectedDocType}-${effectiveNoticeClass}`.replace(/[^a-z0-9-]/gi, "-").toLowerCase()}-timeline-safe-table-heavy`,
+    `${`${selectedDocType}-${effectiveNoticeClass}`.replace(/[^a-z0-9-]/gi, "-").toLowerCase()}-quantum-assertive-matrix`,
+    `${`${selectedDocType}-${effectiveNoticeClass}`.replace(/[^a-z0-9-]/gi, "-").toLowerCase()}-procedure-safe-brief`,
+    `${`${selectedDocType}-${effectiveNoticeClass}`.replace(/[^a-z0-9-]/gi, "-").toLowerCase()}-hearing-balanced-brief`,
+  ]), [selectedDocType, effectiveNoticeClass]);
+  const recommendedTemplatePackOptions = useMemo(
+    () => templatePackOptions.filter((pack) => recommendedTemplateIds.has(pack.id)).slice(0, 8),
+    [templatePackOptions, recommendedTemplateIds],
+  );
   const filteredTemplatePackOptions = useMemo(() => {
     const authorityIds = getAuthorityTemplatePackIds(selectedDocType);
     const query = templateSearch.trim().toLowerCase();
-    const recommendedIds = new Set<string>([
-      "auto",
-      "class-core",
-      "conservative",
-      "balanced",
-      "assertive",
-      `${`${selectedDocType}-${effectiveNoticeClass}`.replace(/[^a-z0-9-]/gi, "-").toLowerCase()}-facts-balanced-matrix`,
-      `${`${selectedDocType}-${effectiveNoticeClass}`.replace(/[^a-z0-9-]/gi, "-").toLowerCase()}-law-balanced-matrix`,
-      `${`${selectedDocType}-${effectiveNoticeClass}`.replace(/[^a-z0-9-]/gi, "-").toLowerCase()}-evidence-balanced-table-heavy`,
-      `${`${selectedDocType}-${effectiveNoticeClass}`.replace(/[^a-z0-9-]/gi, "-").toLowerCase()}-timeline-safe-table-heavy`,
-      `${`${selectedDocType}-${effectiveNoticeClass}`.replace(/[^a-z0-9-]/gi, "-").toLowerCase()}-quantum-assertive-matrix`,
-      `${`${selectedDocType}-${effectiveNoticeClass}`.replace(/[^a-z0-9-]/gi, "-").toLowerCase()}-procedure-safe-brief`,
-      `${`${selectedDocType}-${effectiveNoticeClass}`.replace(/[^a-z0-9-]/gi, "-").toLowerCase()}-hearing-balanced-brief`,
-    ]);
 
     const scoped = templatePackOptions.filter((pack) => {
       const inView = (() => {
         if (templateCatalogView === "all") return true;
-        if (templateCatalogView === "recommended") return recommendedIds.has(pack.id);
+        if (templateCatalogView === "recommended") return recommendedTemplateIds.has(pack.id);
         if (templateCatalogView === "class-variants") return isClassVariantTemplate(pack.id, selectedDocType, effectiveNoticeClass);
         if (templateCatalogView === "authority-packs") return authorityIds.has(pack.id);
         if (templateCatalogView === "universal-packs") return UNIVERSAL_TEMPLATE_PACK_IDS.has(pack.id);
@@ -1638,7 +1642,7 @@ const AIDraftingEngine = ({ demoMode = false, includeLawyerReview = true }: AIDr
       if (selected) return [selected, ...scoped];
     }
     return scoped;
-  }, [templatePackOptions, templateCatalogView, templateSearch, selectedDocType, effectiveNoticeClass, templatePackOverride]);
+  }, [templatePackOptions, templateCatalogView, templateSearch, selectedDocType, effectiveNoticeClass, templatePackOverride, recommendedTemplateIds]);
   const effectiveTemplatePack = useMemo(() => {
     const defaultPack = templatePackOptions.find((pack) => pack.id === "class-core") || templatePackOptions.find((pack) => pack.id !== "auto");
     if (!defaultPack) return AUTO_TEMPLATE_PACK;
@@ -1663,6 +1667,10 @@ const AIDraftingEngine = ({ demoMode = false, includeLawyerReview = true }: AIDr
       ? baseTemplate
       : `${classAware}\n\n${baseTemplate}`;
   }, [selectedDocType, selectedDocLabel, effectiveNoticeClass, selectedClassLabel, effectiveTemplatePack]);
+  const selectedTemplatePackDefinition = useMemo(
+    () => templatePackOptions.find((pack) => pack.id === templatePackOverride),
+    [templatePackOptions, templatePackOverride],
+  );
   const supabaseAny = supabase as any;
   const getMcaAutoFixNotes = (
     issues: Array<{ issue: string; suggestion: string }>,
@@ -5353,11 +5361,32 @@ Return only revised final draft text.`;
               )}
 
               {selectedDocType && (
-                <div>
+                <div className="p-3 rounded-lg border border-border/50 bg-background/30">
                   <label className="block text-sm font-medium text-foreground mb-2">
                     <FileText className="w-4 h-4 inline-block mr-2" />
-                    Template Pack
+                    Template Intelligence Engine
                   </label>
+                  {recommendedTemplatePackOptions.length > 0 ? (
+                    <div className="mb-2">
+                      <p className="text-[11px] text-muted-foreground mb-1">Quick picks</p>
+                      <div className="flex flex-wrap gap-1.5">
+                        {recommendedTemplatePackOptions.map((pack) => (
+                          <button
+                            key={pack.id}
+                            type="button"
+                            onClick={() => setTemplatePackOverride(pack.id)}
+                            className={`text-[11px] px-2 py-1 rounded border ${
+                              templatePackOverride === pack.id
+                                ? "bg-primary/20 text-primary border-primary/40"
+                                : "bg-background/50 text-muted-foreground border-border/50 hover:text-foreground"
+                            }`}
+                          >
+                            {pack.label}
+                          </button>
+                        ))}
+                      </div>
+                    </div>
+                  ) : null}
                   <div className="grid grid-cols-1 md:grid-cols-2 gap-2 mb-2">
                     <Select value={templateCatalogView} onValueChange={(v) => setTemplateCatalogView(v as TemplateCatalogView)}>
                       <SelectTrigger className="bg-background/50">
@@ -5390,6 +5419,12 @@ Return only revised final draft text.`;
                       ))}
                     </SelectContent>
                   </Select>
+                  {selectedTemplatePackDefinition ? (
+                    <div className="mt-2 p-2 rounded border border-border/50 bg-background/40">
+                      <p className="text-xs text-foreground font-medium">{selectedTemplatePackDefinition.label}</p>
+                      <p className="text-[11px] text-muted-foreground">{selectedTemplatePackDefinition.description}</p>
+                    </div>
+                  ) : null}
                   <p className="text-xs text-muted-foreground mt-1">
                     Auto template tracks class:{" "}
                     <span className="text-foreground font-medium">{selectedClassLabel}</span>. Available packs:{" "}
