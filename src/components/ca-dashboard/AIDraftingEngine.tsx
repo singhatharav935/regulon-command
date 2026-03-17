@@ -553,6 +553,14 @@ const UNIVERSAL_TEMPLATE_PACKS: TemplatePackDefinition[] = [
   { id: "evidence-led", label: "Evidence-Led", description: "Annexure-first rebuttal", instructions: "Map each rebuttal point to explicit annexure/document anchors and proof trail." },
   { id: "computation-first", label: "Computation First", description: "Amount reconciliation focus", instructions: "Include accepted vs disputed amount analysis and recomputation logic early." },
   { id: "procedural-objection", label: "Procedural Objection", description: "Procedure and natural justice focus", instructions: "Emphasize service defects, limitation, hearing rights, and procedural fairness where factually available." },
+  { id: "jurisdiction-limitation", label: "Jurisdiction + Limitation", description: "Jurisdictional and time-bar framing", instructions: "Prioritize jurisdiction, limitation, and maintainability submissions before merits." },
+  { id: "burden-of-proof", label: "Burden of Proof", description: "Departmental proof burden focus", instructions: "Structure each issue around burden of proof and evidentiary threshold." },
+  { id: "risk-minimized", label: "Risk Minimized", description: "Lowest litigation-risk template", instructions: "Use safest filing language with limited assumptions and strict factual caveats." },
+  { id: "forensic-audit", label: "Forensic Audit", description: "Document-level forensic style", instructions: "Organize by transaction/document audit trail and contradiction mapping." },
+  { id: "litigation-ready", label: "Litigation Ready", description: "Appeal-ready structure", instructions: "Draft in a way that can directly support appellate grounds later." },
+  { id: "appeal-bridge", label: "Appeal Bridge", description: "Adjudication to appeal continuity", instructions: "Include findings-risk and future appellate continuity points in concise form." },
+  { id: "management-brief", label: "Management Brief", description: "Decision-maker summary focus", instructions: "Include executive summary, key risks, and required documentary actions." },
+  { id: "adjudication-tight", label: "Adjudication Tight", description: "Strict AO-ready structure", instructions: "Keep concise issue matrix, statutory anchors, and targeted prayer only." },
   { id: "leniency-focused", label: "Leniency Focus", description: "Mitigation-first structure", instructions: "Prioritize mitigation factors, bona fide conduct, and proportional penalty submissions." },
   { id: "hearing-focused", label: "Hearing Focus", description: "Oral hearing prep style", instructions: "Structure draft for hearing with concise issue matrix and hearing ask in every relief block." },
   { id: "conservative", label: "Conservative", description: "Lowest risk language", instructions: "Use compliance-first, low-risk language and avoid aggressive legal claims." },
@@ -567,6 +575,9 @@ const DOCUMENT_TEMPLATE_PACKS: Record<string, TemplatePackDefinition[]> = {
     { id: "mca-officer-defense", label: "Officer Defense", description: "Officer-wise role matrix", instructions: "Include officer-specific role period, allegation, and mitigating facts table." },
     { id: "mca-446b-eligibility", label: "Section 446B", description: "Lesser penalty eligibility", instructions: "Use 446B block only with factual qualification support and date-linked eligibility." },
     { id: "mca-board-governance", label: "Governance Matrix", description: "Board/compliance controls", instructions: "Highlight governance controls, compliance calendar, and recurrence-prevention actions." },
+    { id: "mca-adjudication-order-ready", label: "AO Order Ready", description: "ROC/AO adjudication style", instructions: "Align blocks exactly to AO decision flow: facts, law, application, relief." },
+    { id: "mca-hearing-brief", label: "MCA Hearing Brief", description: "Hearing-ready concise mode", instructions: "Add concise hearing points and answer-ready issue bullets for officer hearing." },
+    { id: "mca-compounding-lens", label: "Compounding Lens", description: "Compounding-friendly framing", instructions: "Frame rectification and mitigation to support compounding/lenient disposal where available." },
   ],
   "gst-show-cause": [
     { id: "gst-drc-matrix", label: "DRC Matrix", description: "DRC allegation matrix", instructions: "Create allegation-wise matrix mapped to DRC issues and statutory hooks." },
@@ -574,41 +585,78 @@ const DOCUMENT_TEMPLATE_PACKS: Record<string, TemplatePackDefinition[]> = {
     { id: "gst-computation-challenge", label: "Demand Computation", description: "Tax/interest/penalty split", instructions: "Add accepted vs disputed tax, interest and penalty computation challenge table." },
     { id: "gst-natural-justice", label: "Natural Justice", description: "Procedural fairness angle", instructions: "Emphasize hearing opportunity and evidence confrontation before demand confirmation." },
     { id: "gst-registration-defense", label: "Registration Defense", description: "REG-17/23 type focus", instructions: "Use registration cancellation/revocation specific defense flow with operational continuity facts." },
+    { id: "gst-scn-para-rebuttal", label: "SCN Para Rebuttal", description: "Paragraph-wise SCN rebuttal", instructions: "Respond paragraph-by-paragraph to SCN allegations with evidence tags." },
+    { id: "gst-itc-rule-42-43", label: "Rule 42/43 Focus", description: "Apportionment-specific template", instructions: "Use ITC reversal/apportionment computation with Rule 42/43 reconciliation." },
+    { id: "gst-adjudication-hearing", label: "GST Hearing Brief", description: "Hearing prep template", instructions: "Add officer hearing points, disputed quantum, and fallback settlement framing." },
   ],
   "income-tax-response": [
     { id: "it-addition-matrix", label: "Addition Matrix", description: "Issue-wise addition rebuttal", instructions: "Use issue/addition-wise matrix: AO position vs assessee rebuttal with evidence." },
     { id: "it-books-reconciliation", label: "Books Reconciliation", description: "Books and ledger focus", instructions: "Prioritize books, ledger, AIS/TIS/26AS reconciliation before legal submissions." },
     { id: "it-penalty-defense", label: "Penalty Defense", description: "270A and mens rea angle", instructions: "Use penalty-defense template with under-reporting/misreporting challenge and bona fide position." },
     { id: "it-reassessment-defense", label: "Reassessment Defense", description: "147/148/148A flow", instructions: "Structure around jurisdiction, reasons, and reopening threshold challenge." },
+    { id: "it-faceless-submission", label: "Faceless Format", description: "NFAC-friendly structure", instructions: "Use concise fact table, issue matrix, and evidence index for faceless submissions." },
+    { id: "it-26as-ais-tis", label: "AIS/TIS/26AS Match", description: "Data mismatch reconciliation", instructions: "Prioritize 26AS/AIS/TIS reconciliation with books and return disclosures." },
+    { id: "it-appeal-continuity", label: "Appeal Continuity", description: "Assessment to CIT(A) bridge", instructions: "Frame grounds in assessment reply to support later appellate challenge continuity." },
   ],
   "rbi-filing": [
     { id: "rbi-fema-contravention", label: "FEMA Contravention", description: "Contravention regularization focus", instructions: "Map allegations to FEMA provisions and corrective reporting actions." },
     { id: "rbi-reporting-delay", label: "Reporting Delay", description: "Delay condonation flow", instructions: "Use delay-cause, corrective filing, and LSF/compounding mitigation structure." },
     { id: "rbi-authorization-controls", label: "Control Framework", description: "Compliance controls focus", instructions: "Highlight internal controls, maker-checker, and compliance monitoring mechanisms." },
+    { id: "rbi-fema-reporting-grid", label: "FEMA Reporting Grid", description: "Form-by-form reporting matrix", instructions: "Use reporting-grid format for each delayed/incorrect filing with remedial action." },
+    { id: "rbi-compounding-ready", label: "Compounding Ready", description: "Compounding support template", instructions: "Use factual contravention grid with corrective actions and non-recurrence controls." },
+    { id: "rbi-inspection-response", label: "Inspection Response", description: "Inspection/observation closure", instructions: "Address each inspection point with closure evidence and control enhancements." },
   ],
   "sebi-compliance": [
     { id: "sebi-lodr-disclosure", label: "LODR Disclosure", description: "Disclosure timeline defense", instructions: "Focus on disclosure timeline, materiality assessment, and exchange filing records." },
     { id: "sebi-pit-upsi", label: "PIT/UPSI Controls", description: "Insider controls framework", instructions: "Emphasize code of conduct, UPSI controls, and structured digital database evidence." },
     { id: "sebi-allegation-matrix", label: "Allegation Matrix", description: "Regulation-wise rebuttal", instructions: "Create allegation-wise matrix with regulation hook and documentary proof mapping." },
     { id: "sebi-settlement-style", label: "Settlement Style", description: "Mitigated adjudication posture", instructions: "Use calibrated mitigation and compliance-remediation posture for adjudication/settlement style responses." },
+    { id: "sebi-regulation-grid", label: "Regulation Grid", description: "Regulation-wise response", instructions: "Map each allegation directly to the cited SEBI regulation and rebuttal evidence." },
+    { id: "sebi-disclosure-timeline", label: "Disclosure Timeline", description: "Exchange filing timeline", instructions: "Lead with disclosure timeline and filing acknowledgements from exchange records." },
+    { id: "sebi-enforcement-defense", label: "Enforcement Defense", description: "Investigation/adjudication defense", instructions: "Prioritize enforceability thresholds, intent, and documentary contradiction mapping." },
   ],
   "customs-response": [
     { id: "customs-classification", label: "Classification Defense", description: "CTH/HSN dispute focus", instructions: "Center draft on classification rationale, technical notes, and tariff interpretation." },
     { id: "customs-valuation", label: "Valuation Defense", description: "Valuation rejection challenge", instructions: "Use transaction value defense with valuation-rule anchored submissions." },
     { id: "customs-demand-recompute", label: "Demand Recompute", description: "Duty/interest/fine split", instructions: "Add duty-interest-penalty-redemption fine recomputation challenge table." },
     { id: "customs-seizure-procedure", label: "Seizure Procedure", description: "110/111/112 procedural focus", instructions: "Focus on seizure/confiscation procedural compliance and evidentiary thresholds." },
+    { id: "customs-notification-benefit", label: "Notification Benefit", description: "Exemption benefit defense", instructions: "Map exemption notification conditions to factual compliance with documentary support." },
+    { id: "customs-origin-fta", label: "Origin/FTA Defense", description: "COO/FTA-focused template", instructions: "Use origin criteria and FTA documentation trail rebuttal format." },
+    { id: "customs-dri-defense", label: "DRI Proceedings", description: "DRI/investigation format", instructions: "Use investigation-response structure with statement context and seizure trail mapping." },
   ],
   "contract-review": [
     { id: "contract-clause-risk", label: "Clause Risk Matrix", description: "Clause-wise risk review", instructions: "Structure as clause-wise risk matrix with recommended replacement language." },
     { id: "contract-redline-heavy", label: "Redline Heavy", description: "Drafting replacement focus", instructions: "Provide strong redline-ready replacement language for all high-risk clauses." },
     { id: "contract-commercial-balance", label: "Commercial Balance", description: "Legal + business tradeoff", instructions: "Balance legal risk with commercial feasibility and negotiation fallbacks." },
     { id: "contract-dispute-ready", label: "Dispute Ready", description: "Enforceability and dispute posture", instructions: "Prioritize enforceability, jurisdiction, arbitration, and breach-remedy clauses." },
+    { id: "contract-saas-enterprise", label: "SaaS Enterprise", description: "SaaS enterprise template", instructions: "Focus on SLA, uptime, DPA, indemnity, data localization and IP licensing clauses." },
+    { id: "contract-procurement-enterprise", label: "Procurement Enterprise", description: "Vendor/procurement master format", instructions: "Prioritize acceptance criteria, service credits, liability and termination triggers." },
+    { id: "contract-board-summary", label: "Board Summary", description: "Board-level contract risk brief", instructions: "Add decision-level summary with risk tiers and fallback negotiation options." },
   ],
   "custom-draft": [
     { id: "custom-general-matrix", label: "General Matrix", description: "Issue-wise matrix baseline", instructions: "Use issue-wise matrix with statutory anchors and evidence mapping." },
     { id: "custom-provision-heavy", label: "Provision Heavy", description: "Law-first template", instructions: "Prioritize section/rule/regulation mapping and legal threshold analysis." },
     { id: "custom-remediation", label: "Remediation Focus", description: "Corrective action heavy", instructions: "Lead with corrective actions, compliance remediation, and prevention controls." },
+    { id: "custom-cross-regulatory", label: "Cross-Regulatory", description: "Multi-regulator response", instructions: "Structure issues for multi-regulator context with harmonized legal anchors." },
+    { id: "custom-summons-response", label: "Summons Response", description: "Inquiry/investigation style", instructions: "Use structured summons response with question-wise and document-wise replies." },
+    { id: "custom-demand-neutralization", label: "Demand Neutralization", description: "Demand reduction strategy", instructions: "Focus on quantum neutralization with accepted vs disputed computation grid." },
   ],
+};
+
+const buildClassSpecificTemplatePacks = (documentType: string, classId: string): TemplatePackDefinition[] => {
+  if (!documentType || !classId || classId === "auto") return [];
+  const slug = `${documentType}-${classId}`.replace(/[^a-z0-9-]/gi, "-").toLowerCase();
+  const classTitle = classId.replace(/-/g, " ");
+
+  return [
+    { id: `${slug}-deep-defense`, label: "Class Deep Defense", description: `${classTitle} deep-defense variant`, instructions: `Build comprehensive issue-wise defense specifically for ${classId} with full fact-law-evidence chain.` },
+    { id: `${slug}-fast-hearing`, label: "Class Fast Hearing", description: `${classTitle} hearing-short format`, instructions: `Create concise adjudication hearing format for ${classId} with short issue bullets and key relief asks.` },
+    { id: `${slug}-evidence-strict`, label: "Class Evidence Strict", description: `${classTitle} proof-first variant`, instructions: `For ${classId}, ensure each assertion has immediate documentary anchor and annexure mapping.` },
+    { id: `${slug}-timeline-strict`, label: "Class Timeline Strict", description: `${classTitle} date-critical variant`, instructions: `For ${classId}, prioritize due/event/actual timeline grid and date-consistency checks across all sections.` },
+    { id: `${slug}-mitigation-max`, label: "Class Mitigation Max", description: `${classTitle} mitigation-heavy variant`, instructions: `For ${classId}, emphasize bona fide conduct, correction actions, and proportionality-based penalty moderation.` },
+    { id: `${slug}-quantum-challenge`, label: "Class Quantum Challenge", description: `${classTitle} computation-focused variant`, instructions: `For ${classId}, prioritize accepted-vs-disputed computation and quantification challenge matrix.` },
+    { id: `${slug}-appeal-ready`, label: "Class Appeal Ready", description: `${classTitle} future-appeal variant`, instructions: `Draft ${classId} response with appellate continuity, preserving grounds and evidence anchors for future challenge.` },
+  ];
 };
 
 const getReplyTypeOptionsByDocumentType = (documentType: string) => {
@@ -656,6 +704,7 @@ const getTemplatePackOptionsBySelection = (
     AUTO_TEMPLATE_PACK,
     ...UNIVERSAL_TEMPLATE_PACKS,
     ...(DOCUMENT_TEMPLATE_PACKS[documentType] || []),
+    ...buildClassSpecificTemplatePacks(documentType, classId),
   ];
 
   const classLower = (classId || "").toLowerCase();
