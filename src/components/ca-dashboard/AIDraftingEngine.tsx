@@ -3069,11 +3069,6 @@ const AIDraftingEngine = ({ demoMode = false, includeLawyerReview = true }: AIDr
     }
   };
 
-  const handleClearNoticeDetails = () => {
-    setNoticeDetails("");
-    toast.success("Notice / Order Details cleared.");
-  };
-
   const handleGenerateNoticeDetailsAI = async () => {
     if (!selectedDocType) {
       toast.error("Select document type first.");
@@ -4774,7 +4769,7 @@ Return only revised final draft text.`;
                 <p className="text-xs text-muted-foreground mt-1">
                   Providing notice details enables point-by-point rebuttal. Procedural objections are raised only if evidence supports them.
                 </p>
-                <div className="mt-2 grid grid-cols-1 sm:grid-cols-4 gap-2">
+                <div className="mt-2 grid grid-cols-1 sm:grid-cols-3 gap-2">
                   <Button
                     type="button"
                     variant="outline"
@@ -4805,14 +4800,6 @@ Return only revised final draft text.`;
                     disabled={!selectedDocType}
                   >
                     Copy 200+ Template
-                  </Button>
-                  <Button
-                    type="button"
-                    variant="outline"
-                    onClick={handleClearNoticeDetails}
-                    disabled={!noticeDetails.trim()}
-                  >
-                    Clear Text
                   </Button>
                 </div>
                 <div className="mt-2 p-2 rounded-lg border border-border/50 bg-background/40 flex items-center justify-between">
