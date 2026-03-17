@@ -2792,6 +2792,12 @@ const AIDraftingEngine = ({ demoMode = false, includeLawyerReview = true }: AIDr
   }, [selectedDocType, draftGenerated, draftContent, draftQA]);
 
   useEffect(() => {
+    if (selectedDocType !== "contract-review" || !draftGenerated || !draftContent.trim()) return;
+    runContractDraftIssueCheck(draftContent, draftQA);
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [selectedDocType, draftGenerated, draftContent, draftQA]);
+
+  useEffect(() => {
     if (selectedDocType !== "custom-draft" || !draftGenerated || !draftContent.trim()) return;
     runCustomDraftIssueCheck(draftContent, draftQA);
     // eslint-disable-next-line react-hooks/exhaustive-deps
@@ -3095,6 +3101,9 @@ const AIDraftingEngine = ({ demoMode = false, includeLawyerReview = true }: AIDr
           : undefined,
         customsReplyTypeOverride: selectedDocType === "customs-response" && customsReplyTypeOverride !== "auto"
           ? customsReplyTypeOverride
+          : undefined,
+        contractReplyTypeOverride: selectedDocType === "contract-review" && contractReplyTypeOverride !== "auto"
+          ? contractReplyTypeOverride
           : undefined,
         customReplyTypeOverride: selectedDocType === "custom-draft" && customReplyTypeOverride !== "auto"
           ? customReplyTypeOverride
@@ -3737,6 +3746,98 @@ Return only revised final draft text.`;
       toast.error(msg);
     } finally {
       setIsApplyingSebiFix(false);
+    }
+  };
+
+  const handleApplyContractFix = async () => {
+    if (selectedDocType !== "contract-review" || !draftContent.trim()) {
+      toast.error("Generate a Contract Review draft first.");
+      return;
+    }
+    if (!contractHasChecked) {
+      runContractDraftIssueCheck();
+    }
+
+    const client = clientOptions.find((c) => c.id === selectedClient);
+    const issueText = liveContractIssueItems
+      .map((item, idx) => `${idx + 1}. Issue: ${item.issue}\n   Suggestion: ${item.suggestion}`)
+      .join("\n");
+    const advancedSuggestionText = liveContractAdvancedSuggestions
+      .filter((item) => !item.implemented)
+      .map((item, idx) => `${idx + 1}. Upgrade: ${item.title}\n   Suggestion: ${item.suggestion}`)
+      .join("\n");
+    const recheckNotes = (contractRecheckReport?.flags || [])
+      .map((flag, idx) => `${idx + 1}. [${flag.severity.toUpperCase()}] ${flag.issue}\n   Fix: ${flag.fix}`)
+      .join("\n");
+    const combinedFixNotes = [contractAutoFixNotes, recheckNotes, contractUserFixNotes.trim()]
+      .filter((entry) => entry && entry.trim().length > 0)
+      .join("\n\n");
+    const pendingPlaybookText = contractPendingFixPlaybook
+      .map((item, idx) => `${idx + 1}. Pending: ${item.title}\n   Solution: ${item.solution}`)
+      .join("\n");
+
+    const fixContext = `You are improving a Contract Review advisory draft.
+Task: Regenerate a corrected final draft by merging current draft with required fixes.
+Mandatory fixes:
+1) Add clause-wise risk matrix
+2) Add negotiation fallback positions for high-risk clauses
+3) Add redline-ready replacement language
+4) Add dispute resolution/governing law assessment
+5) Add commercial risk ranking and implementation checklist
+
+CURRENT DRAFT:
+${draftContent}
+
+DETECTED ISSUES:
+${issueText || "No local issue detector items."}
+
+ADVANCED UPGRADE SUGGESTIONS:
+${advancedSuggestionText || "No additional upgrades detected."}
+
+RECHECK FLAGS:
+${recheckNotes || "No recheck flags."}
+
+PENDING FIX PLAYBOOK (MANDATORY ACTION STEPS):
+${pendingPlaybookText || "No pending actions."}
+
+CA NOTES:
+${combinedFixNotes || "None"}
+
+Return only revised final draft text.`;
+
+    setIsApplyingContractFix(true);
+    try {
+      const data = await requestDraftData({
+        documentType: "contract-review",
+        contractReplyTypeOverride: contractReplyTypeOverride !== "auto" ? contractReplyTypeOverride : undefined,
+        companyName: client?.name || "Company",
+        companyId: clientSource === "live" ? selectedClient : undefined,
+        industry: client?.industry || "",
+        draftRunId: currentDraftRunId || undefined,
+        trainingCaseId: contractTrainingCaseId || undefined,
+        draftMode: selectedMode,
+        advancedMode: true,
+        strictValidation: true,
+        context: fixContext,
+        noticeDetails: maskPII(noticeDetails) || undefined,
+        stream: false,
+      });
+
+      const content = (data?.draft as string | undefined) || "";
+      if (!content) throw new Error("Contract AI fix regeneration returned empty content.");
+      setDraftContent(content);
+      setDraftQA((data?.qa ?? null) as DraftQA | null);
+      setDraftPackage((data?.package ?? null) as DraftPackage | null);
+      const nextCaseId = (data?.metadata as { trainingCaseId?: string } | undefined)?.trainingCaseId;
+      if (nextCaseId) setContractTrainingCaseId(nextCaseId);
+      setContractUserFixNotes("");
+      runContractDraftIssueCheck(content, (data?.qa ?? null) as DraftQA | null);
+      toast.success("Contract draft corrected and regenerated.");
+    } catch (error) {
+      const msg = error instanceof Error ? error.message : "Failed to apply Contract AI fix";
+      toast.error(msg);
+    } finally {
+      setIsApplyingContractFix(false);
     }
   };
 
@@ -4570,6 +4671,33 @@ Return only revised final draft text.`;
                     Auto-detected class:{" "}
                     <span className="text-foreground font-medium">
                       {customsReplyTypeOptions.find((o) => o.id === inferredCustomsReplyType)?.label || "General Customs Response"}
+                    </span>
+                  </p>
+                </div>
+              )}
+
+              {selectedDocType === "contract-review" && (
+                <div>
+                  <label className="block text-sm font-medium text-foreground mb-2">
+                    <Book className="w-4 h-4 inline-block mr-2" />
+                    Contract Review Class
+                  </label>
+                  <Select value={contractReplyTypeOverride} onValueChange={setContractReplyTypeOverride}>
+                    <SelectTrigger className="bg-background/50">
+                      <SelectValue placeholder="Choose contract review class..." />
+                    </SelectTrigger>
+                    <SelectContent>
+                      {contractReplyTypeOptions.map((option) => (
+                        <SelectItem key={option.id} value={option.id}>
+                          {option.label}
+                        </SelectItem>
+                      ))}
+                    </SelectContent>
+                  </Select>
+                  <p className="text-xs text-muted-foreground mt-1">
+                    Auto-detected class:{" "}
+                    <span className="text-foreground font-medium">
+                      {contractReplyTypeOptions.find((o) => o.id === inferredContractReplyType)?.label || "General Contract Review"}
                     </span>
                   </p>
                 </div>
@@ -5709,6 +5837,155 @@ Return only revised final draft text.`;
                         </>
                       ) : (
                         "Apply AI Fix & Regenerate Customs Draft"
+                      )}
+                    </Button>
+                  </div>
+                </div>
+              )}
+
+              {draftGenerated && selectedDocType === "contract-review" && (
+                <div className="mt-3 space-y-2">
+                  <Button
+                    type="button"
+                    variant="outline"
+                    className="w-full"
+                    onClick={runContractDraftIssueCheck}
+                  >
+                    Check What Is Wrong In This Contract Draft
+                  </Button>
+                  {contractHasChecked && (
+                    <div
+                      className={`p-4 rounded-lg border text-sm ${
+                        contractComputedIssueReport.ok
+                          ? "border-green-500/30 bg-green-500/10 text-green-300"
+                          : "border-yellow-500/30 bg-yellow-500/10 text-yellow-200"
+                      }`}
+                    >
+                      {contractComputedIssueReport.ok ? (
+                        <p>All Contract checks passed. This draft is structurally aligned for legal/CA review.</p>
+                      ) : (
+                        <div className="space-y-2">
+                          <p className="font-medium">Issues detected:</p>
+                          <ul className="list-disc pl-5 space-y-2">
+                            {contractComputedIssueReport.items.map((item, idx) => (
+                              <li key={`${item.issue}-${idx}`}>
+                                <p>{item.issue}</p>
+                                <p className="text-xs text-yellow-100/90 mt-1">Suggestion: {item.suggestion}</p>
+                              </li>
+                            ))}
+                          </ul>
+                        </div>
+                      )}
+                    </div>
+                  )}
+
+                  {liveContractAdvancedSuggestions.length > 0 && (
+                    <div className="p-4 rounded-lg border border-cyan-500/30 bg-cyan-500/10 text-cyan-200 text-sm">
+                      <p className="font-medium mb-2">Advanced Suggestions:</p>
+                      <ul className="list-disc pl-5 space-y-2">
+                        {liveContractAdvancedSuggestions.map((item, idx) => (
+                          <li key={`${item.title}-${idx}`}>
+                            <p className={item.implemented ? "text-green-300" : "text-cyan-200"}>
+                              {item.implemented ? "✓ " : ""}{item.title}
+                              <span className={`ml-2 text-[11px] ${item.implemented ? "text-green-300" : "text-yellow-200"}`}>
+                                [{item.implemented ? "Implemented" : "Pending"}]
+                              </span>
+                            </p>
+                            <p className="text-xs text-cyan-100/90 mt-1">Suggestion: {item.suggestion}</p>
+                          </li>
+                        ))}
+                      </ul>
+                    </div>
+                  )}
+
+                  <div className="p-3 rounded-lg border border-border/50 bg-background/30 space-y-2">
+                    <p className="text-sm font-medium text-foreground">AI Fix Assistant (Contract)</p>
+                    <p className="text-xs text-muted-foreground">
+                      Contract issue detector and recheck are separate from other regulators. Add optional notes, then regenerate.
+                    </p>
+                    <Textarea
+                      value={contractEvidenceContext}
+                      onChange={(e) => setContractEvidenceContext(e.target.value)}
+                      placeholder="Optional: paste contract evidence/context clauses for Recheck AI."
+                      className="min-h-[90px] bg-background/50"
+                    />
+                    <Button
+                      type="button"
+                      variant="outline"
+                      className="w-full"
+                      onClick={handleRecheckContractDraft}
+                      disabled={isRecheckingContract || !draftGenerated}
+                    >
+                      {isRecheckingContract ? (
+                        <>
+                          <Loader2 className="w-4 h-4 mr-2 animate-spin" />
+                          Rechecking Contract AI...
+                        </>
+                      ) : (
+                        "Recheck AI (Contract Draft + Context + Evidence)"
+                      )}
+                    </Button>
+                    {contractRecheckReport && (
+                      <div className={`rounded-lg border p-3 text-xs space-y-2 ${
+                        contractRecheckReport.ok
+                          ? "border-green-500/30 bg-green-500/10 text-green-300"
+                          : "border-rose-500/30 bg-rose-500/10 text-rose-200"
+                      }`}>
+                        <p className="font-medium">{contractRecheckReport.ok ? "Contract Recheck AI: Passed" : "Contract Recheck AI: Flags Detected"}</p>
+                        {contractRecheckReport.summary ? <p>{contractRecheckReport.summary}</p> : null}
+                        {!contractRecheckReport.ok && (
+                          <ul className="list-disc pl-4 space-y-2">
+                            {contractRecheckReport.flags.map((flag, idx) => (
+                              <li key={`${flag.issue}-${idx}`}>
+                                <p>[{flag.severity.toUpperCase()}] {flag.issue}</p>
+                                <p className="text-rose-100/90">Fix: {flag.fix}</p>
+                              </li>
+                            ))}
+                          </ul>
+                        )}
+                      </div>
+                    )}
+                    <p className="text-xs text-cyan-300">Pending Contract fixes: {contractPendingFixCount}</p>
+                    <Textarea
+                      value={contractAutoFixNotes || "No pending issue-detector fixes right now."}
+                      readOnly
+                      className="min-h-[90px] bg-background/40 text-muted-foreground"
+                    />
+                    <div className="rounded-lg border border-cyan-500/20 bg-cyan-500/5 p-3 text-xs space-y-2">
+                      <p className="font-medium text-cyan-200">Pending Fix Solutions (AI)</p>
+                      {contractPendingFixPlaybook.length === 0 ? (
+                        <p className="text-cyan-100/80">No pending solutions. Draft is clear on current checks.</p>
+                      ) : (
+                        <ul className="list-disc pl-4 space-y-2 text-cyan-100/90">
+                          {contractPendingFixPlaybook.map((item, idx) => (
+                            <li key={`${item.title}-${idx}`}>
+                              <p>{item.title}</p>
+                              <p className="text-cyan-100/75">How to fix: {item.solution}</p>
+                            </li>
+                          ))}
+                        </ul>
+                      )}
+                    </div>
+                    <Textarea
+                      value={contractUserFixNotes}
+                      onChange={(e) => setContractUserFixNotes(e.target.value)}
+                      placeholder="Optional legal/CA note for Contract AI fix."
+                      className="min-h-[90px] bg-background/50"
+                    />
+                    <Button
+                      type="button"
+                      variant="outline"
+                      className="w-full"
+                      onClick={handleApplyContractFix}
+                      disabled={isApplyingContractFix || !draftGenerated || (contractPendingFixCount === 0 && contractUserFixNotes.trim().length === 0)}
+                    >
+                      {isApplyingContractFix ? (
+                        <>
+                          <Loader2 className="w-4 h-4 mr-2 animate-spin" />
+                          Applying Contract AI Fix...
+                        </>
+                      ) : (
+                        "Apply AI Fix & Regenerate Contract Draft"
                       )}
                     </Button>
                   </div>

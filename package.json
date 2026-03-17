@@ -17,7 +17,8 @@
     "rbi:bootstrap": "node scripts/bootstrap-rbi-training.mjs",
     "sebi:bootstrap": "node scripts/bootstrap-sebi-training.mjs",
     "customs:bootstrap": "node scripts/bootstrap-customs-training.mjs",
-    "custom:bootstrap": "node scripts/bootstrap-custom-training.mjs"
+    "custom:bootstrap": "node scripts/bootstrap-custom-training.mjs",
+    "contract:bootstrap": "node scripts/bootstrap-contract-training.mjs"
   },
   "dependencies": {
     "@hookform/resolvers": "^3.10.0",
