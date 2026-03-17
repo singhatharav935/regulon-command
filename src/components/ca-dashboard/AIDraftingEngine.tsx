@@ -1,4 +1,4 @@
-import { useEffect, useMemo, useState } from "react";
+import { useEffect, useMemo, useRef, useState, type ChangeEvent } from "react";
 import { motion } from "framer-motion";
 import { 
   FileText, 
@@ -465,6 +465,34 @@ const inferCustomReplyTypeFromNotice = (noticeText: string): string => {
   if (/cross[-\s]*border|forex|exchange control|trade compliance|fema/i.test(corpus)) return "cross-border-forex-trade";
   if (/industry specific|sectoral guideline|domain regulation/i.test(corpus)) return "industry-specific-compliance";
   return "custom-general";
+};
+
+const inferDocumentTypeFromNotice = (noticeText: string): string => {
+  const corpus = (noticeText || "").toLowerCase();
+
+  if (/gst|cgst|sgst|igst|drc-?01|asmt-?10|gstr-?3b|gstr-?2b|itc|e-?way bill/i.test(corpus)) {
+    return "gst-show-cause";
+  }
+  if (/income[-\s]*tax|assessee|assessment year|ay\s*\d{4}-\d{2}|section\s*143|section\s*142|section\s*148|itr/i.test(corpus)) {
+    return "income-tax-response";
+  }
+  if (/sebi|lodr|pit regulations|sast|pfutp|adjudicating officer/i.test(corpus)) {
+    return "sebi-compliance";
+  }
+  if (/rbi|fema|fc-?gpr|fc-?trs|fla return|nbfc|payment aggregator/i.test(corpus)) {
+    return "rbi-filing";
+  }
+  if (/customs|bill of entry|boe|section\s*28\b|dri|cth|tariff heading/i.test(corpus)) {
+    return "customs-response";
+  }
+  if (/agreement|contract|clause|indemnity|termination|arbitration|governing law/i.test(corpus)) {
+    return "contract-review";
+  }
+  if (/companies act|mca|roc|adjudication notice|section\s*92|section\s*137|aoc-?4|mgt-?7|director kyc/i.test(corpus)) {
+    return "mca-notice";
+  }
+
+  return "custom-draft";
 };
 
 const extractNoticeDateFromText = (noticeText: string): string => {
@@ -1101,6 +1129,9 @@ const AIDraftingEngine = ({ demoMode = false, includeLawyerReview = true }: AIDr
   const [contractReplyTypeOverride, setContractReplyTypeOverride] = useState<string>("auto");
   const [customReplyTypeOverride, setCustomReplyTypeOverride] = useState<string>("auto");
   const [noticeDetails, setNoticeDetails] = useState<string>("");
+  const noticeUploadInputRef = useRef<HTMLInputElement | null>(null);
+  const [isProcessingNoticeUpload, setIsProcessingNoticeUpload] = useState(false);
+  const [uploadedNoticeFileName, setUploadedNoticeFileName] = useState<string>("");
   const [isGeneratingNoticeDetails, setIsGeneratingNoticeDetails] = useState(false);
   const [preferPiiMasking, setPreferPiiMasking] = useState(true);
   const [advancedMode, setAdvancedMode] = useState(true);
@@ -3046,6 +3077,223 @@ const AIDraftingEngine = ({ demoMode = false, includeLawyerReview = true }: AIDr
     }
   }, [selectedDocType]);
 
+  const normalizeUploadedNoticeText = (value: string) =>
+    value
+      .replace(/\u0000/g, " ")
+      .replace(/\s+/g, " ")
+      .trim();
+
+  const decodePdfEscapes = (value: string) =>
+    value
+      .replace(/\\([\\()])/g, "$1")
+      .replace(/\\n/g, " ")
+      .replace(/\\r/g, " ")
+      .replace(/\\t/g, " ")
+      .replace(/\\(\d{3})/g, (_, octal) => String.fromCharCode(parseInt(octal, 8)));
+
+  const extractTextFromPdfHeuristic = async (file: File): Promise<string> => {
+    const buffer = await file.arrayBuffer();
+    const raw = new TextDecoder("latin1").decode(new Uint8Array(buffer));
+    const chunks: string[] = [];
+
+    const tjRegex = /\(([^()]*)\)\s*Tj/g;
+    let tjMatch: RegExpExecArray | null = null;
+    while ((tjMatch = tjRegex.exec(raw)) !== null) {
+      const text = decodePdfEscapes(tjMatch[1] || "");
+      if (text.trim().length > 1) chunks.push(text);
+    }
+
+    const tjArrayRegex = /\[(.*?)\]\s*TJ/gs;
+    let arrMatch: RegExpExecArray | null = null;
+    while ((arrMatch = tjArrayRegex.exec(raw)) !== null) {
+      const segment = arrMatch[1] || "";
+      const textRegex = /\(([^()]*)\)/g;
+      let textMatch: RegExpExecArray | null = null;
+      while ((textMatch = textRegex.exec(segment)) !== null) {
+        const text = decodePdfEscapes(textMatch[1] || "");
+        if (text.trim().length > 1) chunks.push(text);
+      }
+    }
+
+    const heuristicJoined = normalizeUploadedNoticeText(chunks.join(" "));
+    if (heuristicJoined.length >= 200) {
+      return heuristicJoined.slice(0, 28000);
+    }
+
+    const asciiRuns = raw.match(/[A-Za-z][A-Za-z0-9,.:;()\/\-\s]{24,}/g) || [];
+    const fallback = normalizeUploadedNoticeText(asciiRuns.join(" "));
+    return fallback.slice(0, 28000);
+  };
+
+  const extractNoticeTextFromUploadedFile = async (file: File): Promise<string> => {
+    const ext = file.name.toLowerCase().split(".").pop() || "";
+    const mime = (file.type || "").toLowerCase();
+
+    if (
+      mime.startsWith("text/") ||
+      ["txt", "md", "csv", "json", "xml", "html", "htm", "log"].includes(ext)
+    ) {
+      return normalizeUploadedNoticeText(await file.text()).slice(0, 28000);
+    }
+
+    if (mime === "application/pdf" || ext === "pdf") {
+      return extractTextFromPdfHeuristic(file);
+    }
+
+    if (mime.startsWith("image/")) {
+      throw new Error("Image OCR is not enabled yet in this build. Upload text-based PDF/TXT or paste OCR text.");
+    }
+
+    if (["doc", "docx"].includes(ext)) {
+      throw new Error("DOC/DOCX parsing is not enabled yet. Save/export as text-based PDF or paste notice text.");
+    }
+
+    return normalizeUploadedNoticeText(await file.text()).slice(0, 28000);
+  };
+
+  const inferClassForDocumentType = (docType: string, sourceNotice: string): string => {
+    if (docType === "mca-notice") return inferMcaReplyTypeFromNotice(sourceNotice);
+    if (docType === "gst-show-cause") return inferGstReplyTypeFromNotice(sourceNotice);
+    if (docType === "income-tax-response") return inferIncomeTaxReplyTypeFromNotice(sourceNotice);
+    if (docType === "rbi-filing") return inferRbiReplyTypeFromNotice(sourceNotice);
+    if (docType === "sebi-compliance") return inferSebiReplyTypeFromNotice(sourceNotice);
+    if (docType === "customs-response") return inferCustomsReplyTypeFromNotice(sourceNotice);
+    if (docType === "contract-review") return inferContractReplyTypeFromNotice(sourceNotice);
+    if (docType === "custom-draft") return inferCustomReplyTypeFromNotice(sourceNotice);
+    return "auto";
+  };
+
+  const applyClassOverrideForDocType = (docType: string, inferredClass: string) => {
+    if (docType === "mca-notice") setMcaReplyTypeOverride(inferredClass || "auto");
+    if (docType === "gst-show-cause") setGstReplyTypeOverride(inferredClass || "auto");
+    if (docType === "income-tax-response") setIncomeTaxReplyTypeOverride(inferredClass || "auto");
+    if (docType === "rbi-filing") setRbiReplyTypeOverride(inferredClass || "auto");
+    if (docType === "sebi-compliance") setSebiReplyTypeOverride(inferredClass || "auto");
+    if (docType === "customs-response") setCustomsReplyTypeOverride(inferredClass || "auto");
+    if (docType === "contract-review") setContractReplyTypeOverride(inferredClass || "auto");
+    if (docType === "custom-draft") setCustomReplyTypeOverride(inferredClass || "auto");
+  };
+
+  const generateNoticeDetailsForDoc = async (docType: string, sourceNoticeInput: string, inferredClassOverride?: string) => {
+    const client = clientOptions.find((c) => c.id === selectedClient);
+    const sourceNotice = sourceNoticeInput.trim() || readyNoticeTemplates[docType] || "";
+    const docLabel = documentTypes.find((doc) => doc.id === docType)?.label || "Selected Draft";
+    const effectiveMcaType = docType === "mca-notice"
+      ? (inferredClassOverride && inferredClassOverride !== "auto"
+          ? inferredClassOverride
+          : inferMcaReplyTypeFromNotice(sourceNotice))
+      : undefined;
+
+    const generated = await requestDraftData({
+      operation: "notice-details",
+      documentType: docType,
+      companyName: client?.name || "Company",
+      industry: client?.industry || "",
+      draftMode: selectedMode,
+      mcaReplyTypeOverride: docType === "mca-notice" && inferredClassOverride && inferredClassOverride !== "auto"
+        ? inferredClassOverride
+        : docType === "mca-notice" && mcaReplyTypeOverride !== "auto"
+          ? mcaReplyTypeOverride
+          : undefined,
+      gstReplyTypeOverride: docType === "gst-show-cause" && inferredClassOverride && inferredClassOverride !== "auto"
+        ? inferredClassOverride
+        : docType === "gst-show-cause" && gstReplyTypeOverride !== "auto"
+          ? gstReplyTypeOverride
+          : undefined,
+      incomeTaxReplyTypeOverride: docType === "income-tax-response" && inferredClassOverride && inferredClassOverride !== "auto"
+        ? inferredClassOverride
+        : docType === "income-tax-response" && incomeTaxReplyTypeOverride !== "auto"
+          ? incomeTaxReplyTypeOverride
+          : undefined,
+      rbiReplyTypeOverride: docType === "rbi-filing" && inferredClassOverride && inferredClassOverride !== "auto"
+        ? inferredClassOverride
+        : docType === "rbi-filing" && rbiReplyTypeOverride !== "auto"
+          ? rbiReplyTypeOverride
+          : undefined,
+      sebiReplyTypeOverride: docType === "sebi-compliance" && inferredClassOverride && inferredClassOverride !== "auto"
+        ? inferredClassOverride
+        : docType === "sebi-compliance" && sebiReplyTypeOverride !== "auto"
+          ? sebiReplyTypeOverride
+          : undefined,
+      customsReplyTypeOverride: docType === "customs-response" && inferredClassOverride && inferredClassOverride !== "auto"
+        ? inferredClassOverride
+        : docType === "customs-response" && customsReplyTypeOverride !== "auto"
+          ? customsReplyTypeOverride
+          : undefined,
+      contractReplyTypeOverride: docType === "contract-review" && inferredClassOverride && inferredClassOverride !== "auto"
+        ? inferredClassOverride
+        : docType === "contract-review" && contractReplyTypeOverride !== "auto"
+          ? contractReplyTypeOverride
+          : undefined,
+      customReplyTypeOverride: docType === "custom-draft" && inferredClassOverride && inferredClassOverride !== "auto"
+        ? inferredClassOverride
+        : docType === "custom-draft" && customReplyTypeOverride !== "auto"
+          ? customReplyTypeOverride
+          : undefined,
+      context: `Generate precise Notice/Order Details for ${docLabel}. Ensure this is input-quality text for strict legal drafting checks.`,
+      noticeDetails: sourceNotice || undefined,
+      stream: false,
+    });
+
+    const aiNoticeDetails = (
+      (generated?.noticeDetails as string | undefined) ||
+      (generated?.draft as string | undefined)
+    )?.trim();
+    if (!aiNoticeDetails) {
+      throw new Error("AI did not return notice details.");
+    }
+
+    const sanitizedNotice = sanitizeNoticeDetailsClient(aiNoticeDetails, sourceNotice);
+    const normalizedSanitized = normalizeForComparison(sanitizedNotice);
+    const normalizedCurrent = normalizeForComparison(noticeDetails);
+    const normalizedTemplate = normalizeForComparison(readyNoticeTemplates[docType] || "");
+    const shouldUseStructuredFallback =
+      normalizedSanitized.length === 0 ||
+      normalizedSanitized === normalizedCurrent ||
+      normalizedSanitized === normalizedTemplate;
+
+    const finalNoticeDetails = shouldUseStructuredFallback
+      ? buildStructuredNoticeDetailsFallback(docType, sourceNotice, docLabel, effectiveMcaType)
+      : sanitizedNotice;
+
+    setNoticeDetails(finalNoticeDetails);
+    setLastTemplateDocType(docType);
+
+    return { shouldUseStructuredFallback };
+  };
+
+  const handleUploadNoticeAndAutoFill = async (event: ChangeEvent<HTMLInputElement>) => {
+    const file = event.target.files?.[0];
+    event.target.value = "";
+    if (!file) return;
+
+    setIsProcessingNoticeUpload(true);
+    setUploadedNoticeFileName(file.name);
+    try {
+      const extractedText = await extractNoticeTextFromUploadedFile(file);
+      if (!extractedText || extractedText.length < 80) {
+        throw new Error("Uploaded file does not have enough readable text. Use a text-based PDF/TXT or paste notice text.");
+      }
+
+      const autoDocType = inferDocumentTypeFromNotice(extractedText);
+      const autoClass = inferClassForDocumentType(autoDocType, extractedText);
+
+      setSelectedDocType(autoDocType);
+      applyClassOverrideForDocType(autoDocType, autoClass);
+      setNoticeDetails(extractedText);
+      setLastTemplateDocType(autoDocType);
+
+      await generateNoticeDetailsForDoc(autoDocType, extractedText, autoClass);
+      const docTypeLabel = documentTypes.find((doc) => doc.id === autoDocType)?.label || autoDocType;
+      toast.success(`Notice uploaded and processed. Auto-selected ${docTypeLabel}. You can still edit manually.`);
+    } catch (error) {
+      const msg = error instanceof Error ? error.message : "Failed to process uploaded notice.";
+      toast.error(msg);
+    } finally {
+      setIsProcessingNoticeUpload(false);
+    }
+  };
+
   const handleInsertTemplate = () => {
     if (!selectedDocType || !selectedTemplate) {
       toast.error("Select a document type first.");
@@ -3074,75 +3322,10 @@ const AIDraftingEngine = ({ demoMode = false, includeLawyerReview = true }: AIDr
       toast.error("Select document type first.");
       return;
     }
-    const client = clientOptions.find((c) => c.id === selectedClient);
     setIsGeneratingNoticeDetails(true);
     try {
       const sourceNotice = noticeDetails.trim() || readyNoticeTemplates[selectedDocType] || "";
-      const generated = await requestDraftData({
-        operation: "notice-details",
-        documentType: selectedDocType,
-        companyName: client?.name || "Company",
-        industry: client?.industry || "",
-        draftMode: selectedMode,
-        mcaReplyTypeOverride: selectedDocType === "mca-notice" && mcaReplyTypeOverride !== "auto"
-          ? mcaReplyTypeOverride
-          : undefined,
-        gstReplyTypeOverride: selectedDocType === "gst-show-cause" && gstReplyTypeOverride !== "auto"
-          ? gstReplyTypeOverride
-          : undefined,
-        incomeTaxReplyTypeOverride: selectedDocType === "income-tax-response" && incomeTaxReplyTypeOverride !== "auto"
-          ? incomeTaxReplyTypeOverride
-          : undefined,
-        rbiReplyTypeOverride: selectedDocType === "rbi-filing" && rbiReplyTypeOverride !== "auto"
-          ? rbiReplyTypeOverride
-          : undefined,
-        sebiReplyTypeOverride: selectedDocType === "sebi-compliance" && sebiReplyTypeOverride !== "auto"
-          ? sebiReplyTypeOverride
-          : undefined,
-        customsReplyTypeOverride: selectedDocType === "customs-response" && customsReplyTypeOverride !== "auto"
-          ? customsReplyTypeOverride
-          : undefined,
-        contractReplyTypeOverride: selectedDocType === "contract-review" && contractReplyTypeOverride !== "auto"
-          ? contractReplyTypeOverride
-          : undefined,
-        customReplyTypeOverride: selectedDocType === "custom-draft" && customReplyTypeOverride !== "auto"
-          ? customReplyTypeOverride
-          : undefined,
-        context: `Generate precise Notice/Order Details for ${selectedDocLabel}. Ensure this is input-quality text for strict legal drafting checks.`,
-        noticeDetails: sourceNotice || undefined,
-        stream: false,
-      });
-
-      const aiNoticeDetails = (
-        (generated?.noticeDetails as string | undefined) ||
-        (generated?.draft as string | undefined)
-      )?.trim();
-      if (!aiNoticeDetails) {
-        throw new Error("AI did not return notice details.");
-      }
-      const fallbackNotice = sourceNotice;
-      const sanitizedNotice = sanitizeNoticeDetailsClient(aiNoticeDetails, fallbackNotice);
-      const normalizedSanitized = normalizeForComparison(sanitizedNotice);
-      const normalizedCurrent = normalizeForComparison(noticeDetails);
-      const normalizedTemplate = normalizeForComparison(readyNoticeTemplates[selectedDocType] || "");
-      const shouldUseStructuredFallback =
-        normalizedSanitized.length === 0 ||
-        normalizedSanitized === normalizedCurrent ||
-        normalizedSanitized === normalizedTemplate;
-
-      const finalNoticeDetails = shouldUseStructuredFallback
-        ? buildStructuredNoticeDetailsFallback(
-            selectedDocType,
-            sourceNotice,
-            selectedDocLabel,
-            selectedDocType === "mca-notice"
-              ? (mcaReplyTypeOverride !== "auto" ? mcaReplyTypeOverride : inferredMcaReplyType)
-              : undefined,
-          )
-        : sanitizedNotice;
-
-      setNoticeDetails(finalNoticeDetails);
-      setLastTemplateDocType(selectedDocType);
+      const { shouldUseStructuredFallback } = await generateNoticeDetailsForDoc(selectedDocType, sourceNotice);
       toast.success(
         shouldUseStructuredFallback
           ? "Notice/Order Details generated with structured AI-safe fallback."
@@ -4769,7 +4952,29 @@ Return only revised final draft text.`;
                 <p className="text-xs text-muted-foreground mt-1">
                   Providing notice details enables point-by-point rebuttal. Procedural objections are raised only if evidence supports them.
                 </p>
-                <div className="mt-2 grid grid-cols-1 sm:grid-cols-3 gap-2">
+                <input
+                  ref={noticeUploadInputRef}
+                  type="file"
+                  className="hidden"
+                  accept=".pdf,.txt,.md,.csv,.json,.xml,.html,.htm,.log,.png,.jpg,.jpeg,.webp"
+                  onChange={handleUploadNoticeAndAutoFill}
+                />
+                <div className="mt-2 grid grid-cols-1 sm:grid-cols-4 gap-2">
+                  <Button
+                    type="button"
+                    variant="outline"
+                    onClick={() => noticeUploadInputRef.current?.click()}
+                    disabled={isProcessingNoticeUpload}
+                  >
+                    {isProcessingNoticeUpload ? (
+                      <>
+                        <Loader2 className="w-4 h-4 mr-2 animate-spin" />
+                        Uploading...
+                      </>
+                    ) : (
+                      "Upload Notice (Auto AI)"
+                    )}
+                  </Button>
                   <Button
                     type="button"
                     variant="outline"
@@ -4802,6 +5007,11 @@ Return only revised final draft text.`;
                     Copy 200+ Template
                   </Button>
                 </div>
+                {uploadedNoticeFileName ? (
+                  <p className="text-xs text-muted-foreground mt-1">
+                    Last uploaded notice: <span className="text-foreground">{uploadedNoticeFileName}</span>
+                  </p>
+                ) : null}
                 <div className="mt-2 p-2 rounded-lg border border-border/50 bg-background/40 flex items-center justify-between">
                   <p className="text-xs text-muted-foreground">PII Masking before generation</p>
                   <button
