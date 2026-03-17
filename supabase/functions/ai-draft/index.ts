@@ -335,6 +335,96 @@ const CUSTOMS_REPLY_TYPES: CustomsReplyType[] = [
   "customs-general",
 ];
 
+type ContractReplyType =
+  | "msa-general"
+  | "nda-confidentiality"
+  | "saas-license"
+  | "employment-consultancy"
+  | "vendor-procurement"
+  | "ip-assignment-licensing"
+  | "loan-financing"
+  | "shareholders-jv"
+  | "lease-rent"
+  | "franchise-distribution"
+  | "data-processing-dpa"
+  | "privacy-cybersecurity"
+  | "indemnity-liability-cap"
+  | "termination-exit"
+  | "non-compete-non-solicit"
+  | "arbitration-dispute-resolution"
+  | "settlement-release"
+  | "regulatory-compliance-sanctions"
+  | "cross-border-tax-fx"
+  | "contract-general";
+
+const CONTRACT_REPLY_TYPES: ContractReplyType[] = [
+  "msa-general",
+  "nda-confidentiality",
+  "saas-license",
+  "employment-consultancy",
+  "vendor-procurement",
+  "ip-assignment-licensing",
+  "loan-financing",
+  "shareholders-jv",
+  "lease-rent",
+  "franchise-distribution",
+  "data-processing-dpa",
+  "privacy-cybersecurity",
+  "indemnity-liability-cap",
+  "termination-exit",
+  "non-compete-non-solicit",
+  "arbitration-dispute-resolution",
+  "settlement-release",
+  "regulatory-compliance-sanctions",
+  "cross-border-tax-fx",
+  "contract-general",
+];
+
+type CustomReplyType =
+  | "regulatory-scn-reply"
+  | "adjudication-order-appeal"
+  | "license-registration-compliance"
+  | "late-filing-delay-condonation"
+  | "tax-demand-computation"
+  | "penalty-interest-mitigation"
+  | "refund-rejection-recovery"
+  | "show-cause-natural-justice"
+  | "investigation-summons-response"
+  | "inspection-audit-objection"
+  | "classification-valuation-dispute"
+  | "input-credit-deduction-dispute"
+  | "procedural-noncompliance"
+  | "documentation-evidence-deficiency"
+  | "jurisdiction-limitation-objection"
+  | "rectification-revision"
+  | "appeal-stay-interim-relief"
+  | "cross-border-forex-trade"
+  | "industry-specific-compliance"
+  | "custom-general";
+
+const CUSTOM_REPLY_TYPES: CustomReplyType[] = [
+  "regulatory-scn-reply",
+  "adjudication-order-appeal",
+  "license-registration-compliance",
+  "late-filing-delay-condonation",
+  "tax-demand-computation",
+  "penalty-interest-mitigation",
+  "refund-rejection-recovery",
+  "show-cause-natural-justice",
+  "investigation-summons-response",
+  "inspection-audit-objection",
+  "classification-valuation-dispute",
+  "input-credit-deduction-dispute",
+  "procedural-noncompliance",
+  "documentation-evidence-deficiency",
+  "jurisdiction-limitation-objection",
+  "rectification-revision",
+  "appeal-stay-interim-relief",
+  "cross-border-forex-trade",
+  "industry-specific-compliance",
+  "custom-general",
+];
+
 const normalizeIncomeTaxReplyType = (value: string | null | undefined): IncomeTaxReplyType | null => {
   if (!value) return null;
   const cleaned = value.trim().toLowerCase();
@@ -357,6 +447,18 @@ const normalizeCustomsReplyType = (value: string | null | undefined): CustomsRep
   if (!value) return null;
   const cleaned = value.trim().toLowerCase();
   return (CUSTOMS_REPLY_TYPES as string[]).includes(cleaned) ? (cleaned as CustomsReplyType) : null;
+};
+
+const normalizeContractReplyType = (value: string | null | undefined): ContractReplyType | null => {
+  if (!value) return null;
+  const cleaned = value.trim().toLowerCase();
+  return (CONTRACT_REPLY_TYPES as string[]).includes(cleaned) ? (cleaned as ContractReplyType) : null;
+};
+
+const normalizeCustomReplyType = (value: string | null | undefined): CustomReplyType | null => {
+  if (!value) return null;
+  const cleaned = value.trim().toLowerCase();
+  return (CUSTOM_REPLY_TYPES as string[]).includes(cleaned) ? (cleaned as CustomReplyType) : null;
 };
 
 const normalizeMcaReplyType = (value: string | null | undefined): McaReplyType | null => {
@@ -534,6 +636,54 @@ const inferCustomsReplyType = (noticeDetails?: string, extractedNotice?: NoticeI
   if (/audit|post clearance audit|caap/i.test(corpus)) return "customs-audit-caap";
   if (/dri|directorate of revenue intelligence|investigation summons/i.test(corpus)) return "driu-investigation";
   return "customs-general";
+};
+
+const inferContractReplyType = (noticeDetails?: string, extractedNotice?: NoticeIntelligence | null): ContractReplyType => {
+  const corpus = `${noticeDetails ?? ""}\n${JSON.stringify(extractedNotice?.notice_snapshot?.invoked_provisions ?? [])}`.toLowerCase();
+  if (/master services agreement|msa|statement of work|sow/i.test(corpus)) return "msa-general";
+  if (/nda|non-disclosure|confidential information|confidentiality/i.test(corpus)) return "nda-confidentiality";
+  if (/saas|software license|subscription service|uptime|sla/i.test(corpus)) return "saas-license";
+  if (/employment agreement|consultancy agreement|service provider|retainer/i.test(corpus)) return "employment-consultancy";
+  if (/vendor agreement|purchase order|procurement|supply agreement/i.test(corpus)) return "vendor-procurement";
+  if (/intellectual property|ip assignment|license grant|ownership of work product/i.test(corpus)) return "ip-assignment-licensing";
+  if (/loan agreement|facility agreement|interest covenant|security creation/i.test(corpus)) return "loan-financing";
+  if (/shareholders agreement|sha|joint venture|jv/i.test(corpus)) return "shareholders-jv";
+  if (/lease deed|rent agreement|lock-in|security deposit/i.test(corpus)) return "lease-rent";
+  if (/franchise|distribution agreement|territory rights|minimum purchase/i.test(corpus)) return "franchise-distribution";
+  if (/data processing agreement|dpa|processor|controller|sub-processor/i.test(corpus)) return "data-processing-dpa";
+  if (/privacy policy|data breach|cybersecurity|information security/i.test(corpus)) return "privacy-cybersecurity";
+  if (/indemnity|limitation of liability|cap on liability|consequential damages/i.test(corpus)) return "indemnity-liability-cap";
+  if (/termination|exit|survival|transition assistance/i.test(corpus)) return "termination-exit";
+  if (/non-compete|non solicitation|restrictive covenant/i.test(corpus)) return "non-compete-non-solicit";
+  if (/arbitration|dispute resolution|governing law|jurisdiction/i.test(corpus)) return "arbitration-dispute-resolution";
+  if (/settlement agreement|release and discharge|full and final settlement/i.test(corpus)) return "settlement-release";
+  if (/anti-bribery|sanctions|fcp[a]?|ukba|compliance representation/i.test(corpus)) return "regulatory-compliance-sanctions";
+  if (/withholding tax|transfer pricing|forex|exchange control|cross-border/i.test(corpus)) return "cross-border-tax-fx";
+  return "contract-general";
+};
+
+const inferCustomReplyType = (noticeDetails?: string, extractedNotice?: NoticeIntelligence | null): CustomReplyType => {
+  const corpus = `${noticeDetails ?? ""}\n${JSON.stringify(extractedNotice?.notice_snapshot?.invoked_provisions ?? [])}`.toLowerCase();
+  if (/show cause notice|scn|reply to notice|pre-adjudication/i.test(corpus)) return "regulatory-scn-reply";
+  if (/adjudication order|order-in-original|appeal memo|appellate authority/i.test(corpus)) return "adjudication-order-appeal";
+  if (/license|registration|authorization|renewal|suspension/i.test(corpus)) return "license-registration-compliance";
+  if (/delay condonation|late filing|condonation of delay/i.test(corpus)) return "late-filing-delay-condonation";
+  if (/demand|computation|short payment|short levy|quantification/i.test(corpus)) return "tax-demand-computation";
+  if (/penalty|interest|mitigation|leniency|proportionality/i.test(corpus)) return "penalty-interest-mitigation";
+  if (/refund|recovery|rejection|withheld refund/i.test(corpus)) return "refund-rejection-recovery";
+  if (/natural justice|hearing|opportunity of being heard|procedural fairness/i.test(corpus)) return "show-cause-natural-justice";
+  if (/summons|statement|investigation|inquiry|enforcement/i.test(corpus)) return "investigation-summons-response";
+  if (/inspection|audit|observation|audit memo|non-conformance/i.test(corpus)) return "inspection-audit-objection";
+  if (/classification|valuation|rate dispute|tariff/i.test(corpus)) return "classification-valuation-dispute";
+  if (/credit|deduction|set-off|input credit/i.test(corpus)) return "input-credit-deduction-dispute";
+  if (/procedural lapse|procedural non[-\s]*compliance|filing defect/i.test(corpus)) return "procedural-noncompliance";
+  if (/documentary deficiency|evidence deficiency|supporting documents/i.test(corpus)) return "documentation-evidence-deficiency";
+  if (/jurisdiction|limitation|time barred|barred by limitation/i.test(corpus)) return "jurisdiction-limitation-objection";
+  if (/rectification|revision|correction/i.test(corpus)) return "rectification-revision";
+  if (/stay|interim relief|status quo|appeal and stay/i.test(corpus)) return "appeal-stay-interim-relief";
+  if (/cross[-\s]*border|forex|exchange control|trade compliance|fema/i.test(corpus)) return "cross-border-forex-trade";
+  if (/industry specific|sectoral guideline|domain regulation/i.test(corpus)) return "industry-specific-compliance";
+  return "custom-general";
 };
 
 const inferGstReplyType = (noticeDetails?: string, extractedNotice?: NoticeIntelligence | null): GstReplyType => {
@@ -1680,6 +1830,264 @@ const captureCustomsRecheckIssues = async ({
     .eq("user_id", userId);
 };
 
+const captureContractTrainingCase = async ({
+  authClient,
+  userId,
+  companyId,
+  draftRunId,
+  noticeClass,
+  noticeDetails,
+  generatedDraft,
+  qaPayload,
+  companyName,
+  industry,
+  draftMode,
+  previousCaseId,
+}: {
+  authClient: any;
+  userId: string | null;
+  companyId?: string | null;
+  draftRunId?: string | null;
+  noticeClass: string;
+  noticeDetails?: string | null;
+  generatedDraft: string;
+  qaPayload?: unknown;
+  companyName?: string | null;
+  industry?: string | null;
+  draftMode?: string | null;
+  previousCaseId?: string | null;
+}): Promise<string | null> => {
+  if (!userId || !generatedDraft?.trim()) return null;
+
+  const payload = {
+    draft_run_id: draftRunId ?? null,
+    user_id: userId,
+    company_id: companyId ?? null,
+    notice_class: noticeClass || "contract-general",
+    notice_snapshot: (noticeDetails || "Contract details not provided.").slice(0, 16000),
+    generated_draft: generatedDraft.slice(0, 120000),
+    filing_score: typeof (qaPayload as any)?.filing_score === "number" ? (qaPayload as any).filing_score : null,
+    risk_band: (qaPayload as any)?.risk_band ?? null,
+    qa_payload: qaPayload ?? null,
+    metadata: {
+      source_operation: "draft",
+      company_name: companyName ?? null,
+      industry: industry ?? null,
+      draft_mode: draftMode ?? null,
+      captured_at: new Date().toISOString(),
+    },
+  };
+
+  if (previousCaseId) {
+    const { data, error } = await authClient
+      .from("contract_training_cases")
+      .update(payload)
+      .eq("id", previousCaseId)
+      .eq("user_id", userId)
+      .select("id")
+      .maybeSingle();
+    if (!error && data?.id) return data.id as string;
+  }
+
+  const { data, error } = await authClient
+    .from("contract_training_cases")
+    .insert(payload)
+    .select("id")
+    .maybeSingle();
+  if (error) {
+    console.error("Contract training capture failed:", error.message);
+    return null;
+  }
+  return (data?.id as string) ?? null;
+};
+
+const captureContractRecheckIssues = async ({
+  authClient,
+  userId,
+  caseId,
+  flags,
+  summary,
+}: {
+  authClient: any;
+  userId: string | null;
+  caseId?: string | null;
+  flags: RecheckFlag[];
+  summary?: string;
+}) => {
+  if (!userId || !caseId) return;
+
+  if (!flags.length) {
+    await authClient
+      .from("contract_training_cases")
+      .update({
+        status: "reviewed",
+        metadata: {
+          recheck_summary: summary ?? "Recheck passed",
+          recheck_flags_count: 0,
+          rechecked_at: new Date().toISOString(),
+        },
+      })
+      .eq("id", caseId)
+      .eq("user_id", userId);
+    return;
+  }
+
+  const rows = flags.map((f) => ({
+    case_id: caseId,
+    severity: f.severity,
+    detector_source: f.source === "ai" ? "ai" : "rule",
+    issue_text: f.issue,
+    suggested_fix: f.fix,
+  }));
+
+  const { error } = await authClient.from("contract_training_issues").insert(rows);
+  if (error) {
+    console.error("Contract recheck issue capture failed:", error.message);
+  }
+
+  await authClient
+    .from("contract_training_cases")
+    .update({
+      status: "reviewed",
+      metadata: {
+        recheck_summary: summary ?? "Recheck completed",
+        recheck_flags_count: flags.length,
+        rechecked_at: new Date().toISOString(),
+      },
+    })
+    .eq("id", caseId)
+    .eq("user_id", userId);
+};
+
+const captureCustomTrainingCase = async ({
+  authClient,
+  userId,
+  companyId,
+  draftRunId,
+  noticeClass,
+  noticeDetails,
+  generatedDraft,
+  qaPayload,
+  companyName,
+  industry,
+  draftMode,
+  previousCaseId,
+}: {
+  authClient: any;
+  userId: string | null;
+  companyId?: string | null;
+  draftRunId?: string | null;
+  noticeClass: string;
+  noticeDetails?: string | null;
+  generatedDraft: string;
+  qaPayload?: unknown;
+  companyName?: string | null;
+  industry?: string | null;
+  draftMode?: string | null;
+  previousCaseId?: string | null;
+}): Promise<string | null> => {
+  if (!userId || !generatedDraft?.trim()) return null;
+
+  const payload = {
+    draft_run_id: draftRunId ?? null,
+    user_id: userId,
+    company_id: companyId ?? null,
+    notice_class: noticeClass || "custom-general",
+    notice_snapshot: (noticeDetails || "Notice details not provided.").slice(0, 16000),
+    generated_draft: generatedDraft.slice(0, 120000),
+    filing_score: typeof (qaPayload as any)?.filing_score === "number" ? (qaPayload as any).filing_score : null,
+    risk_band: (qaPayload as any)?.risk_band ?? null,
+    qa_payload: qaPayload ?? null,
+    metadata: {
+      source_operation: "draft",
+      company_name: companyName ?? null,
+      industry: industry ?? null,
+      draft_mode: draftMode ?? null,
+      captured_at: new Date().toISOString(),
+    },
+  };
+
+  if (previousCaseId) {
+    const { data, error } = await authClient
+      .from("custom_training_cases")
+      .update(payload)
+      .eq("id", previousCaseId)
+      .eq("user_id", userId)
+      .select("id")
+      .maybeSingle();
+    if (!error && data?.id) return data.id as string;
+  }
+
+  const { data, error } = await authClient
+    .from("custom_training_cases")
+    .insert(payload)
+    .select("id")
+    .maybeSingle();
+  if (error) {
+    console.error("Custom training capture failed:", error.message);
+    return null;
+  }
+  return (data?.id as string) ?? null;
+};
+
+const captureCustomRecheckIssues = async ({
+  authClient,
+  userId,
+  caseId,
+  flags,
+  summary,
+}: {
+  authClient: any;
+  userId: string | null;
+  caseId?: string | null;
+  flags: RecheckFlag[];
+  summary?: string;
+}) => {
+  if (!userId || !caseId) return;
+
+  if (!flags.length) {
+    await authClient
+      .from("custom_training_cases")
+      .update({
+        status: "reviewed",
+        metadata: {
+          recheck_summary: summary ?? "Recheck passed",
+          recheck_flags_count: 0,
+          rechecked_at: new Date().toISOString(),
+        },
+      })
+      .eq("id", caseId)
+      .eq("user_id", userId);
+    return;
+  }
+
+  const rows = flags.map((f) => ({
+    case_id: caseId,
+    severity: f.severity,
+    detector_source: f.source === "ai" ? "ai" : "rule",
+    issue_text: f.issue,
+    suggested_fix: f.fix,
+  }));
+
+  const { error } = await authClient.from("custom_training_issues").insert(rows);
+  if (error) {
+    console.error("Custom recheck issue capture failed:", error.message);
+  }
+
+  await authClient
+    .from("custom_training_cases")
+    .update({
+      status: "reviewed",
+      metadata: {
+        recheck_summary: summary ?? "Recheck completed",
+        recheck_flags_count: flags.length,
+        rechecked_at: new Date().toISOString(),
+      },
+    })
+    .eq("id", caseId)
+    .eq("user_id", userId);
+};
+
 const normalizeSimilarityText = (input: string) =>
   (input || "")
     .toLowerCase()
@@ -2258,6 +2666,80 @@ const detectCustomsRecheckFlags = (
   return flags;
 };
 
+const detectContractRecheckFlags = (
+  draft: string,
+  noticeDetails: string,
+): RecheckFlag[] => {
+  const flags: RecheckFlag[] = [];
+  const add = (severity: RecheckFlag["severity"], issue: string, fix: string) => {
+    if (!flags.some((f) => f.issue.toLowerCase() === issue.toLowerCase())) {
+      flags.push({ severity, issue, fix, source: "rule" });
+    }
+  };
+
+  const hasClauseTable = /\|\s*Clause\s*\|\s*Risk\s*\|\s*Recommendation\s*\|/i.test(draft)
+    || /clause[-\s]*wise risk/i.test(draft);
+  const hasNegotiationFallback = /fallback position|negotiation position|counter[-\s]*proposal/i.test(draft);
+  const hasCommercialImpact = /commercial impact|financial exposure|liability cap|risk ranking/i.test(draft);
+  const hasDisputeFramework = /arbitration|governing law|jurisdiction|dispute resolution/i.test(draft);
+  const hasRedlineAdvice = /redline|mark-up|suggested drafting language/i.test(draft);
+
+  if (!hasClauseTable) add("high", "Clause-wise risk table missing.", "Add a clause-wise table: Clause | Risk | Why risky | Proposed revision | Priority.");
+  if (!hasNegotiationFallback) add("medium", "Negotiation fallback positions missing.", "Add fallback negotiation positions for high-risk clauses.");
+  if (!hasCommercialImpact) add("medium", "Commercial exposure/risk ranking is weak.", "Add quantified or tiered risk scoring for key clauses.");
+  if (!hasDisputeFramework) add("high", "Dispute resolution framework not clearly addressed.", "Add arbitration/governing law/jurisdiction review with recommended wording.");
+  if (!hasRedlineAdvice) add("medium", "Redline-ready drafting suggestions are missing.", "Add concrete replacement language for problematic clauses.");
+  if (/\bwaive\b[^.\n]{0,70}\bliabilit/i.test(draft) || /\babsolve\b/i.test(draft)) {
+    add("medium", "Over-strong legal wording detected.", "Use calibrated, enforceable drafting language and avoid absolute assertions.");
+  }
+  if (/\[(insert|to be filled)[^\]]*\]/i.test(draft)) {
+    add("low", "Unresolved placeholders detected.", "Replace placeholders before final contract advice delivery.");
+  }
+
+  if (/indemnity|limitation of liability|termination|ip|confidentiality/i.test(noticeDetails) && !hasClauseTable) {
+    add("high", "Notice/context indicates clause-specific review but clause matrix is absent.", "Ensure clause-wise analysis covers all major flagged clauses in source text.");
+  }
+
+  return flags;
+};
+
+const detectCustomRecheckFlags = (
+  draft: string,
+  noticeDetails: string,
+): RecheckFlag[] => {
+  const flags: RecheckFlag[] = [];
+  const add = (severity: RecheckFlag["severity"], issue: string, fix: string) => {
+    if (!flags.some((f) => f.issue.toLowerCase() === issue.toLowerCase())) {
+      flags.push({ severity, issue, fix, source: "rule" });
+    }
+  };
+
+  const hasMatrix = /allegation[-\s]*wise rebuttal|issue[-\s]*wise rebuttal|para[-\s]*wise rebuttal/i.test(draft)
+    || /\|\s*Issue\s*\|\s*Department Position\s*\|\s*(Noticee|Entity) Rebuttal\s*\|/i.test(draft);
+  const hasTimeline = /timeline|chronology/i.test(draft) && /\|\s*[-:]+\s*\|\s*[-:]+\s*\|/.test(draft);
+  const hasProvisionAnchors = /\bsection\s*\d+|rule\s*\d+|regulation\s*\d+/i.test(draft);
+  const hasComputation = /accepted\s*\|\s*disputed|computation|tax|duty|interest|penalty|financial exposure/i.test(draft);
+  const hasEvidenceMap = /annexure|evidence|document/i.test(draft);
+
+  if (!hasMatrix) add("high", "Custom response rebuttal matrix missing.", "Add matrix: Issue/Allegation | Department Position | Noticee Rebuttal | Evidence | Relief Sought.");
+  if (!hasTimeline) add("medium", "Custom response chronology/timeline table missing.", "Add chronology: Event | Provision | Due/Event Date | Actual Action Date | Reference | Status.");
+  if (!hasProvisionAnchors) add("high", "Provision anchors are weak/missing.", "Anchor submissions to invoked sections/rules/regulations mentioned in notice.");
+  if (!hasComputation) add("medium", "Computation/exposure reconciliation is weak.", "Add accepted-vs-disputed exposure/computation table.");
+  if (!hasEvidenceMap) add("medium", "Evidence/annexure mapping is weak.", "Map each major rebuttal to documentary evidence and annexures.");
+  if (/\bwaive\b[^.\n]{0,70}\bpenalt/i.test(draft) || /\babsolve\b/i.test(draft)) {
+    add("medium", "Risky prayer wording detected.", "Use calibrated prayer: drop or reduce unsustainable demand/penalty based on facts and law.");
+  }
+  if (/\[(insert|to be filled)[^\]]*\]/i.test(draft)) {
+    add("low", "Unresolved placeholders detected.", "Replace unresolved placeholders before final filing.");
+  }
+
+  if (/section\s*\d+|rule\s*\d+|regulation\s*\d+/i.test(noticeDetails) && !hasProvisionAnchors) {
+    add("high", "Draft does not reflect key invoked provisions from notice.", "Ensure legal submissions mirror invoked provisions and rebut each allegation.");
+  }
+
+  return flags;
+};
+
 const isNoPlaceholderGatePassed = (content: string, documentType: string) => {
   if (documentType === "mca-notice") {
     if (!hasPlaceholderMarkers(content)) return true;
@@ -2678,6 +3160,73 @@ const enforceCustomsDraftMinimumStructure = (draft: string) => {
   return enforceCrossRegulatorySafetyLanguage(fixed, "customs-response");
 };
 
+const enforceContractDraftMinimumStructure = (draft: string) => {
+  let fixed = enforceCrossRegulatorySafetyLanguage(draft, "contract-review");
+  const hasClauseMatrix = /\|\s*Clause\s*\|\s*Risk\s*\|\s*Recommendation\s*\|/i.test(fixed)
+    || /clause[-\s]*wise risk/i.test(fixed);
+  const hasFallback = /fallback position|negotiation position|counter[-\s]*proposal/i.test(fixed);
+  const hasRedline = /redline|suggested drafting language|replacement language/i.test(fixed);
+  const hasDispute = /arbitration|governing law|jurisdiction|dispute resolution/i.test(fixed);
+
+  if (!hasClauseMatrix) {
+    fixed += `\n\n### Clause-Wise Risk Matrix\n| Clause | Risk | Why Risky | Proposed Revision | Priority |\n|---|---|---|---|---|\n| [Clause ref] | [High/Medium/Low] | [Reason] | [Suggested wording] | [P1/P2/P3] |`;
+  }
+  if (!hasFallback) {
+    fixed += `\n\n### Negotiation Fallback Positions\n1. Primary position: [To be filled by CA/Lawyer]\n2. Fallback position: [To be filled by CA/Lawyer]\n3. Walk-away threshold: [To be filled by CA/Lawyer]`;
+  }
+  if (!hasRedline) {
+    fixed += `\n\n### Redline Suggestions\n- Replace one-sided indemnity with proportionate mutual indemnity language.\n- Cap aggregate liability with carve-outs for willful misconduct/fraud.\n- Clarify termination triggers and cure periods with objective milestones.`;
+  }
+  if (!hasDispute) {
+    fixed += `\n\n### Dispute Resolution Review\n- Governing Law: [To be filled by CA/Lawyer]\n- Jurisdiction/Seat: [To be filled by CA/Lawyer]\n- Arbitration clause review: [To be filled by CA/Lawyer]`;
+  }
+  return enforceCrossRegulatorySafetyLanguage(fixed, "contract-review");
+};
+
+const buildCustomFallbackMatrix = () => `| Issue / Allegation | Department Position | Noticee Rebuttal | Evidence | Relief Sought |
+|---|---|---|---|---|
+| Procedural / substantive non-compliance allegation | [To be filled by CA/Lawyer] | [Fact + law based rebuttal] | Annexure A/B | Drop or reduce unsustainable demand |
+| Computation / quantification challenge | [To be filled by CA/Lawyer] | [Accepted vs disputed basis with recalculation] | Annexure C | Recompute and restrict liability proportionately |`;
+
+const buildCustomFallbackTimeline = () => `| Compliance/Event | Invoked Provision | Due/Event Date | Actual Filing/Action Date | Reference | Status |
+|---|---|---|---|---|---|
+| Primary compliance event | [To be filled by CA/Lawyer] | [To be filled by CA/Lawyer] | [To be filled by CA/Lawyer] | [To be filled by CA/Lawyer] | [To be filled by CA/Lawyer] |
+| Notice response / corrective action | [To be filled by CA/Lawyer] | [To be filled by CA/Lawyer] | [To be filled by CA/Lawyer] | [To be filled by CA/Lawyer] | [To be filled by CA/Lawyer] |`;
+
+const enforceCustomDraftMinimumStructure = (draft: string) => {
+  let fixed = enforceCrossRegulatorySafetyLanguage(draft, "custom-draft");
+
+  const hasMatrix = /allegation[-\s]*wise rebuttal|issue[-\s]*wise rebuttal|para[-\s]*wise rebuttal/i.test(fixed)
+    || /\|\s*Issue\s*\|\s*Department Position\s*\|\s*(Noticee|Entity) Rebuttal\s*\|/i.test(fixed);
+  const hasTimeline = /timeline|chronology/i.test(fixed) && /\|\s*[-:]+\s*\|\s*[-:]+\s*\|/.test(fixed);
+  const hasComputation = /accepted\s*\|\s*disputed|computation|tax|duty|interest|penalty|exposure/i.test(fixed);
+  const hasEvidence = /annexure|evidence|document/i.test(fixed);
+
+  if (!hasMatrix) {
+    fixed += `\n\n### Allegation / Issue-Wise Rebuttal Matrix\n${buildCustomFallbackMatrix()}`;
+  }
+  if (!hasTimeline) {
+    fixed += `\n\n### Chronology / Timeline\n${buildCustomFallbackTimeline()}`;
+  }
+  if (!hasComputation) {
+    fixed += `\n\n### Computation Reconciliation (Accepted vs Disputed)\n| Particulars | Department Position | Noticee Position | Remarks |\n|---|---|---|---|\n| Principal exposure | [To be filled by CA/Lawyer] | [To be filled by CA/Lawyer] | [To be filled by CA/Lawyer] |\n| Interest | [To be filled by CA/Lawyer] | [To be filled by CA/Lawyer] | [To be filled by CA/Lawyer] |\n| Penalty / other levy | [To be filled by CA/Lawyer] | [To be filled by CA/Lawyer] | [To be filled by CA/Lawyer] |`;
+  }
+  if (!hasEvidence) {
+    fixed += `\n\n### Evidence / Annexure Mapping\n1. Annexure A: Notice and reference metadata.\n2. Annexure B: Primary documentary evidence supporting factual rebuttal.\n3. Annexure C: Computation/reconciliation working papers.\n4. Annexure D: Additional legal or procedural support records.`;
+  }
+  if (!/personal hearing|hearing request/i.test(fixed)) {
+    fixed += `\n\n### Hearing Request\nThe Noticee requests an opportunity of personal hearing before any adverse order is passed.`;
+  }
+  if (!/prayer|relief/i.test(fixed)) {
+    fixed += `\n\n### Prayer\n1. Drop or reduce unsustainable allegations/demand based on facts and law.\n2. Restrict interest/penalty to legally sustainable extent.\n3. Grant personal hearing and permit additional submissions.\n4. Pass any other order deemed fit in the interest of justice.`;
+  }
+
+  fixed = removeDuplicateMarkdownSection(fixed, "Allegation / Issue-Wise Rebuttal Matrix");
+  fixed = removeDuplicateMarkdownSection(fixed, "Chronology / Timeline");
+  fixed = removeDuplicateMarkdownSection(fixed, "Prayer");
+  return enforceCrossRegulatorySafetyLanguage(fixed, "custom-draft");
+};
+
 const enforceMcaDraftMinimumStructure = (
   draft: string,
   mcaReplyType: McaReplyType,
@@ -2868,6 +3417,8 @@ serve(async (req) => {
       rbiReplyTypeOverride,
       sebiReplyTypeOverride,
       customsReplyTypeOverride,
+      contractReplyTypeOverride,
+      customReplyTypeOverride,
       advancedMode = false,
       strictValidation = false,
       stream = false,
@@ -2899,6 +3450,16 @@ serve(async (req) => {
       : null;
     const inferredCustomsReplyType = inferCustomsReplyType(noticeDetails, null);
     const effectiveCustomsReplyType: CustomsReplyType = normalizedCustomsReplyType ?? inferredCustomsReplyType;
+    const normalizedContractReplyType = typeof contractReplyTypeOverride === "string" && contractReplyTypeOverride.trim()
+      ? normalizeContractReplyType(contractReplyTypeOverride)
+      : null;
+    const inferredContractReplyType = inferContractReplyType(noticeDetails, null);
+    const effectiveContractReplyType: ContractReplyType = normalizedContractReplyType ?? inferredContractReplyType;
+    const normalizedCustomReplyType = typeof customReplyTypeOverride === "string" && customReplyTypeOverride.trim()
+      ? normalizeCustomReplyType(customReplyTypeOverride)
+      : null;
+    const inferredCustomReplyType = inferCustomReplyType(noticeDetails, null);
+    const effectiveCustomReplyType: CustomReplyType = normalizedCustomReplyType ?? inferredCustomReplyType;
 
     if (normalizedOperation === "recheck") {
       if (!draftContent || typeof draftContent !== "string" || draftContent.trim().length < 40) {
@@ -2923,6 +3484,12 @@ serve(async (req) => {
       const customsReplyType: CustomsReplyType = documentType === "customs-response"
         ? (normalizeCustomsReplyType(customsReplyTypeOverride) ?? inferCustomsReplyType(noticeDetails, null))
         : "customs-general";
+      const contractReplyType: ContractReplyType = documentType === "contract-review"
+        ? (normalizeContractReplyType(contractReplyTypeOverride) ?? inferContractReplyType(noticeDetails, null))
+        : "contract-general";
+      const customReplyType: CustomReplyType = documentType === "custom-draft"
+        ? (normalizeCustomReplyType(customReplyTypeOverride) ?? inferCustomReplyType(noticeDetails, null))
+        : "custom-general";
 
       const ruleFlags = documentType === "mca-notice"
         ? detectMcaRecheckFlags(draftContent, noticeDetails || "", mcaReplyType)
@@ -2936,6 +3503,10 @@ serve(async (req) => {
             ? detectSebiRecheckFlags(draftContent, noticeDetails || "")
             : documentType === "customs-response"
               ? detectCustomsRecheckFlags(draftContent, noticeDetails || "")
+              : documentType === "contract-review"
+                ? detectContractRecheckFlags(draftContent, noticeDetails || "")
+                : documentType === "custom-draft"
+                  ? detectCustomRecheckFlags(draftContent, noticeDetails || "")
           : [];
 
       const recheckSystemPrompt = `You are a legal QA reviewer for Indian regulatory draft filings.
@@ -2964,6 +3535,8 @@ GST Reply Type: ${effectiveGstReplyType}
 RBI Reply Type: ${rbiReplyType}
 SEBI Reply Type: ${sebiReplyType}
 Customs Reply Type: ${customsReplyType}
+Contract Reply Type: ${contractReplyType}
+Custom Reply Type: ${customReplyType}
 
 NOTICE/ORDER DETAILS:
 ${noticeDetails || "Not provided"}
@@ -3063,6 +3636,22 @@ ${evidenceContext || "None provided"}`;
           flags: dedup,
           summary,
         });
+      } else if (documentType === "contract-review") {
+        await captureContractRecheckIssues({
+          authClient,
+          userId,
+          caseId: typeof trainingCaseId === "string" ? trainingCaseId : null,
+          flags: dedup,
+          summary,
+        });
+      } else if (documentType === "custom-draft") {
+        await captureCustomRecheckIssues({
+          authClient,
+          userId,
+          caseId: typeof trainingCaseId === "string" ? trainingCaseId : null,
+          flags: dedup,
+          summary,
+        });
       }
 
       return new Response(JSON.stringify({
@@ -3095,6 +3684,12 @@ ${evidenceContext || "None provided"}`;
       const customsReplyType: CustomsReplyType | null = documentType === "customs-response"
         ? (normalizeCustomsReplyType(customsReplyTypeOverride) ?? inferCustomsReplyType(noticeDetails, null))
         : null;
+      const contractReplyType: ContractReplyType | null = documentType === "contract-review"
+        ? (normalizeContractReplyType(contractReplyTypeOverride) ?? inferContractReplyType(noticeDetails, null))
+        : null;
+      const customReplyType: CustomReplyType | null = documentType === "custom-draft"
+        ? (normalizeCustomReplyType(customReplyTypeOverride) ?? inferCustomReplyType(noticeDetails, null))
+        : null;
       const mcaKnowledge = mcaReplyType ? getMcaKnowledgeBlock(mcaReplyType) : "";
       const mcaChecklist = mcaReplyType ? getMcaPendingDataChecklist(mcaReplyType).map((item) => `- ${item}`).join("\n") : "";
 
@@ -3119,6 +3714,8 @@ ${documentType === "gst-show-cause" && gstReplyType ? `- GST Reply Type: ${gstRe
 ${documentType === "rbi-filing" && rbiReplyType ? `- RBI Reply Type: ${rbiReplyType}` : ""}
 ${documentType === "sebi-compliance" && sebiReplyType ? `- SEBI Reply Type: ${sebiReplyType}` : ""}
 ${documentType === "customs-response" && customsReplyType ? `- Customs Reply Type: ${customsReplyType}` : ""}
+${documentType === "contract-review" && contractReplyType ? `- Contract Reply Type: ${contractReplyType}` : ""}
+${documentType === "custom-draft" ? `- Custom Reply Type: ${effectiveCustomReplyType}` : ""}
 
 Use this context if provided:
 ${context || "No extra context provided."}
@@ -3167,6 +3764,8 @@ ${noticeDetails || "None provided."}`;
           rbiReplyType,
           sebiReplyType,
           customsReplyType,
+          contractReplyType,
+          customReplyType,
           generatedAt: new Date().toISOString(),
         },
       }), {
@@ -3272,6 +3871,12 @@ If notice data is missing, list specific missing items in critical_missing_field
     const customsReplyType: CustomsReplyType | null = documentType === "customs-response"
       ? (normalizeCustomsReplyType(customsReplyTypeOverride) ?? inferCustomsReplyType(noticeDetails, extractedNotice))
       : null;
+    const contractReplyType: ContractReplyType | null = documentType === "contract-review"
+      ? (normalizeContractReplyType(contractReplyTypeOverride) ?? inferContractReplyType(noticeDetails, extractedNotice))
+      : null;
+    const customReplyType: CustomReplyType | null = documentType === "custom-draft"
+      ? (normalizeCustomReplyType(customReplyTypeOverride) ?? inferCustomReplyType(noticeDetails, extractedNotice))
+      : null;
     const extractedNoticeDate = extractNoticeDateFromText(noticeDetails);
     const mcaPendingChecklistText = mcaReplyType
       ? getMcaPendingDataChecklist(mcaReplyType).map((item) => `- ${item}`).join("\n")
@@ -3316,6 +3921,8 @@ ${documentType === "income-tax-response" && incomeTaxReplyType ? `- Income-tax R
 ${documentType === "rbi-filing" && rbiReplyType ? `- RBI Reply Type: ${rbiReplyType}` : ""}
 ${documentType === "sebi-compliance" ? `- SEBI Reply Type: ${effectiveSebiReplyType}` : ""}
 ${documentType === "customs-response" ? `- Customs Reply Type: ${effectiveCustomsReplyType}` : ""}
+${documentType === "contract-review" ? `- Contract Reply Type: ${contractReplyType ?? effectiveContractReplyType}` : ""}
+${documentType === "custom-draft" ? `- Custom Reply Type: ${customReplyType ?? effectiveCustomReplyType}` : ""}
 
 ${extractedNotice ? `EXTRACTED NOTICE INTELLIGENCE (use as primary structure source):\n${JSON.stringify(extractedNotice, null, 2)}` : ""}
 
@@ -3414,6 +4021,42 @@ Dataset policy:
 - Use prior dataset patterns only for structure and quality patterns.
 - Never reproduce long sentence blocks or paragraph chunks from prior stored drafts.
 - The output must be freshly written and specific to the current notice facts.`
+      : documentType === "contract-review"
+        ? `Generate a final contract review advisory for ${companyName}${industry ? ` (${industry} sector)` : ""}.
+Detected contract class: ${contractReplyType ?? effectiveContractReplyType ?? "contract-general"}.
+Mandatory structure:
+1) Contract snapshot and issue summary
+2) Clause-wise risk table (clause | risk | why risky | proposed revision | priority)
+3) Enforceability/legal position section
+4) Commercial impact and negotiation strategy
+5) Fallback positions for high-risk clauses
+6) Redline-ready suggested drafting language
+7) Dispute-resolution and governing-law assessment
+8) Final recommendation and execution-readiness checklist
+Avoid unsupported case law. Use controlled placeholders only where unavoidable.
+Dataset policy:
+- Use prior dataset patterns only for structure and quality patterns.
+- Never reproduce long sentence blocks or paragraph chunks from prior stored drafts.
+- The output must be freshly written and specific to the current contract facts.`
+      : documentType === "custom-draft"
+        ? `Generate a final adjudication-ready custom regulatory response for ${companyName}${industry ? ` (${industry} sector)` : ""}.
+Detected custom notice class: ${customReplyType ?? effectiveCustomReplyType ?? "custom-general"}.
+Mandatory structure:
+1) Heading + authority/office metadata from notice
+2) Notice metadata (reference no, DIN/RFN if available, date, period)
+3) Preliminary submissions
+4) Allegation/issue-wise rebuttal matrix linked to invoked provisions
+5) Provision-wise legal submissions under invoked sections/rules/regulations
+6) Accepted-vs-disputed computation/exposure table
+7) Chronology/timeline table (event date vs filing/action date + reference IDs)
+8) Evidence and annexure mapping
+9) Layered prayer with hearing request and calibrated proportionality language
+10) Sign-off
+Avoid unsupported case law. Use controlled placeholders only where unavoidable.
+Dataset policy:
+- Use prior dataset patterns only for structure and quality patterns.
+- Never reproduce long sentence blocks or paragraph chunks from prior stored drafts.
+- The output must be freshly written and specific to the current notice facts.`
       : `Generate a comprehensive, filing-ready ${documentType.replace(/-/g, " ")} for ${companyName}${industry ? ` (${industry} sector)` : ""}. Include SCN para-wise rebuttal matrix, allegation-wise computation challenge with accepted/disputed columns, annexure mapping per issue, calibrated legal language, and complete layered prayer.`);
 
     if (!advancedMode) {
@@ -3463,6 +4106,10 @@ Dataset policy:
         draftContent = enforceSebiDraftMinimumStructure(draftContent);
       } else if (documentType === "customs-response") {
         draftContent = enforceCustomsDraftMinimumStructure(draftContent);
+      } else if (documentType === "contract-review") {
+        draftContent = enforceContractDraftMinimumStructure(draftContent);
+      } else if (documentType === "custom-draft") {
+        draftContent = enforceCustomDraftMinimumStructure(draftContent);
       } else {
         draftContent = enforceCrossRegulatorySafetyLanguage(draftContent, documentType);
       }
@@ -3479,6 +4126,8 @@ Dataset policy:
           rbiReplyType: effectiveRbiReplyType,
           sebiReplyType: effectiveSebiReplyType,
           customsReplyType: customsReplyType ?? effectiveCustomsReplyType,
+          contractReplyType: contractReplyType ?? effectiveContractReplyType,
+          customReplyType: customReplyType ?? effectiveCustomReplyType,
           advancedMode,
           generatedAt: new Date().toISOString(),
           version: "2.0",
@@ -3747,6 +4396,10 @@ Checklist:
       finalDraft = enforceSebiDraftMinimumStructure(finalDraft);
     } else if (documentType === "customs-response") {
       finalDraft = enforceCustomsDraftMinimumStructure(finalDraft);
+    } else if (documentType === "contract-review") {
+      finalDraft = enforceContractDraftMinimumStructure(finalDraft);
+    } else if (documentType === "custom-draft") {
+      finalDraft = enforceCustomDraftMinimumStructure(finalDraft);
     } else if (documentType !== "mca-notice") {
       finalDraft = enforceCrossRegulatorySafetyLanguage(finalDraft, documentType);
     } else {
@@ -3953,6 +4606,36 @@ Schema:
         draftMode,
         previousCaseId: typeof trainingCaseId === "string" ? trainingCaseId : null,
       });
+    } else if (documentType === "contract-review") {
+      capturedTrainingCaseId = await captureContractTrainingCase({
+        authClient,
+        userId,
+        companyId: typeof companyId === "string" ? companyId : null,
+        draftRunId: typeof draftRunId === "string" ? draftRunId : null,
+        noticeClass: contractReplyType ?? effectiveContractReplyType ?? "contract-general",
+        noticeDetails: noticeDetails ?? null,
+        generatedDraft: finalDraft,
+        qaPayload: finalQaPayload,
+        companyName,
+        industry,
+        draftMode,
+        previousCaseId: typeof trainingCaseId === "string" ? trainingCaseId : null,
+      });
+    } else if (documentType === "custom-draft") {
+      capturedTrainingCaseId = await captureCustomTrainingCase({
+        authClient,
+        userId,
+        companyId: typeof companyId === "string" ? companyId : null,
+        draftRunId: typeof draftRunId === "string" ? draftRunId : null,
+        noticeClass: customReplyType ?? effectiveCustomReplyType ?? "custom-general",
+        noticeDetails: noticeDetails ?? null,
+        generatedDraft: finalDraft,
+        qaPayload: finalQaPayload,
+        companyName,
+        industry,
+        draftMode,
+        previousCaseId: typeof trainingCaseId === "string" ? trainingCaseId : null,
+      });
     }
 
     return new Response(JSON.stringify({
@@ -3969,6 +4652,8 @@ Schema:
         rbiReplyType: rbiReplyType ?? normalizedRbiReplyType ?? effectiveRbiReplyType,
         sebiReplyType: sebiReplyType ?? effectiveSebiReplyType,
         customsReplyType: customsReplyType ?? effectiveCustomsReplyType,
+        contractReplyType: contractReplyType ?? effectiveContractReplyType,
+        customReplyType: customReplyType ?? effectiveCustomReplyType,
         advancedMode,
         userId,
         trainingCaseId: capturedTrainingCaseId,

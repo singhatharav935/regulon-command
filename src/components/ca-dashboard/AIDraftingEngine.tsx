@@ -221,6 +221,54 @@ const customsReplyTypeOptions = [
   { id: "customs-general", label: "General Customs Response" },
 ];
 
+const contractReplyTypeOptions = [
+  { id: "auto", label: "Auto-detect from contract context" },
+  { id: "msa-general", label: "MSA / SOW Review" },
+  { id: "nda-confidentiality", label: "NDA / Confidentiality" },
+  { id: "saas-license", label: "SaaS / License Terms" },
+  { id: "employment-consultancy", label: "Employment / Consultancy Agreement" },
+  { id: "vendor-procurement", label: "Vendor / Procurement Contract" },
+  { id: "ip-assignment-licensing", label: "IP Assignment / Licensing" },
+  { id: "loan-financing", label: "Loan / Financing Documents" },
+  { id: "shareholders-jv", label: "SHA / JV Arrangement" },
+  { id: "lease-rent", label: "Lease / Rent Agreement" },
+  { id: "franchise-distribution", label: "Franchise / Distribution Agreement" },
+  { id: "data-processing-dpa", label: "DPA / Data Processing" },
+  { id: "privacy-cybersecurity", label: "Privacy / Cybersecurity Clauses" },
+  { id: "indemnity-liability-cap", label: "Indemnity / Liability Cap" },
+  { id: "termination-exit", label: "Termination / Exit Terms" },
+  { id: "non-compete-non-solicit", label: "Non-compete / Non-solicit" },
+  { id: "arbitration-dispute-resolution", label: "Arbitration / Dispute Resolution" },
+  { id: "settlement-release", label: "Settlement / Release Deed" },
+  { id: "regulatory-compliance-sanctions", label: "Compliance / Anti-bribery / Sanctions" },
+  { id: "cross-border-tax-fx", label: "Cross-border Tax / FX Clauses" },
+  { id: "contract-general", label: "General Contract Review" },
+];
+
+const customReplyTypeOptions = [
+  { id: "auto", label: "Auto-detect from notice" },
+  { id: "regulatory-scn-reply", label: "Regulatory SCN Reply" },
+  { id: "adjudication-order-appeal", label: "Adjudication Order / Appeal" },
+  { id: "license-registration-compliance", label: "License / Registration Compliance" },
+  { id: "late-filing-delay-condonation", label: "Late Filing / Delay Condonation" },
+  { id: "tax-demand-computation", label: "Tax / Demand Computation Dispute" },
+  { id: "penalty-interest-mitigation", label: "Penalty / Interest Mitigation" },
+  { id: "refund-rejection-recovery", label: "Refund Rejection / Recovery" },
+  { id: "show-cause-natural-justice", label: "Show Cause / Natural Justice" },
+  { id: "investigation-summons-response", label: "Investigation / Summons Response" },
+  { id: "inspection-audit-objection", label: "Inspection / Audit Objection" },
+  { id: "classification-valuation-dispute", label: "Classification / Valuation Dispute" },
+  { id: "input-credit-deduction-dispute", label: "Input Credit / Deduction Dispute" },
+  { id: "procedural-noncompliance", label: "Procedural Non-compliance" },
+  { id: "documentation-evidence-deficiency", label: "Documentation / Evidence Deficiency" },
+  { id: "jurisdiction-limitation-objection", label: "Jurisdiction / Limitation Objection" },
+  { id: "rectification-revision", label: "Rectification / Revision" },
+  { id: "appeal-stay-interim-relief", label: "Appeal / Stay / Interim Relief" },
+  { id: "cross-border-forex-trade", label: "Cross-border / Forex / Trade" },
+  { id: "industry-specific-compliance", label: "Industry-specific Compliance" },
+  { id: "custom-general", label: "General Custom Regulatory Reply" },
+];
+
 const inferMcaReplyTypeFromNotice = (noticeText: string): string => {
   const corpus = (noticeText || "").toLowerCase();
   if (/\bsection\s*92\b|\bsection\s*137\b|\bmgt-?7\b|\baoc-?4\b/.test(corpus)) return "annual-filing-92-137";
@@ -369,6 +417,54 @@ const inferCustomsReplyTypeFromNotice = (noticeText: string): string => {
   if (/audit|post clearance audit|caap/i.test(corpus)) return "customs-audit-caap";
   if (/\bdri\b|directorate of revenue intelligence|investigation summons/i.test(corpus)) return "driu-investigation";
   return "customs-general";
+};
+
+const inferContractReplyTypeFromNotice = (noticeText: string): string => {
+  const corpus = (noticeText || "").toLowerCase();
+  if (/master services agreement|msa|statement of work|sow/i.test(corpus)) return "msa-general";
+  if (/nda|non-disclosure|confidential information|confidentiality/i.test(corpus)) return "nda-confidentiality";
+  if (/saas|software license|subscription service|uptime|sla/i.test(corpus)) return "saas-license";
+  if (/employment agreement|consultancy agreement|service provider|retainer/i.test(corpus)) return "employment-consultancy";
+  if (/vendor agreement|purchase order|procurement|supply agreement/i.test(corpus)) return "vendor-procurement";
+  if (/intellectual property|ip assignment|license grant|ownership of work product/i.test(corpus)) return "ip-assignment-licensing";
+  if (/loan agreement|facility agreement|interest covenant|security creation/i.test(corpus)) return "loan-financing";
+  if (/shareholders agreement|sha|joint venture|jv/i.test(corpus)) return "shareholders-jv";
+  if (/lease deed|rent agreement|lock-in|security deposit/i.test(corpus)) return "lease-rent";
+  if (/franchise|distribution agreement|territory rights|minimum purchase/i.test(corpus)) return "franchise-distribution";
+  if (/data processing agreement|dpa|processor|controller|sub-processor/i.test(corpus)) return "data-processing-dpa";
+  if (/privacy policy|data breach|cybersecurity|information security/i.test(corpus)) return "privacy-cybersecurity";
+  if (/indemnity|limitation of liability|cap on liability|consequential damages/i.test(corpus)) return "indemnity-liability-cap";
+  if (/termination|exit|survival|transition assistance/i.test(corpus)) return "termination-exit";
+  if (/non-compete|non solicitation|restrictive covenant/i.test(corpus)) return "non-compete-non-solicit";
+  if (/arbitration|dispute resolution|governing law|jurisdiction/i.test(corpus)) return "arbitration-dispute-resolution";
+  if (/settlement agreement|release and discharge|full and final settlement/i.test(corpus)) return "settlement-release";
+  if (/anti-bribery|sanctions|fcp[a]?|ukba|compliance representation/i.test(corpus)) return "regulatory-compliance-sanctions";
+  if (/withholding tax|transfer pricing|forex|exchange control|cross-border/i.test(corpus)) return "cross-border-tax-fx";
+  return "contract-general";
+};
+
+const inferCustomReplyTypeFromNotice = (noticeText: string): string => {
+  const corpus = (noticeText || "").toLowerCase();
+  if (/show cause notice|scn|reply to notice|pre-adjudication/i.test(corpus)) return "regulatory-scn-reply";
+  if (/adjudication order|order-in-original|appeal memo|appellate authority/i.test(corpus)) return "adjudication-order-appeal";
+  if (/license|registration|authorization|renewal|suspension/i.test(corpus)) return "license-registration-compliance";
+  if (/delay condonation|late filing|condonation of delay/i.test(corpus)) return "late-filing-delay-condonation";
+  if (/demand|computation|short payment|short levy|quantification/i.test(corpus)) return "tax-demand-computation";
+  if (/penalty|interest|mitigation|leniency|proportionality/i.test(corpus)) return "penalty-interest-mitigation";
+  if (/refund|recovery|rejection|withheld refund/i.test(corpus)) return "refund-rejection-recovery";
+  if (/natural justice|hearing|opportunity of being heard|procedural fairness/i.test(corpus)) return "show-cause-natural-justice";
+  if (/summons|statement|investigation|inquiry|enforcement/i.test(corpus)) return "investigation-summons-response";
+  if (/inspection|audit|observation|audit memo|non-conformance/i.test(corpus)) return "inspection-audit-objection";
+  if (/classification|valuation|rate dispute|tariff/i.test(corpus)) return "classification-valuation-dispute";
+  if (/credit|deduction|set-off|input credit/i.test(corpus)) return "input-credit-deduction-dispute";
+  if (/procedural lapse|procedural non[-\s]*compliance|filing defect/i.test(corpus)) return "procedural-noncompliance";
+  if (/documentary deficiency|evidence deficiency|supporting documents/i.test(corpus)) return "documentation-evidence-deficiency";
+  if (/jurisdiction|limitation|time barred|barred by limitation/i.test(corpus)) return "jurisdiction-limitation-objection";
+  if (/rectification|revision|correction/i.test(corpus)) return "rectification-revision";
+  if (/stay|interim relief|status quo|appeal and stay/i.test(corpus)) return "appeal-stay-interim-relief";
+  if (/cross[-\s]*border|forex|exchange control|trade compliance|fema/i.test(corpus)) return "cross-border-forex-trade";
+  if (/industry specific|sectoral guideline|domain regulation/i.test(corpus)) return "industry-specific-compliance";
+  return "custom-general";
 };
 
 const extractNoticeDateFromText = (noticeText: string): string => {
@@ -607,6 +703,48 @@ type CustomsRecheckFlag = {
 type CustomsRecheckReport = {
   ok: boolean;
   flags: CustomsRecheckFlag[];
+  summary?: string;
+  checkedAt?: string;
+};
+
+type ContractIssueReport = {
+  ok: boolean;
+  items: Array<{ issue: string; suggestion: string }>;
+  issues: string[];
+  checkedAt: string;
+};
+
+type ContractRecheckFlag = {
+  severity: "high" | "medium" | "low";
+  issue: string;
+  fix: string;
+  source?: "rule" | "ai";
+};
+
+type ContractRecheckReport = {
+  ok: boolean;
+  flags: ContractRecheckFlag[];
+  summary?: string;
+  checkedAt?: string;
+};
+
+type CustomIssueReport = {
+  ok: boolean;
+  items: Array<{ issue: string; suggestion: string }>;
+  issues: string[];
+  checkedAt: string;
+};
+
+type CustomRecheckFlag = {
+  severity: "high" | "medium" | "low";
+  issue: string;
+  fix: string;
+  source?: "rule" | "ai";
+};
+
+type CustomRecheckReport = {
+  ok: boolean;
+  flags: CustomRecheckFlag[];
   summary?: string;
   checkedAt?: string;
 };
@@ -960,6 +1098,8 @@ const AIDraftingEngine = ({ demoMode = false, includeLawyerReview = true }: AIDr
   const [rbiReplyTypeOverride, setRbiReplyTypeOverride] = useState<string>("auto");
   const [sebiReplyTypeOverride, setSebiReplyTypeOverride] = useState<string>("auto");
   const [customsReplyTypeOverride, setCustomsReplyTypeOverride] = useState<string>("auto");
+  const [contractReplyTypeOverride, setContractReplyTypeOverride] = useState<string>("auto");
+  const [customReplyTypeOverride, setCustomReplyTypeOverride] = useState<string>("auto");
   const [noticeDetails, setNoticeDetails] = useState<string>("");
   const [isGeneratingNoticeDetails, setIsGeneratingNoticeDetails] = useState(false);
   const [preferPiiMasking, setPreferPiiMasking] = useState(true);
@@ -973,6 +1113,8 @@ const AIDraftingEngine = ({ demoMode = false, includeLawyerReview = true }: AIDr
   const [rbiTrainingCaseId, setRbiTrainingCaseId] = useState<string | null>(null);
   const [sebiTrainingCaseId, setSebiTrainingCaseId] = useState<string | null>(null);
   const [customsTrainingCaseId, setCustomsTrainingCaseId] = useState<string | null>(null);
+  const [contractTrainingCaseId, setContractTrainingCaseId] = useState<string | null>(null);
+  const [customTrainingCaseId, setCustomTrainingCaseId] = useState<string | null>(null);
   const [showFormatDetails, setShowFormatDetails] = useState(false);
   const [currentDraftRunId, setCurrentDraftRunId] = useState<string | null>(null);
   const [workflowStatus, setWorkflowStatus] = useState<WorkflowStatus>("generated");
@@ -1021,6 +1163,20 @@ const AIDraftingEngine = ({ demoMode = false, includeLawyerReview = true }: AIDr
   const [customsRecheckReport, setCustomsRecheckReport] = useState<CustomsRecheckReport | null>(null);
   const [isRecheckingCustoms, setIsRecheckingCustoms] = useState(false);
   const [isApplyingCustomsFix, setIsApplyingCustomsFix] = useState(false);
+  const [contractHasChecked, setContractHasChecked] = useState(false);
+  const [contractLastCheckedAt, setContractLastCheckedAt] = useState<string | null>(null);
+  const [contractUserFixNotes, setContractUserFixNotes] = useState("");
+  const [contractEvidenceContext, setContractEvidenceContext] = useState("");
+  const [contractRecheckReport, setContractRecheckReport] = useState<ContractRecheckReport | null>(null);
+  const [isRecheckingContract, setIsRecheckingContract] = useState(false);
+  const [isApplyingContractFix, setIsApplyingContractFix] = useState(false);
+  const [customHasChecked, setCustomHasChecked] = useState(false);
+  const [customLastCheckedAt, setCustomLastCheckedAt] = useState<string | null>(null);
+  const [customUserFixNotes, setCustomUserFixNotes] = useState("");
+  const [customEvidenceContext, setCustomEvidenceContext] = useState("");
+  const [customRecheckReport, setCustomRecheckReport] = useState<CustomRecheckReport | null>(null);
+  const [isRecheckingCustom, setIsRecheckingCustom] = useState(false);
+  const [isApplyingCustomFix, setIsApplyingCustomFix] = useState(false);
   const [currentSteps, setCurrentSteps] = useState<ReviewStep[]>(initialReviewSteps);
   const [generationError, setGenerationError] = useState<string | null>(null);
 
@@ -1062,6 +1218,14 @@ const AIDraftingEngine = ({ demoMode = false, includeLawyerReview = true }: AIDr
   );
   const inferredCustomsReplyType = useMemo(
     () => inferCustomsReplyTypeFromNotice(noticeDetails),
+    [noticeDetails],
+  );
+  const inferredContractReplyType = useMemo(
+    () => inferContractReplyTypeFromNotice(noticeDetails),
+    [noticeDetails],
+  );
+  const inferredCustomReplyType = useMemo(
+    () => inferCustomReplyTypeFromNotice(noticeDetails),
     [noticeDetails],
   );
   const supabaseAny = supabase as any;
@@ -1721,6 +1885,233 @@ const AIDraftingEngine = ({ demoMode = false, includeLawyerReview = true }: AIDr
     [liveCustomsIssueItems, liveCustomsAdvancedSuggestions],
   );
 
+  function evaluateContractDraftIssues(
+    content: string,
+    qa?: DraftQA | null,
+    includeQaGates = true,
+  ): Array<{ issue: string; suggestion: string }> {
+    const items: Array<{ issue: string; suggestion: string }> = [];
+    const addIssue = (condition: boolean, issue: string, suggestion: string) => {
+      if (condition) items.push({ issue, suggestion });
+    };
+
+    const hasClauseMatrix = /clause[-\s]*wise risk/i.test(content) || /\|\s*Clause\s*\|\s*Risk\s*\|\s*Recommendation\s*\|/i.test(content);
+    const hasNegotiation = /fallback position|negotiation position|counter[-\s]*proposal/i.test(content);
+    const hasRedline = /redline|suggested drafting language|replacement language/i.test(content);
+    const hasDispute = /arbitration|governing law|jurisdiction|dispute resolution/i.test(content);
+    const hasCommercialImpact = /commercial impact|financial exposure|liability cap|risk ranking/i.test(content);
+
+    addIssue(!hasClauseMatrix, "Clause-wise risk matrix is missing.", "Add table: Clause | Risk | Why risky | Proposed revision | Priority.");
+    addIssue(!hasNegotiation, "Negotiation fallback positions are missing.", "Add primary + fallback negotiation positions for high-risk clauses.");
+    addIssue(!hasRedline, "Redline-ready suggested language is missing.", "Add concrete replacement language for key risky clauses.");
+    addIssue(!hasDispute, "Dispute-resolution/governing-law review is weak.", "Add arbitration, governing law, jurisdiction assessment with recommendation.");
+    addIssue(!hasCommercialImpact, "Commercial exposure/risk ranking is weak.", "Add quantified or tiered risk impact analysis.");
+    addIssue(/\[(insert|to be filled)[^\]]*\]/i.test(content), "Unresolved placeholders detected in contract review output.", "Replace unresolved placeholders before final client delivery.");
+
+    if (includeQaGates) {
+      const badMandatoryGates = Object.entries(qa?.mandatory_gates || {})
+        .filter(([, passed]) => !passed)
+        .map(([gate]) => ({
+          issue: `Mandatory gate failed: ${gate}`,
+          suggestion: "Add the missing mandatory section and re-run draft checks.",
+        }));
+      items.push(...badMandatoryGates);
+    }
+    return items;
+  }
+
+  function evaluateContractAdvancedSuggestions(
+    content: string,
+    qa?: DraftQA | null,
+  ): Array<{ title: string; suggestion: string; implemented: boolean }> {
+    return [
+      {
+        title: "Strengthen Clause-Level Legal Framing",
+        suggestion: "Map each risky clause to enforceability rationale and practical downside.",
+        implemented: /enforceability|legal position|risk rationale/i.test(content),
+      },
+      {
+        title: "Add Structured Redline Pack",
+        suggestion: "Provide replacement language for indemnity, liability cap, termination, and dispute clauses.",
+        implemented: /redline|replacement language|draft wording/i.test(content),
+      },
+      {
+        title: "Improve Negotiation Strategy",
+        suggestion: "Include primary ask, fallback ask, and walk-away threshold for each critical clause.",
+        implemented: /fallback position|walk-away|negotiation position/i.test(content),
+      },
+      {
+        title: "Commercial Risk Quantification",
+        suggestion: "Add exposure prioritization (P1/P2/P3) with business impact summary.",
+        implemented: /p1|p2|p3|commercial impact|financial exposure/i.test(content),
+      },
+      {
+        title: "Raise Review-Readiness Score",
+        suggestion: "Tighten clause references and remove repetitive generic observations.",
+        implemented: (qa?.filing_score ?? 100) >= 95,
+      },
+    ];
+  }
+
+  const liveContractIssueItems = useMemo(
+    () => evaluateContractDraftIssues(draftContent || "", draftQA, true),
+    [draftContent, draftQA],
+  );
+
+  const liveContractAdvancedSuggestions = useMemo(
+    () => evaluateContractAdvancedSuggestions(draftContent || "", draftQA),
+    [draftContent, draftQA],
+  );
+
+  const contractComputedIssueReport: ContractIssueReport = useMemo(() => ({
+    ok: liveContractIssueItems.length === 0,
+    items: liveContractIssueItems,
+    issues: liveContractIssueItems.map((item) => item.issue),
+    checkedAt: contractLastCheckedAt || new Date().toISOString(),
+  }), [liveContractIssueItems, contractLastCheckedAt]);
+
+  const contractAutoFixNotes = useMemo(() => {
+    const issueNotes = liveContractIssueItems.map((item, idx) => `${idx + 1}. ${item.issue}\nSuggestion: ${item.suggestion}`);
+    const pendingAdvanced = liveContractAdvancedSuggestions
+      .filter((item) => !item.implemented)
+      .map((item, idx) => `${idx + 1 + issueNotes.length}. ${item.title}\nSuggestion: ${item.suggestion}`);
+    return [...issueNotes, ...pendingAdvanced].join("\n\n");
+  }, [liveContractIssueItems, liveContractAdvancedSuggestions]);
+
+  const contractPendingFixPlaybook = useMemo(() => {
+    const issuePlaybook = liveContractIssueItems.map((item) => ({
+      title: item.issue,
+      solution: item.suggestion,
+    }));
+    const advancedPlaybook = liveContractAdvancedSuggestions
+      .filter((item) => !item.implemented)
+      .map((item) => ({
+        title: item.title,
+        solution: item.suggestion,
+      }));
+    return [...issuePlaybook, ...advancedPlaybook];
+  }, [liveContractIssueItems, liveContractAdvancedSuggestions]);
+
+  const contractPendingFixCount = useMemo(
+    () => liveContractIssueItems.length + liveContractAdvancedSuggestions.filter((item) => !item.implemented).length,
+    [liveContractIssueItems, liveContractAdvancedSuggestions],
+  );
+
+  function evaluateCustomDraftIssues(
+    content: string,
+    qa?: DraftQA | null,
+    includeQaGates = true,
+  ): Array<{ issue: string; suggestion: string }> {
+    const items: Array<{ issue: string; suggestion: string }> = [];
+    const addIssue = (condition: boolean, issue: string, suggestion: string) => {
+      if (condition) items.push({ issue, suggestion });
+    };
+
+    const hasMatrix = /allegation[-\s]*wise rebuttal|issue[-\s]*wise rebuttal|para[-\s]*wise rebuttal/i.test(content)
+      || /\|\s*Issue\s*\|\s*Department Position\s*\|\s*(Noticee|Entity) Rebuttal\s*\|/i.test(content);
+    const hasTimeline = /timeline|chronology/i.test(content) && /\|\s*[-:]+\s*\|\s*[-:]+\s*\|/.test(content);
+    const hasProvisionAnchor = /\bsection\s*\d+|rule\s*\d+|regulation\s*\d+/i.test(content);
+    const hasComputation = /accepted\s*\|\s*disputed|computation|tax|duty|interest|penalty|exposure/i.test(content);
+    const hasEvidence = /annexure|evidence|document/i.test(content);
+
+    addIssue(!hasMatrix, "Issue/allegation-wise rebuttal matrix is missing.", "Add matrix: Issue/Allegation | Department Position | Noticee Rebuttal | Evidence | Relief.");
+    addIssue(!hasTimeline, "Chronology/timeline table is missing.", "Add chronology table with event date vs action date and reference IDs.");
+    addIssue(!hasProvisionAnchor, "Provision anchors are weak/missing.", "Anchor each key submission to invoked sections/rules/regulations from notice.");
+    addIssue(!hasComputation, "Computation/exposure reconciliation is weak.", "Add accepted-vs-disputed computation table with recalculation basis.");
+    addIssue(!hasEvidence, "Evidence/annexure mapping is weak.", "Map each major rebuttal to supporting documentary evidence.");
+    addIssue(/\bwaive\b[^.\n]{0,70}\bpenalt/i.test(content) || /\babsolve\b/i.test(content), "Risky prayer wording detected.", "Use calibrated wording: drop or reduce unsustainable demand/penalty.");
+    addIssue(/\[(insert|to be filled)[^\]]*\]/i.test(content), "Unresolved placeholders detected in custom draft.", "Replace placeholders with notice-specific data before filing.");
+
+    if (includeQaGates) {
+      const badMandatoryGates = Object.entries(qa?.mandatory_gates || {})
+        .filter(([, passed]) => !passed)
+        .map(([gate]) => ({
+          issue: `Mandatory gate failed: ${gate}`,
+          suggestion: "Add the missing mandatory section and re-run draft checks.",
+        }));
+      items.push(...badMandatoryGates);
+    }
+
+    return items;
+  }
+
+  function evaluateCustomAdvancedSuggestions(
+    content: string,
+    qa?: DraftQA | null,
+  ): Array<{ title: string; suggestion: string; implemented: boolean }> {
+    return [
+      {
+        title: "Strengthen Provision Anchoring",
+        suggestion: "Tie each allegation to invoked sections/rules/regulations in notice with factual rebuttal.",
+        implemented: /\bsection\s*\d+|rule\s*\d+|regulation\s*\d+/i.test(content),
+      },
+      {
+        title: "Improve Computation Reconciliation",
+        suggestion: "Add accepted-vs-disputed exposure table with recalculation basis.",
+        implemented: /accepted\s*\|\s*disputed|computation|tax|duty|interest|penalty|exposure/i.test(content),
+      },
+      {
+        title: "Evidence-Anchored Defense",
+        suggestion: "Map every major rebuttal to annexure evidence and documentary references.",
+        implemented: /annexure|evidence|document/i.test(content),
+      },
+      {
+        title: "Timeline Precision",
+        suggestion: "Add event-date vs action-date chronology with reference IDs and filing trail.",
+        implemented: /timeline|chronology/i.test(content) && /\|\s*[-:]+\s*\|\s*[-:]+\s*\|/.test(content),
+      },
+      {
+        title: "Raise Filing-Readiness Score",
+        suggestion: "Tighten issue-wise legal/factual mapping and remove repetitive generic language.",
+        implemented: (qa?.filing_score ?? 100) >= 95,
+      },
+    ];
+  }
+
+  const liveCustomIssueItems = useMemo(
+    () => evaluateCustomDraftIssues(draftContent || "", draftQA, true),
+    [draftContent, draftQA],
+  );
+
+  const liveCustomAdvancedSuggestions = useMemo(
+    () => evaluateCustomAdvancedSuggestions(draftContent || "", draftQA),
+    [draftContent, draftQA],
+  );
+
+  const customComputedIssueReport: CustomIssueReport = useMemo(() => ({
+    ok: liveCustomIssueItems.length === 0,
+    items: liveCustomIssueItems,
+    issues: liveCustomIssueItems.map((item) => item.issue),
+    checkedAt: customLastCheckedAt || new Date().toISOString(),
+  }), [liveCustomIssueItems, customLastCheckedAt]);
+
+  const customAutoFixNotes = useMemo(() => {
+    const issueNotes = liveCustomIssueItems.map((item, idx) => `${idx + 1}. ${item.issue}\nSuggestion: ${item.suggestion}`);
+    const pendingAdvanced = liveCustomAdvancedSuggestions
+      .filter((item) => !item.implemented)
+      .map((item, idx) => `${idx + 1 + issueNotes.length}. ${item.title}\nSuggestion: ${item.suggestion}`);
+    return [...issueNotes, ...pendingAdvanced].join("\n\n");
+  }, [liveCustomIssueItems, liveCustomAdvancedSuggestions]);
+
+  const customPendingFixPlaybook = useMemo(() => {
+    const issuePlaybook = liveCustomIssueItems.map((item) => ({
+      title: item.issue,
+      solution: item.suggestion,
+    }));
+    const advancedPlaybook = liveCustomAdvancedSuggestions
+      .filter((item) => !item.implemented)
+      .map((item) => ({
+        title: item.title,
+        solution: item.suggestion,
+      }));
+    return [...issuePlaybook, ...advancedPlaybook];
+  }, [liveCustomIssueItems, liveCustomAdvancedSuggestions]);
+
+  const customPendingFixCount = useMemo(
+    () => liveCustomIssueItems.length + liveCustomAdvancedSuggestions.filter((item) => !item.implemented).length,
+    [liveCustomIssueItems, liveCustomAdvancedSuggestions],
+  );
+
   const enforceMcaLocalFallback = (rawContent: string, mcaType?: string) => {
     let content = rawContent || "";
 
@@ -2022,6 +2413,22 @@ const AIDraftingEngine = ({ demoMode = false, includeLawyerReview = true }: AIDr
     setCustomsLastCheckedAt(new Date().toISOString());
   };
 
+  const runContractDraftIssueCheck = (contentOverride?: string, qaOverride?: DraftQA | null) => {
+    const content = contentOverride ?? draftContent ?? "";
+    const effectiveQa = qaOverride ?? draftQA;
+    evaluateContractDraftIssues(content, effectiveQa, true);
+    setContractHasChecked(true);
+    setContractLastCheckedAt(new Date().toISOString());
+  };
+
+  const runCustomDraftIssueCheck = (contentOverride?: string, qaOverride?: DraftQA | null) => {
+    const content = contentOverride ?? draftContent ?? "";
+    const effectiveQa = qaOverride ?? draftQA;
+    evaluateCustomDraftIssues(content, effectiveQa, true);
+    setCustomHasChecked(true);
+    setCustomLastCheckedAt(new Date().toISOString());
+  };
+
   const handleRecheckMcaDraft = async () => {
     if (selectedDocType !== "mca-notice" || !draftGenerated || !draftContent.trim()) {
       toast.error("Generate and edit an MCA draft first.");
@@ -2266,6 +2673,88 @@ const AIDraftingEngine = ({ demoMode = false, includeLawyerReview = true }: AIDr
     }
   };
 
+  const handleRecheckContractDraft = async () => {
+    if (selectedDocType !== "contract-review" || !draftGenerated || !draftContent.trim()) {
+      toast.error("Generate and edit a Contract Review draft first.");
+      return;
+    }
+
+    setIsRecheckingContract(true);
+    try {
+      const client = clientOptions.find((c) => c.id === selectedClient);
+      const data = await requestDraftData({
+        operation: "recheck",
+        documentType: "contract-review",
+        contractReplyTypeOverride: contractReplyTypeOverride !== "auto" ? contractReplyTypeOverride : undefined,
+        companyName: client?.name || "Company",
+        companyId: clientSource === "live" ? selectedClient : undefined,
+        draftRunId: currentDraftRunId || undefined,
+        trainingCaseId: contractTrainingCaseId || undefined,
+        noticeDetails: maskPII(noticeDetails) || undefined,
+        draftContent,
+        evidenceContext: contractEvidenceContext || undefined,
+        stream: false,
+      });
+
+      const report: ContractRecheckReport = {
+        ok: Boolean(data?.ok),
+        flags: Array.isArray(data?.flags) ? data.flags : [],
+        summary: typeof data?.summary === "string" ? data.summary : undefined,
+        checkedAt: typeof data?.checkedAt === "string" ? data.checkedAt : new Date().toISOString(),
+      };
+      setContractRecheckReport(report);
+
+      if (report.ok) toast.success("Contract Recheck AI passed. No critical mismatches detected.");
+      else toast.warning(`Contract Recheck AI flagged ${report.flags.length} item(s).`);
+    } catch (error) {
+      const msg = error instanceof Error ? error.message : "Contract Recheck AI failed";
+      toast.error(msg);
+    } finally {
+      setIsRecheckingContract(false);
+    }
+  };
+
+  const handleRecheckCustomDraft = async () => {
+    if (selectedDocType !== "custom-draft" || !draftGenerated || !draftContent.trim()) {
+      toast.error("Generate and edit a Custom Regulatory draft first.");
+      return;
+    }
+
+    setIsRecheckingCustom(true);
+    try {
+      const client = clientOptions.find((c) => c.id === selectedClient);
+      const data = await requestDraftData({
+        operation: "recheck",
+        documentType: "custom-draft",
+        customReplyTypeOverride: customReplyTypeOverride !== "auto" ? customReplyTypeOverride : undefined,
+        companyName: client?.name || "Company",
+        companyId: clientSource === "live" ? selectedClient : undefined,
+        draftRunId: currentDraftRunId || undefined,
+        trainingCaseId: customTrainingCaseId || undefined,
+        noticeDetails: maskPII(noticeDetails) || undefined,
+        draftContent,
+        evidenceContext: customEvidenceContext || undefined,
+        stream: false,
+      });
+
+      const report: CustomRecheckReport = {
+        ok: Boolean(data?.ok),
+        flags: Array.isArray(data?.flags) ? data.flags : [],
+        summary: typeof data?.summary === "string" ? data.summary : undefined,
+        checkedAt: typeof data?.checkedAt === "string" ? data.checkedAt : new Date().toISOString(),
+      };
+      setCustomRecheckReport(report);
+
+      if (report.ok) toast.success("Custom Recheck AI passed. No critical mismatches detected.");
+      else toast.warning(`Custom Recheck AI flagged ${report.flags.length} item(s).`);
+    } catch (error) {
+      const msg = error instanceof Error ? error.message : "Custom Recheck AI failed";
+      toast.error(msg);
+    } finally {
+      setIsRecheckingCustom(false);
+    }
+  };
+
   useEffect(() => {
     if (selectedDocType !== "mca-notice" || !draftGenerated || !draftContent.trim()) return;
     runMcaDraftIssueCheck(draftContent);
@@ -2299,6 +2788,12 @@ const AIDraftingEngine = ({ demoMode = false, includeLawyerReview = true }: AIDr
   useEffect(() => {
     if (selectedDocType !== "customs-response" || !draftGenerated || !draftContent.trim()) return;
     runCustomsDraftIssueCheck(draftContent, draftQA);
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [selectedDocType, draftGenerated, draftContent, draftQA]);
+
+  useEffect(() => {
+    if (selectedDocType !== "custom-draft" || !draftGenerated || !draftContent.trim()) return;
+    runCustomDraftIssueCheck(draftContent, draftQA);
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [selectedDocType, draftGenerated, draftContent, draftQA]);
 
@@ -2533,6 +3028,18 @@ const AIDraftingEngine = ({ demoMode = false, includeLawyerReview = true }: AIDr
     }
   }, [selectedDocType]);
 
+  useEffect(() => {
+    if (selectedDocType !== "contract-review") {
+      setContractReplyTypeOverride("auto");
+    }
+  }, [selectedDocType]);
+
+  useEffect(() => {
+    if (selectedDocType !== "custom-draft") {
+      setCustomReplyTypeOverride("auto");
+    }
+  }, [selectedDocType]);
+
   const handleInsertTemplate = () => {
     if (!selectedDocType || !selectedTemplate) {
       toast.error("Select a document type first.");
@@ -2588,6 +3095,9 @@ const AIDraftingEngine = ({ demoMode = false, includeLawyerReview = true }: AIDr
           : undefined,
         customsReplyTypeOverride: selectedDocType === "customs-response" && customsReplyTypeOverride !== "auto"
           ? customsReplyTypeOverride
+          : undefined,
+        customReplyTypeOverride: selectedDocType === "custom-draft" && customReplyTypeOverride !== "auto"
+          ? customReplyTypeOverride
           : undefined,
         context: `Generate precise Notice/Order Details for ${selectedDocLabel}. Ensure this is input-quality text for strict legal drafting checks.`,
         noticeDetails: sourceNotice || undefined,
@@ -3322,6 +3832,98 @@ Return only revised final draft text.`;
     }
   };
 
+  const handleApplyCustomFix = async () => {
+    if (selectedDocType !== "custom-draft" || !draftContent.trim()) {
+      toast.error("Generate a Custom Regulatory draft first.");
+      return;
+    }
+    if (!customHasChecked) {
+      runCustomDraftIssueCheck();
+    }
+
+    const client = clientOptions.find((c) => c.id === selectedClient);
+    const issueText = liveCustomIssueItems
+      .map((item, idx) => `${idx + 1}. Issue: ${item.issue}\n   Suggestion: ${item.suggestion}`)
+      .join("\n");
+    const advancedSuggestionText = liveCustomAdvancedSuggestions
+      .filter((item) => !item.implemented)
+      .map((item, idx) => `${idx + 1}. Upgrade: ${item.title}\n   Suggestion: ${item.suggestion}`)
+      .join("\n");
+    const recheckNotes = (customRecheckReport?.flags || [])
+      .map((flag, idx) => `${idx + 1}. [${flag.severity.toUpperCase()}] ${flag.issue}\n   Fix: ${flag.fix}`)
+      .join("\n");
+    const combinedFixNotes = [customAutoFixNotes, recheckNotes, customUserFixNotes.trim()]
+      .filter((entry) => entry && entry.trim().length > 0)
+      .join("\n\n");
+    const pendingPlaybookText = customPendingFixPlaybook
+      .map((item, idx) => `${idx + 1}. Pending: ${item.title}\n   Solution: ${item.solution}`)
+      .join("\n");
+
+    const fixContext = `You are improving a Custom Regulatory response draft.
+Task: Regenerate a corrected final draft by merging current draft with required fixes.
+Mandatory fixes:
+1) Add issue/allegation-wise rebuttal matrix with provision-wise legal anchors
+2) Add chronology/timeline table with event vs action dates and reference IDs
+3) Add accepted-vs-disputed computation/exposure table
+4) Add evidence/annexure mapping for each major submission
+5) Use safe prayer wording (drop/reduce), avoid waive/absolve language
+
+CURRENT DRAFT:
+${draftContent}
+
+DETECTED ISSUES:
+${issueText || "No local issue detector items."}
+
+ADVANCED UPGRADE SUGGESTIONS:
+${advancedSuggestionText || "No additional upgrades detected."}
+
+RECHECK FLAGS:
+${recheckNotes || "No recheck flags."}
+
+PENDING FIX PLAYBOOK (MANDATORY ACTION STEPS):
+${pendingPlaybookText || "No pending actions."}
+
+CA NOTES:
+${combinedFixNotes || "None"}
+
+Return only revised final draft text.`;
+
+    setIsApplyingCustomFix(true);
+    try {
+      const data = await requestDraftData({
+        documentType: "custom-draft",
+        customReplyTypeOverride: customReplyTypeOverride !== "auto" ? customReplyTypeOverride : undefined,
+        companyName: client?.name || "Company",
+        companyId: clientSource === "live" ? selectedClient : undefined,
+        industry: client?.industry || "",
+        draftRunId: currentDraftRunId || undefined,
+        trainingCaseId: customTrainingCaseId || undefined,
+        draftMode: selectedMode,
+        advancedMode: true,
+        strictValidation: true,
+        context: fixContext,
+        noticeDetails: maskPII(noticeDetails) || undefined,
+        stream: false,
+      });
+
+      const content = (data?.draft as string | undefined) || "";
+      if (!content) throw new Error("Custom AI fix regeneration returned empty content.");
+      setDraftContent(content);
+      setDraftQA((data?.qa ?? null) as DraftQA | null);
+      setDraftPackage((data?.package ?? null) as DraftPackage | null);
+      const nextCaseId = (data?.metadata as { trainingCaseId?: string } | undefined)?.trainingCaseId;
+      if (nextCaseId) setCustomTrainingCaseId(nextCaseId);
+      setCustomUserFixNotes("");
+      runCustomDraftIssueCheck(content, (data?.qa ?? null) as DraftQA | null);
+      toast.success("Custom draft corrected and regenerated.");
+    } catch (error) {
+      const msg = error instanceof Error ? error.message : "Failed to apply Custom AI fix";
+      toast.error(msg);
+    } finally {
+      setIsApplyingCustomFix(false);
+    }
+  };
+
   const handleGenerateDraft = async () => {
     if (!selectedClient || !selectedDocType) return;
 
@@ -3352,6 +3954,8 @@ Return only revised final draft text.`;
     setRbiTrainingCaseId(null);
     setSebiTrainingCaseId(null);
     setCustomsTrainingCaseId(null);
+    setContractTrainingCaseId(null);
+    setCustomTrainingCaseId(null);
     setDraftQA(null);
     setDraftPackage(null);
     setMcaHasChecked(false);
@@ -3378,6 +3982,14 @@ Return only revised final draft text.`;
     setCustomsLastCheckedAt(null);
     setCustomsUserFixNotes("");
     setCustomsRecheckReport(null);
+    setContractHasChecked(false);
+    setContractLastCheckedAt(null);
+    setContractUserFixNotes("");
+    setContractRecheckReport(null);
+    setCustomHasChecked(false);
+    setCustomLastCheckedAt(null);
+    setCustomUserFixNotes("");
+    setCustomRecheckReport(null);
     
     const client = clientOptions.find(c => c.id === selectedClient);
     const maskedNoticeDetails = noticeDetails ? maskPII(noticeDetails) : undefined;
@@ -3475,6 +4087,10 @@ Return only revised final draft text.`;
                 ? (sebiTrainingCaseId || undefined)
               : selectedDocType === "customs-response"
                 ? (customsTrainingCaseId || undefined)
+              : selectedDocType === "contract-review"
+                ? (contractTrainingCaseId || undefined)
+              : selectedDocType === "custom-draft"
+                ? (customTrainingCaseId || undefined)
             : undefined,
         mcaReplyTypeOverride: selectedDocType === "mca-notice" && mcaReplyTypeOverride !== "auto"
           ? mcaReplyTypeOverride
@@ -3493,6 +4109,12 @@ Return only revised final draft text.`;
           : undefined,
         customsReplyTypeOverride: selectedDocType === "customs-response" && customsReplyTypeOverride !== "auto"
           ? customsReplyTypeOverride
+          : undefined,
+        contractReplyTypeOverride: selectedDocType === "contract-review" && contractReplyTypeOverride !== "auto"
+          ? contractReplyTypeOverride
+          : undefined,
+        customReplyTypeOverride: selectedDocType === "custom-draft" && customReplyTypeOverride !== "auto"
+          ? customReplyTypeOverride
           : undefined,
         advancedMode,
         strictValidation: advancedMode,
@@ -3567,6 +4189,8 @@ Return only revised final draft text.`;
         if (selectedDocType === "rbi-filing") setRbiTrainingCaseId(generatedCaseId || null);
         if (selectedDocType === "sebi-compliance") setSebiTrainingCaseId(generatedCaseId || null);
         if (selectedDocType === "customs-response") setCustomsTrainingCaseId(generatedCaseId || null);
+        if (selectedDocType === "contract-review") setContractTrainingCaseId(generatedCaseId || null);
+        if (selectedDocType === "custom-draft") setCustomTrainingCaseId(generatedCaseId || null);
         setDraftGenerated(true);
         setShowFormatDetails(false);
         setWorkflowStatus("generated");
@@ -3946,6 +4570,33 @@ Return only revised final draft text.`;
                     Auto-detected class:{" "}
                     <span className="text-foreground font-medium">
                       {customsReplyTypeOptions.find((o) => o.id === inferredCustomsReplyType)?.label || "General Customs Response"}
+                    </span>
+                  </p>
+                </div>
+              )}
+
+              {selectedDocType === "custom-draft" && (
+                <div>
+                  <label className="block text-sm font-medium text-foreground mb-2">
+                    <Book className="w-4 h-4 inline-block mr-2" />
+                    Custom Notice Class
+                  </label>
+                  <Select value={customReplyTypeOverride} onValueChange={setCustomReplyTypeOverride}>
+                    <SelectTrigger className="bg-background/50">
+                      <SelectValue placeholder="Choose custom notice class..." />
+                    </SelectTrigger>
+                    <SelectContent>
+                      {customReplyTypeOptions.map((option) => (
+                        <SelectItem key={option.id} value={option.id}>
+                          {option.label}
+                        </SelectItem>
+                      ))}
+                    </SelectContent>
+                  </Select>
+                  <p className="text-xs text-muted-foreground mt-1">
+                    Auto-detected class:{" "}
+                    <span className="text-foreground font-medium">
+                      {customReplyTypeOptions.find((o) => o.id === inferredCustomReplyType)?.label || "General Custom Regulatory Reply"}
                     </span>
                   </p>
                 </div>
@@ -5058,6 +5709,155 @@ Return only revised final draft text.`;
                         </>
                       ) : (
                         "Apply AI Fix & Regenerate Customs Draft"
+                      )}
+                    </Button>
+                  </div>
+                </div>
+              )}
+
+              {draftGenerated && selectedDocType === "custom-draft" && (
+                <div className="mt-3 space-y-2">
+                  <Button
+                    type="button"
+                    variant="outline"
+                    className="w-full"
+                    onClick={runCustomDraftIssueCheck}
+                  >
+                    Check What Is Wrong In This Custom Draft
+                  </Button>
+                  {customHasChecked && (
+                    <div
+                      className={`p-4 rounded-lg border text-sm ${
+                        customComputedIssueReport.ok
+                          ? "border-green-500/30 bg-green-500/10 text-green-300"
+                          : "border-yellow-500/30 bg-yellow-500/10 text-yellow-200"
+                      }`}
+                    >
+                      {customComputedIssueReport.ok ? (
+                        <p>All Custom checks passed. This draft is structurally aligned for CA review.</p>
+                      ) : (
+                        <div className="space-y-2">
+                          <p className="font-medium">Issues detected:</p>
+                          <ul className="list-disc pl-5 space-y-2">
+                            {customComputedIssueReport.items.map((item, idx) => (
+                              <li key={`${item.issue}-${idx}`}>
+                                <p>{item.issue}</p>
+                                <p className="text-xs text-yellow-100/90 mt-1">Suggestion: {item.suggestion}</p>
+                              </li>
+                            ))}
+                          </ul>
+                        </div>
+                      )}
+                    </div>
+                  )}
+
+                  {liveCustomAdvancedSuggestions.length > 0 && (
+                    <div className="p-4 rounded-lg border border-cyan-500/30 bg-cyan-500/10 text-cyan-200 text-sm">
+                      <p className="font-medium mb-2">Advanced Suggestions:</p>
+                      <ul className="list-disc pl-5 space-y-2">
+                        {liveCustomAdvancedSuggestions.map((item, idx) => (
+                          <li key={`${item.title}-${idx}`}>
+                            <p className={item.implemented ? "text-green-300" : "text-cyan-200"}>
+                              {item.implemented ? "✓ " : ""}{item.title}
+                              <span className={`ml-2 text-[11px] ${item.implemented ? "text-green-300" : "text-yellow-200"}`}>
+                                [{item.implemented ? "Implemented" : "Pending"}]
+                              </span>
+                            </p>
+                            <p className="text-xs text-cyan-100/90 mt-1">Suggestion: {item.suggestion}</p>
+                          </li>
+                        ))}
+                      </ul>
+                    </div>
+                  )}
+
+                  <div className="p-3 rounded-lg border border-border/50 bg-background/30 space-y-2">
+                    <p className="text-sm font-medium text-foreground">AI Fix Assistant (Custom)</p>
+                    <p className="text-xs text-muted-foreground">
+                      Custom issue detector and recheck are separate from other regulators. Add optional notes, then regenerate.
+                    </p>
+                    <Textarea
+                      value={customEvidenceContext}
+                      onChange={(e) => setCustomEvidenceContext(e.target.value)}
+                      placeholder="Optional: paste additional evidence text for Recheck AI."
+                      className="min-h-[90px] bg-background/50"
+                    />
+                    <Button
+                      type="button"
+                      variant="outline"
+                      className="w-full"
+                      onClick={handleRecheckCustomDraft}
+                      disabled={isRecheckingCustom || !draftGenerated}
+                    >
+                      {isRecheckingCustom ? (
+                        <>
+                          <Loader2 className="w-4 h-4 mr-2 animate-spin" />
+                          Rechecking Custom AI...
+                        </>
+                      ) : (
+                        "Recheck AI (Custom Draft + Notice + Evidence)"
+                      )}
+                    </Button>
+                    {customRecheckReport && (
+                      <div className={`rounded-lg border p-3 text-xs space-y-2 ${
+                        customRecheckReport.ok
+                          ? "border-green-500/30 bg-green-500/10 text-green-300"
+                          : "border-rose-500/30 bg-rose-500/10 text-rose-200"
+                      }`}>
+                        <p className="font-medium">{customRecheckReport.ok ? "Custom Recheck AI: Passed" : "Custom Recheck AI: Flags Detected"}</p>
+                        {customRecheckReport.summary ? <p>{customRecheckReport.summary}</p> : null}
+                        {!customRecheckReport.ok && (
+                          <ul className="list-disc pl-4 space-y-2">
+                            {customRecheckReport.flags.map((flag, idx) => (
+                              <li key={`${flag.issue}-${idx}`}>
+                                <p>[{flag.severity.toUpperCase()}] {flag.issue}</p>
+                                <p className="text-rose-100/90">Fix: {flag.fix}</p>
+                              </li>
+                            ))}
+                          </ul>
+                        )}
+                      </div>
+                    )}
+                    <p className="text-xs text-cyan-300">Pending Custom fixes: {customPendingFixCount}</p>
+                    <Textarea
+                      value={customAutoFixNotes || "No pending issue-detector fixes right now."}
+                      readOnly
+                      className="min-h-[90px] bg-background/40 text-muted-foreground"
+                    />
+                    <div className="rounded-lg border border-cyan-500/20 bg-cyan-500/5 p-3 text-xs space-y-2">
+                      <p className="font-medium text-cyan-200">Pending Fix Solutions (AI)</p>
+                      {customPendingFixPlaybook.length === 0 ? (
+                        <p className="text-cyan-100/80">No pending solutions. Draft is clear on current checks.</p>
+                      ) : (
+                        <ul className="list-disc pl-4 space-y-2 text-cyan-100/90">
+                          {customPendingFixPlaybook.map((item, idx) => (
+                            <li key={`${item.title}-${idx}`}>
+                              <p>{item.title}</p>
+                              <p className="text-cyan-100/75">How to fix: {item.solution}</p>
+                            </li>
+                          ))}
+                        </ul>
+                      )}
+                    </div>
+                    <Textarea
+                      value={customUserFixNotes}
+                      onChange={(e) => setCustomUserFixNotes(e.target.value)}
+                      placeholder="Optional CA note for Custom AI fix."
+                      className="min-h-[90px] bg-background/50"
+                    />
+                    <Button
+                      type="button"
+                      variant="outline"
+                      className="w-full"
+                      onClick={handleApplyCustomFix}
+                      disabled={isApplyingCustomFix || !draftGenerated || (customPendingFixCount === 0 && customUserFixNotes.trim().length === 0)}
+                    >
+                      {isApplyingCustomFix ? (
+                        <>
+                          <Loader2 className="w-4 h-4 mr-2 animate-spin" />
+                          Applying Custom AI Fix...
+                        </>
+                      ) : (
+                        "Apply AI Fix & Regenerate Custom Draft"
                       )}
                     </Button>
                   </div>
