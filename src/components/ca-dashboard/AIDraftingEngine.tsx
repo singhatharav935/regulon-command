@@ -531,6 +531,61 @@ const sanitizeNoticeDetailsClient = (raw: string, fallback: string) => {
 const normalizeForComparison = (value: string) =>
   (value || "").replace(/\s+/g, " ").trim().toLowerCase();
 
+type TemplatePackId = "auto" | "class-core" | "conservative" | "balanced" | "assertive";
+
+const templatePackOptions: Array<{ id: TemplatePackId; label: string }> = [
+  { id: "auto", label: "Auto (By Class)" },
+  { id: "class-core", label: "Class Core" },
+  { id: "conservative", label: "Conservative Template" },
+  { id: "balanced", label: "Balanced Template" },
+  { id: "assertive", label: "Assertive Template" },
+];
+
+const getReplyTypeOptionsByDocumentType = (documentType: string) => {
+  if (documentType === "mca-notice") return mcaReplyTypeOptions;
+  if (documentType === "gst-show-cause") return gstReplyTypeOptions;
+  if (documentType === "income-tax-response") return incomeTaxReplyTypeOptions;
+  if (documentType === "rbi-filing") return rbiReplyTypeOptions;
+  if (documentType === "sebi-compliance") return sebiReplyTypeOptions;
+  if (documentType === "customs-response") return customsReplyTypeOptions;
+  if (documentType === "contract-review") return contractReplyTypeOptions;
+  if (documentType === "custom-draft") return customReplyTypeOptions;
+  return [];
+};
+
+const buildClassAwareTemplate = ({
+  documentType,
+  documentLabel,
+  classId,
+  classLabel,
+  pack,
+}: {
+  documentType: string;
+  documentLabel: string;
+  classId: string;
+  classLabel: string;
+  pack: Exclude<TemplatePackId, "auto">;
+}) => {
+  const styleLine =
+    pack === "conservative"
+      ? "Use compliance-first and low-risk language, avoid legal overreach, and keep relief calibrated."
+      : pack === "assertive"
+        ? "Use assertive but legally defensible language with allegation-wise challenge and strict burden-of-proof framing."
+        : pack === "balanced"
+          ? "Use standard adjudication-ready structure with proportional legal challenge and evidence-linked rebuttal."
+          : "Use class-specific neutral core structure with all mandatory drafting anchors.";
+
+  return `Notice/Order intake template for ${documentLabel}. Auto class: ${classLabel} (${classId}).
+Reference fields to fill: Notice No./Reference, DIN/RFN, notice date, issuing authority, period under dispute, proposed demand/penalty, invoked provisions, and response due date.
+Drafting scope required: allegation-wise rebuttal, section/rule/regulation anchors, chronology with due/event date vs actual action date, computation challenge where amount is involved, officer-specific defense where relevant, annexure mapping, and calibrated prayer language (drop/reduce, not waive/absolve).
+${styleLine}
+Facts block to include: factual background, chronology, specific allegations from notice, noticee position, and documentary anchors.
+Evidence block to include: filing acknowledgements/SRN/challan (if filing case), returns/invoices/reconciliation (if tax), governance/control records (if regulatory), or clause-wise evidence matrix (if contract review).
+Prayer block to include: drop/reduce unsustainable demand or penalty, hearing opportunity request, and such further orders as deemed fit.
+Mandatory placeholders allowed only as [To be filled by CA/Lawyer] for missing factual data.
+This template is generated for ${documentType} :: ${classId} to keep downstream AI drafting class-specific and filing-ready.`;
+};
+
 const buildStructuredNoticeDetailsFallback = (
   documentType: string,
   sourceText: string,
@@ -1120,6 +1175,7 @@ const AIDraftingEngine = ({ demoMode = false, includeLawyerReview = true }: AIDr
   const [selectedDocType, setSelectedDocType] = useState<string>("");
   const [lastTemplateDocType, setLastTemplateDocType] = useState<string>("");
   const [selectedMode, setSelectedMode] = useState<string>("balanced");
+  const [templatePackOverride, setTemplatePackOverride] = useState<TemplatePackId>("auto");
   const [mcaReplyTypeOverride, setMcaReplyTypeOverride] = useState<string>("auto");
   const [gstReplyTypeOverride, setGstReplyTypeOverride] = useState<string>("auto");
   const [incomeTaxReplyTypeOverride, setIncomeTaxReplyTypeOverride] = useState<string>("auto");
@@ -1129,6 +1185,7 @@ const AIDraftingEngine = ({ demoMode = false, includeLawyerReview = true }: AIDr
   const [contractReplyTypeOverride, setContractReplyTypeOverride] = useState<string>("auto");
   const [customReplyTypeOverride, setCustomReplyTypeOverride] = useState<string>("auto");
   const [noticeDetails, setNoticeDetails] = useState<string>("");
+  const [lastAppliedTemplate, setLastAppliedTemplate] = useState<string>("");
   const noticeUploadInputRef = useRef<HTMLInputElement | null>(null);
   const [isProcessingNoticeUpload, setIsProcessingNoticeUpload] = useState(false);
   const [uploadedNoticeFileName, setUploadedNoticeFileName] = useState<string>("");
@@ -1226,7 +1283,47 @@ const AIDraftingEngine = ({ demoMode = false, includeLawyerReview = true }: AIDr
   }));
   const selectedDocLabel = documentTypes.find(doc => doc.id === selectedDocType)?.label || "Selected Draft";
   const docSpecificFormat = documentFormatModules[selectedDocType] || documentFormatModules["custom-draft"];
-  const selectedTemplate = selectedDocType ? readyNoticeTemplates[selectedDocType] : "";
+  const effectiveNoticeClass = useMemo(() => {
+    if (!selectedDocType) return "auto";
+    if (selectedDocType === "mca-notice") return mcaReplyTypeOverride !== "auto" ? mcaReplyTypeOverride : inferredMcaReplyType;
+    if (selectedDocType === "gst-show-cause") return gstReplyTypeOverride !== "auto" ? gstReplyTypeOverride : inferredGstReplyType;
+    if (selectedDocType === "income-tax-response") return incomeTaxReplyTypeOverride !== "auto" ? incomeTaxReplyTypeOverride : inferredIncomeTaxReplyType;
+    if (selectedDocType === "rbi-filing") return rbiReplyTypeOverride !== "auto" ? rbiReplyTypeOverride : inferredRbiReplyType;
+    if (selectedDocType === "sebi-compliance") return sebiReplyTypeOverride !== "auto" ? sebiReplyTypeOverride : inferredSebiReplyType;
+    if (selectedDocType === "customs-response") return customsReplyTypeOverride !== "auto" ? customsReplyTypeOverride : inferredCustomsReplyType;
+    if (selectedDocType === "contract-review") return contractReplyTypeOverride !== "auto" ? contractReplyTypeOverride : inferredContractReplyType;
+    if (selectedDocType === "custom-draft") return customReplyTypeOverride !== "auto" ? customReplyTypeOverride : inferredCustomReplyType;
+    return "auto";
+  }, [
+    selectedDocType,
+    mcaReplyTypeOverride, inferredMcaReplyType,
+    gstReplyTypeOverride, inferredGstReplyType,
+    incomeTaxReplyTypeOverride, inferredIncomeTaxReplyType,
+    rbiReplyTypeOverride, inferredRbiReplyType,
+    sebiReplyTypeOverride, inferredSebiReplyType,
+    customsReplyTypeOverride, inferredCustomsReplyType,
+    contractReplyTypeOverride, inferredContractReplyType,
+    customReplyTypeOverride, inferredCustomReplyType,
+  ]);
+  const effectiveTemplatePack = templatePackOverride === "auto" ? "class-core" : templatePackOverride;
+  const selectedClassLabel = useMemo(() => {
+    const options = getReplyTypeOptionsByDocumentType(selectedDocType);
+    return options.find((opt) => opt.id === effectiveNoticeClass)?.label || "General Class";
+  }, [selectedDocType, effectiveNoticeClass]);
+  const selectedTemplate = useMemo(() => {
+    if (!selectedDocType) return "";
+    const baseTemplate = readyNoticeTemplates[selectedDocType] || "";
+    const classAware = buildClassAwareTemplate({
+      documentType: selectedDocType,
+      documentLabel: selectedDocLabel,
+      classId: effectiveNoticeClass,
+      classLabel: selectedClassLabel,
+      pack: effectiveTemplatePack,
+    });
+    return normalizeForComparison(baseTemplate) === normalizeForComparison(classAware)
+      ? baseTemplate
+      : `${classAware}\n\n${baseTemplate}`;
+  }, [selectedDocType, selectedDocLabel, effectiveNoticeClass, selectedClassLabel, effectiveTemplatePack]);
   const inferredMcaReplyType = useMemo(
     () => inferMcaReplyTypeFromNotice(noticeDetails),
     [noticeDetails],
@@ -3019,15 +3116,16 @@ const AIDraftingEngine = ({ demoMode = false, includeLawyerReview = true }: AIDr
   useEffect(() => {
     if (!selectedDocType) return;
 
-    const prevTemplate = lastTemplateDocType ? readyNoticeTemplates[lastTemplateDocType] : "";
+    const prevTemplate = lastTemplateDocType ? lastAppliedTemplate : "";
     const currentText = noticeDetails.trim();
     const canAutoReplace = currentText.length === 0 || (prevTemplate && currentText === prevTemplate);
 
     if (canAutoReplace) {
-      setNoticeDetails(readyNoticeTemplates[selectedDocType] || "");
+      setNoticeDetails(selectedTemplate || "");
+      setLastAppliedTemplate(selectedTemplate || "");
       setLastTemplateDocType(selectedDocType);
     }
-  }, [selectedDocType, lastTemplateDocType]);
+  }, [selectedDocType, lastTemplateDocType, selectedTemplate, lastAppliedTemplate]);
 
   useEffect(() => {
     if (selectedDocType !== "mca-notice") {
@@ -3075,6 +3173,10 @@ const AIDraftingEngine = ({ demoMode = false, includeLawyerReview = true }: AIDr
     if (selectedDocType !== "custom-draft") {
       setCustomReplyTypeOverride("auto");
     }
+  }, [selectedDocType]);
+
+  useEffect(() => {
+    setTemplatePackOverride("auto");
   }, [selectedDocType]);
 
   const normalizeUploadedNoticeText = (value: string) =>
@@ -3319,6 +3421,7 @@ const AIDraftingEngine = ({ demoMode = false, includeLawyerReview = true }: AIDr
       return;
     }
     setNoticeDetails(selectedTemplate);
+    setLastAppliedTemplate(selectedTemplate);
     setLastTemplateDocType(selectedDocType);
     toast.success("Ready 200+ template inserted.");
   };
@@ -4928,6 +5031,31 @@ Return only revised final draft text.`;
                     <span className="text-foreground font-medium">
                       {customReplyTypeOptions.find((o) => o.id === inferredCustomReplyType)?.label || "General Custom Regulatory Reply"}
                     </span>
+                  </p>
+                </div>
+              )}
+
+              {selectedDocType && (
+                <div>
+                  <label className="block text-sm font-medium text-foreground mb-2">
+                    <FileText className="w-4 h-4 inline-block mr-2" />
+                    Template Pack
+                  </label>
+                  <Select value={templatePackOverride} onValueChange={(v) => setTemplatePackOverride(v as TemplatePackId)}>
+                    <SelectTrigger className="bg-background/50">
+                      <SelectValue placeholder="Choose template pack..." />
+                    </SelectTrigger>
+                    <SelectContent>
+                      {templatePackOptions.map((option) => (
+                        <SelectItem key={option.id} value={option.id}>
+                          {option.label}
+                        </SelectItem>
+                      ))}
+                    </SelectContent>
+                  </Select>
+                  <p className="text-xs text-muted-foreground mt-1">
+                    Auto template tracks class:{" "}
+                    <span className="text-foreground font-medium">{selectedClassLabel}</span>. You can override pack anytime.
                   </p>
                 </div>
               )}
