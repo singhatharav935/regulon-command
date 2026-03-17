@@ -19,6 +19,7 @@ import {
 import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
 import { Textarea } from "@/components/ui/textarea";
+import { Input } from "@/components/ui/input";
 import {
   Select,
   SelectContent,
@@ -538,6 +539,15 @@ type TemplatePackDefinition = {
   description: string;
   instructions: string;
 };
+type TemplateCatalogView = "recommended" | "class-variants" | "authority-packs" | "universal-packs" | "all";
+
+const TEMPLATE_CATALOG_VIEW_OPTIONS: Array<{ id: TemplateCatalogView; label: string }> = [
+  { id: "recommended", label: "Recommended" },
+  { id: "class-variants", label: "Class Variants" },
+  { id: "authority-packs", label: "Authority Packs" },
+  { id: "universal-packs", label: "Universal Packs" },
+  { id: "all", label: "All Templates" },
+];
 
 const AUTO_TEMPLATE_PACK: TemplatePackDefinition = {
   id: "auto",
@@ -567,6 +577,7 @@ const UNIVERSAL_TEMPLATE_PACKS: TemplatePackDefinition[] = [
   { id: "balanced", label: "Balanced", description: "Standard professional tone", instructions: "Use standard adjudication-ready structure with proportionate legal challenge." },
   { id: "assertive", label: "Assertive", description: "Strong but defensible", instructions: "Use assertive but legally defensible language with burden-of-proof challenge." },
 ];
+const UNIVERSAL_TEMPLATE_PACK_IDS = new Set<string>(UNIVERSAL_TEMPLATE_PACKS.map((pack) => pack.id));
 
 const DOCUMENT_TEMPLATE_PACKS: Record<string, TemplatePackDefinition[]> = {
   "mca-notice": [
@@ -642,6 +653,9 @@ const DOCUMENT_TEMPLATE_PACKS: Record<string, TemplatePackDefinition[]> = {
     { id: "custom-demand-neutralization", label: "Demand Neutralization", description: "Demand reduction strategy", instructions: "Focus on quantum neutralization with accepted vs disputed computation grid." },
   ],
 };
+
+const getAuthorityTemplatePackIds = (documentType: string) =>
+  new Set<string>((DOCUMENT_TEMPLATE_PACKS[documentType] || []).map((pack) => pack.id));
 
 const buildClassSpecificTemplatePacks = (documentType: string, classId: string): TemplatePackDefinition[] => {
   if (!documentType || !classId || classId === "auto") return [];
@@ -770,6 +784,11 @@ const getTemplatePackOptionsBySelection = (
     seen.add(item.id);
     return true;
   });
+};
+
+const isClassVariantTemplate = (packId: string, documentType: string, classId: string) => {
+  const prefix = `${documentType}-${classId}`.replace(/[^a-z0-9-]/gi, "-").toLowerCase();
+  return packId.startsWith(prefix);
 };
 
 const buildStructuredNoticeDetailsFallback = (
@@ -1362,6 +1381,8 @@ const AIDraftingEngine = ({ demoMode = false, includeLawyerReview = true }: AIDr
   const [lastTemplateDocType, setLastTemplateDocType] = useState<string>("");
   const [selectedMode, setSelectedMode] = useState<string>("balanced");
   const [templatePackOverride, setTemplatePackOverride] = useState<TemplatePackId>("auto");
+  const [templateCatalogView, setTemplateCatalogView] = useState<TemplateCatalogView>("recommended");
+  const [templateSearch, setTemplateSearch] = useState("");
   const [mcaReplyTypeOverride, setMcaReplyTypeOverride] = useState<string>("auto");
   const [gstReplyTypeOverride, setGstReplyTypeOverride] = useState<string>("auto");
   const [incomeTaxReplyTypeOverride, setIncomeTaxReplyTypeOverride] = useState<string>("auto");
@@ -1527,6 +1548,44 @@ const AIDraftingEngine = ({ demoMode = false, includeLawyerReview = true }: AIDr
     () => getTemplatePackOptionsBySelection(selectedDocType, effectiveNoticeClass),
     [selectedDocType, effectiveNoticeClass],
   );
+  const filteredTemplatePackOptions = useMemo(() => {
+    const authorityIds = getAuthorityTemplatePackIds(selectedDocType);
+    const query = templateSearch.trim().toLowerCase();
+    const recommendedIds = new Set<string>([
+      "auto",
+      "class-core",
+      "conservative",
+      "balanced",
+      "assertive",
+      `${`${selectedDocType}-${effectiveNoticeClass}`.replace(/[^a-z0-9-]/gi, "-").toLowerCase()}-facts-balanced-matrix`,
+      `${`${selectedDocType}-${effectiveNoticeClass}`.replace(/[^a-z0-9-]/gi, "-").toLowerCase()}-law-balanced-matrix`,
+      `${`${selectedDocType}-${effectiveNoticeClass}`.replace(/[^a-z0-9-]/gi, "-").toLowerCase()}-evidence-balanced-table-heavy`,
+      `${`${selectedDocType}-${effectiveNoticeClass}`.replace(/[^a-z0-9-]/gi, "-").toLowerCase()}-timeline-safe-table-heavy`,
+      `${`${selectedDocType}-${effectiveNoticeClass}`.replace(/[^a-z0-9-]/gi, "-").toLowerCase()}-quantum-assertive-matrix`,
+      `${`${selectedDocType}-${effectiveNoticeClass}`.replace(/[^a-z0-9-]/gi, "-").toLowerCase()}-procedure-safe-brief`,
+      `${`${selectedDocType}-${effectiveNoticeClass}`.replace(/[^a-z0-9-]/gi, "-").toLowerCase()}-hearing-balanced-brief`,
+    ]);
+
+    const scoped = templatePackOptions.filter((pack) => {
+      const inView = (() => {
+        if (templateCatalogView === "all") return true;
+        if (templateCatalogView === "recommended") return recommendedIds.has(pack.id);
+        if (templateCatalogView === "class-variants") return isClassVariantTemplate(pack.id, selectedDocType, effectiveNoticeClass);
+        if (templateCatalogView === "authority-packs") return authorityIds.has(pack.id);
+        if (templateCatalogView === "universal-packs") return UNIVERSAL_TEMPLATE_PACK_IDS.has(pack.id);
+        return true;
+      })();
+      if (!inView) return false;
+      if (!query) return true;
+      const corpus = `${pack.label} ${pack.description} ${pack.instructions} ${pack.id}`.toLowerCase();
+      return corpus.includes(query);
+    });
+    if (templatePackOverride !== "auto" && !scoped.some((pack) => pack.id === templatePackOverride)) {
+      const selected = templatePackOptions.find((pack) => pack.id === templatePackOverride);
+      if (selected) return [selected, ...scoped];
+    }
+    return scoped;
+  }, [templatePackOptions, templateCatalogView, templateSearch, selectedDocType, effectiveNoticeClass, templatePackOverride]);
   const effectiveTemplatePack = useMemo(() => {
     const defaultPack = templatePackOptions.find((pack) => pack.id === "class-core") || templatePackOptions.find((pack) => pack.id !== "auto");
     if (!defaultPack) return AUTO_TEMPLATE_PACK;
@@ -3372,6 +3431,8 @@ const AIDraftingEngine = ({ demoMode = false, includeLawyerReview = true }: AIDr
 
   useEffect(() => {
     setTemplatePackOverride("auto");
+    setTemplateCatalogView("recommended");
+    setTemplateSearch("");
   }, [selectedDocType]);
 
   useEffect(() => {
@@ -5244,12 +5305,32 @@ Return only revised final draft text.`;
                     <FileText className="w-4 h-4 inline-block mr-2" />
                     Template Pack
                   </label>
+                  <div className="grid grid-cols-1 md:grid-cols-2 gap-2 mb-2">
+                    <Select value={templateCatalogView} onValueChange={(v) => setTemplateCatalogView(v as TemplateCatalogView)}>
+                      <SelectTrigger className="bg-background/50">
+                        <SelectValue placeholder="Template view..." />
+                      </SelectTrigger>
+                      <SelectContent>
+                        {TEMPLATE_CATALOG_VIEW_OPTIONS.map((option) => (
+                          <SelectItem key={option.id} value={option.id}>
+                            {option.label}
+                          </SelectItem>
+                        ))}
+                      </SelectContent>
+                    </Select>
+                    <Input
+                      value={templateSearch}
+                      onChange={(e) => setTemplateSearch(e.target.value)}
+                      placeholder="Search template by purpose..."
+                      className="bg-background/50"
+                    />
+                  </div>
                   <Select value={templatePackOverride} onValueChange={setTemplatePackOverride}>
                     <SelectTrigger className="bg-background/50">
                       <SelectValue placeholder="Choose template pack..." />
                     </SelectTrigger>
                     <SelectContent>
-                      {templatePackOptions.map((option) => (
+                      {filteredTemplatePackOptions.map((option) => (
                         <SelectItem key={option.id} value={option.id}>
                           {option.label}
                         </SelectItem>
@@ -5259,7 +5340,8 @@ Return only revised final draft text.`;
                   <p className="text-xs text-muted-foreground mt-1">
                     Auto template tracks class:{" "}
                     <span className="text-foreground font-medium">{selectedClassLabel}</span>. Available packs:{" "}
-                    <span className="text-foreground font-medium">{templatePackOptions.length - 1}</span> for this class.
+                    <span className="text-foreground font-medium">{filteredTemplatePackOptions.length}</span> shown of{" "}
+                    <span className="text-foreground font-medium">{Math.max(templatePackOptions.length - 1, 0)}</span> for this class.
                   </p>
                 </div>
               )}
