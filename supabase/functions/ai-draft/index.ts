@@ -956,7 +956,7 @@ const aiRequest = async ({
   apiKey: string;
   model: string;
   endpoint: string;
-  messages: Array<{ role: "system" | "user"; content: string }>;
+  messages: Array<{ role: "system" | "user"; content: string | Array<Record<string, unknown>> }>;
   stream: boolean;
 }) => {
   return fetch(endpoint, {
@@ -3421,6 +3421,7 @@ serve(async (req) => {
       customReplyTypeOverride,
       advancedMode = false,
       strictValidation = false,
+      imageDataUrl,
       stream = false,
     } = await req.json();
 
@@ -3767,6 +3768,72 @@ ${noticeDetails || "None provided."}`;
           contractReplyType,
           customReplyType,
           generatedAt: new Date().toISOString(),
+        },
+      }), {
+        headers: { ...corsHeaders, "Content-Type": "application/json" },
+      });
+    }
+
+    if (normalizedOperation === "notice-ocr") {
+      if (!imageDataUrl || typeof imageDataUrl !== "string" || !imageDataUrl.startsWith("data:image/")) {
+        return new Response(JSON.stringify({ error: "Valid imageDataUrl is required for notice OCR." }), {
+          status: 400,
+          headers: { ...corsHeaders, "Content-Type": "application/json" },
+        });
+      }
+
+      const ocrSystemPrompt = `You are a legal OCR extractor for Indian regulatory notices.
+Extract only readable text from the uploaded notice image.
+Rules:
+1) Return plain text only (no markdown, no bullets, no JSON).
+2) Preserve key legal metadata: notice number, DIN/RFN/reference no., dates, sections/rules, amounts, period, authority, and deadlines.
+3) Correct obvious OCR spacing issues where safe, but do not invent facts.
+4) If any field is unclear, keep best-effort visible text instead of guessing.`;
+
+      const ocrUserText = `Extract full notice text from this uploaded image for drafting intake.
+Document Type Hint: ${documentType || "unknown"}
+Context: ${context || "None"}`;
+
+      const ocrResp = await aiRequest({
+        apiKey: aiConfig.apiKey,
+        model: aiConfig.model,
+        endpoint: aiConfig.endpoint,
+        stream: false,
+        messages: [
+          { role: "system", content: ocrSystemPrompt },
+          {
+            role: "user",
+            content: [
+              { type: "text", text: ocrUserText },
+              { type: "image_url", image_url: { url: imageDataUrl } },
+            ],
+          },
+        ],
+      });
+
+      if (!ocrResp.ok) {
+        const errorText = await ocrResp.text();
+        throw new Error(`Notice OCR failed: ${ocrResp.status} ${errorText}`);
+      }
+
+      const ocrData = await ocrResp.json();
+      const extracted = extractAssistantText(ocrData).replace(/\s+/g, " ").trim();
+
+      if (!extracted || extracted.length < 40) {
+        return new Response(JSON.stringify({
+          error: "OCR could not extract enough readable text. Upload a clearer image or paste text.",
+        }), {
+          status: 422,
+          headers: { ...corsHeaders, "Content-Type": "application/json" },
+        });
+      }
+
+      return new Response(JSON.stringify({
+        text: extracted,
+        metadata: {
+          operation: "notice-ocr",
+          aiProvider: aiConfig.provider,
+          extractedAt: new Date().toISOString(),
         },
       }), {
         headers: { ...corsHeaders, "Content-Type": "application/json" },

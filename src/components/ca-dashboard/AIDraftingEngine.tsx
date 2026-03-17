@@ -3125,6 +3125,14 @@ const AIDraftingEngine = ({ demoMode = false, includeLawyerReview = true }: AIDr
     return fallback.slice(0, 28000);
   };
 
+  const fileToDataUrl = (file: File) =>
+    new Promise<string>((resolve, reject) => {
+      const reader = new FileReader();
+      reader.onload = () => resolve(String(reader.result || ""));
+      reader.onerror = () => reject(new Error("Failed to read uploaded file."));
+      reader.readAsDataURL(file);
+    });
+
   const extractNoticeTextFromUploadedFile = async (file: File): Promise<string> => {
     const ext = file.name.toLowerCase().split(".").pop() || "";
     const mime = (file.type || "").toLowerCase();
@@ -3141,7 +3149,18 @@ const AIDraftingEngine = ({ demoMode = false, includeLawyerReview = true }: AIDr
     }
 
     if (mime.startsWith("image/")) {
-      throw new Error("Image OCR is not enabled yet in this build. Upload text-based PDF/TXT or paste OCR text.");
+      const imageDataUrl = await fileToDataUrl(file);
+      const ocrResp = await requestDraftData({
+        operation: "notice-ocr",
+        documentType: selectedDocType || undefined,
+        context: `OCR extraction for uploaded notice image: ${file.name}`,
+        imageDataUrl,
+      });
+      const extracted = ((ocrResp as Record<string, unknown>)?.text as string | undefined)?.trim();
+      if (!extracted) {
+        throw new Error("Could not read text from image notice. Try a clearer image or paste the notice text.");
+      }
+      return normalizeUploadedNoticeText(extracted).slice(0, 28000);
     }
 
     if (["doc", "docx"].includes(ext)) {
