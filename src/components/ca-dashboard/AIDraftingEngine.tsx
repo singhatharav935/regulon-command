@@ -645,10 +645,53 @@ const DOCUMENT_TEMPLATE_PACKS: Record<string, TemplatePackDefinition[]> = {
 
 const buildClassSpecificTemplatePacks = (documentType: string, classId: string): TemplatePackDefinition[] => {
   if (!documentType || !classId || classId === "auto") return [];
+
   const slug = `${documentType}-${classId}`.replace(/[^a-z0-9-]/gi, "-").toLowerCase();
   const classTitle = classId.replace(/-/g, " ");
 
-  return [
+  const focusTracks = [
+    { id: "facts", label: "Facts", instruction: "Lead with factual matrix, chronology, and documentary sequence before legal analysis." },
+    { id: "law", label: "Law", instruction: "Lead with provision-wise legal thresholds and then apply facts against each allegation." },
+    { id: "evidence", label: "Evidence", instruction: "Map each allegation directly to annexure-backed documentary evidence." },
+    { id: "timeline", label: "Timeline", instruction: "Use due/event date vs actual action date grid and strict date consistency checks." },
+    { id: "quantum", label: "Quantum", instruction: "Prioritize accepted-vs-disputed computation and quantification challenge tables." },
+    { id: "procedure", label: "Procedure", instruction: "Prioritize procedural defects, natural justice, jurisdiction, and limitation where fact-supported." },
+    { id: "governance", label: "Governance", instruction: "Highlight compliance controls, internal governance and recurrence-prevention measures." },
+    { id: "hearing", label: "Hearing", instruction: "Structure for oral hearing with issue bullets, fallback asks, and concise relief framing." },
+  ];
+
+  const postureTracks = [
+    { id: "safe", label: "Safe", instruction: "Use conservative low-risk wording and avoid over-claiming legal relief." },
+    { id: "balanced", label: "Balanced", instruction: "Use standard adjudication-ready language with proportionate challenge." },
+    { id: "assertive", label: "Assertive", instruction: "Use assertive but defensible burden-of-proof challenge language." },
+    { id: "litigation", label: "Litigation", instruction: "Preserve appellate grounds and draft with litigation continuity in mind." },
+    { id: "mitigation", label: "Mitigation", instruction: "Emphasize bona fide intent, rectification, proportionality, and leniency factors." },
+  ];
+
+  const formatTracks = [
+    { id: "matrix", label: "Matrix", instruction: "Use allegation-wise matrix: Department position vs Noticee rebuttal vs evidence vs relief." },
+    { id: "narrative", label: "Narrative", instruction: "Use structured narrative format with sections: facts, law, application, and prayer." },
+    { id: "table-heavy", label: "Table-Heavy", instruction: "Use multiple compact tables for chronology, officer roles, computation, and annexure mapping." },
+    { id: "brief", label: "Brief", instruction: "Use concise adjudication brief style with short issue blocks and hearing-ready asks." },
+  ];
+
+  const generated: TemplatePackDefinition[] = [];
+
+  for (const focus of focusTracks) {
+    for (const posture of postureTracks) {
+      for (const format of formatTracks) {
+        const id = `${slug}-${focus.id}-${posture.id}-${format.id}`;
+        generated.push({
+          id,
+          label: `${focus.label} / ${posture.label} / ${format.label}`,
+          description: `${classTitle} variant`,
+          instructions: `Template matrix for ${classId}. ${focus.instruction} ${posture.instruction} ${format.instruction}`,
+        });
+      }
+    }
+  }
+
+  const legacy: TemplatePackDefinition[] = [
     { id: `${slug}-deep-defense`, label: "Class Deep Defense", description: `${classTitle} deep-defense variant`, instructions: `Build comprehensive issue-wise defense specifically for ${classId} with full fact-law-evidence chain.` },
     { id: `${slug}-fast-hearing`, label: "Class Fast Hearing", description: `${classTitle} hearing-short format`, instructions: `Create concise adjudication hearing format for ${classId} with short issue bullets and key relief asks.` },
     { id: `${slug}-evidence-strict`, label: "Class Evidence Strict", description: `${classTitle} proof-first variant`, instructions: `For ${classId}, ensure each assertion has immediate documentary anchor and annexure mapping.` },
@@ -657,6 +700,8 @@ const buildClassSpecificTemplatePacks = (documentType: string, classId: string):
     { id: `${slug}-quantum-challenge`, label: "Class Quantum Challenge", description: `${classTitle} computation-focused variant`, instructions: `For ${classId}, prioritize accepted-vs-disputed computation and quantification challenge matrix.` },
     { id: `${slug}-appeal-ready`, label: "Class Appeal Ready", description: `${classTitle} future-appeal variant`, instructions: `Draft ${classId} response with appellate continuity, preserving grounds and evidence anchors for future challenge.` },
   ];
+
+  return [...legacy, ...generated];
 };
 
 const getReplyTypeOptionsByDocumentType = (documentType: string) => {
