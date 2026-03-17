@@ -57,6 +57,23 @@ const HeroSection = () => {
             Complete compliance coverage across MCA, GST, Income Tax, RBI & SEBI.
           </motion.p>
 
+          <motion.div
+            initial={{ opacity: 0, y: 20 }}
+            animate={{ opacity: 1, y: 0 }}
+            transition={{ duration: 0.5, delay: 0.35 }}
+            className="flex flex-wrap items-center justify-center gap-2 mb-8"
+          >
+            <span className="px-3 py-1 rounded-full border border-primary/30 bg-primary/10 text-xs text-primary font-medium">
+              10,000+ Regulatory Blueprints
+            </span>
+            <span className="px-3 py-1 rounded-full border border-primary/30 bg-primary/10 text-xs text-primary font-medium">
+              5,000+ Reasoning Prompts
+            </span>
+            <span className="px-3 py-1 rounded-full border border-primary/30 bg-primary/10 text-xs text-primary font-medium">
+              Advisory · Drafting · Comprehensive
+            </span>
+          </motion.div>
+
           {/* CTAs */}
           <motion.div
             initial={{ opacity: 0, y: 20 }}
@@ -97,22 +114,22 @@ const HeroSection = () => {
               <div className="flex items-center justify-center w-12 h-12 mx-auto mb-3 rounded-xl bg-primary/10">
                 <FileCheck className="w-6 h-6 text-primary" />
               </div>
-              <p className="text-3xl font-bold text-foreground">100%</p>
-              <p className="text-sm text-muted-foreground">Audit Trail</p>
+              <p className="text-3xl font-bold text-foreground">10K+</p>
+              <p className="text-sm text-muted-foreground">Regulatory Blueprints</p>
             </div>
             <div className="text-center">
               <div className="flex items-center justify-center w-12 h-12 mx-auto mb-3 rounded-xl bg-primary/10">
                 <Users className="w-6 h-6 text-primary" />
               </div>
-              <p className="text-3xl font-bold text-foreground">CA+Law</p>
-              <p className="text-sm text-muted-foreground">Verified Review</p>
+              <p className="text-3xl font-bold text-foreground">5K+</p>
+              <p className="text-sm text-muted-foreground">Reasoning Prompts</p>
             </div>
             <div className="text-center">
               <div className="flex items-center justify-center w-12 h-12 mx-auto mb-3 rounded-xl bg-primary/10">
                 <Shield className="w-6 h-6 text-primary" />
               </div>
-              <p className="text-3xl font-bold text-foreground">ISO 27001</p>
-              <p className="text-sm text-muted-foreground">Certified</p>
+              <p className="text-3xl font-bold text-foreground">CA+Law</p>
+              <p className="text-sm text-muted-foreground">Verified Review</p>
             </div>
           </motion.div>
         </div>

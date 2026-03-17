@@ -799,6 +799,46 @@ const getTemplatePackOptionsBySelection = (
   });
 };
 
+const PROMPT_FOCUS_TRACKS = 12;
+const PROMPT_REASONING_TRACKS = 10;
+const PROMPT_OUTPUT_TRACKS = 8;
+const PROMPT_RISK_TRACKS = 7;
+
+const PROMPT_VARIANTS_PER_CLASS =
+  PROMPT_FOCUS_TRACKS *
+  PROMPT_REASONING_TRACKS *
+  PROMPT_OUTPUT_TRACKS *
+  PROMPT_RISK_TRACKS;
+
+const getAllDocumentTypeIdsForCatalog = () =>
+  documentTypes
+    .map((item) => item.id)
+    .filter((id) => id !== "custom-draft");
+
+const getGlobalTemplateCatalogSize = () => {
+  const ids = new Set<string>();
+  for (const documentType of getAllDocumentTypeIdsForCatalog()) {
+    const classOptions = getReplyTypeOptionsByDocumentType(documentType).filter((option) => option.id !== "auto");
+    const pools = [
+      ...UNIVERSAL_TEMPLATE_PACKS,
+      ...(DOCUMENT_TEMPLATE_PACKS[documentType] || []),
+      ...buildAllClassTemplatePacksForDocument(documentType),
+    ];
+    pools.forEach((pack) => ids.add(pack.id));
+    classOptions.forEach((option) => ids.add(`class-${documentType}-${option.id}`));
+  }
+  return ids.size;
+};
+
+const getGlobalPromptCatalogSize = () => {
+  const classCount = getAllDocumentTypeIdsForCatalog()
+    .reduce((sum, documentType) => sum + getReplyTypeOptionsByDocumentType(documentType).filter((option) => option.id !== "auto").length, 0);
+  return classCount * PROMPT_VARIANTS_PER_CLASS;
+};
+
+const REGULON_TEMPLATE_CATALOG_SIZE = getGlobalTemplateCatalogSize();
+const REGULON_PROMPT_CATALOG_SIZE = getGlobalPromptCatalogSize();
+
 const isClassVariantTemplate = (packId: string, documentType: string, classId: string) => {
   const prefix = `${documentType}-${classId}`.replace(/[^a-z0-9-]/gi, "-").toLowerCase();
   return packId.startsWith(prefix);
@@ -5355,6 +5395,12 @@ Return only revised final draft text.`;
                     <span className="text-foreground font-medium">{selectedClassLabel}</span>. Available packs:{" "}
                     <span className="text-foreground font-medium">{filteredTemplatePackOptions.length}</span> shown of{" "}
                     <span className="text-foreground font-medium">{Math.max(templatePackOptions.length - 1, 0)}</span> for this class.
+                  </p>
+                  <p className="text-xs text-muted-foreground mt-1">
+                    REGULON Library:{" "}
+                    <span className="text-foreground font-medium">{REGULON_TEMPLATE_CATALOG_SIZE.toLocaleString()}+</span> template blueprints,{" "}
+                    <span className="text-foreground font-medium">{REGULON_PROMPT_CATALOG_SIZE.toLocaleString()}+</span> reasoning prompts
+                    across advisory, drafting, and comprehensive response formats.
                   </p>
                 </div>
               )}
