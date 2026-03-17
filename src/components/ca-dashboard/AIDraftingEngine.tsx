@@ -533,7 +533,7 @@ const buildStructuredNoticeDetailsFallback = (
       ? `Auto-detected MCA class is ${mcaType || "general-mca"}. Ensure draft explicitly covers allegation-wise legal response, chronology evidence, officer-wise defense, and calibrated prayer language.`
       : "Ensure the draft remains allegation-wise, evidence-linked, and proportionate in relief prayer.";
 
-  return `Notice/Order Details Summary for ${authorityLabel}: Reference ${noticeNo}, dated ${noticeDate}, DIN/RFN ${dinOrRfn}. The notice indicates alleged non-compliance under ${sections.length ? sections.join(", ") : "[To be filled by CA/Lawyer]"}${rules.length ? ` read with ${rules.join(", ")}` : ""}, for period ${fy}. Proposed exposure/penalty marker captured from notice text is INR ${amount}. ${mcaSpecificLine} Drafting requirements: include chronology with due/event date vs actual action date, section-wise legal submissions, annexure mapping with document anchors, and hearing request. Keep pending factual fields as [To be filled by CA/Lawyer] only.`;
+  return `Notice/Order Details Summary for ${authorityLabel}: Reference ${noticeNo}, dated ${noticeDate}, DIN/RFN ${dinOrRfn}. The extracted notice narrative indicates alleged non-compliance under ${sections.length ? sections.join(", ") : "[To be filled by CA/Lawyer]"}${rules.length ? ` read with ${rules.join(", ")}` : ""}, for period ${fy}, with a currently captured exposure marker of INR ${amount}. On a drafting-readiness basis, the department position appears to rely on mismatch/delay/incorrect treatment assertions and consequential levy framing, while the noticee position should be structured as allegation-wise rebuttal supported by verifiable documents and timeline evidence. ${mcaSpecificLine} Required drafting anchors: notice snapshot (authority, notice reference, date, DIN/RFN, period, invoked provisions); chronology fields with due/event date versus actual filing/action date; section/rule/regulation-wise legal submissions tied to facts; accepted-versus-disputed computation framing where demand/exposure is proposed; and annexure mapping that clearly links each rebuttal to documentary proof. Use calibrated language for relief and hearing request, avoid over-claims, and keep unresolved factual fields strictly as [To be filled by CA/Lawyer]. The resulting notice-details block should be adjudication-ready, specific, and free from generic filler text so downstream AI drafting remains precise and defensible.`;
 };
 
 type StepStatus = "pending" | "completed" | "current";
@@ -2996,7 +2996,7 @@ const AIDraftingEngine = ({ demoMode = false, includeLawyerReview = true }: AIDr
       setNoticeDetails(readyNoticeTemplates[selectedDocType] || "");
       setLastTemplateDocType(selectedDocType);
     }
-  }, [selectedDocType, lastTemplateDocType, noticeDetails]);
+  }, [selectedDocType, lastTemplateDocType]);
 
   useEffect(() => {
     if (selectedDocType !== "mca-notice") {
@@ -3067,6 +3067,11 @@ const AIDraftingEngine = ({ demoMode = false, includeLawyerReview = true }: AIDr
     } catch {
       toast.error("Clipboard access failed. Use Insert Template instead.");
     }
+  };
+
+  const handleClearNoticeDetails = () => {
+    setNoticeDetails("");
+    toast.success("Notice / Order Details cleared.");
   };
 
   const handleGenerateNoticeDetailsAI = async () => {
@@ -4769,7 +4774,7 @@ Return only revised final draft text.`;
                 <p className="text-xs text-muted-foreground mt-1">
                   Providing notice details enables point-by-point rebuttal. Procedural objections are raised only if evidence supports them.
                 </p>
-                <div className="mt-2 grid grid-cols-1 sm:grid-cols-3 gap-2">
+                <div className="mt-2 grid grid-cols-1 sm:grid-cols-4 gap-2">
                   <Button
                     type="button"
                     variant="outline"
@@ -4800,6 +4805,14 @@ Return only revised final draft text.`;
                     disabled={!selectedDocType}
                   >
                     Copy 200+ Template
+                  </Button>
+                  <Button
+                    type="button"
+                    variant="outline"
+                    onClick={handleClearNoticeDetails}
+                    disabled={!noticeDetails.trim()}
+                  >
+                    Clear Text
                   </Button>
                 </div>
                 <div className="mt-2 p-2 rounded-lg border border-border/50 bg-background/40 flex items-center justify-between">
