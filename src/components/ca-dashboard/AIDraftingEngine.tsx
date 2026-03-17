@@ -1283,6 +1283,38 @@ const AIDraftingEngine = ({ demoMode = false, includeLawyerReview = true }: AIDr
   }));
   const selectedDocLabel = documentTypes.find(doc => doc.id === selectedDocType)?.label || "Selected Draft";
   const docSpecificFormat = documentFormatModules[selectedDocType] || documentFormatModules["custom-draft"];
+  const inferredMcaReplyType = useMemo(
+    () => inferMcaReplyTypeFromNotice(noticeDetails),
+    [noticeDetails],
+  );
+  const inferredGstReplyType = useMemo(
+    () => inferGstReplyTypeFromNotice(noticeDetails),
+    [noticeDetails],
+  );
+  const inferredIncomeTaxReplyType = useMemo(
+    () => inferIncomeTaxReplyTypeFromNotice(noticeDetails),
+    [noticeDetails],
+  );
+  const inferredRbiReplyType = useMemo(
+    () => inferRbiReplyTypeFromNotice(noticeDetails),
+    [noticeDetails],
+  );
+  const inferredSebiReplyType = useMemo(
+    () => inferSebiReplyTypeFromNotice(noticeDetails),
+    [noticeDetails],
+  );
+  const inferredCustomsReplyType = useMemo(
+    () => inferCustomsReplyTypeFromNotice(noticeDetails),
+    [noticeDetails],
+  );
+  const inferredContractReplyType = useMemo(
+    () => inferContractReplyTypeFromNotice(noticeDetails),
+    [noticeDetails],
+  );
+  const inferredCustomReplyType = useMemo(
+    () => inferCustomReplyTypeFromNotice(noticeDetails),
+    [noticeDetails],
+  );
   const effectiveNoticeClass = useMemo(() => {
     if (!selectedDocType) return "auto";
     if (selectedDocType === "mca-notice") return mcaReplyTypeOverride !== "auto" ? mcaReplyTypeOverride : inferredMcaReplyType;
@@ -1324,38 +1356,6 @@ const AIDraftingEngine = ({ demoMode = false, includeLawyerReview = true }: AIDr
       ? baseTemplate
       : `${classAware}\n\n${baseTemplate}`;
   }, [selectedDocType, selectedDocLabel, effectiveNoticeClass, selectedClassLabel, effectiveTemplatePack]);
-  const inferredMcaReplyType = useMemo(
-    () => inferMcaReplyTypeFromNotice(noticeDetails),
-    [noticeDetails],
-  );
-  const inferredGstReplyType = useMemo(
-    () => inferGstReplyTypeFromNotice(noticeDetails),
-    [noticeDetails],
-  );
-  const inferredIncomeTaxReplyType = useMemo(
-    () => inferIncomeTaxReplyTypeFromNotice(noticeDetails),
-    [noticeDetails],
-  );
-  const inferredRbiReplyType = useMemo(
-    () => inferRbiReplyTypeFromNotice(noticeDetails),
-    [noticeDetails],
-  );
-  const inferredSebiReplyType = useMemo(
-    () => inferSebiReplyTypeFromNotice(noticeDetails),
-    [noticeDetails],
-  );
-  const inferredCustomsReplyType = useMemo(
-    () => inferCustomsReplyTypeFromNotice(noticeDetails),
-    [noticeDetails],
-  );
-  const inferredContractReplyType = useMemo(
-    () => inferContractReplyTypeFromNotice(noticeDetails),
-    [noticeDetails],
-  );
-  const inferredCustomReplyType = useMemo(
-    () => inferCustomReplyTypeFromNotice(noticeDetails),
-    [noticeDetails],
-  );
   const supabaseAny = supabase as any;
   const getMcaAutoFixNotes = (
     issues: Array<{ issue: string; suggestion: string }>,
