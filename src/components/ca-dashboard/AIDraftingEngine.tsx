@@ -718,6 +718,18 @@ const buildClassSpecificTemplatePacks = (documentType: string, classId: string):
   return [...legacy, ...generated];
 };
 
+const TEMPLATE_CATALOG_CACHE: Record<string, TemplatePackDefinition[]> = {};
+
+const buildAllClassTemplatePacksForDocument = (documentType: string): TemplatePackDefinition[] => {
+  if (!documentType) return [];
+  if (TEMPLATE_CATALOG_CACHE[documentType]) return TEMPLATE_CATALOG_CACHE[documentType];
+
+  const classOptions = getReplyTypeOptionsByDocumentType(documentType).filter((option) => option.id !== "auto");
+  const packs = classOptions.flatMap((option) => buildClassSpecificTemplatePacks(documentType, option.id));
+  TEMPLATE_CATALOG_CACHE[documentType] = packs;
+  return packs;
+};
+
 const getReplyTypeOptionsByDocumentType = (documentType: string) => {
   if (documentType === "mca-notice") return mcaReplyTypeOptions;
   if (documentType === "gst-show-cause") return gstReplyTypeOptions;
@@ -764,6 +776,7 @@ const getTemplatePackOptionsBySelection = (
     ...UNIVERSAL_TEMPLATE_PACKS,
     ...(DOCUMENT_TEMPLATE_PACKS[documentType] || []),
     ...buildClassSpecificTemplatePacks(documentType, classId),
+    ...buildAllClassTemplatePacksForDocument(documentType),
   ];
 
   const classLower = (classId || "").toLowerCase();
