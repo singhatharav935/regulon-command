@@ -4959,12 +4959,13 @@ Return only revised final draft text.`;
                   accept=".pdf,.txt,.md,.csv,.json,.xml,.html,.htm,.log,.png,.jpg,.jpeg,.webp"
                   onChange={handleUploadNoticeAndAutoFill}
                 />
-                <div className="mt-2 grid grid-cols-1 sm:grid-cols-4 gap-2">
+                <div className="mt-2 grid grid-cols-1 md:grid-cols-2 xl:grid-cols-4 gap-2">
                   <Button
                     type="button"
                     variant="outline"
                     onClick={() => noticeUploadInputRef.current?.click()}
                     disabled={isProcessingNoticeUpload}
+                    className="w-full h-auto min-h-11 py-2 whitespace-normal text-center leading-tight"
                   >
                     {isProcessingNoticeUpload ? (
                       <>
@@ -4972,7 +4973,7 @@ Return only revised final draft text.`;
                         Uploading...
                       </>
                     ) : (
-                      "Upload Notice (Auto AI)"
+                      "Upload Notice"
                     )}
                   </Button>
                   <Button
@@ -4980,6 +4981,7 @@ Return only revised final draft text.`;
                     variant="outline"
                     onClick={handleGenerateNoticeDetailsAI}
                     disabled={!selectedDocType || isGeneratingNoticeDetails}
+                    className="w-full h-auto min-h-11 py-2 whitespace-normal text-center leading-tight"
                   >
                     {isGeneratingNoticeDetails ? (
                       <>
@@ -4995,6 +4997,7 @@ Return only revised final draft text.`;
                     variant="outline"
                     onClick={handleInsertTemplate}
                     disabled={!selectedDocType}
+                    className="w-full h-auto min-h-11 py-2 whitespace-normal text-center leading-tight"
                   >
                     Insert 200+ Template
                   </Button>
@@ -5003,10 +5006,14 @@ Return only revised final draft text.`;
                     variant="outline"
                     onClick={handleCopyTemplate}
                     disabled={!selectedDocType}
+                    className="w-full h-auto min-h-11 py-2 whitespace-normal text-center leading-tight"
                   >
                     Copy 200+ Template
                   </Button>
                 </div>
+                <p className="text-[11px] text-muted-foreground mt-1">
+                  Upload notice auto-detects class/type and regenerates Notice/Order Details. You can still edit everything manually.
+                </p>
                 {uploadedNoticeFileName ? (
                   <p className="text-xs text-muted-foreground mt-1">
                     Last uploaded notice: <span className="text-foreground">{uploadedNoticeFileName}</span>
