@@ -531,15 +531,85 @@ const sanitizeNoticeDetailsClient = (raw: string, fallback: string) => {
 const normalizeForComparison = (value: string) =>
   (value || "").replace(/\s+/g, " ").trim().toLowerCase();
 
-type TemplatePackId = "auto" | "class-core" | "conservative" | "balanced" | "assertive";
+type TemplatePackId = string;
+type TemplatePackDefinition = {
+  id: TemplatePackId;
+  label: string;
+  description: string;
+  instructions: string;
+};
 
-const templatePackOptions: Array<{ id: TemplatePackId; label: string }> = [
-  { id: "auto", label: "Auto (By Class)" },
-  { id: "class-core", label: "Class Core" },
-  { id: "conservative", label: "Conservative Template" },
-  { id: "balanced", label: "Balanced Template" },
-  { id: "assertive", label: "Assertive Template" },
+const AUTO_TEMPLATE_PACK: TemplatePackDefinition = {
+  id: "auto",
+  label: "Auto (By Class)",
+  description: "Automatically selects the best class-specific template baseline.",
+  instructions: "Use class-specific baseline with mandatory drafting anchors for the selected notice class.",
+};
+
+const UNIVERSAL_TEMPLATE_PACKS: TemplatePackDefinition[] = [
+  { id: "class-core", label: "Class Core", description: "Default class baseline", instructions: "Use a neutral class-specific structure with complete mandatory blocks." },
+  { id: "facts-heavy", label: "Facts-Heavy", description: "Detailed factual narrative", instructions: "Prioritize chronology, factual record, and documentary sequence before law blocks." },
+  { id: "timeline-first", label: "Timeline First", description: "Due vs actual driven", instructions: "Lead with due/event vs actual action timeline and date-anchored compliance matrix." },
+  { id: "evidence-led", label: "Evidence-Led", description: "Annexure-first rebuttal", instructions: "Map each rebuttal point to explicit annexure/document anchors and proof trail." },
+  { id: "computation-first", label: "Computation First", description: "Amount reconciliation focus", instructions: "Include accepted vs disputed amount analysis and recomputation logic early." },
+  { id: "procedural-objection", label: "Procedural Objection", description: "Procedure and natural justice focus", instructions: "Emphasize service defects, limitation, hearing rights, and procedural fairness where factually available." },
+  { id: "leniency-focused", label: "Leniency Focus", description: "Mitigation-first structure", instructions: "Prioritize mitigation factors, bona fide conduct, and proportional penalty submissions." },
+  { id: "hearing-focused", label: "Hearing Focus", description: "Oral hearing prep style", instructions: "Structure draft for hearing with concise issue matrix and hearing ask in every relief block." },
+  { id: "conservative", label: "Conservative", description: "Lowest risk language", instructions: "Use compliance-first, low-risk language and avoid aggressive legal claims." },
+  { id: "balanced", label: "Balanced", description: "Standard professional tone", instructions: "Use standard adjudication-ready structure with proportionate legal challenge." },
+  { id: "assertive", label: "Assertive", description: "Strong but defensible", instructions: "Use assertive but legally defensible language with burden-of-proof challenge." },
 ];
+
+const DOCUMENT_TEMPLATE_PACKS: Record<string, TemplatePackDefinition[]> = {
+  "mca-notice": [
+    { id: "mca-454-proviso", label: "Section 454 Proviso", description: "454 proviso anchored", instructions: "Add clear 454 proviso paragraph with date-anchored rectification eligibility." },
+    { id: "mca-chronology-srn", label: "Chronology + SRN", description: "Filing chronology focus", instructions: "Mandatory chronology table with due vs actual date and SRN/challan details." },
+    { id: "mca-officer-defense", label: "Officer Defense", description: "Officer-wise role matrix", instructions: "Include officer-specific role period, allegation, and mitigating facts table." },
+    { id: "mca-446b-eligibility", label: "Section 446B", description: "Lesser penalty eligibility", instructions: "Use 446B block only with factual qualification support and date-linked eligibility." },
+    { id: "mca-board-governance", label: "Governance Matrix", description: "Board/compliance controls", instructions: "Highlight governance controls, compliance calendar, and recurrence-prevention actions." },
+  ],
+  "gst-show-cause": [
+    { id: "gst-drc-matrix", label: "DRC Matrix", description: "DRC allegation matrix", instructions: "Create allegation-wise matrix mapped to DRC issues and statutory hooks." },
+    { id: "gst-itc-reconciliation", label: "ITC Reconciliation", description: "ITC mismatch focus", instructions: "Lead with invoice-level ITC reconciliation and GSTR-2B/3B tie-out." },
+    { id: "gst-computation-challenge", label: "Demand Computation", description: "Tax/interest/penalty split", instructions: "Add accepted vs disputed tax, interest and penalty computation challenge table." },
+    { id: "gst-natural-justice", label: "Natural Justice", description: "Procedural fairness angle", instructions: "Emphasize hearing opportunity and evidence confrontation before demand confirmation." },
+    { id: "gst-registration-defense", label: "Registration Defense", description: "REG-17/23 type focus", instructions: "Use registration cancellation/revocation specific defense flow with operational continuity facts." },
+  ],
+  "income-tax-response": [
+    { id: "it-addition-matrix", label: "Addition Matrix", description: "Issue-wise addition rebuttal", instructions: "Use issue/addition-wise matrix: AO position vs assessee rebuttal with evidence." },
+    { id: "it-books-reconciliation", label: "Books Reconciliation", description: "Books and ledger focus", instructions: "Prioritize books, ledger, AIS/TIS/26AS reconciliation before legal submissions." },
+    { id: "it-penalty-defense", label: "Penalty Defense", description: "270A and mens rea angle", instructions: "Use penalty-defense template with under-reporting/misreporting challenge and bona fide position." },
+    { id: "it-reassessment-defense", label: "Reassessment Defense", description: "147/148/148A flow", instructions: "Structure around jurisdiction, reasons, and reopening threshold challenge." },
+  ],
+  "rbi-filing": [
+    { id: "rbi-fema-contravention", label: "FEMA Contravention", description: "Contravention regularization focus", instructions: "Map allegations to FEMA provisions and corrective reporting actions." },
+    { id: "rbi-reporting-delay", label: "Reporting Delay", description: "Delay condonation flow", instructions: "Use delay-cause, corrective filing, and LSF/compounding mitigation structure." },
+    { id: "rbi-authorization-controls", label: "Control Framework", description: "Compliance controls focus", instructions: "Highlight internal controls, maker-checker, and compliance monitoring mechanisms." },
+  ],
+  "sebi-compliance": [
+    { id: "sebi-lodr-disclosure", label: "LODR Disclosure", description: "Disclosure timeline defense", instructions: "Focus on disclosure timeline, materiality assessment, and exchange filing records." },
+    { id: "sebi-pit-upsi", label: "PIT/UPSI Controls", description: "Insider controls framework", instructions: "Emphasize code of conduct, UPSI controls, and structured digital database evidence." },
+    { id: "sebi-allegation-matrix", label: "Allegation Matrix", description: "Regulation-wise rebuttal", instructions: "Create allegation-wise matrix with regulation hook and documentary proof mapping." },
+    { id: "sebi-settlement-style", label: "Settlement Style", description: "Mitigated adjudication posture", instructions: "Use calibrated mitigation and compliance-remediation posture for adjudication/settlement style responses." },
+  ],
+  "customs-response": [
+    { id: "customs-classification", label: "Classification Defense", description: "CTH/HSN dispute focus", instructions: "Center draft on classification rationale, technical notes, and tariff interpretation." },
+    { id: "customs-valuation", label: "Valuation Defense", description: "Valuation rejection challenge", instructions: "Use transaction value defense with valuation-rule anchored submissions." },
+    { id: "customs-demand-recompute", label: "Demand Recompute", description: "Duty/interest/fine split", instructions: "Add duty-interest-penalty-redemption fine recomputation challenge table." },
+    { id: "customs-seizure-procedure", label: "Seizure Procedure", description: "110/111/112 procedural focus", instructions: "Focus on seizure/confiscation procedural compliance and evidentiary thresholds." },
+  ],
+  "contract-review": [
+    { id: "contract-clause-risk", label: "Clause Risk Matrix", description: "Clause-wise risk review", instructions: "Structure as clause-wise risk matrix with recommended replacement language." },
+    { id: "contract-redline-heavy", label: "Redline Heavy", description: "Drafting replacement focus", instructions: "Provide strong redline-ready replacement language for all high-risk clauses." },
+    { id: "contract-commercial-balance", label: "Commercial Balance", description: "Legal + business tradeoff", instructions: "Balance legal risk with commercial feasibility and negotiation fallbacks." },
+    { id: "contract-dispute-ready", label: "Dispute Ready", description: "Enforceability and dispute posture", instructions: "Prioritize enforceability, jurisdiction, arbitration, and breach-remedy clauses." },
+  ],
+  "custom-draft": [
+    { id: "custom-general-matrix", label: "General Matrix", description: "Issue-wise matrix baseline", instructions: "Use issue-wise matrix with statutory anchors and evidence mapping." },
+    { id: "custom-provision-heavy", label: "Provision Heavy", description: "Law-first template", instructions: "Prioritize section/rule/regulation mapping and legal threshold analysis." },
+    { id: "custom-remediation", label: "Remediation Focus", description: "Corrective action heavy", instructions: "Lead with corrective actions, compliance remediation, and prevention controls." },
+  ],
+};
 
 const getReplyTypeOptionsByDocumentType = (documentType: string) => {
   if (documentType === "mca-notice") return mcaReplyTypeOptions;
@@ -564,26 +634,48 @@ const buildClassAwareTemplate = ({
   documentLabel: string;
   classId: string;
   classLabel: string;
-  pack: Exclude<TemplatePackId, "auto">;
+  pack: TemplatePackDefinition;
 }) => {
-  const styleLine =
-    pack === "conservative"
-      ? "Use compliance-first and low-risk language, avoid legal overreach, and keep relief calibrated."
-      : pack === "assertive"
-        ? "Use assertive but legally defensible language with allegation-wise challenge and strict burden-of-proof framing."
-        : pack === "balanced"
-          ? "Use standard adjudication-ready structure with proportional legal challenge and evidence-linked rebuttal."
-          : "Use class-specific neutral core structure with all mandatory drafting anchors.";
-
   return `Notice/Order intake template for ${documentLabel}. Auto class: ${classLabel} (${classId}).
 Reference fields to fill: Notice No./Reference, DIN/RFN, notice date, issuing authority, period under dispute, proposed demand/penalty, invoked provisions, and response due date.
 Drafting scope required: allegation-wise rebuttal, section/rule/regulation anchors, chronology with due/event date vs actual action date, computation challenge where amount is involved, officer-specific defense where relevant, annexure mapping, and calibrated prayer language (drop/reduce, not waive/absolve).
-${styleLine}
+Template pack selected: ${pack.label} - ${pack.description}
+Template directive: ${pack.instructions}
 Facts block to include: factual background, chronology, specific allegations from notice, noticee position, and documentary anchors.
 Evidence block to include: filing acknowledgements/SRN/challan (if filing case), returns/invoices/reconciliation (if tax), governance/control records (if regulatory), or clause-wise evidence matrix (if contract review).
 Prayer block to include: drop/reduce unsustainable demand or penalty, hearing opportunity request, and such further orders as deemed fit.
 Mandatory placeholders allowed only as [To be filled by CA/Lawyer] for missing factual data.
 This template is generated for ${documentType} :: ${classId} to keep downstream AI drafting class-specific and filing-ready.`;
+};
+
+const getTemplatePackOptionsBySelection = (
+  documentType: string,
+  classId: string,
+): TemplatePackDefinition[] => {
+  const pools = [
+    AUTO_TEMPLATE_PACK,
+    ...UNIVERSAL_TEMPLATE_PACKS,
+    ...(DOCUMENT_TEMPLATE_PACKS[documentType] || []),
+  ];
+
+  const classLower = (classId || "").toLowerCase();
+  const filtered = pools.filter((pack) => {
+    if (pack.id === "auto") return true;
+    if (documentType === "mca-notice" && classLower.includes("annual")) {
+      return !["mca-board-governance"].includes(pack.id);
+    }
+    if (documentType === "gst-show-cause" && /(itc|reconciliation|drc)/.test(classLower)) {
+      return !["gst-registration-defense"].includes(pack.id);
+    }
+    return true;
+  });
+
+  const seen = new Set<string>();
+  return filtered.filter((item) => {
+    if (seen.has(item.id)) return false;
+    seen.add(item.id);
+    return true;
+  });
 };
 
 const buildStructuredNoticeDetailsFallback = (
@@ -1337,7 +1429,16 @@ const AIDraftingEngine = ({ demoMode = false, includeLawyerReview = true }: AIDr
     contractReplyTypeOverride, inferredContractReplyType,
     customReplyTypeOverride, inferredCustomReplyType,
   ]);
-  const effectiveTemplatePack = templatePackOverride === "auto" ? "class-core" : templatePackOverride;
+  const templatePackOptions = useMemo(
+    () => getTemplatePackOptionsBySelection(selectedDocType, effectiveNoticeClass),
+    [selectedDocType, effectiveNoticeClass],
+  );
+  const effectiveTemplatePack = useMemo(() => {
+    const defaultPack = templatePackOptions.find((pack) => pack.id === "class-core") || templatePackOptions.find((pack) => pack.id !== "auto");
+    if (!defaultPack) return AUTO_TEMPLATE_PACK;
+    if (templatePackOverride === "auto") return defaultPack;
+    return templatePackOptions.find((pack) => pack.id === templatePackOverride) || defaultPack;
+  }, [templatePackOverride, templatePackOptions]);
   const selectedClassLabel = useMemo(() => {
     const options = getReplyTypeOptionsByDocumentType(selectedDocType);
     return options.find((opt) => opt.id === effectiveNoticeClass)?.label || "General Class";
@@ -3178,6 +3279,14 @@ const AIDraftingEngine = ({ demoMode = false, includeLawyerReview = true }: AIDr
   useEffect(() => {
     setTemplatePackOverride("auto");
   }, [selectedDocType]);
+
+  useEffect(() => {
+    if (!templatePackOverride || templatePackOverride === "auto") return;
+    const valid = templatePackOptions.some((item) => item.id === templatePackOverride);
+    if (!valid) {
+      setTemplatePackOverride("auto");
+    }
+  }, [templatePackOverride, templatePackOptions]);
 
   const normalizeUploadedNoticeText = (value: string) =>
     value
@@ -5041,7 +5150,7 @@ Return only revised final draft text.`;
                     <FileText className="w-4 h-4 inline-block mr-2" />
                     Template Pack
                   </label>
-                  <Select value={templatePackOverride} onValueChange={(v) => setTemplatePackOverride(v as TemplatePackId)}>
+                  <Select value={templatePackOverride} onValueChange={setTemplatePackOverride}>
                     <SelectTrigger className="bg-background/50">
                       <SelectValue placeholder="Choose template pack..." />
                     </SelectTrigger>
@@ -5055,7 +5164,8 @@ Return only revised final draft text.`;
                   </Select>
                   <p className="text-xs text-muted-foreground mt-1">
                     Auto template tracks class:{" "}
-                    <span className="text-foreground font-medium">{selectedClassLabel}</span>. You can override pack anytime.
+                    <span className="text-foreground font-medium">{selectedClassLabel}</span>. Available packs:{" "}
+                    <span className="text-foreground font-medium">{templatePackOptions.length - 1}</span> for this class.
                   </p>
                 </div>
               )}
