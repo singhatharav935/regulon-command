@@ -6,6 +6,7 @@ import Footer from "@/components/layout/Footer";
 import DashboardTypeNav from "@/components/dashboard/DashboardTypeNav";
 import AIDraftingEngine from "@/components/ca-dashboard/AIDraftingEngine";
 import ComplianceChatbot from "@/components/ca-dashboard/ComplianceChatbot";
+import AIVoiceBriefAgent from "@/components/voice/AIVoiceBriefAgent";
 import { useCAWorkspace } from "@/hooks/use-ca-workspace";
 import { useAuth } from "@/hooks/use-auth";
 import { supabase } from "@/integrations/supabase/client";
@@ -183,6 +184,21 @@ const AppCADashboard = () => {
               Workspace profile source: {source === "profile" ? "configured" : "default (external_ca)"}
             </p>
           </div>
+
+          <AIVoiceBriefAgent
+            dashboardId="app-ca"
+            actorName="CA"
+            roleLabel={isRegulonCA ? "Regulon In-House CA Workspace" : "External CA Workspace"}
+            pendingWork={mapped?.tasks.filter((task) => task.status !== "completed").slice(0, 4).map((task) => `${task.title} (${task.regulator})`) || []}
+            newRules={[
+              "MCA: Chronology and officer-defense tables must remain explicit",
+              "Cross-regulator: Keep annexure-linked evidence for every key rebuttal",
+            ]}
+            autopilotActions={[
+              "Re-ranked draft queue by due date and risk",
+              "Prepared hearing-ready summary notes for critical matters",
+            ]}
+          />
 
           {!mapped || mapped.stats.assignedCompanies === 0 ? (
             <Card className="glass-card border-border/40 mb-8">

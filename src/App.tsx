@@ -21,6 +21,7 @@ import AppCAFirmDashboard from "./pages/AppCAFirmDashboard";
 import { AuthProvider } from "./hooks/use-auth";
 import ProtectedRoute from "./components/auth/ProtectedRoute";
 import RoleLandingRoute from "./components/auth/RoleLandingRoute";
+import AgentWorkReview from "./pages/AgentWorkReview";
 
 const queryClient = new QueryClient();
 
@@ -39,6 +40,7 @@ const App = () => (
             <Route path="/admin-dashboard" element={<AdminDashboard />} />
             <Route path="/university-demo" element={<UniversityDemoDashboard />} />
             <Route path="/ca-firm-dashboard" element={<CAFirmDashboard />} />
+            <Route path="/agent-work-review" element={<AgentWorkReview />} />
 
             <Route path="/app" element={<RoleLandingRoute />} />
             <Route
@@ -110,6 +112,18 @@ const App = () => (
               element={
                 <ProtectedRoute allowRoles={["user", "manager", "admin"]}>
                   <AppUniversityDashboard />
+                </ProtectedRoute>
+              }
+            />
+            <Route
+              path="/app/agent-work-review"
+              element={
+                <ProtectedRoute
+                  allowRoles={["user", "manager", "admin"]}
+                  allowPersonas={["company_owner", "external_ca", "in_house_ca", "in_house_lawyer", "admin", "ca_firm"]}
+                  requireVerified={false}
+                >
+                  <AgentWorkReview />
                 </ProtectedRoute>
               }
             />

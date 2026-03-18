@@ -1,0 +1,251 @@
+import { serve } from "https://deno.land/std@0.168.0/http/server.ts";
+import { createClient } from "https://esm.sh/@supabase/supabase-js@2";
+
+const getCorsHeaders = (req: Request) => {
+  const origin = req.headers.get("origin") ?? "";
+  const allowlist = (Deno.env.get("ALLOWED_ORIGINS") ?? "")
+    .split(",")
+    .map((item) => item.trim())
+    .filter(Boolean);
+
+  const isLocalOrigin =
+    origin.startsWith("http://localhost:") ||
+    origin.startsWith("https://localhost:") ||
+    origin.startsWith("http://127.0.0.1:") ||
+    origin.startsWith("https://127.0.0.1:");
+
+  const hasWildcard = allowlist.includes("*");
+  const isAllowlisted = allowlist.includes(origin);
+  const allowOrigin = allowlist.length === 0 ? "*" : (isLocalOrigin || hasWildcard || isAllowlisted ? origin : "null");
+
+  return {
+    "Access-Control-Allow-Origin": allowOrigin,
+    "Access-Control-Allow-Headers": "authorization, x-client-info, apikey, content-type",
+    "Access-Control-Allow-Methods": "GET,POST,PATCH,OPTIONS",
+  };
+};
+
+const json = (req: Request, status: number, payload: unknown) =>
+  new Response(JSON.stringify(payload), {
+    status,
+    headers: { ...getCorsHeaders(req), "Content-Type": "application/json" },
+  });
+
+const getEnv = () => {
+  const url = Deno.env.get("SUPABASE_URL") || "";
+  const anon = Deno.env.get("SUPABASE_ANON_KEY") || "";
+  const service = Deno.env.get("SUPABASE_SERVICE_ROLE_KEY") || "";
+  if (!url || !anon || !service) {
+    throw new Error("Missing Supabase env configuration");
+  }
+  return { url, anon, service };
+};
+
+const getUserClient = async (req: Request) => {
+  const { url, anon } = getEnv();
+  const authHeader = req.headers.get("Authorization") || req.headers.get("authorization") || "";
+  if (!authHeader.toLowerCase().startsWith("bearer ")) {
+    throw new Error("Unauthorized");
+  }
+  const token = authHeader.replace(/^bearer\s+/i, "").trim();
+  const client = createClient(url, anon, {
+    global: { headers: { Authorization: `Bearer ${token}` } },
+  });
+  const { data, error } = await client.auth.getUser();
+  if (error || !data?.user) {
+    throw new Error("Unauthorized");
+  }
+  return { client, user: data.user };
+};
+
+const getAdminClient = () => {
+  const { url, service } = getEnv();
+  return createClient(url, service);
+};
+
+serve(async (req: Request) => {
+  if (req.method === "OPTIONS") return new Response(null, { headers: getCorsHeaders(req) });
+
+  try {
+    const url = new URL(req.url);
+    const path = url.pathname.replace(/^\/+/, "");
+    const { client, user } = await getUserClient(req);
+    const admin = getAdminClient();
+
+    if (req.method === "POST" && path.endsWith("run")) {
+      const body = await req.json();
+      const companyId = body.company_id ?? null;
+      const dashboardScope = (body.dashboard_scope || "ca").toString();
+      const summary = body.summary?.toString() || null;
+      const context = body.context ?? {};
+      const actions = Array.isArray(body.actions) ? body.actions : [];
+
+      const { data: run, error: runError } = await client
+        .from("agent_runs")
+        .insert({
+          company_id: companyId,
+          owner_user_id: user.id,
+          dashboard_scope: dashboardScope,
+          summary,
+          context,
+          status: "needs_owner_review",
+          started_at: new Date().toISOString(),
+        })
+        .select("id, company_id, owner_user_id, dashboard_scope, status, created_at")
+        .single();
+
+      if (runError || !run) {
+        return json(req, 400, { error: runError?.message || "Could not create agent run" });
+      }
+
+      if (actions.length > 0) {
+        const rows = actions.map((item: Record<string, unknown>) => ({
+          run_id: run.id,
+          company_id: companyId,
+          owner_user_id: user.id,
+          portal: (item.portal || "Regulatory").toString(),
+          action_type: (item.action_type || "draft_generation").toString(),
+          title: (item.title || "Agent-generated work item").toString(),
+          generated_work: (item.generated_work || "").toString(),
+          status: (item.status || "needs_approval").toString(),
+          needs_approval: item.needs_approval === false ? false : true,
+          metadata: item.metadata ?? {},
+        }));
+        const { error: actionInsertError } = await client.from("agent_actions").insert(rows);
+        if (actionInsertError) {
+          return json(req, 400, { error: actionInsertError.message });
+        }
+      }
+
+      return json(req, 200, { ok: true, run_id: run.id });
+    }
+
+    if (req.method === "GET" && path.endsWith("dashboard")) {
+      const dashboardScope = url.searchParams.get("dashboard_scope");
+      const companyId = url.searchParams.get("company_id");
+      let query = client
+        .from("agent_runs")
+        .select("id, company_id, owner_user_id, dashboard_scope, status, summary, created_at")
+        .eq("owner_user_id", user.id)
+        .order("created_at", { ascending: false })
+        .limit(30);
+
+      if (dashboardScope) query = query.eq("dashboard_scope", dashboardScope);
+      if (companyId) query = query.eq("company_id", companyId);
+
+      const { data: runs, error } = await query;
+      if (error) return json(req, 400, { error: error.message });
+
+      const runIds = (runs || []).map((r) => r.id);
+      let actions: unknown[] = [];
+      if (runIds.length > 0) {
+        const { data: actionsData, error: actionsError } = await client
+          .from("agent_actions")
+          .select("id, run_id, portal, action_type, title, status, needs_approval, approval_note, approved_at, created_at")
+          .in("run_id", runIds)
+          .order("created_at", { ascending: false });
+        if (actionsError) return json(req, 400, { error: actionsError.message });
+        actions = actionsData || [];
+      }
+
+      return json(req, 200, { ok: true, runs: runs || [], actions });
+    }
+
+    if (req.method === "GET" && path.includes("run/")) {
+      const runId = path.split("run/")[1];
+      const { data: run, error: runError } = await client
+        .from("agent_runs")
+        .select("*")
+        .eq("id", runId)
+        .single();
+      if (runError) return json(req, 404, { error: runError.message });
+
+      const { data: actions, error: actionError } = await client
+        .from("agent_actions")
+        .select("*")
+        .eq("run_id", runId)
+        .order("created_at", { ascending: false });
+      if (actionError) return json(req, 400, { error: actionError.message });
+
+      return json(req, 200, { ok: true, run, actions: actions || [] });
+    }
+
+    if (req.method === "POST" && path.includes("action/") && path.endsWith("/approve")) {
+      const actionId = path.split("action/")[1].replace("/approve", "");
+      const body = await req.json();
+      const approvalNote = (body.approval_note || "").toString() || null;
+
+      const { data: action, error: actionError } = await client
+        .from("agent_actions")
+        .select("id, run_id")
+        .eq("id", actionId)
+        .single();
+      if (actionError || !action) return json(req, 404, { error: "Action not found" });
+
+      const { error: updateError } = await client
+        .from("agent_actions")
+        .update({
+          status: "approved",
+          needs_approval: false,
+          approval_note: approvalNote,
+          approved_by: user.id,
+          approved_at: new Date().toISOString(),
+        })
+        .eq("id", actionId);
+      if (updateError) return json(req, 400, { error: updateError.message });
+
+      const { error: runUpdateError } = await admin
+        .from("agent_runs")
+        .update({ status: "approved", finished_at: new Date().toISOString() })
+        .eq("id", action.run_id)
+        .eq("owner_user_id", user.id);
+      if (runUpdateError) return json(req, 400, { error: runUpdateError.message });
+
+      return json(req, 200, { ok: true });
+    }
+
+    if (req.method === "POST" && path.includes("action/") && path.endsWith("/edit")) {
+      const actionId = path.split("action/")[1].replace("/edit", "");
+      const body = await req.json();
+      const editedWork = (body.edited_work || "").toString();
+      const changeNote = (body.change_note || "").toString() || null;
+      if (!editedWork.trim()) return json(req, 400, { error: "edited_work is required" });
+
+      const { data: action, error: actionError } = await client
+        .from("agent_actions")
+        .select("id, status")
+        .eq("id", actionId)
+        .single();
+      if (actionError || !action) return json(req, 404, { error: "Action not found" });
+
+      const { error: editError } = await client
+        .from("agent_action_edits")
+        .insert({
+          action_id: actionId,
+          edited_by: user.id,
+          edited_work: editedWork,
+          change_note: changeNote,
+        });
+      if (editError) return json(req, 400, { error: editError.message });
+
+      const { error: actionUpdateError } = await client
+        .from("agent_actions")
+        .update({
+          generated_work: editedWork,
+          status: action.status === "approved" ? "needs_approval" : action.status,
+          needs_approval: true,
+          approval_note: null,
+          approved_by: null,
+          approved_at: null,
+        })
+        .eq("id", actionId);
+      if (actionUpdateError) return json(req, 400, { error: actionUpdateError.message });
+
+      return json(req, 200, { ok: true });
+    }
+
+    return json(req, 404, { error: "Route not found" });
+  } catch (error) {
+    return json(req, 500, { error: error instanceof Error ? error.message : "Internal error" });
+  }
+});

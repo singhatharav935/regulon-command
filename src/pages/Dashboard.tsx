@@ -13,6 +13,7 @@ import ComplianceGapSection from "@/components/dashboard/ComplianceGapSection";
 import UpcomingLawImpactSection from "@/components/dashboard/UpcomingLawImpactSection";
 import AuditEvidenceVault from "@/components/dashboard/AuditEvidenceVault";
 import AIBusinessIntelligencePanel from "@/components/dashboard/AIBusinessIntelligencePanel";
+import AIVoiceBriefAgent from "@/components/voice/AIVoiceBriefAgent";
 
 // Demo data for the dashboard example
 const demoCompany = {
@@ -93,6 +94,42 @@ const Dashboard = () => {
               <span className="text-muted-foreground ml-2">Sign in to access your company's actual compliance data.</span>
             </p>
           </motion.div>
+
+          <AIVoiceBriefAgent
+            dashboardId="demo-company"
+            actorName="Compliance Lead"
+            roleLabel="Company Dashboard"
+            pendingWork={demoTasks.filter((task) => task.status !== "completed").slice(0, 3).map((task) => `${task.title} due ${task.dueDate}`)}
+            newRules={demoExposures.slice(0, 3).map((item) => `${item.regulator}: ${item.notes}`)}
+            autopilotActions={[
+              "Queued reminders for tasks due in next seven days",
+              "Prepared regulator-wise status digest for management review",
+            ]}
+            actionLedger={[
+              {
+                id: "company-ledger-1",
+                timeLabel: "06:03 AM",
+                portal: "GST",
+                action: "Updated return-risk board with newly detected mismatch exposure.",
+                status: "completed",
+              },
+              {
+                id: "company-ledger-2",
+                timeLabel: "06:14 AM",
+                portal: "MCA",
+                action: "Drafted annual filing correction checklist and linked supporting evidence.",
+                status: "completed",
+              },
+              {
+                id: "company-ledger-3",
+                timeLabel: "06:22 AM",
+                portal: "Income Tax",
+                action: "Prepared advisory note for advance tax and assessment readiness.",
+                status: "needs_approval",
+                approvalTitle: "Approve circulation of Income Tax advisory to finance team.",
+              },
+            ]}
+          />
 
           <DashboardHeader 
             companyName={demoCompany.name}

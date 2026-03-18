@@ -14,6 +14,7 @@ import ComplianceGapSection from "@/components/dashboard/ComplianceGapSection";
 import UpcomingLawImpactSection from "@/components/dashboard/UpcomingLawImpactSection";
 import AuditEvidenceVault from "@/components/dashboard/AuditEvidenceVault";
 import AIBusinessIntelligencePanel from "@/components/dashboard/AIBusinessIntelligencePanel";
+import AIVoiceBriefAgent from "@/components/voice/AIVoiceBriefAgent";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { useToast } from "@/hooks/use-toast";
@@ -246,6 +247,18 @@ const AppDashboard = () => {
       <main className="pt-24 pb-16">
         <div className="container mx-auto px-4 max-w-7xl">
           <DashboardTypeNav activeType="company" routePrefix="/app" />
+
+          <AIVoiceBriefAgent
+            dashboardId="app-company"
+            actorName={mappedData.company.name}
+            roleLabel="Company Compliance Workspace"
+            pendingWork={mappedData.tasks.filter((task) => task.status !== "completed").slice(0, 4).map((task) => `${task.title} (${task.regulator})`)}
+            newRules={mappedData.exposures.slice(0, 4).map((item) => `${item.regulator}: ${item.notes || "status updated"}`)}
+            autopilotActions={[
+              "Prepared upcoming deadline alerts for client stakeholders",
+              "Updated regulator exposure summary with current task posture",
+            ]}
+          />
 
           <DashboardHeader
             companyName={mappedData.company.name}

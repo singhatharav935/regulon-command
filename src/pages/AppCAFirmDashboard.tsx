@@ -11,6 +11,7 @@ import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@
 import { supabase } from "@/integrations/supabase/client";
 import { useAuth } from "@/hooks/use-auth";
 import { useToast } from "@/hooks/use-toast";
+import AIVoiceBriefAgent from "@/components/voice/AIVoiceBriefAgent";
 
 const AppCAFirmDashboard = () => {
   const { user } = useAuth();
@@ -163,6 +164,21 @@ const AppCAFirmDashboard = () => {
                   <strong>{data.firm.name}</strong> · {data.firm.registration_number} · {data.firm.jurisdiction || "Jurisdiction not set"}
                 </p>
               </div>
+
+              <AIVoiceBriefAgent
+                dashboardId="app-ca-firm"
+                actorName={data.firm.name}
+                roleLabel="CA Firm Workspace"
+                pendingWork={filteredDirectory.slice(0, 4).map((entry: any) => `${entry.ca_name} has ${entry.workCount} tracked work items`)}
+                newRules={[
+                  "Firm ops: prioritize overdue filings with backup-owner routing",
+                  "Quality: enforce issue detector and AI-fix cycle before submission",
+                ]}
+                autopilotActions={[
+                  "Compiled workload distribution across tracked CAs",
+                  "Prepared high-load rebalance recommendations",
+                ]}
+              />
 
               <div className="grid grid-cols-2 md:grid-cols-4 gap-4 mb-6">
                 <Card className="glass-card border-border/40"><CardContent className="p-4"><p className="text-xs text-muted-foreground">Team Members</p><p className="text-2xl font-bold">{data.members.length}</p></CardContent></Card>

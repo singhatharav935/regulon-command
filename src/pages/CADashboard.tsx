@@ -14,6 +14,7 @@ import CACommunicationLogs from "@/components/ca-dashboard/CACommunicationLogs";
 import CAAnalyticsSection from "@/components/ca-dashboard/CAAnalyticsSection";
 import AIDraftingEngine from "@/components/ca-dashboard/AIDraftingEngine";
 import ComplianceChatbot from "@/components/ca-dashboard/ComplianceChatbot";
+import AIVoiceBriefAgent from "@/components/voice/AIVoiceBriefAgent";
 
 const CADashboard = () => {
   const [isLoading, setIsLoading] = useState(true);
@@ -52,6 +53,57 @@ const CADashboard = () => {
               <strong>CA Professional Dashboard</strong> — Manage all assigned companies and compliance tasks from one control center.
             </p>
           </motion.div>
+
+          <AIVoiceBriefAgent
+            dashboardId="demo-ca"
+            actorName="CA"
+            roleLabel="CA Professional Dashboard"
+            pendingWork={[
+              "Review pending MCA adjudication drafts and hearing asks",
+              "Validate GST rebuttal evidence mapping before filing",
+              "Update client dependency blockers for overdue tasks",
+            ]}
+            newRules={[
+              "MCA: Prioritize date-anchored Section 454 proviso submissions",
+              "GST: Keep accepted vs disputed computation matrix mandatory",
+            ]}
+            autopilotActions={[
+              "Generated class-aware draft templates for active notices",
+              "Flagged high-risk drafts for immediate CA review",
+            ]}
+            actionLedger={[
+              {
+                id: "ca-ledger-1",
+                timeLabel: "05:42 AM",
+                portal: "GST",
+                action: "Scanned new GST mismatch notices and generated point-by-point reconciliations for 4 clients.",
+                status: "completed",
+              },
+              {
+                id: "ca-ledger-2",
+                timeLabel: "05:58 AM",
+                portal: "MCA",
+                action: "Updated annual filing draft matrix with chronology, officer defense, and Section 454 anchors.",
+                status: "completed",
+              },
+              {
+                id: "ca-ledger-3",
+                timeLabel: "06:06 AM",
+                portal: "Income Tax",
+                action: "Mapped 143(2) query points with AIS/TDS mismatch evidence bundle.",
+                status: "needs_approval",
+                approvalTitle: "Approve outward submission set for Income Tax hearing prep.",
+              },
+              {
+                id: "ca-ledger-4",
+                timeLabel: "06:17 AM",
+                portal: "RBI/SEBI",
+                action: "Refreshed compliance checklist for overnight circular updates and marked impacted clients.",
+                status: "needs_approval",
+                approvalTitle: "Approve client alerts for RBI/SEBI circular impact.",
+              },
+            ]}
+          />
 
           <CAHomeSection />
           

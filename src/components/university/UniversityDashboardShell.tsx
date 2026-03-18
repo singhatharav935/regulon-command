@@ -26,6 +26,7 @@ import {
 } from "lucide-react";
 import Navbar from "@/components/layout/Navbar";
 import Footer from "@/components/layout/Footer";
+import AIVoiceBriefAgent from "@/components/voice/AIVoiceBriefAgent";
 import { Badge } from "@/components/ui/badge";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
@@ -975,6 +976,21 @@ const UniversityDashboardShell = ({ mode }: UniversityDashboardShellProps) => {
               </div>
             </div>
           </div>
+
+          <AIVoiceBriefAgent
+            dashboardId={`university-${mode}`}
+            actorName={roleMeta[effectiveRole].title}
+            roleLabel={`University ${mode === "demo" ? "Demo" : "Live"} Compliance OS`}
+            pendingWork={roleQueueMap[effectiveRole].slice(0, 3).map((item) => `${item.title} (${item.sla})`)}
+            newRules={[
+              "University compliance policy: keep statutory, finance, procurement, and audit controls in one traceable workflow.",
+              "Escalate any critical pending filing to role owner with SLA breach prevention.",
+            ]}
+            autopilotActions={[
+              "Generated role-wise queue summary for opening brief",
+              "Flagged deadline-sensitive items for same-day review",
+            ]}
+          />
 
           <div className="grid grid-cols-1 xl:grid-cols-4 gap-4">
             <Card className="bg-card/50 border-border/50 xl:col-span-1">

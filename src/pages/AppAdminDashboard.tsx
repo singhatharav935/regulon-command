@@ -8,6 +8,7 @@ import { supabase } from "@/integrations/supabase/client";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table";
 import { Badge } from "@/components/ui/badge";
+import AIVoiceBriefAgent from "@/components/voice/AIVoiceBriefAgent";
 
 const AppAdminDashboard = () => {
   const { data, isLoading, isError, error } = useQuery({
@@ -122,6 +123,25 @@ const AppAdminDashboard = () => {
               <strong>Production Admin Workspace</strong> - Live tenant data, role oversight, and delivery monitoring.
             </p>
           </div>
+
+          <AIVoiceBriefAgent
+            dashboardId="app-admin"
+            actorName="Platform Admin"
+            roleLabel="Production Admin Workspace"
+            pendingWork={[
+              `Open tasks: ${mapped?.stats.openTasks || 0}`,
+              `Overdue tasks: ${mapped?.stats.overdueTasks || 0}`,
+              `Draft runs awaiting review: ${mapped?.stats.draftRuns || 0}`,
+            ]}
+            newRules={[
+              "Platform policy: strict gate checks before final draft approval",
+              "Governance policy: maintain immutable audit event coverage",
+            ]}
+            autopilotActions={[
+              "Queued high-risk tenant anomaly scan",
+              "Prepared nearest-deadline cross-tenant escalation list",
+            ]}
+          />
 
           {mapped && (
             <>

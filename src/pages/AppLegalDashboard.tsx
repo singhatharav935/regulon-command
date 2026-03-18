@@ -7,6 +7,7 @@ import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Badge } from "@/components/ui/badge";
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table";
 import { supabase } from "@/integrations/supabase/client";
+import AIVoiceBriefAgent from "@/components/voice/AIVoiceBriefAgent";
 
 const AppLegalDashboard = () => {
   const { data, isLoading, isError, error } = useQuery({
@@ -74,6 +75,24 @@ const AppLegalDashboard = () => {
               <strong>In-House Lawyer Workspace</strong> - Live legal review queue with immutable draft audit visibility.
             </p>
           </div>
+
+          <AIVoiceBriefAgent
+            dashboardId="app-legal"
+            actorName="Legal Reviewer"
+            roleLabel="In-House Legal Workspace"
+            pendingWork={[
+              `Drafts under review: ${underReview}`,
+              `Approved drafts pending sign-off check: ${approved}`,
+            ]}
+            newRules={[
+              "Legal review policy: keep factual placeholders explicit where data is missing",
+              "Risk policy: avoid non-defensible prayer language across filings",
+            ]}
+            autopilotActions={[
+              "Prepared review-priority queue from latest draft runs",
+              "Compiled legal audit-event summary for traceability",
+            ]}
+          />
 
           <div className="grid grid-cols-2 md:grid-cols-4 gap-4 mb-8">
             <Card className="glass-card border-border/40"><CardContent className="p-4"><p className="text-xs text-muted-foreground">Draft Runs</p><p className="text-2xl font-bold">{data?.runs.length ?? 0}</p></CardContent></Card>

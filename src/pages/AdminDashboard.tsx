@@ -12,6 +12,7 @@ import AuditQualityControl from "@/components/admin-dashboard/AuditQualityContro
 import IncidentManagement from "@/components/admin-dashboard/IncidentManagement";
 import SystemActivityLogs from "@/components/admin-dashboard/SystemActivityLogs";
 import PlatformAnalytics from "@/components/admin-dashboard/PlatformAnalytics";
+import AIVoiceBriefAgent from "@/components/voice/AIVoiceBriefAgent";
 
 const AdminDashboard = () => {
   const [isLoading, setIsLoading] = useState(true);
@@ -50,6 +51,25 @@ const AdminDashboard = () => {
               <strong>Admin Control Center</strong> — Full platform oversight, CA governance, and system management.
             </p>
           </motion.div>
+
+          <AIVoiceBriefAgent
+            dashboardId="demo-admin"
+            actorName="Admin"
+            roleLabel="Platform Admin Control Center"
+            pendingWork={[
+              "Review overdue compliance task clusters across tenant companies",
+              "Audit CA workload distribution and SLA breach risk",
+              "Validate incident queue and unresolved system alerts",
+            ]}
+            newRules={[
+              "Platform: Enforce stricter draft quality gates for high-risk matters",
+              "Governance: Keep immutable audit trails for all AI-generated drafts",
+            ]}
+            autopilotActions={[
+              "Queued platform-wide compliance health anomaly scan",
+              "Prepared daily regulator-impact briefing for admins",
+            ]}
+          />
 
           <AdminHomeSection />
           <CompanyRiskOversight />

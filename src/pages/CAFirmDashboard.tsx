@@ -12,6 +12,7 @@ import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { Textarea } from "@/components/ui/textarea";
 import { Bot, Brain, Cpu, Radar, Search, Sparkles, Users, Wand2 } from "lucide-react";
+import AIVoiceBriefAgent from "@/components/voice/AIVoiceBriefAgent";
 
 type CAStatus = "active" | "on_leave" | "at_capacity";
 type WorkStatus = "todo" | "in_progress" | "blocked" | "completed" | "overdue";
@@ -212,6 +213,47 @@ const CAFirmDashboard = () => {
             </p>
           </div>
 
+          <AIVoiceBriefAgent
+            dashboardId="demo-ca-firm"
+            actorName="Managing Partner"
+            roleLabel="CA Firm Command Dashboard"
+            pendingWork={workRows.filter((w) => w.status !== "completed").slice(0, 4).map((w) => `${w.company}: ${w.task}`)}
+            newRules={aiInsights}
+            autopilotActions={autopilotRecommendations.slice(0, 3).map((r) => `Reassignment suggestion ${r.fromCA} to ${r.toCA} for ${r.company}`)}
+            actionLedger={[
+              {
+                id: "firm-ledger-1",
+                timeLabel: "04:55 AM",
+                portal: "MCA",
+                action: "Re-sequenced 7 high-priority MCA matters into 24h and 48h firm lanes.",
+                status: "completed",
+              },
+              {
+                id: "firm-ledger-2",
+                timeLabel: "05:11 AM",
+                portal: "GST",
+                action: "Prepared dependency-unblock steps for blocked GST cases and notified assigned CAs.",
+                status: "completed",
+              },
+              {
+                id: "firm-ledger-3",
+                timeLabel: "05:29 AM",
+                portal: "Income Tax",
+                action: "Drafted reassignment plan for time-sensitive assessment responses.",
+                status: "needs_approval",
+                approvalTitle: "Approve IT reassignment plan and dispatch client-side updates.",
+              },
+              {
+                id: "firm-ledger-4",
+                timeLabel: "05:44 AM",
+                portal: "RBI/SEBI",
+                action: "Created compliance watchlist for new circular-driven client impact.",
+                status: "needs_approval",
+                approvalTitle: "Approve circulation of regulator watchlist to partner group.",
+              },
+            ]}
+          />
+
           <div className="grid grid-cols-2 md:grid-cols-4 gap-4">
             <Card className="glass-card border-border/40"><CardContent className="p-4"><p className="text-xs text-muted-foreground">Tracked CAs</p><p className="text-2xl font-bold">{demoCas.length}</p></CardContent></Card>
             <Card className="glass-card border-border/40"><CardContent className="p-4"><p className="text-xs text-muted-foreground">Active Work Items</p><p className="text-2xl font-bold">{demoWorkItems.filter((w) => w.status !== "completed").length}</p></CardContent></Card>
@@ -384,4 +426,3 @@ const CAFirmDashboard = () => {
 };
 
 export default CAFirmDashboard;
-

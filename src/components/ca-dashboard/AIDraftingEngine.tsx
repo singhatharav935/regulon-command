@@ -31,6 +31,7 @@ import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { toast } from "sonner";
 import { supabase } from "@/integrations/supabase/client";
+import { useLocation, useNavigate } from "react-router-dom";
 
 const documentTypes = [
   { id: "mca-notice", label: "MCA Notice Response", authority: "MCA" },
@@ -539,7 +540,15 @@ type TemplatePackDefinition = {
   description: string;
   instructions: string;
 };
+type PromptPackId = string;
+type PromptPackDefinition = {
+  id: PromptPackId;
+  label: string;
+  description: string;
+  instructions: string;
+};
 type TemplateCatalogView = "recommended" | "class-variants" | "authority-packs" | "universal-packs" | "all";
+type PromptCatalogView = "recommended" | "class-variants" | "authority-packs" | "universal-packs" | "all";
 
 const TEMPLATE_CATALOG_VIEW_OPTIONS: Array<{ id: TemplateCatalogView; label: string }> = [
   { id: "recommended", label: "Recommended" },
@@ -548,12 +557,25 @@ const TEMPLATE_CATALOG_VIEW_OPTIONS: Array<{ id: TemplateCatalogView; label: str
   { id: "universal-packs", label: "Universal Packs" },
   { id: "all", label: "All Templates" },
 ];
+const PROMPT_CATALOG_VIEW_OPTIONS: Array<{ id: PromptCatalogView; label: string }> = [
+  { id: "recommended", label: "Recommended" },
+  { id: "class-variants", label: "Class Variants" },
+  { id: "authority-packs", label: "Authority Packs" },
+  { id: "universal-packs", label: "Universal Packs" },
+  { id: "all", label: "All Prompts" },
+];
 
 const AUTO_TEMPLATE_PACK: TemplatePackDefinition = {
   id: "auto",
   label: "Auto (By Class)",
   description: "Automatically selects the best class-specific template baseline.",
   instructions: "Use class-specific baseline with mandatory drafting anchors for the selected notice class.",
+};
+const AUTO_PROMPT_PACK: PromptPackDefinition = {
+  id: "auto",
+  label: "Auto (By Class)",
+  description: "Automatically selects the best prompt policy for selected class and mode.",
+  instructions: "Use class-specific prompt policy: strict fact extraction, evidence anchors, calibrated legal posture, and filing-safe outputs only.",
 };
 
 const UNIVERSAL_TEMPLATE_PACKS: TemplatePackDefinition[] = [
@@ -578,6 +600,19 @@ const UNIVERSAL_TEMPLATE_PACKS: TemplatePackDefinition[] = [
   { id: "assertive", label: "Assertive", description: "Strong but defensible", instructions: "Use assertive but legally defensible language with burden-of-proof challenge." },
 ];
 const UNIVERSAL_TEMPLATE_PACK_IDS = new Set<string>(UNIVERSAL_TEMPLATE_PACKS.map((pack) => pack.id));
+const UNIVERSAL_PROMPT_PACKS: PromptPackDefinition[] = [
+  { id: "prompt-facts-first", label: "Facts First", description: "Fact extraction-first reasoning", instructions: "Start from notice facts and chronology before legal argument generation." },
+  { id: "prompt-law-first", label: "Law First", description: "Provision-first reasoning", instructions: "Map each allegation to section/rule/regulation first, then apply facts and evidence." },
+  { id: "prompt-evidence-first", label: "Evidence First", description: "Annexure-linked reasoning", instructions: "Every key assertion must include an evidence anchor or explicit missing-data marker." },
+  { id: "prompt-quantum-first", label: "Quantum First", description: "Computation-oriented reasoning", instructions: "Prioritize accepted-vs-disputed quantum and arithmetic reconciliation early." },
+  { id: "prompt-procedure-first", label: "Procedure First", description: "Natural justice and maintainability", instructions: "Prioritize jurisdiction, limitation, and hearing/procedure checks where fact-supported." },
+  { id: "prompt-risk-safe", label: "Risk Safe", description: "Most conservative language policy", instructions: "Use compliance-first language; avoid over-claims; keep relief calibrated to facts." },
+  { id: "prompt-risk-balanced", label: "Risk Balanced", description: "Standard professional policy", instructions: "Use balanced legal challenge with proportionality and defensible prayer language." },
+  { id: "prompt-risk-assertive", label: "Risk Assertive", description: "Strong but defensible policy", instructions: "Challenge burden-of-proof and computation strongly while preserving filing safety." },
+  { id: "prompt-qa-strict", label: "QA Strict", description: "Strict quality-gate prompting", instructions: "Block generic filler; enforce chronology, issue matrix, annexure mapping, and precise prayer." },
+  { id: "prompt-hearing-mode", label: "Hearing Mode", description: "Oral hearing-ready prompting", instructions: "Generate concise hearing points with fallback asks and adverse-order prevention framing." },
+];
+const UNIVERSAL_PROMPT_PACK_IDS = new Set<string>(UNIVERSAL_PROMPT_PACKS.map((pack) => pack.id));
 
 const DOCUMENT_TEMPLATE_PACKS: Record<string, TemplatePackDefinition[]> = {
   "mca-notice": [
@@ -653,9 +688,56 @@ const DOCUMENT_TEMPLATE_PACKS: Record<string, TemplatePackDefinition[]> = {
     { id: "custom-demand-neutralization", label: "Demand Neutralization", description: "Demand reduction strategy", instructions: "Focus on quantum neutralization with accepted vs disputed computation grid." },
   ],
 };
+const DOCUMENT_PROMPT_PACKS: Record<string, PromptPackDefinition[]> = {
+  "mca-notice": [
+    { id: "mca-prompt-454", label: "MCA 454 Proviso", description: "Section 454 proviso-focused prompts", instructions: "Include fact-dependent 454 proviso check with notice-date anchor and rectification timing." },
+    { id: "mca-prompt-filing-grid", label: "MCA Filing Grid", description: "AOC-4/MGT-7 chronology prompts", instructions: "Enforce due vs actual filing grid with SRN/challan references." },
+    { id: "mca-prompt-officer-defense", label: "MCA Officer Defense", description: "Officer-wise role prompts", instructions: "Enforce officer-specific defense table: role period, alleged responsibility, mitigating facts." },
+    { id: "mca-prompt-penalty-calibration", label: "MCA Penalty Calibration", description: "Calibrated prayer prompts", instructions: "Use drop/reduce penalty language and avoid waive/absolve phrasing." },
+  ],
+  "gst-show-cause": [
+    { id: "gst-prompt-drc", label: "GST DRC Matrix", description: "DRC allegation prompts", instructions: "Respond allegation-wise with DRC mapping and section/rule anchors." },
+    { id: "gst-prompt-itc-reco", label: "GST ITC Reconciliation", description: "2B/3B invoice prompts", instructions: "Enforce invoice-level ITC reconciliation for 2B/3B mismatch scenarios." },
+    { id: "gst-prompt-quantum", label: "GST Quantum Challenge", description: "Demand split prompts", instructions: "Generate accepted/disputed tax-interest-penalty computation table." },
+    { id: "gst-prompt-hearing", label: "GST Hearing Strategy", description: "Adjudication hearing prompts", instructions: "Generate concise hearing ask and evidence submission readiness points." },
+  ],
+  "income-tax-response": [
+    { id: "it-prompt-issue-matrix", label: "IT Issue Matrix", description: "Addition-wise prompts", instructions: "Generate issue-wise matrix: AO position vs assessee rebuttal vs evidence." },
+    { id: "it-prompt-ais-26as", label: "IT AIS/26AS Reco", description: "Data mismatch prompts", instructions: "Enforce AIS/TIS/26AS/books reconciliation blocks." },
+    { id: "it-prompt-penalty", label: "IT Penalty Defense", description: "270A-focused prompts", instructions: "Generate mens rea/bona fide arguments for penalty-phase risk." },
+    { id: "it-prompt-reopen", label: "IT Reassessment", description: "147/148/148A prompts", instructions: "Check reassessment threshold and jurisdictional framing before merits." },
+  ],
+  "rbi-filing": [
+    { id: "rbi-prompt-fema-grid", label: "RBI FEMA Grid", description: "FEMA mapping prompts", instructions: "Generate regulation-wise FEMA allegation to response mapping." },
+    { id: "rbi-prompt-delay", label: "RBI Delay Regularization", description: "Delay/LSF prompts", instructions: "Prioritize reporting delay cause, corrective filings, and LSF/compounding framing." },
+    { id: "rbi-prompt-controls", label: "RBI Controls", description: "Control-remediation prompts", instructions: "Generate maker-checker, governance, and recurrence-control sections." },
+  ],
+  "sebi-compliance": [
+    { id: "sebi-prompt-reg-grid", label: "SEBI Regulation Grid", description: "Regulation-wise prompts", instructions: "Generate allegation matrix mapped to exact SEBI regulations cited." },
+    { id: "sebi-prompt-disclosure-timeline", label: "SEBI Timeline", description: "Disclosure timeline prompts", instructions: "Enforce due vs actual disclosure timeline with exchange references." },
+    { id: "sebi-prompt-enforcement", label: "SEBI Enforcement Defense", description: "AO/investigation prompts", instructions: "Prioritize evidentiary thresholds, intent, and investor-impact mitigation framing." },
+  ],
+  "customs-response": [
+    { id: "customs-prompt-cth", label: "Customs Classification", description: "CTH/HSN prompts", instructions: "Generate classification defense with tariff notes and technical evidence references." },
+    { id: "customs-prompt-valuation", label: "Customs Valuation", description: "Valuation-rule prompts", instructions: "Generate valuation-rule challenge with transaction value anchors." },
+    { id: "customs-prompt-duty-split", label: "Customs Duty Split", description: "Duty/interest/fine prompts", instructions: "Generate accepted/disputed duty-interest-penalty-redemption-fine matrix." },
+  ],
+  "contract-review": [
+    { id: "contract-prompt-risk", label: "Contract Risk Matrix", description: "Clause-risk prompts", instructions: "Generate clause-wise risk matrix with business/legal impact tags." },
+    { id: "contract-prompt-redline", label: "Contract Redline", description: "Replacement-language prompts", instructions: "Generate precise replacement clauses for high-risk terms." },
+    { id: "contract-prompt-negotiation", label: "Contract Negotiation", description: "Fallback prompts", instructions: "Generate primary and fallback negotiation positions per critical clause." },
+  ],
+  "custom-draft": [
+    { id: "custom-prompt-matrix", label: "Custom Issue Matrix", description: "General issue-grid prompts", instructions: "Generate issue-wise matrix with provision, evidence, and relief columns." },
+    { id: "custom-prompt-provision", label: "Custom Provision Anchor", description: "Law-anchored prompts", instructions: "Force section/rule/regulation anchoring for each major allegation." },
+    { id: "custom-prompt-remediation", label: "Custom Remediation", description: "Corrective-action prompts", instructions: "Add corrective-control and non-recurrence actions where applicable." },
+  ],
+};
 
 const getAuthorityTemplatePackIds = (documentType: string) =>
   new Set<string>((DOCUMENT_TEMPLATE_PACKS[documentType] || []).map((pack) => pack.id));
+const getAuthorityPromptPackIds = (documentType: string) =>
+  new Set<string>((DOCUMENT_PROMPT_PACKS[documentType] || []).map((pack) => pack.id));
 
 const buildClassSpecificTemplatePacks = (documentType: string, classId: string): TemplatePackDefinition[] => {
   if (!documentType || !classId || classId === "auto") return [];
@@ -717,8 +799,50 @@ const buildClassSpecificTemplatePacks = (documentType: string, classId: string):
 
   return [...legacy, ...generated];
 };
+const buildClassSpecificPromptPacks = (documentType: string, classId: string): PromptPackDefinition[] => {
+  if (!documentType || !classId || classId === "auto") return [];
+  const slug = `${documentType}-${classId}`.replace(/[^a-z0-9-]/gi, "-").toLowerCase();
+  const focusTracks = [
+    { id: "facts", label: "Facts", instruction: "Prioritize factual chronology and notice-anchored narrative." },
+    { id: "law", label: "Law", instruction: "Prioritize provision/rule/regulation anchoring before conclusions." },
+    { id: "evidence", label: "Evidence", instruction: "Prioritize annexure/document proof mapping per allegation." },
+    { id: "quantum", label: "Quantum", instruction: "Prioritize accepted-vs-disputed amount/computation reconciliation." },
+  ];
+  const reasoningTracks = [
+    { id: "strict", label: "Strict", instruction: "Use strict legal threshold checks and block unsupported assumptions." },
+    { id: "balanced", label: "Balanced", instruction: "Use balanced legal analysis with practical filing posture." },
+    { id: "exploratory", label: "Exploratory", instruction: "Surface alternate defensible lines where facts allow." },
+  ];
+  const outputTracks = [
+    { id: "advisory", label: "Advisory", instruction: "Output concise advisor notes and risk flags for CA review." },
+    { id: "drafting", label: "Drafting", instruction: "Output filing-ready draft language with complete structure." },
+    { id: "comprehensive", label: "Comprehensive", instruction: "Output full narrative + matrix + hearing-ready blocks." },
+  ];
+  const riskTracks = [
+    { id: "safe", label: "Safe", instruction: "Keep prayer and claims conservative and strictly fact-grounded." },
+    { id: "standard", label: "Standard", instruction: "Use standard industry posture and calibrated challenge language." },
+    { id: "assertive", label: "Assertive", instruction: "Use assertive but defensible challenge posture on weak allegations." },
+  ];
+  const generated: PromptPackDefinition[] = [];
+  for (const focus of focusTracks) {
+    for (const reasoning of reasoningTracks) {
+      for (const output of outputTracks) {
+        for (const risk of riskTracks) {
+          generated.push({
+            id: `${slug}-${focus.id}-${reasoning.id}-${output.id}-${risk.id}`,
+            label: `${focus.label} / ${reasoning.label} / ${output.label} / ${risk.label}`,
+            description: `${classId.replace(/-/g, " ")} prompt policy`,
+            instructions: `${focus.instruction} ${reasoning.instruction} ${output.instruction} ${risk.instruction}`,
+          });
+        }
+      }
+    }
+  }
+  return generated;
+};
 
 const TEMPLATE_CATALOG_CACHE: Record<string, TemplatePackDefinition[]> = {};
+const PROMPT_CATALOG_CACHE: Record<string, PromptPackDefinition[]> = {};
 
 const buildAllClassTemplatePacksForDocument = (documentType: string): TemplatePackDefinition[] => {
   if (!documentType) return [];
@@ -727,6 +851,14 @@ const buildAllClassTemplatePacksForDocument = (documentType: string): TemplatePa
   const classOptions = getReplyTypeOptionsByDocumentType(documentType).filter((option) => option.id !== "auto");
   const packs = classOptions.flatMap((option) => buildClassSpecificTemplatePacks(documentType, option.id));
   TEMPLATE_CATALOG_CACHE[documentType] = packs;
+  return packs;
+};
+const buildAllClassPromptPacksForDocument = (documentType: string): PromptPackDefinition[] => {
+  if (!documentType) return [];
+  if (PROMPT_CATALOG_CACHE[documentType]) return PROMPT_CATALOG_CACHE[documentType];
+  const classOptions = getReplyTypeOptionsByDocumentType(documentType).filter((option) => option.id !== "auto");
+  const packs = classOptions.flatMap((option) => buildClassSpecificPromptPacks(documentType, option.id));
+  PROMPT_CATALOG_CACHE[documentType] = packs;
   return packs;
 };
 
@@ -798,17 +930,24 @@ const getTemplatePackOptionsBySelection = (
     return true;
   });
 };
-
-const PROMPT_FOCUS_TRACKS = 12;
-const PROMPT_REASONING_TRACKS = 10;
-const PROMPT_OUTPUT_TRACKS = 8;
-const PROMPT_RISK_TRACKS = 7;
-
-const PROMPT_VARIANTS_PER_CLASS =
-  PROMPT_FOCUS_TRACKS *
-  PROMPT_REASONING_TRACKS *
-  PROMPT_OUTPUT_TRACKS *
-  PROMPT_RISK_TRACKS;
+const getPromptPackOptionsBySelection = (
+  documentType: string,
+  classId: string,
+): PromptPackDefinition[] => {
+  const pools = [
+    AUTO_PROMPT_PACK,
+    ...UNIVERSAL_PROMPT_PACKS,
+    ...(DOCUMENT_PROMPT_PACKS[documentType] || []),
+    ...buildClassSpecificPromptPacks(documentType, classId),
+    ...buildAllClassPromptPacksForDocument(documentType),
+  ];
+  const seen = new Set<string>();
+  return pools.filter((item) => {
+    if (seen.has(item.id)) return false;
+    seen.add(item.id);
+    return true;
+  });
+};
 
 const getAllDocumentTypeIdsForCatalog = () =>
   documentTypes
@@ -831,15 +970,26 @@ const getGlobalTemplateCatalogSize = () => {
 };
 
 const getGlobalPromptCatalogSize = () => {
-  const classCount = getAllDocumentTypeIdsForCatalog()
-    .reduce((sum, documentType) => sum + getReplyTypeOptionsByDocumentType(documentType).filter((option) => option.id !== "auto").length, 0);
-  return classCount * PROMPT_VARIANTS_PER_CLASS;
+  const ids = new Set<string>();
+  for (const documentType of getAllDocumentTypeIdsForCatalog()) {
+    const pools = [
+      ...UNIVERSAL_PROMPT_PACKS,
+      ...(DOCUMENT_PROMPT_PACKS[documentType] || []),
+      ...buildAllClassPromptPacksForDocument(documentType),
+    ];
+    pools.forEach((pack) => ids.add(pack.id));
+  }
+  return ids.size;
 };
 
 const REGULON_TEMPLATE_CATALOG_SIZE = getGlobalTemplateCatalogSize();
 const REGULON_PROMPT_CATALOG_SIZE = getGlobalPromptCatalogSize();
 
 const isClassVariantTemplate = (packId: string, documentType: string, classId: string) => {
+  const prefix = `${documentType}-${classId}`.replace(/[^a-z0-9-]/gi, "-").toLowerCase();
+  return packId.startsWith(prefix);
+};
+const isClassVariantPrompt = (packId: string, documentType: string, classId: string) => {
   const prefix = `${documentType}-${classId}`.replace(/[^a-z0-9-]/gi, "-").toLowerCase();
   return packId.startsWith(prefix);
 };
@@ -1422,6 +1572,8 @@ const advancedChecksByType: Record<string, AdvancedCheck[]> = {
 };
 
 const AIDraftingEngine = ({ demoMode = false, includeLawyerReview = true }: AIDraftingEngineProps) => {
+  const navigate = useNavigate();
+  const location = useLocation();
   const initialReviewSteps = useMemo(
     () => buildInitialReviewSteps(includeLawyerReview),
     [includeLawyerReview],
@@ -1436,6 +1588,9 @@ const AIDraftingEngine = ({ demoMode = false, includeLawyerReview = true }: AIDr
   const [templatePackOverride, setTemplatePackOverride] = useState<TemplatePackId>("auto");
   const [templateCatalogView, setTemplateCatalogView] = useState<TemplateCatalogView>("recommended");
   const [templateSearch, setTemplateSearch] = useState("");
+  const [promptPackOverride, setPromptPackOverride] = useState<PromptPackId>("auto");
+  const [promptCatalogView, setPromptCatalogView] = useState<PromptCatalogView>("recommended");
+  const [promptSearch, setPromptSearch] = useState("");
   const [mcaReplyTypeOverride, setMcaReplyTypeOverride] = useState<string>("auto");
   const [gstReplyTypeOverride, setGstReplyTypeOverride] = useState<string>("auto");
   const [incomeTaxReplyTypeOverride, setIncomeTaxReplyTypeOverride] = useState<string>("auto");
@@ -1653,6 +1808,11 @@ const AIDraftingEngine = ({ demoMode = false, includeLawyerReview = true }: AIDr
     const options = getReplyTypeOptionsByDocumentType(selectedDocType);
     return options.find((opt) => opt.id === effectiveNoticeClass)?.label || "General Class";
   }, [selectedDocType, effectiveNoticeClass]);
+  const inAppArea = useMemo(() => location.pathname.startsWith("/app/"), [location.pathname]);
+  const draftReviewDashboardKey = useMemo(
+    () => `${inAppArea ? "app" : "demo"}-draft-${selectedDocType || "unknown"}`,
+    [inAppArea, selectedDocType],
+  );
   const selectedTemplate = useMemo(() => {
     if (!selectedDocType) return "";
     const baseTemplate = readyNoticeTemplates[selectedDocType] || "";
@@ -1671,6 +1831,72 @@ const AIDraftingEngine = ({ demoMode = false, includeLawyerReview = true }: AIDr
     () => templatePackOptions.find((pack) => pack.id === templatePackOverride),
     [templatePackOptions, templatePackOverride],
   );
+  const promptPackOptions = useMemo(
+    () => getPromptPackOptionsBySelection(selectedDocType, effectiveNoticeClass),
+    [selectedDocType, effectiveNoticeClass],
+  );
+  const recommendedPromptIds = useMemo(() => new Set<string>([
+    "auto",
+    "prompt-facts-first",
+    "prompt-risk-balanced",
+    "prompt-qa-strict",
+    "prompt-hearing-mode",
+    `${`${selectedDocType}-${effectiveNoticeClass}`.replace(/[^a-z0-9-]/gi, "-").toLowerCase()}-facts-balanced-drafting-standard`,
+    `${`${selectedDocType}-${effectiveNoticeClass}`.replace(/[^a-z0-9-]/gi, "-").toLowerCase()}-law-strict-drafting-safe`,
+    `${`${selectedDocType}-${effectiveNoticeClass}`.replace(/[^a-z0-9-]/gi, "-").toLowerCase()}-evidence-balanced-comprehensive-standard`,
+    `${`${selectedDocType}-${effectiveNoticeClass}`.replace(/[^a-z0-9-]/gi, "-").toLowerCase()}-quantum-balanced-drafting-standard`,
+  ]), [selectedDocType, effectiveNoticeClass]);
+  const recommendedPromptPackOptions = useMemo(
+    () => promptPackOptions.filter((pack) => recommendedPromptIds.has(pack.id)).slice(0, 8),
+    [promptPackOptions, recommendedPromptIds],
+  );
+  const filteredPromptPackOptions = useMemo(() => {
+    const authorityIds = getAuthorityPromptPackIds(selectedDocType);
+    const query = promptSearch.trim().toLowerCase();
+    const scoped = promptPackOptions.filter((pack) => {
+      const inView = (() => {
+        if (promptCatalogView === "all") return true;
+        if (promptCatalogView === "recommended") return recommendedPromptIds.has(pack.id);
+        if (promptCatalogView === "class-variants") return isClassVariantPrompt(pack.id, selectedDocType, effectiveNoticeClass);
+        if (promptCatalogView === "authority-packs") return authorityIds.has(pack.id);
+        if (promptCatalogView === "universal-packs") return UNIVERSAL_PROMPT_PACK_IDS.has(pack.id);
+        return true;
+      })();
+      if (!inView) return false;
+      if (!query) return true;
+      const corpus = `${pack.label} ${pack.description} ${pack.instructions} ${pack.id}`.toLowerCase();
+      return corpus.includes(query);
+    });
+    if (promptPackOverride !== "auto" && !scoped.some((pack) => pack.id === promptPackOverride)) {
+      const selected = promptPackOptions.find((pack) => pack.id === promptPackOverride);
+      if (selected) return [selected, ...scoped];
+    }
+    return scoped;
+  }, [promptPackOptions, selectedDocType, effectiveNoticeClass, promptSearch, promptCatalogView, promptPackOverride, recommendedPromptIds]);
+  const effectivePromptPack = useMemo(() => {
+    const defaultPack = promptPackOptions.find((pack) => pack.id === "prompt-risk-balanced")
+      || promptPackOptions.find((pack) => pack.id !== "auto");
+    if (!defaultPack) return AUTO_PROMPT_PACK;
+    if (promptPackOverride === "auto") return defaultPack;
+    return promptPackOptions.find((pack) => pack.id === promptPackOverride) || defaultPack;
+  }, [promptPackOverride, promptPackOptions]);
+  const selectedPromptPackDefinition = useMemo(
+    () => promptPackOptions.find((pack) => pack.id === promptPackOverride),
+    [promptPackOptions, promptPackOverride],
+  );
+  const promptPolicyDirective = useMemo(
+    () => `Prompt policy [${effectivePromptPack.label}]: ${effectivePromptPack.instructions}`,
+    [effectivePromptPack],
+  );
+  const buildContextWithTemplateAndPrompt = (base: string) =>
+    `${base}\n\nTemplate policy [${effectiveTemplatePack.label}]: ${effectiveTemplatePack.instructions}\n${promptPolicyDirective}`;
+  useEffect(() => {
+    if (!promptPackOverride || promptPackOverride === "auto") return;
+    const valid = promptPackOptions.some((item) => item.id === promptPackOverride);
+    if (!valid) {
+      setPromptPackOverride("auto");
+    }
+  }, [promptPackOverride, promptPackOptions]);
   const supabaseAny = supabase as any;
   const getMcaAutoFixNotes = (
     issues: Array<{ issue: string; suggestion: string }>,
@@ -3307,6 +3533,43 @@ const AIDraftingEngine = ({ demoMode = false, includeLawyerReview = true }: AIDr
     }
   };
 
+  const openDraftApprovalReviewPage = () => {
+    if (!draftGenerated || !draftContent.trim() || !selectedDocType) {
+      toast.error("Generate draft first, then open approval review.");
+      return;
+    }
+    const reviewPath = inAppArea ? "/app/agent-work-review" : "/agent-work-review";
+    const reviewStorageKey = `regulon:agent-work-review:${draftReviewDashboardKey}`;
+    const approvalStorageKey = `regulon:voice-agent:approval-status:${draftReviewDashboardKey}`;
+    const nowIso = new Date().toISOString();
+    const reviewItemId = `draft-${currentDraftRunId ?? Date.now()}`;
+    const reviewPayload = {
+      dashboardId: draftReviewDashboardKey,
+      actorName: "Draft Owner",
+      roleLabel: selectedDocLabel,
+      generatedAt: nowIso,
+      source: "draft-engine",
+      returnPath: location.pathname,
+      draftRunId: currentDraftRunId,
+      items: [
+        {
+          id: reviewItemId,
+          timeLabel: new Date(nowIso).toLocaleTimeString([], { hour: "2-digit", minute: "2-digit" }),
+          portal: selectedDocLabel,
+          action: `AI generated ${selectedDocLabel} (${selectedClassLabel}) draft. Owner review, edit, and approval required before final sign-off.`,
+          status: "needs_approval",
+          approvalTitle: "Review, edit manually if needed, then approve this draft.",
+          generatedWork: draftContent,
+        },
+      ],
+    };
+    if (typeof window !== "undefined") {
+      window.localStorage.setItem(reviewStorageKey, JSON.stringify(reviewPayload));
+      window.localStorage.setItem(approvalStorageKey, JSON.stringify({ [reviewItemId]: "pending" }));
+    }
+    navigate(`${reviewPath}?dashboardId=${encodeURIComponent(draftReviewDashboardKey)}`);
+  };
+
   useEffect(() => {
     if (demoMode) {
       setClientOptions(demoClients);
@@ -3494,6 +3757,9 @@ const AIDraftingEngine = ({ demoMode = false, includeLawyerReview = true }: AIDr
     setTemplatePackOverride("auto");
     setTemplateCatalogView("recommended");
     setTemplateSearch("");
+    setPromptPackOverride("auto");
+    setPromptCatalogView("recommended");
+    setPromptSearch("");
   }, [selectedDocType]);
 
   useEffect(() => {
@@ -3676,7 +3942,15 @@ const AIDraftingEngine = ({ demoMode = false, includeLawyerReview = true }: AIDr
         : docType === "custom-draft" && customReplyTypeOverride !== "auto"
           ? customReplyTypeOverride
           : undefined,
-      context: `Generate precise Notice/Order Details for ${docLabel}. Ensure this is input-quality text for strict legal drafting checks.`,
+      templatePackId: effectiveTemplatePack.id,
+      templatePackLabel: effectiveTemplatePack.label,
+      templatePackDirective: effectiveTemplatePack.instructions,
+      promptPackId: effectivePromptPack.id,
+      promptPackLabel: effectivePromptPack.label,
+      promptPackDirective: effectivePromptPack.instructions,
+      context: buildContextWithTemplateAndPrompt(
+        `Generate precise Notice/Order Details for ${docLabel}. Ensure this is input-quality text for strict legal drafting checks.`,
+      ),
       noticeDetails: sourceNotice || undefined,
       stream: false,
     });
@@ -3814,7 +4088,15 @@ const AIDraftingEngine = ({ demoMode = false, includeLawyerReview = true }: AIDr
 
   const requestDraftData = async (requestBody: Record<string, unknown>) => {
     const authToken = await getEffectiveAuthToken();
-    const body = JSON.stringify(requestBody);
+    const body = JSON.stringify({
+      templatePackId: effectiveTemplatePack.id,
+      templatePackLabel: effectiveTemplatePack.label,
+      templatePackDirective: effectiveTemplatePack.instructions,
+      promptPackId: effectivePromptPack.id,
+      promptPackLabel: effectivePromptPack.label,
+      promptPackDirective: effectivePromptPack.instructions,
+      ...requestBody,
+    });
 
     const tryRequest = async (withAuthHeaders: boolean) =>
       fetch(DRAFT_URL, {
@@ -3884,7 +4166,7 @@ const AIDraftingEngine = ({ demoMode = false, includeLawyerReview = true }: AIDr
       .map((item, idx) => `${idx + 1}. Pending: ${item.title}\n   Solution: ${item.solution}`)
       .join("\n");
 
-    const fixContext = `You are improving an MCA adjudication draft.
+    const fixContext = buildContextWithTemplateAndPrompt(`You are improving an MCA adjudication draft.
 Task: Regenerate a corrected final draft by merging the existing draft with required fixes.
 Non-negotiable fixes:
 1) Section 454 proviso submission (fact-dependent, date-aware)
@@ -3908,7 +4190,7 @@ ${pendingPlaybookText || "No pending actions."}
 CA/LAWYER ADDITIONAL FIX NOTES:
 ${combinedFixNotes || "Use the detected issues and suggestions above as mandatory corrections."}
 
-Return only the revised final draft text.`;
+Return only the revised final draft text.`);
 
     setIsApplyingMcaFix(true);
     setGenerationError(null);
@@ -4038,7 +4320,7 @@ Return only the revised final draft text.`;
       .map((item, idx) => `${idx + 1}. Pending: ${item.title}\n   Solution: ${item.solution}`)
       .join("\n");
 
-    const fixContext = `You are improving a GST show-cause reply draft.
+    const fixContext = buildContextWithTemplateAndPrompt(`You are improving a GST show-cause reply draft.
 Task: Regenerate a corrected final draft by merging current draft with required fixes.
 Mandatory fixes:
 1) Add para-wise/allegation-wise rebuttal matrix if missing
@@ -4065,7 +4347,7 @@ ${pendingPlaybookText || "No pending actions."}
 CA NOTES:
 ${combinedFixNotes || "None"}
 
-Return only revised final draft text.`;
+Return only revised final draft text.`);
 
     setIsApplyingGstFix(true);
     try {
@@ -4130,7 +4412,7 @@ Return only revised final draft text.`;
       .map((item, idx) => `${idx + 1}. Pending: ${item.title}\n   Solution: ${item.solution}`)
       .join("\n");
 
-    const fixContext = `You are improving an Income-tax response draft.
+    const fixContext = buildContextWithTemplateAndPrompt(`You are improving an Income-tax response draft.
 Task: Regenerate a corrected final draft by merging current draft with required fixes.
 Mandatory fixes:
 1) Add issue-wise/addition-wise rebuttal matrix
@@ -4157,7 +4439,7 @@ ${pendingPlaybookText || "No pending actions."}
 CA NOTES:
 ${combinedFixNotes || "None"}
 
-Return only revised final draft text.`;
+Return only revised final draft text.`);
 
     setIsApplyingIncomeTaxFix(true);
     try {
@@ -4222,7 +4504,7 @@ Return only revised final draft text.`;
       .map((item, idx) => `${idx + 1}. Pending: ${item.title}\n   Solution: ${item.solution}`)
       .join("\n");
 
-    const fixContext = `You are improving an RBI/FEMA response draft.
+    const fixContext = buildContextWithTemplateAndPrompt(`You are improving an RBI/FEMA response draft.
 Task: Regenerate a corrected final draft by merging current draft with required fixes.
 Mandatory fixes:
 1) Add regulation-wise legal response against notice allegations
@@ -4249,7 +4531,7 @@ ${pendingPlaybookText || "No pending actions."}
 CA NOTES:
 ${combinedFixNotes || "None"}
 
-Return only revised final draft text.`;
+Return only revised final draft text.`);
 
     setIsApplyingRbiFix(true);
     try {
@@ -4314,7 +4596,7 @@ Return only revised final draft text.`;
       .map((item, idx) => `${idx + 1}. Pending: ${item.title}\n   Solution: ${item.solution}`)
       .join("\n");
 
-    const fixContext = `You are improving a SEBI compliance response draft.
+    const fixContext = buildContextWithTemplateAndPrompt(`You are improving a SEBI compliance response draft.
 Task: Regenerate a corrected final draft by merging current draft with required fixes.
 Mandatory fixes:
 1) Add allegation-wise rebuttal matrix with regulation mapping
@@ -4341,7 +4623,7 @@ ${pendingPlaybookText || "No pending actions."}
 CA NOTES:
 ${combinedFixNotes || "None"}
 
-Return only revised final draft text.`;
+Return only revised final draft text.`);
 
     setIsApplyingSebiFix(true);
     try {
@@ -4406,7 +4688,7 @@ Return only revised final draft text.`;
       .map((item, idx) => `${idx + 1}. Pending: ${item.title}\n   Solution: ${item.solution}`)
       .join("\n");
 
-    const fixContext = `You are improving a Contract Review advisory draft.
+    const fixContext = buildContextWithTemplateAndPrompt(`You are improving a Contract Review advisory draft.
 Task: Regenerate a corrected final draft by merging current draft with required fixes.
 Mandatory fixes:
 1) Add clause-wise risk matrix
@@ -4433,7 +4715,7 @@ ${pendingPlaybookText || "No pending actions."}
 CA NOTES:
 ${combinedFixNotes || "None"}
 
-Return only revised final draft text.`;
+Return only revised final draft text.`);
 
     setIsApplyingContractFix(true);
     try {
@@ -4498,7 +4780,7 @@ Return only revised final draft text.`;
       .map((item, idx) => `${idx + 1}. Pending: ${item.title}\n   Solution: ${item.solution}`)
       .join("\n");
 
-    const fixContext = `You are improving a Customs response draft.
+    const fixContext = buildContextWithTemplateAndPrompt(`You are improving a Customs response draft.
 Task: Regenerate a corrected final draft by merging current draft with required fixes.
 Mandatory fixes:
 1) Add allegation-wise rebuttal matrix with section-wise legal anchors
@@ -4525,7 +4807,7 @@ ${pendingPlaybookText || "No pending actions."}
 CA NOTES:
 ${combinedFixNotes || "None"}
 
-Return only revised final draft text.`;
+Return only revised final draft text.`);
 
     setIsApplyingCustomsFix(true);
     try {
@@ -4590,7 +4872,7 @@ Return only revised final draft text.`;
       .map((item, idx) => `${idx + 1}. Pending: ${item.title}\n   Solution: ${item.solution}`)
       .join("\n");
 
-    const fixContext = `You are improving a Custom Regulatory response draft.
+    const fixContext = buildContextWithTemplateAndPrompt(`You are improving a Custom Regulatory response draft.
 Task: Regenerate a corrected final draft by merging current draft with required fixes.
 Mandatory fixes:
 1) Add issue/allegation-wise rebuttal matrix with provision-wise legal anchors
@@ -4617,7 +4899,7 @@ ${pendingPlaybookText || "No pending actions."}
 CA NOTES:
 ${combinedFixNotes || "None"}
 
-Return only revised final draft text.`;
+Return only revised final draft text.`);
 
     setIsApplyingCustomFix(true);
     try {
@@ -4847,8 +5129,17 @@ Return only revised final draft text.`;
         customReplyTypeOverride: selectedDocType === "custom-draft" && customReplyTypeOverride !== "auto"
           ? customReplyTypeOverride
           : undefined,
+        templatePackId: effectiveTemplatePack.id,
+        templatePackLabel: effectiveTemplatePack.label,
+        templatePackDirective: effectiveTemplatePack.instructions,
+        promptPackId: effectivePromptPack.id,
+        promptPackLabel: effectivePromptPack.label,
+        promptPackDirective: effectivePromptPack.instructions,
         advancedMode,
         strictValidation: advancedMode,
+        context: buildContextWithTemplateAndPrompt(
+          `Generate a filing-ready ${selectedDocLabel} in ${selectedMode} mode for class ${selectedClassLabel}.`,
+        ),
         noticeDetails: maskedNoticeDetails || undefined,
         stream: !advancedMode,
       });
@@ -5436,6 +5727,81 @@ Return only revised final draft text.`;
                     <span className="text-foreground font-medium">{REGULON_TEMPLATE_CATALOG_SIZE.toLocaleString()}+</span> template blueprints,{" "}
                     <span className="text-foreground font-medium">{REGULON_PROMPT_CATALOG_SIZE.toLocaleString()}+</span> reasoning prompts
                     across advisory, drafting, and comprehensive response formats.
+                  </p>
+                </div>
+              )}
+
+              {selectedDocType && (
+                <div className="p-3 rounded-lg border border-border/50 bg-background/30">
+                  <label className="block text-sm font-medium text-foreground mb-2">
+                    <Sparkles className="w-4 h-4 inline-block mr-2" />
+                    Prompt Intelligence Engine
+                  </label>
+                  {recommendedPromptPackOptions.length > 0 ? (
+                    <div className="mb-2">
+                      <p className="text-[11px] text-muted-foreground mb-1">Quick picks</p>
+                      <div className="flex flex-wrap gap-1.5">
+                        {recommendedPromptPackOptions.map((pack) => (
+                          <button
+                            key={pack.id}
+                            type="button"
+                            onClick={() => setPromptPackOverride(pack.id)}
+                            className={`text-[11px] px-2 py-1 rounded border ${
+                              promptPackOverride === pack.id
+                                ? "bg-primary/20 text-primary border-primary/40"
+                                : "bg-background/50 text-muted-foreground border-border/50 hover:text-foreground"
+                            }`}
+                          >
+                            {pack.label}
+                          </button>
+                        ))}
+                      </div>
+                    </div>
+                  ) : null}
+                  <div className="grid grid-cols-1 md:grid-cols-2 gap-2 mb-2">
+                    <Select value={promptCatalogView} onValueChange={(v) => setPromptCatalogView(v as PromptCatalogView)}>
+                      <SelectTrigger className="bg-background/50">
+                        <SelectValue placeholder="Prompt view..." />
+                      </SelectTrigger>
+                      <SelectContent>
+                        {PROMPT_CATALOG_VIEW_OPTIONS.map((option) => (
+                          <SelectItem key={option.id} value={option.id}>
+                            {option.label}
+                          </SelectItem>
+                        ))}
+                      </SelectContent>
+                    </Select>
+                    <Input
+                      value={promptSearch}
+                      onChange={(e) => setPromptSearch(e.target.value)}
+                      placeholder="Search prompt policy..."
+                      className="bg-background/50"
+                    />
+                  </div>
+                  <Select value={promptPackOverride} onValueChange={setPromptPackOverride}>
+                    <SelectTrigger className="bg-background/50">
+                      <SelectValue placeholder="Choose prompt pack..." />
+                    </SelectTrigger>
+                    <SelectContent>
+                      {filteredPromptPackOptions.map((option) => (
+                        <SelectItem key={option.id} value={option.id}>
+                          {option.label}
+                        </SelectItem>
+                      ))}
+                    </SelectContent>
+                  </Select>
+                  {selectedPromptPackDefinition ? (
+                    <div className="mt-2 p-2 rounded border border-border/50 bg-background/40">
+                      <p className="text-xs text-foreground font-medium">{selectedPromptPackDefinition.label}</p>
+                      <p className="text-[11px] text-muted-foreground">{selectedPromptPackDefinition.description}</p>
+                      <p className="text-[11px] text-muted-foreground mt-1">{selectedPromptPackDefinition.instructions}</p>
+                    </div>
+                  ) : null}
+                  <p className="text-xs text-muted-foreground mt-1">
+                    Active prompt policy:{" "}
+                    <span className="text-foreground font-medium">{effectivePromptPack.label}</span>. Available packs:{" "}
+                    <span className="text-foreground font-medium">{filteredPromptPackOptions.length}</span> shown of{" "}
+                    <span className="text-foreground font-medium">{Math.max(promptPackOptions.length - 1, 0)}</span> for this class.
                   </p>
                 </div>
               )}
@@ -6938,16 +7304,9 @@ Return only revised final draft text.`;
                     size="sm"
                     variant="outline"
                     disabled={!currentDraftRunId || workflowStatus !== "under_review"}
-                    onClick={async () => {
-                      if (!currentDraftRunId) return;
-                      if (!demoMode) {
-                        await supabaseAny.from("draft_runs").update({ status: "approved" }).eq("id", currentDraftRunId);
-                      }
-                      setWorkflowStatus("approved");
-                      await recordAudit(currentDraftRunId, "approved_by_senior");
-                    }}
+                    onClick={openDraftApprovalReviewPage}
                   >
-                    Mark Approved
+                    Approve (Open Review Page)
                   </Button>
                   <Button
                     size="sm"
@@ -7004,7 +7363,7 @@ Return only revised final draft text.`;
                         )}
                       </div>
                       {step.status === "current" && (
-                        <Button size="sm" className="shrink-0">
+                        <Button size="sm" className="shrink-0" onClick={openDraftApprovalReviewPage}>
                           <Eye className="w-4 h-4 mr-2" />
                           Review Now
                         </Button>
