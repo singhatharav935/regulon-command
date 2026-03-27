@@ -433,6 +433,80 @@ const parseMonthStart = (value: string | null) => {
   return `${trimmed}-01`;
 };
 
+const getActorQuotaSnapshot = async (client: ReturnType<typeof createClient>, userId: string) => {
+  const monthStart = getMonthStartDate();
+  const defaultMonthlyLimit = Math.max(100, Number(Deno.env.get("AI_DEFAULT_ACTOR_MONTHLY_LIMIT") ?? "4000"));
+  const entitlements = await loadActorEntitlements(client, userId);
+  const [{ data: quotaRow, error: quotaError }, { data: usageRow, error: usageError }] = await Promise.all([
+    client
+      .from("ai_actor_usage_quotas")
+      .select("monthly_request_limit, hard_block")
+      .eq("user_id", userId)
+      .maybeSingle(),
+    client
+      .from("ai_actor_monthly_usage")
+      .select("request_count")
+      .eq("user_id", userId)
+      .eq("month_start", monthStart)
+      .maybeSingle(),
+  ]);
+  if (quotaError) throw quotaError;
+  if (usageError) throw usageError;
+
+  const configuredLimit = Number(quotaRow?.monthly_request_limit ?? defaultMonthlyLimit);
+  const effectiveLimit = entitlements.planMonthlyRequestLimit
+    ? Math.min(configuredLimit, entitlements.planMonthlyRequestLimit)
+    : configuredLimit;
+  const used = Number(usageRow?.request_count ?? 0);
+
+  return {
+    monthStart,
+    hardBlock: quotaRow?.hard_block === true,
+    configuredLimit,
+    planLimit: entitlements.planMonthlyRequestLimit,
+    effectiveLimit,
+    used,
+    remaining: Math.max(0, effectiveLimit - used),
+  };
+};
+
+const getFirmQuotaSnapshotForActor = async (client: ReturnType<typeof createClient>, userId: string) => {
+  const caFirmId = await loadActorFirmId(client, userId);
+  if (!caFirmId) return null;
+
+  const monthStart = getMonthStartDate();
+  const defaultMonthlyLimit = Math.max(500, Number(Deno.env.get("AI_DEFAULT_FIRM_MONTHLY_LIMIT") ?? "15000"));
+  const [{ data: firm }, { data: quotaRow, error: quotaError }, { data: usageRow, error: usageError }] = await Promise.all([
+    client.from("ca_firms").select("id, name").eq("id", caFirmId).maybeSingle(),
+    client
+      .from("ai_firm_usage_quotas")
+      .select("monthly_request_limit, hard_block")
+      .eq("ca_firm_id", caFirmId)
+      .maybeSingle(),
+    client
+      .from("ai_firm_monthly_usage")
+      .select("request_count")
+      .eq("ca_firm_id", caFirmId)
+      .eq("month_start", monthStart)
+      .maybeSingle(),
+  ]);
+  if (quotaError) throw quotaError;
+  if (usageError) throw usageError;
+
+  const limit = Number(quotaRow?.monthly_request_limit ?? defaultMonthlyLimit);
+  const used = Number(usageRow?.request_count ?? 0);
+
+  return {
+    caFirmId,
+    firmName: firm?.name ?? null,
+    monthStart,
+    hardBlock: quotaRow?.hard_block === true,
+    limit,
+    used,
+    remaining: Math.max(0, limit - used),
+  };
+};
+
 const loadActorFirmId = async (client: ReturnType<typeof createClient>, userId: string) => {
   const { data, error } = await client
     .from("ca_firm_members")
@@ -1599,6 +1673,37 @@ serve(async (req: Request) => {
     if (req.method === "GET" && path.endsWith("drafting/preferences")) {
       requireRole(roles, ["manager", "admin"]);
       return json(req, 200, { ok: true, data: await loadPracticePreferences(client, user.id) });
+    }
+
+    if (req.method === "GET" && path.endsWith("drafting/capabilities")) {
+      requireRole(roles, ["manager", "admin"]);
+      const entitlements = await loadActorEntitlements(client, user.id);
+      const legalLaneEnabled = resolveLegalLaneEnabled(persona, entitlements);
+      const actorQuota = await getActorQuotaSnapshot(client, user.id);
+      const firmQuota = await getFirmQuotaSnapshotForActor(client, user.id);
+
+      return json(req, 200, {
+        ok: true,
+        data: {
+          persona,
+          roles,
+          capabilities: {
+            can_draft_generate: persona === "external_ca" || persona === "in_house_ca" || persona === "ca_firm" || roles.includes("admin"),
+            can_lawyer_manual_override: persona === "in_house_lawyer" || roles.includes("admin"),
+            can_internal_legal_lane: legalLaneEnabled,
+            can_assistant_access: entitlements.assistantAccessEnabled,
+          },
+          entitlement: {
+            regulon_legal_lane_enabled: entitlements.regulonLegalLaneEnabled,
+            assistant_access_enabled: entitlements.assistantAccessEnabled,
+            plan_monthly_request_limit: entitlements.planMonthlyRequestLimit,
+          },
+          quota: {
+            actor: actorQuota,
+            firm: firmQuota,
+          },
+        },
+      });
     }
 
     if (req.method === "GET" && path.endsWith("ops/config-check")) {
