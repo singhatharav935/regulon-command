@@ -332,10 +332,12 @@ const assertAiOperationActorAllowed = ({
   roles,
   persona,
   operation,
+  payload,
 }: {
   roles: Set<string>;
   persona: AppPersona | null;
   operation: string;
+  payload: Record<string, unknown>;
 }) => {
   if (roles.has("admin")) return;
   if (!roles.has("manager")) {
@@ -346,8 +348,12 @@ const assertAiOperationActorAllowed = ({
   if (!persona) return;
 
   const caPersonas: AppPersona[] = ["external_ca", "in_house_ca", "ca_firm"];
+  const lawyerManualOverride = payload.lawyerOverride === true || payload.legalOverride === true;
 
   if (operation === "draft" || operation === "generate" || operation === "apply-fix" || operation === "fix") {
+    if (persona === "in_house_lawyer" && lawyerManualOverride) {
+      return;
+    }
     if (!caPersonas.includes(persona)) {
       throw new Error("Policy denied: draft_generation_requires_ca_persona");
     }
@@ -1341,7 +1347,7 @@ const validateAiDraftScope = async (
   payload: Record<string, unknown>,
 ) => {
   const operation = normalizeAiOperation(payload);
-  assertAiOperationActorAllowed({ roles, persona, operation });
+  assertAiOperationActorAllowed({ roles, persona, operation, payload });
   assertAiOperationPayloadShape(operation, payload);
 
   let companyId = typeof payload.companyId === "string" ? payload.companyId : null;
@@ -1562,6 +1568,15 @@ serve(async (req: Request) => {
   try {
     const url = new URL(req.url);
     const path = url.pathname.replace(/^\/+/, "");
+
+    if (req.method === "GET" && path.endsWith("health")) {
+      return json(req, 200, {
+        ok: true,
+        service: "workspace-backend",
+        time: new Date().toISOString(),
+      });
+    }
+
     const { client, user, token } = await getUserClient(req);
     const roles = await getUserRoles(client, user.id);
     const persona = await getUserPersona(client, user.id, user);
@@ -1584,6 +1599,35 @@ serve(async (req: Request) => {
     if (req.method === "GET" && path.endsWith("drafting/preferences")) {
       requireRole(roles, ["manager", "admin"]);
       return json(req, 200, { ok: true, data: await loadPracticePreferences(client, user.id) });
+    }
+
+    if (req.method === "GET" && path.endsWith("ops/config-check")) {
+      requireRole(roles, ["admin"]);
+      const envKeys = {
+        SUPABASE_URL: Boolean(Deno.env.get("SUPABASE_URL")),
+        SUPABASE_ANON_KEY: Boolean(Deno.env.get("SUPABASE_ANON_KEY")),
+        SUPABASE_SERVICE_ROLE_KEY: Boolean(Deno.env.get("SUPABASE_SERVICE_ROLE_KEY")),
+        ALLOWED_ORIGINS: Boolean((Deno.env.get("ALLOWED_ORIGINS") ?? "").trim()),
+        OPENAI_API_KEY: Boolean(Deno.env.get("OPENAI_API_KEY")),
+        OPENAI_MODEL: Boolean(Deno.env.get("OPENAI_MODEL")),
+      };
+
+      const [{ data: tablesProbe, error: probeError }] = await Promise.all([
+        client
+          .from("user_roles")
+          .select("user_id")
+          .limit(1),
+      ]);
+
+      return json(req, 200, {
+        ok: true,
+        auth_user_id: user.id,
+        persona,
+        roles,
+        env_present: envKeys,
+        db_probe_ok: !probeError,
+        db_probe_rows: (tablesProbe ?? []).length,
+      });
     }
 
     if (req.method === "GET" && path.endsWith("drafting/ai-ops/actor-entitlement")) {
