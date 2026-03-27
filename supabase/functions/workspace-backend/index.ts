@@ -261,6 +261,104 @@ const isLockFresh = (updatedAt: string | null | undefined, thresholdSeconds: num
   return parsed >= Date.now() - (thresholdSeconds * 1000);
 };
 
+const enforceAiRequestRateLimit = async (client: ReturnType<typeof createClient>, userId: string) => {
+  const maxRequestsPerMinute = Math.max(5, Number(Deno.env.get("AI_MAX_REQUESTS_PER_MINUTE") ?? "30"));
+  const maxConcurrentRequests = Math.max(1, Number(Deno.env.get("AI_MAX_CONCURRENT_REQUESTS") ?? "3"));
+  const lockWindowSeconds = Math.max(15, Number(Deno.env.get("AI_LOCK_WINDOW_SECONDS") ?? "120"));
+  const minuteAgoIso = new Date(Date.now() - 60 * 1000).toISOString();
+
+  const [{ data: recentRows, error: recentError }, { data: processingRows, error: processingError }] = await Promise.all([
+    client
+      .from("ai_request_idempotency")
+      .select("id")
+      .eq("user_id", userId)
+      .gte("created_at", minuteAgoIso)
+      .limit(maxRequestsPerMinute + 1),
+    client
+      .from("ai_request_idempotency")
+      .select("id, updated_at")
+      .eq("user_id", userId)
+      .eq("status", "processing")
+      .limit(maxConcurrentRequests + 5),
+  ]);
+  if (recentError) throw recentError;
+  if (processingError) throw processingError;
+
+  const recentCount = (recentRows ?? []).length;
+  const freshInFlightCount = (processingRows ?? []).filter((row) => isLockFresh(row.updated_at, lockWindowSeconds)).length;
+
+  if (freshInFlightCount >= maxConcurrentRequests) {
+    throw new Error("AI rate limit exceeded: too_many_inflight");
+  }
+  if (recentCount >= maxRequestsPerMinute) {
+    throw new Error("AI rate limit exceeded: too_many_requests");
+  }
+};
+
+const prepareAiIdempotencyLock = async (
+  client: ReturnType<typeof createClient>,
+  userId: string,
+  operation: string,
+  payload: Record<string, unknown>,
+) => {
+  const companyId = typeof payload.companyId === "string" ? payload.companyId : null;
+  const lockWindowSeconds = Math.max(15, Number(Deno.env.get("AI_LOCK_WINDOW_SECONDS") ?? "120"));
+  const requestFingerprint = stableStringify({ operation, payload });
+  const requestKey = await sha256Hex(requestFingerprint);
+
+  const { data: existingLock } = await client
+    .from("ai_request_idempotency")
+    .select("id, status, response_payload, updated_at")
+    .eq("user_id", userId)
+    .eq("request_key", requestKey)
+    .maybeSingle();
+
+  if (existingLock?.status === "completed" && existingLock.response_payload) {
+    return {
+      requestKey,
+      cachedResponse: existingLock.response_payload as Record<string, unknown>,
+    };
+  }
+
+  if (existingLock?.status === "processing" && isLockFresh(existingLock.updated_at, lockWindowSeconds)) {
+    throw new Error("AI request already in progress");
+  }
+
+  await enforceAiRequestRateLimit(client, userId);
+
+  const { error: lockError } = await client
+    .from("ai_request_idempotency")
+    .upsert({
+      user_id: userId,
+      company_id: companyId,
+      request_key: requestKey,
+      operation,
+      status: "processing",
+      response_payload: null,
+      error_message: null,
+    }, { onConflict: "user_id,request_key" });
+  if (lockError) throw lockError;
+
+  return { requestKey, cachedResponse: null };
+};
+
+const finalizeAiIdempotencyLock = async (
+  client: ReturnType<typeof createClient>,
+  userId: string,
+  requestKey: string,
+  params: { status: "completed" | "failed"; responsePayload?: unknown; errorMessage?: string | null },
+) => {
+  await client
+    .from("ai_request_idempotency")
+    .update({
+      status: params.status,
+      response_payload: params.status === "completed" ? (params.responsePayload ?? null) : null,
+      error_message: params.status === "failed" ? (params.errorMessage ?? "ai_request_failed") : null,
+    })
+    .eq("user_id", userId)
+    .eq("request_key", requestKey);
+};
+
 const assertAiOperationPayloadShape = (operation: string, payload: Record<string, unknown>) => {
   const documentType = parseDocumentType(payload);
   const requiresDocumentType = operation === "draft" ||
@@ -284,6 +382,7 @@ const resolveErrorCode = (message: string) => {
   if (message.startsWith("Forbidden")) return "ACCESS_FORBIDDEN";
   if (message.startsWith("Policy denied:")) return "WORKFLOW_ACTOR_FORBIDDEN";
   if (message === "AI request already in progress") return "AI_REQUEST_IN_PROGRESS";
+  if (message.startsWith("AI rate limit exceeded:")) return "AI_RATE_LIMITED";
   if (message.startsWith("Unsupported documentType:")) return "VALIDATION_INVALID_FIELD";
   if (message.startsWith("Invalid workflow transition:")) return "WORKFLOW_TRANSITION_INVALID";
   if (message.startsWith("Invalid event type for transition:")) return "WORKFLOW_EVENT_INVALID";
@@ -853,43 +952,16 @@ const proxyAiDraft = async (
 ) => {
   await validateAiDraftScope(client, userId, roles, persona, payload);
   const operation = normalizeAiOperation(payload);
-  const companyId = typeof payload.companyId === "string" ? payload.companyId : null;
-  const lockWindowSeconds = Math.max(15, Number(Deno.env.get("AI_LOCK_WINDOW_SECONDS") ?? "120"));
-  const requestFingerprint = stableStringify({ operation, payload });
-  const requestKey = await sha256Hex(requestFingerprint);
+  const { requestKey, cachedResponse } = await prepareAiIdempotencyLock(client, userId, operation, payload);
 
-  const { data: existingLock } = await client
-    .from("ai_request_idempotency")
-    .select("id, status, response_payload, updated_at")
-    .eq("user_id", userId)
-    .eq("request_key", requestKey)
-    .maybeSingle();
-
-  if (existingLock?.status === "completed" && existingLock.response_payload) {
+  if (cachedResponse) {
     return {
       ok: true,
       status: 200,
-      body: existingLock.response_payload as Record<string, unknown>,
+      body: cachedResponse,
       error: null,
     };
   }
-
-  if (existingLock?.status === "processing" && isLockFresh(existingLock.updated_at, lockWindowSeconds)) {
-    throw new Error("AI request already in progress");
-  }
-
-  const { error: lockError } = await client
-    .from("ai_request_idempotency")
-    .upsert({
-      user_id: userId,
-      company_id: companyId,
-      request_key: requestKey,
-      operation,
-      status: "processing",
-      response_payload: null,
-      error_message: null,
-    }, { onConflict: "user_id,request_key" });
-  if (lockError) throw lockError;
 
   const { url, anon } = getEnv();
   const response = await fetch(`${url}/functions/v1/ai-draft`, {
@@ -906,15 +978,11 @@ const proxyAiDraft = async (
   const contentType = response.headers.get("content-type") || "";
   if (contentType.includes("application/json")) {
     const body = await response.json().catch(() => ({}));
-    await client
-      .from("ai_request_idempotency")
-      .update({
-        status: response.ok ? "completed" : "failed",
-        response_payload: response.ok ? body : null,
-        error_message: response.ok ? null : (typeof body?.error === "string" ? body.error : `ai-draft failed (${response.status})`),
-      })
-      .eq("user_id", userId)
-      .eq("request_key", requestKey);
+    await finalizeAiIdempotencyLock(client, userId, requestKey, {
+      status: response.ok ? "completed" : "failed",
+      responsePayload: response.ok ? body : null,
+      errorMessage: response.ok ? null : (typeof body?.error === "string" ? body.error : `ai-draft failed (${response.status})`),
+    });
     return {
       ok: response.ok,
       status: response.status,
@@ -924,15 +992,10 @@ const proxyAiDraft = async (
   }
 
   const text = await response.text().catch(() => "");
-  await client
-    .from("ai_request_idempotency")
-    .update({
-      status: "failed",
-      response_payload: null,
-      error_message: text || `ai-draft failed (${response.status})`,
-    })
-    .eq("user_id", userId)
-    .eq("request_key", requestKey);
+  await finalizeAiIdempotencyLock(client, userId, requestKey, {
+    status: "failed",
+    errorMessage: text || `ai-draft failed (${response.status})`,
+  });
   return {
     ok: response.ok,
     status: response.status,
@@ -951,22 +1014,37 @@ const proxyAiDraftStream = async (
   payload: Record<string, unknown>,
 ) => {
   await validateAiDraftScope(client, userId, roles, persona, payload);
+  const operation = normalizeAiOperation(payload);
+  const { requestKey } = await prepareAiIdempotencyLock(client, userId, operation, payload);
   const { url, anon } = getEnv();
-  const response = await fetch(`${url}/functions/v1/ai-draft`, {
-    method: "POST",
-    headers: {
-      "Content-Type": "application/json",
-      Authorization: `Bearer ${token}`,
-      apikey: anon,
-    },
-    body: JSON.stringify(payload),
-  });
+  let response: Response;
+  try {
+    response = await fetch(`${url}/functions/v1/ai-draft`, {
+      method: "POST",
+      headers: {
+        "Content-Type": "application/json",
+        Authorization: `Bearer ${token}`,
+        apikey: anon,
+        "x-request-id": requestKey,
+      },
+      body: JSON.stringify(payload),
+    });
+  } catch (error) {
+    const errorMessage = error instanceof Error ? error.message : "ai-draft stream request failed";
+    await finalizeAiIdempotencyLock(client, userId, requestKey, { status: "failed", errorMessage });
+    throw error;
+  }
 
   const headers = new Headers(getCorsHeaders(req));
   const contentType = response.headers.get("content-type");
   const cacheControl = response.headers.get("cache-control");
   if (contentType) headers.set("Content-Type", contentType);
   if (cacheControl) headers.set("Cache-Control", cacheControl);
+
+  await finalizeAiIdempotencyLock(client, userId, requestKey, {
+    status: response.ok ? "completed" : "failed",
+    errorMessage: response.ok ? null : `ai-draft stream failed (${response.status})`,
+  });
 
   if (response.body) {
     return new Response(response.body, {
@@ -1240,6 +1318,8 @@ serve(async (req: Request) => {
           ? 403
           : errorCode === "AI_REQUEST_IN_PROGRESS"
             ? 409
+            : errorCode === "AI_RATE_LIMITED"
+              ? 429
           : errorCode === "WORKFLOW_TRANSITION_INVALID"
             || errorCode === "WORKFLOW_EVENT_INVALID"
             || errorCode === "VALIDATION_INVALID_FIELD"

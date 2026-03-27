@@ -939,15 +939,47 @@ type AIProvider = "openai";
 
 const resolveAIConfig = (
   preferredProvider?: AIProvider,
-): { provider: AIProvider; apiKey: string; model: string; fallbackModel: string | null; endpoint: string } => {
+  options?: { logicLevel?: LogicLevel },
+): { provider: AIProvider; apiKey: string; model: string; modelChain: string[]; endpoint: string } => {
   const openAiApiKey = Deno.env.get("OPENAI_API_KEY");
+
+  const getPrimaryModel = () => {
+    const level = options?.logicLevel;
+    if (level === "regulon_sovereign") {
+      return Deno.env.get("OPENAI_MODEL_SOVEREIGN")?.trim()
+        || Deno.env.get("OPENAI_MODEL")
+        || "gpt-4.1-mini";
+    }
+    if (level === "regulon_nexus_9") {
+      return Deno.env.get("OPENAI_MODEL_NEXUS")?.trim()
+        || Deno.env.get("OPENAI_MODEL")
+        || "gpt-4.1-mini";
+    }
+    if (level === "regulon_core") {
+      return Deno.env.get("OPENAI_MODEL_CORE")?.trim()
+        || Deno.env.get("OPENAI_MODEL")
+        || "gpt-4.1-mini";
+    }
+    return Deno.env.get("OPENAI_MODEL") ?? "gpt-4.1-mini";
+  };
+
+  const getFallbackModels = () => {
+    const chainFromEnv = (Deno.env.get("OPENAI_FALLBACK_MODELS") ?? "")
+      .split(",")
+      .map((item) => item.trim())
+      .filter(Boolean);
+    const legacyFallback = Deno.env.get("OPENAI_FALLBACK_MODEL")?.trim();
+    return legacyFallback ? [...chainFromEnv, legacyFallback] : chainFromEnv;
+  };
 
   const openAiConfig = openAiApiKey
     ? {
       provider: "openai" as const,
       apiKey: openAiApiKey,
-      model: Deno.env.get("OPENAI_MODEL") ?? "gpt-4.1-mini",
-      fallbackModel: Deno.env.get("OPENAI_FALLBACK_MODEL")?.trim() || null,
+      model: getPrimaryModel(),
+      modelChain: [getPrimaryModel(), ...getFallbackModels()]
+        .map((item) => item.trim())
+        .filter((item, index, list) => item.length > 0 && list.indexOf(item) === index),
       endpoint: "https://api.openai.com/v1/chat/completions",
     }
     : null;
@@ -957,26 +989,24 @@ const resolveAIConfig = (
 
 const aiRequest = async ({
   apiKey,
-  model,
-  fallbackModel,
+  modelChain,
   endpoint,
   messages,
   stream,
 }: {
   apiKey: string;
-  model: string;
-  fallbackModel?: string | null;
+  modelChain: string[];
   endpoint: string;
   messages: Array<{ role: "system" | "user"; content: string | Array<Record<string, unknown>> }>;
   stream: boolean;
 }) => {
-  const modelChain = [model, fallbackModel].filter((item, index, list): item is string => Boolean(item) && list.indexOf(item as string) === index);
+  const chain = modelChain.length > 0 ? modelChain : ["gpt-4.1-mini"];
   let attempts = 0;
   let lastResponse: Response | null = null;
   let lastError: unknown = null;
 
-  for (let modelIndex = 0; modelIndex < modelChain.length; modelIndex += 1) {
-    const activeModel = modelChain[modelIndex];
+  for (let modelIndex = 0; modelIndex < chain.length; modelIndex += 1) {
+    const activeModel = chain[modelIndex];
     for (let retryIndex = 0; retryIndex < AI_MAX_RETRIES; retryIndex += 1) {
       attempts += 1;
       try {
@@ -1027,8 +1057,8 @@ const aiRequest = async ({
       statusText: lastResponse.statusText,
       headers: {
         ...Object.fromEntries(lastResponse.headers.entries()),
-        "x-regulon-model-used": modelChain[modelChain.length - 1] ?? model,
-        "x-regulon-fallback-used": String(modelChain.length > 1),
+        "x-regulon-model-used": chain[chain.length - 1] ?? "gpt-4.1-mini",
+        "x-regulon-fallback-used": String(chain.length > 1),
         "x-regulon-attempt-count": String(attempts),
         "x-regulon-model-router-version": MODEL_ROUTER_VERSION,
       },
@@ -3494,7 +3524,7 @@ serve(async (req) => {
     const normalizedOperation = typeof operation === "string" ? operation.trim().toLowerCase() : "draft";
     const effectiveLogicLevel: LogicLevel =
       normalizeLogicLevel(logicLevel) ?? inferLogicLevelFromDraftMode(draftMode);
-    const aiConfig = resolveAIConfig("openai");
+    const aiConfig = resolveAIConfig("openai", { logicLevel: effectiveLogicLevel });
     const normalizedGstReplyType: GstReplyType | null =
       typeof gstReplyTypeOverride === "string" && gstReplyTypeOverride.trim()
         ? normalizeGstReplyType(gstReplyTypeOverride)
@@ -3621,7 +3651,7 @@ ${evidenceContext || "None provided"}`;
 
       const recheckResp = await aiRequest({
         apiKey: aiConfig.apiKey,
-        model: aiConfig.model,
+        modelChain: aiConfig.modelChain,
         endpoint: aiConfig.endpoint,
         stream: false,
         messages: [
@@ -3794,7 +3824,7 @@ ${noticeDetails || "None provided."}`;
 
       const detailsResp = await aiRequest({
         apiKey: aiConfig.apiKey,
-        model: aiConfig.model,
+        modelChain: aiConfig.modelChain,
         endpoint: aiConfig.endpoint,
         stream: false,
         messages: [
@@ -3864,7 +3894,7 @@ Context: ${context || "None"}`;
 
       const ocrResp = await aiRequest({
         apiKey: aiConfig.apiKey,
-        model: aiConfig.model,
+        modelChain: aiConfig.modelChain,
         endpoint: aiConfig.endpoint,
         stream: false,
         messages: [
@@ -3953,7 +3983,7 @@ If notice data is missing, list specific missing items in critical_missing_field
 
       const extractionResp = await aiRequest({
         apiKey: aiConfig.apiKey,
-        model: aiConfig.model,
+        modelChain: aiConfig.modelChain,
         endpoint: aiConfig.endpoint,
         stream: false,
         messages: [
@@ -4200,7 +4230,7 @@ Dataset policy:
     if (!advancedMode) {
       const response = await aiRequest({
         apiKey: aiConfig.apiKey,
-        model: aiConfig.model,
+        modelChain: aiConfig.modelChain,
         endpoint: aiConfig.endpoint,
         messages: [
           { role: "system", content: systemPrompt },
@@ -4345,7 +4375,7 @@ ${mcaPendingChecklistText ? `\nMCA CHECKLIST (ensure represented in object field
 
       const blueprintResp = await aiRequest({
         apiKey: aiConfig.apiKey,
-        model: aiConfig.model,
+        modelChain: aiConfig.modelChain,
         endpoint: aiConfig.endpoint,
         stream: false,
         messages: [
@@ -4389,7 +4419,7 @@ ${mcaPendingChecklistText ? `\nMCA CHECKLIST (ensure represented in object field
     } else {
       const draftResp = await aiRequest({
         apiKey: aiConfig.apiKey,
-        model: aiConfig.model,
+        modelChain: aiConfig.modelChain,
         endpoint: aiConfig.endpoint,
         stream: false,
         messages: [
@@ -4440,7 +4470,7 @@ Checklist:
 
     const reviewerResp = await aiRequest({
       apiKey: aiConfig.apiKey,
-      model: aiConfig.model,
+      modelChain: aiConfig.modelChain,
       endpoint: aiConfig.endpoint,
       stream: false,
       messages: [
@@ -4482,7 +4512,7 @@ Checklist:
       if (copyRiskScore >= 0.72) {
         const antiCopyResp = await aiRequest({
           apiKey: aiConfig.apiKey,
-          model: aiConfig.model,
+          modelChain: aiConfig.modelChain,
           endpoint: aiConfig.endpoint,
           stream: false,
           messages: [
@@ -4580,8 +4610,7 @@ Schema:
 
     const qaResp = await aiRequest({
       apiKey: aiConfig.apiKey,
-      model: aiConfig.model,
-      fallbackModel: aiConfig.fallbackModel,
+      modelChain: aiConfig.modelChain,
       endpoint: aiConfig.endpoint,
       stream: false,
       messages: [
