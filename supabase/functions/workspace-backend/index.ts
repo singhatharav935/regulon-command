@@ -37,7 +37,8 @@ const getEnv = () => {
   if (!url || !anon) {
     throw new Error("Missing Supabase env configuration");
   }
-  return { url, anon };
+  const serviceRole = Deno.env.get("SUPABASE_SERVICE_ROLE_KEY") || "";
+  return { url, anon, serviceRole };
 };
 
 const getUserClient = async (req: Request) => {
@@ -55,6 +56,14 @@ const getUserClient = async (req: Request) => {
     throw new Error("Unauthorized");
   }
   return { client, user: data.user, token };
+};
+
+const getServiceClient = () => {
+  const { url, serviceRole } = getEnv();
+  if (!serviceRole) return null;
+  return createClient(url, serviceRole, {
+    auth: { autoRefreshToken: false, persistSession: false },
+  });
 };
 
 const getUserRoles = async (client: ReturnType<typeof createClient>, userId: string) => {
@@ -626,6 +635,85 @@ const createDraftRun = async (
   return { draftRunId: draftRun.id };
 };
 
+const WORKFLOW_NOTIFICATION_EVENTS = new Set([
+  "submitted_for_review",
+  "review_approved",
+  "legal_review_approved",
+  "final_sign_off",
+  "legal_final_sign_off",
+]);
+
+const queueWorkflowNotifications = async (
+  actorClient: ReturnType<typeof createClient>,
+  draftRunId: string,
+  eventType: string,
+  nextStatus: string,
+  actorUserId: string,
+) => {
+  if (!WORKFLOW_NOTIFICATION_EVENTS.has(eventType)) return;
+
+  const serviceClient = getServiceClient();
+  if (!serviceClient) {
+    console.warn("SUPABASE_SERVICE_ROLE_KEY missing; skipping workflow notification queueing");
+    return;
+  }
+
+  const { data: run, error: runError } = await actorClient
+    .from("draft_runs")
+    .select("id, company_id, document_type")
+    .eq("id", draftRunId)
+    .maybeSingle();
+  if (runError || !run?.company_id) return;
+
+  const [{ data: company }, { data: members, error: membersError }, { data: actorProfile }] = await Promise.all([
+    serviceClient.from("companies").select("id, name").eq("id", run.company_id).maybeSingle(),
+    serviceClient.from("company_members").select("user_id, role").eq("company_id", run.company_id).in("role", ["admin", "manager"]),
+    serviceClient.from("profiles").select("full_name, email").eq("user_id", actorUserId).maybeSingle(),
+  ]);
+
+  if (membersError || !members?.length) return;
+
+  const recipientUserIds = Array.from(new Set(members.map((member) => member.user_id).filter(Boolean)));
+  if (!recipientUserIds.length) return;
+
+  const { data: recipientProfiles, error: recipientProfilesError } = await serviceClient
+    .from("profiles")
+    .select("user_id, full_name, email")
+    .in("user_id", recipientUserIds);
+  if (recipientProfilesError || !recipientProfiles?.length) return;
+
+  const actorName = actorProfile?.full_name || actorProfile?.email || "A team member";
+  const companyName = company?.name || "Your company";
+  const prettyEvent = eventType.replace(/_/g, " ").replace(/\b\w/g, (char) => char.toUpperCase());
+  const subject = `[Regulon] ${prettyEvent}: ${run.document_type}`;
+  const rows = recipientProfiles
+    .filter((profile) => typeof profile.email === "string" && profile.email.trim().length > 0)
+    .map((profile) => ({
+      company_id: run.company_id,
+      owner_user_id: profile.user_id,
+      channel: "email",
+      payload: {
+        template: "draft_workflow_event",
+        to: profile.email,
+        recipient_name: profile.full_name || profile.email,
+        subject,
+        body_text: `${actorName} marked ${run.document_type} as ${nextStatus} (${prettyEvent}) for ${companyName}.`,
+        event_type: eventType,
+        draft_run_id: run.id,
+        document_type: run.document_type,
+        status: nextStatus,
+      },
+      status: "queued",
+    }));
+
+  if (!rows.length) return;
+
+  const { error: outboxError } = await serviceClient.from("agent_notifications_outbox").insert(rows);
+  if (outboxError) {
+    console.warn("Failed to enqueue workflow notifications", outboxError.message);
+  }
+};
+
 const saveDraftSnapshot = async (
   client: ReturnType<typeof createClient>,
   userId: string,
@@ -694,6 +782,8 @@ const saveDraftSnapshot = async (
       },
     });
   if (auditError) throw auditError;
+
+  await queueWorkflowNotifications(client, draftRunId, body.eventType, nextStatus, userId);
 
   return await loadDraftArtifacts(client, userId, roles, draftRunId);
 };
@@ -957,6 +1047,8 @@ serve(async (req: Request) => {
           },
         });
       if (auditError) return json(req, 400, { error: auditError.message });
+
+      await queueWorkflowNotifications(client, draftRunId, eventType, nextStatus, user.id);
 
       return json(req, 200, { ok: true, data: await loadDraftReview(client, user.id, roles, draftRunId) });
     }
