@@ -82,10 +82,28 @@ const ALLOWED_WORKFLOW_TRANSITIONS: Record<string, string[]> = {
   signed_off: ["signed_off"],
 };
 
+const ALLOWED_EVENT_TYPES_BY_TRANSITION: Record<string, string[]> = {
+  "generated->generated": ["manual_version_saved", "review_saved", "legal_review_saved", "draft_generated"],
+  "generated->under_review": ["submitted_for_review", "review_started"],
+  "under_review->under_review": ["manual_version_saved", "review_saved", "legal_review_saved"],
+  "under_review->approved": ["review_approved", "legal_review_approved"],
+  "approved->approved": ["manual_version_saved", "review_saved", "legal_review_saved"],
+  "approved->signed_off": ["final_sign_off", "legal_final_sign_off"],
+  "signed_off->signed_off": ["manual_version_saved", "review_saved"],
+};
+
 const assertValidWorkflowTransition = (currentStatus: string, nextStatus: string) => {
   const allowed = ALLOWED_WORKFLOW_TRANSITIONS[currentStatus] ?? [currentStatus];
   if (!allowed.includes(nextStatus)) {
     throw new Error(`Invalid workflow transition: ${currentStatus} -> ${nextStatus}`);
+  }
+};
+
+const assertValidEventTypeForTransition = (currentStatus: string, nextStatus: string, eventType: string) => {
+  const transitionKey = `${currentStatus}->${nextStatus}`;
+  const allowed = ALLOWED_EVENT_TYPES_BY_TRANSITION[transitionKey] ?? [];
+  if (!allowed.includes(eventType)) {
+    throw new Error(`Invalid event type for transition: ${transitionKey} (${eventType})`);
   }
 };
 
@@ -478,6 +496,7 @@ const saveDraftSnapshot = async (
   const currentStatus = String(review.run.status);
   const nextStatus = body.nextStatus || currentStatus;
   assertValidWorkflowTransition(currentStatus, nextStatus);
+  assertValidEventTypeForTransition(currentStatus, nextStatus, body.eventType);
 
   const { data: latestVersion } = await client
     .from("draft_versions")
@@ -732,7 +751,9 @@ serve(async (req: Request) => {
       const nextStatus = body.next_status ? String(body.next_status) : payload.run.status;
       const eventType = String(body.event_type || "review_saved");
       if (!content) return json(req, 400, { error: "content is required" });
-      assertValidWorkflowTransition(String(payload.run.status), nextStatus);
+      const currentStatus = String(payload.run.status);
+      assertValidWorkflowTransition(currentStatus, nextStatus);
+      assertValidEventTypeForTransition(currentStatus, nextStatus, eventType);
 
       const { data: latestVersion } = await client
         .from("draft_versions")
@@ -766,7 +787,7 @@ serve(async (req: Request) => {
           user_id: user.id,
           event_type: eventType,
           payload: {
-            previous_status: payload.run.status,
+            previous_status: currentStatus,
             next_status: nextStatus,
             review_surface: "workspace-backend",
           },
@@ -878,6 +899,7 @@ serve(async (req: Request) => {
         : message === "Forbidden"
           ? 403
           : message.startsWith("Invalid workflow transition:")
+            || message.startsWith("Invalid event type for transition:")
             ? 400
             : 500;
     return json(req, status, { error: message });
