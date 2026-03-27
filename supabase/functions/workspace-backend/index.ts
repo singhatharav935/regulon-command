@@ -2331,6 +2331,89 @@ const loadDraftPolicyStatus = async (
   };
 };
 
+const loadDraftWorkflowActions = async (
+  client: ReturnType<typeof createClient>,
+  userId: string,
+  roles: Set<string>,
+  persona: AppPersona | null,
+  draftRunId: string,
+) => {
+  const review = await loadDraftReview(client, userId, roles, draftRunId);
+  const currentStatus = String(review.run.status);
+  const documentType = typeof review.run.document_type === "string" ? review.run.document_type : null;
+  const [workflowPolicy, entitlements] = await Promise.all([
+    loadAuthorityWorkflowPolicy(client, documentType),
+    loadActorEntitlements(client, userId),
+  ]);
+  const legalLaneEnabled = resolveLegalLaneEnabled(persona, entitlements);
+
+  const candidates: Array<{ id: string; label: string; eventType: string; nextStatus: string }> = [
+    { id: "submit_for_review", label: "Submit For Review", eventType: "submitted_for_review", nextStatus: "under_review" },
+    { id: "start_review", label: "Start Review", eventType: "review_started", nextStatus: "under_review" },
+    { id: "approve_review", label: "Approve Review", eventType: "review_approved", nextStatus: "approved" },
+    { id: "approve_legal_review", label: "Approve Legal Review", eventType: "legal_review_approved", nextStatus: "approved" },
+    { id: "final_signoff", label: "Final Signoff", eventType: "final_sign_off", nextStatus: "signed_off" },
+    { id: "legal_final_signoff", label: "Legal Final Signoff", eventType: "legal_final_sign_off", nextStatus: "signed_off" },
+    { id: "export_for_external_legal", label: "Export For External Legal", eventType: "exported_for_external_legal", nextStatus: currentStatus },
+    { id: "external_legal_signoff", label: "External Legal Signoff", eventType: "external_legal_signed_off", nextStatus: "signed_off" },
+  ];
+
+  const actions = candidates.map((candidate) => {
+    try {
+      assertValidWorkflowTransition(currentStatus, candidate.nextStatus);
+      assertValidEventTypeForTransition(currentStatus, candidate.nextStatus, candidate.eventType);
+      assertEventActorAllowed({
+        roles,
+        persona,
+        eventType: candidate.eventType,
+        legalLaneEnabled,
+        legalReviewRequired: workflowPolicy.legalReviewRequired,
+        finalSignoffMode: workflowPolicy.finalSignoffMode,
+      });
+      assertWorkflowBlockingConditions({
+        eventType: candidate.eventType,
+        existingEvents: review.events,
+        legalReviewRequired: workflowPolicy.legalReviewRequired,
+        finalSignoffMode: workflowPolicy.finalSignoffMode,
+        legalLaneEnabled,
+        persona,
+      });
+      return {
+        id: candidate.id,
+        label: candidate.label,
+        eventType: candidate.eventType,
+        nextStatus: candidate.nextStatus,
+        allowed: true,
+        reason: null,
+      };
+    } catch (error) {
+      const message = error instanceof Error ? error.message : "Not allowed";
+      return {
+        id: candidate.id,
+        label: candidate.label,
+        eventType: candidate.eventType,
+        nextStatus: candidate.nextStatus,
+        allowed: false,
+        reason: message,
+      };
+    }
+  });
+
+  return {
+    draftRunId,
+    currentStatus,
+    documentType: review.run.document_type,
+    persona,
+    policy: {
+      legalReviewRequired: workflowPolicy.legalReviewRequired,
+      finalSignoffMode: workflowPolicy.finalSignoffMode,
+      legalLaneEnabled,
+      regulonLegalLaneEntitled: entitlements.regulonLegalLaneEnabled,
+    },
+    actions,
+  };
+};
+
 const listActionableDraftQueue = async (
   client: ReturnType<typeof createClient>,
   userId: string,
@@ -3471,6 +3554,15 @@ serve(async (req: Request) => {
       return json(req, 200, {
         ok: true,
         data: await loadDraftPolicyStatus(client, user.id, roles, persona, draftRunId),
+      });
+    }
+
+    if (req.method === "GET" && path.includes("drafts/") && path.endsWith("/workflow-actions")) {
+      requireRole(roles, ["manager", "admin"]);
+      const draftRunId = path.split("drafts/")[1].replace("/workflow-actions", "");
+      return json(req, 200, {
+        ok: true,
+        data: await loadDraftWorkflowActions(client, user.id, roles, persona, draftRunId),
       });
     }
 
