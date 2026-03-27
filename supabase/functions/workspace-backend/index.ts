@@ -261,6 +261,13 @@ const isLockFresh = (updatedAt: string | null | undefined, thresholdSeconds: num
   return parsed >= Date.now() - (thresholdSeconds * 1000);
 };
 
+const isOlderThanMinutes = (timestamp: string | null | undefined, minutes: number) => {
+  if (!timestamp) return false;
+  const parsed = Date.parse(timestamp);
+  if (Number.isNaN(parsed)) return false;
+  return parsed <= Date.now() - (minutes * 60 * 1000);
+};
+
 const enforceAiRequestRateLimit = async (client: ReturnType<typeof createClient>, userId: string) => {
   const maxRequestsPerMinute = Math.max(5, Number(Deno.env.get("AI_MAX_REQUESTS_PER_MINUTE") ?? "30"));
   const maxConcurrentRequests = Math.max(1, Number(Deno.env.get("AI_MAX_CONCURRENT_REQUESTS") ?? "3"));
@@ -1169,7 +1176,7 @@ serve(async (req: Request) => {
 
       const { data: rows, error: rowsError } = await client
         .from("ai_request_idempotency")
-        .select("status, response_status, ai_model_used, ai_fallback_used, ai_attempt_count, error_message, created_at, updated_at, completed_at")
+        .select("user_id, status, response_status, ai_model_used, ai_fallback_used, ai_attempt_count, error_message, created_at, updated_at, completed_at")
         .gte("created_at", sinceIso)
         .order("created_at", { ascending: false })
         .limit(sampleLimit);
@@ -1189,8 +1196,16 @@ serve(async (req: Request) => {
       let attemptsCount = 0;
       let rateLimitErrorCount = 0;
       const latenciesMs: number[] = [];
+      const userRequestCount: Record<string, number> = {};
+      const userFailureCount: Record<string, number> = {};
 
       for (const row of allRows) {
+        if (typeof row.user_id === "string") {
+          userRequestCount[row.user_id] = (userRequestCount[row.user_id] ?? 0) + 1;
+          if (row.status === "failed") {
+            userFailureCount[row.user_id] = (userFailureCount[row.user_id] ?? 0) + 1;
+          }
+        }
         if (typeof row.ai_model_used === "string" && row.ai_model_used.trim()) {
           modelBreakdown[row.ai_model_used] = (modelBreakdown[row.ai_model_used] ?? 0) + 1;
         }
@@ -1215,6 +1230,14 @@ serve(async (req: Request) => {
       const avgLatencyMs = latenciesMs.length > 0 ? Math.round(latenciesMs.reduce((sum, value) => sum + value, 0) / latenciesMs.length) : null;
       const avgAttemptCount = attemptsCount > 0 ? Number((attemptsTotal / attemptsCount).toFixed(2)) : null;
       const staleProcessingCount = allRows.filter((row) => row.status === "processing" && isLockFresh(row.updated_at, lockWindowSeconds) === false).length;
+      const topUsers = Object.entries(userRequestCount)
+        .map(([userId, requestCount]) => ({
+          user_id: userId,
+          request_count: requestCount,
+          failed_count: userFailureCount[userId] ?? 0,
+        }))
+        .sort((a, b) => b.request_count - a.request_count)
+        .slice(0, 10);
 
       return json(req, 200, {
         ok: true,
@@ -1232,6 +1255,98 @@ serve(async (req: Request) => {
           rate_limit_error_count: rateLimitErrorCount,
         },
         model_breakdown: modelBreakdown,
+        top_users: topUsers,
+      });
+    }
+
+    if (req.method === "POST" && path.endsWith("drafting/ai-ops/recover-stale")) {
+      requireRole(roles, ["admin"]);
+      const body = await req.json().catch(() => ({}));
+      const staleMinutesRaw = Number(body?.stale_minutes ?? 15);
+      const staleMinutes = Number.isFinite(staleMinutesRaw) ? Math.max(1, Math.min(240, staleMinutesRaw)) : 15;
+      const limitRaw = Number(body?.limit ?? 500);
+      const limit = Number.isFinite(limitRaw) ? Math.max(1, Math.min(5000, limitRaw)) : 500;
+
+      const { data: processingRows, error: processingError } = await client
+        .from("ai_request_idempotency")
+        .select("id, user_id, request_key, updated_at")
+        .eq("status", "processing")
+        .order("updated_at", { ascending: true })
+        .limit(limit * 2);
+      if (processingError) return json(req, 400, { error: processingError.message });
+
+      const staleRows = (processingRows ?? [])
+        .filter((row) => isOlderThanMinutes(row.updated_at, staleMinutes))
+        .slice(0, limit);
+
+      if (!staleRows.length) {
+        return json(req, 200, { ok: true, recovered: 0, stale_minutes: staleMinutes });
+      }
+
+      let recovered = 0;
+      for (const row of staleRows) {
+        const { error: updateError } = await client
+          .from("ai_request_idempotency")
+          .update({
+            status: "failed",
+            error_message: "Recovered from stale processing lock",
+            completed_at: new Date().toISOString(),
+          })
+          .eq("id", row.id)
+          .eq("status", "processing");
+        if (!updateError) recovered += 1;
+      }
+
+      return json(req, 200, {
+        ok: true,
+        recovered,
+        stale_minutes: staleMinutes,
+        sample_request_keys: staleRows.slice(0, 10).map((row) => row.request_key),
+      });
+    }
+
+    if (req.method === "POST" && path.endsWith("drafting/ai-ops/cleanup")) {
+      requireRole(roles, ["admin"]);
+      const body = await req.json().catch(() => ({}));
+      const retentionDaysRaw = Number(body?.retention_days ?? 30);
+      const retentionDays = Number.isFinite(retentionDaysRaw) ? Math.max(3, Math.min(180, retentionDaysRaw)) : 30;
+      const limitRaw = Number(body?.limit ?? 2000);
+      const limit = Number.isFinite(limitRaw) ? Math.max(100, Math.min(10000, limitRaw)) : 2000;
+      const dryRun = body?.dry_run === true;
+      const cutoffIso = new Date(Date.now() - retentionDays * 24 * 60 * 60 * 1000).toISOString();
+
+      const { data: staleRows, error: staleRowsError } = await client
+        .from("ai_request_idempotency")
+        .select("id")
+        .in("status", ["completed", "failed"])
+        .lt("created_at", cutoffIso)
+        .order("created_at", { ascending: true })
+        .limit(limit);
+      if (staleRowsError) return json(req, 400, { error: staleRowsError.message });
+
+      const ids = (staleRows ?? []).map((row) => row.id);
+      if (!ids.length) {
+        return json(req, 200, { ok: true, dry_run: dryRun, deleted: 0, retention_days: retentionDays });
+      }
+
+      if (dryRun) {
+        return json(req, 200, {
+          ok: true,
+          dry_run: true,
+          candidates: ids.length,
+          retention_days: retentionDays,
+          sample_ids: ids.slice(0, 10),
+        });
+      }
+
+      const { error: deleteError } = await client.from("ai_request_idempotency").delete().in("id", ids);
+      if (deleteError) return json(req, 400, { error: deleteError.message });
+
+      return json(req, 200, {
+        ok: true,
+        dry_run: false,
+        deleted: ids.length,
+        retention_days: retentionDays,
       });
     }
 
