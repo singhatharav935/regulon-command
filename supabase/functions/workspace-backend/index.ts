@@ -2044,6 +2044,9 @@ const appendDraftAuditEvent = async (
   payload?: Record<string, unknown>,
 ) => {
   const review = await loadDraftReview(client, userId, roles, draftRunId);
+  const currentStatus = String(review.run.status);
+  assertValidWorkflowTransition(currentStatus, currentStatus);
+  assertValidEventTypeForTransition(currentStatus, currentStatus, eventType);
   const documentType = typeof review.run.document_type === "string" ? review.run.document_type : null;
   const [workflowPolicy, entitlements] = await Promise.all([
     loadAuthorityWorkflowPolicy(client, documentType),
@@ -3573,8 +3576,8 @@ serve(async (req: Request) => {
       const draftRunId = path.split("drafts/")[1].replace("/export-mark", "");
       const body = await req.json().catch(() => ({}));
       const eventType = String(body.eventType || "exported_for_external_legal");
-      if (eventType !== "exported_for_external_legal" && eventType !== "external_legal_signed_off") {
-        return json(req, 400, { error: "eventType must be exported_for_external_legal or external_legal_signed_off" });
+      if (eventType !== "exported_for_external_legal") {
+        return json(req, 400, { error: "eventType must be exported_for_external_legal for this route" });
       }
       return json(req, 200, {
         ok: true,
