@@ -54,7 +54,7 @@ const getUserClient = async (req: Request) => {
   if (error || !data?.user) {
     throw new Error("Unauthorized");
   }
-  return { client, user: data.user };
+  return { client, user: data.user, token };
 };
 
 const getUserRoles = async (client: ReturnType<typeof createClient>, userId: string) => {
@@ -528,6 +528,57 @@ const saveDraftSnapshot = async (
   return await loadDraftArtifacts(client, userId, roles, draftRunId);
 };
 
+const proxyAiDraft = async (
+  client: ReturnType<typeof createClient>,
+  userId: string,
+  roles: Set<string>,
+  token: string,
+  payload: Record<string, unknown>,
+) => {
+  const companyId = typeof payload.companyId === "string" ? payload.companyId : null;
+  if (companyId) {
+    const companyIds = await getUserCompanyIds(client, userId);
+    if (!companyIds.includes(companyId)) {
+      throw new Error("Forbidden");
+    }
+  }
+
+  const draftRunId = typeof payload.draftRunId === "string" ? payload.draftRunId : null;
+  if (draftRunId) {
+    await loadDraftReview(client, userId, roles, draftRunId);
+  }
+
+  const { url, anon } = getEnv();
+  const response = await fetch(`${url}/functions/v1/ai-draft`, {
+    method: "POST",
+    headers: {
+      "Content-Type": "application/json",
+      Authorization: `Bearer ${token}`,
+      apikey: anon,
+    },
+    body: JSON.stringify(payload),
+  });
+
+  const contentType = response.headers.get("content-type") || "";
+  if (contentType.includes("application/json")) {
+    const body = await response.json().catch(() => ({}));
+    return {
+      ok: response.ok,
+      status: response.status,
+      body,
+      error: typeof body?.error === "string" ? body.error : null,
+    };
+  }
+
+  const text = await response.text().catch(() => "");
+  return {
+    ok: response.ok,
+    status: response.status,
+    body: null,
+    error: text || `ai-draft failed (${response.status})`,
+  };
+};
+
 const loadDraftReview = async (client: ReturnType<typeof createClient>, userId: string, roles: Set<string>, draftRunId: string) => {
   const { data: run, error: runError } = await client
     .from("draft_runs")
@@ -563,7 +614,7 @@ serve(async (req: Request) => {
   try {
     const url = new URL(req.url);
     const path = url.pathname.replace(/^\/+/, "");
-    const { client, user } = await getUserClient(req);
+    const { client, user, token } = await getUserClient(req);
     const roles = await getUserRoles(client, user.id);
 
     if (req.method === "GET" && path.endsWith("company/dashboard")) {
@@ -748,6 +799,19 @@ serve(async (req: Request) => {
           payload: typeof body.payload === "object" && body.payload ? body.payload : undefined,
         }),
       });
+    }
+
+    if (req.method === "POST" && path.endsWith("drafting/ai")) {
+      requireRole(roles, ["manager", "admin"]);
+      const body = await req.json();
+      if (!body || typeof body !== "object") {
+        return json(req, 400, { error: "request body is required" });
+      }
+      const result = await proxyAiDraft(client, user.id, roles, token, body as Record<string, unknown>);
+      if (!result.ok) {
+        return json(req, result.status, { error: result.error || "ai-draft request failed" });
+      }
+      return json(req, 200, { ok: true, data: result.body });
     }
 
     return json(req, 404, { error: "Route not found" });

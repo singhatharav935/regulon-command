@@ -4625,17 +4625,6 @@ const AIDraftingEngine = ({ demoMode = false, includeLawyerReview = true }: AIDr
     }
   };
 
-  const getEffectiveAuthToken = async () => {
-    let authToken = supabasePublishableKey;
-    if (secureFunctionAuth) {
-      const {
-        data: { session },
-      } = await supabase.auth.getSession();
-      authToken = session?.access_token ?? authToken;
-    }
-    return authToken;
-  };
-
   const requestDraftData = async (requestBody: Record<string, unknown>) => {
     assertLiveClientAccessOrThrow();
     const mergedPayload = {
@@ -4650,71 +4639,10 @@ const AIDraftingEngine = ({ demoMode = false, includeLawyerReview = true }: AIDr
       promptPackDirective: effectivePromptPack.instructions,
       ...requestBody,
     };
-
-    try {
-      const { data, error } = await supabase.functions.invoke("ai-draft", {
-        body: mergedPayload,
-      });
-      if (error) {
-        throw error;
-      }
-      return data;
-    } catch (invokeError) {
-      // Fallback to raw fetch path for environments where invoke is unavailable.
-    }
-
-    const authToken = await getEffectiveAuthToken();
-    const body = JSON.stringify(mergedPayload);
-    const sleep = (ms: number) => new Promise((resolve) => setTimeout(resolve, ms));
-
-    const tryRequest = async (withAuthHeaders: boolean) =>
-      fetch(DRAFT_URL, {
-        method: "POST",
-        headers: withAuthHeaders
-          ? {
-              "Content-Type": "application/json",
-              Authorization: `Bearer ${authToken}`,
-              apikey: supabasePublishableKey,
-            }
-          : {
-              "Content-Type": "application/json",
-            },
-        body,
-      });
-
-    let response: Response;
-    try {
-      response = await tryRequest(true);
-    } catch (networkError) {
-      if (secureFunctionAuth) throw networkError;
-      response = await tryRequest(false);
-    }
-
-    const shouldRetry = (candidate: Response) => candidate.status === 429 || candidate.status >= 500;
-    let retryAttempt = 0;
-    while (shouldRetry(response) && retryAttempt < 2) {
-      retryAttempt += 1;
-      const retryAfterHeader = response.headers.get("retry-after");
-      const retryDelay = retryAfterHeader ? Number(retryAfterHeader) * 1000 : 900 * retryAttempt;
-      await sleep(Math.max(retryDelay, 900));
-      response = await tryRequest(true);
-    }
-
-    if (response.status === 429) throw new Error("Rate limit exceeded. Please try again in a moment.");
-    if (response.status === 402) throw new Error("AI credits exhausted. Please add credits to continue.");
-    if (!response.ok) {
-      let serverError = `Draft request failed (${response.status}).`;
-      try {
-        const data = await response.json();
-        serverError = data?.error ? `${serverError} ${data.error}` : serverError;
-      } catch {
-        const text = await response.text();
-        if (text) serverError = `${serverError} ${text.slice(0, 240)}`;
-      }
-      throw new Error(serverError);
-    }
-
-    return response.json();
+    return workspaceBackendRequest<Record<string, unknown>>("/drafting/ai", {
+      method: "POST",
+      body: JSON.stringify(mergedPayload),
+    });
   };
 
   const handleApplyMcaFix = async () => {
