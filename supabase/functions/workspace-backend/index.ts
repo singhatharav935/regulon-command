@@ -268,6 +268,74 @@ const isOlderThanMinutes = (timestamp: string | null | undefined, minutes: numbe
   return parsed <= Date.now() - (minutes * 60 * 1000);
 };
 
+const getMonthStartDate = () => {
+  const now = new Date();
+  const monthStart = new Date(Date.UTC(now.getUTCFullYear(), now.getUTCMonth(), 1));
+  return monthStart.toISOString().slice(0, 10);
+};
+
+const enforceCompanyMonthlyQuota = async (
+  client: ReturnType<typeof createClient>,
+  companyId: string | null,
+) => {
+  if (!companyId) return;
+
+  const defaultMonthlyLimit = Math.max(100, Number(Deno.env.get("AI_DEFAULT_COMPANY_MONTHLY_LIMIT") ?? "2000"));
+  const monthStart = getMonthStartDate();
+
+  const [{ data: quotaRow, error: quotaError }, { data: usageRow, error: usageError }] = await Promise.all([
+    client
+      .from("ai_company_usage_quotas")
+      .select("monthly_request_limit, hard_block")
+      .eq("company_id", companyId)
+      .maybeSingle(),
+    client
+      .from("ai_company_monthly_usage")
+      .select("request_count")
+      .eq("company_id", companyId)
+      .eq("month_start", monthStart)
+      .maybeSingle(),
+  ]);
+  if (quotaError) throw quotaError;
+  if (usageError) throw usageError;
+
+  if (quotaRow?.hard_block) {
+    throw new Error("AI quota exceeded: company_hard_block");
+  }
+
+  const monthlyLimit = quotaRow?.monthly_request_limit ?? defaultMonthlyLimit;
+  const currentCount = Number(usageRow?.request_count ?? 0);
+  if (currentCount >= monthlyLimit) {
+    throw new Error("AI quota exceeded: company_monthly_limit");
+  }
+};
+
+const incrementCompanyMonthlyUsage = async (
+  client: ReturnType<typeof createClient>,
+  companyId: string | null,
+) => {
+  if (!companyId) return;
+  const monthStart = getMonthStartDate();
+
+  const { data: usageRow, error: loadError } = await client
+    .from("ai_company_monthly_usage")
+    .select("request_count")
+    .eq("company_id", companyId)
+    .eq("month_start", monthStart)
+    .maybeSingle();
+  if (loadError) throw loadError;
+
+  const nextCount = Number(usageRow?.request_count ?? 0) + 1;
+  const { error: upsertError } = await client
+    .from("ai_company_monthly_usage")
+    .upsert({
+      company_id: companyId,
+      month_start: monthStart,
+      request_count: nextCount,
+    }, { onConflict: "company_id,month_start" });
+  if (upsertError) throw upsertError;
+};
+
 const enforceAiRequestRateLimit = async (
   client: ReturnType<typeof createClient>,
   userId: string,
@@ -330,6 +398,8 @@ const enforceAiRequestRateLimit = async (
   if (companyId && companyRecentCount >= maxCompanyRequestsPerMinute) {
     throw new Error("AI rate limit exceeded: company_quota");
   }
+
+  await enforceCompanyMonthlyQuota(client, companyId);
 };
 
 const prepareAiIdempotencyLock = async (
@@ -392,8 +462,20 @@ const finalizeAiIdempotencyLock = async (
     aiFallbackUsed?: boolean | null;
     aiAttemptCount?: number | null;
     modelRouterVersion?: string | null;
+    companyId?: string | null;
   },
 ) => {
+  let shouldCountUsage = false;
+  if (params.status === "completed") {
+    const { data: existingRow } = await client
+      .from("ai_request_idempotency")
+      .select("status")
+      .eq("user_id", userId)
+      .eq("request_key", requestKey)
+      .maybeSingle();
+    shouldCountUsage = existingRow?.status !== "completed";
+  }
+
   await client
     .from("ai_request_idempotency")
     .update({
@@ -409,6 +491,10 @@ const finalizeAiIdempotencyLock = async (
     })
     .eq("user_id", userId)
     .eq("request_key", requestKey);
+
+  if (params.status === "completed" && shouldCountUsage) {
+    await incrementCompanyMonthlyUsage(client, params.companyId ?? null);
+  }
 };
 
 const assertAiOperationPayloadShape = (operation: string, payload: Record<string, unknown>) => {
@@ -435,6 +521,7 @@ const resolveErrorCode = (message: string) => {
   if (message.startsWith("Policy denied:")) return "WORKFLOW_ACTOR_FORBIDDEN";
   if (message === "AI request already in progress") return "AI_REQUEST_IN_PROGRESS";
   if (message.startsWith("AI rate limit exceeded:")) return "AI_RATE_LIMITED";
+  if (message.startsWith("AI quota exceeded:")) return "AI_QUOTA_EXCEEDED";
   if (message.startsWith("Unsupported documentType:")) return "VALIDATION_INVALID_FIELD";
   if (message.startsWith("Invalid workflow transition:")) return "WORKFLOW_TRANSITION_INVALID";
   if (message.startsWith("Invalid event type for transition:")) return "WORKFLOW_EVENT_INVALID";
@@ -1068,6 +1155,7 @@ const proxyAiDraft = async (
       aiFallbackUsed: aiFallbackUsedHeader === "true",
       aiAttemptCount: Number.isFinite(aiAttemptCount as number) ? aiAttemptCount : null,
       modelRouterVersion,
+      companyId,
     });
     return {
       ok: response.ok,
@@ -1086,6 +1174,7 @@ const proxyAiDraft = async (
     aiFallbackUsed: aiFallbackUsedHeader === "true",
     aiAttemptCount: Number.isFinite(aiAttemptCount as number) ? aiAttemptCount : null,
     modelRouterVersion,
+    companyId,
   });
   return {
     ok: response.ok,
@@ -1146,6 +1235,7 @@ const proxyAiDraftStream = async (
     aiFallbackUsed: aiFallbackUsedHeader === "true",
     aiAttemptCount: Number.isFinite(aiAttemptCount as number) ? aiAttemptCount : null,
     modelRouterVersion,
+    companyId,
   });
 
   if (response.body) {
@@ -1607,6 +1697,8 @@ serve(async (req: Request) => {
             ? 409
             : errorCode === "AI_RATE_LIMITED"
               ? 429
+              : errorCode === "AI_QUOTA_EXCEEDED"
+                ? 429
           : errorCode === "WORKFLOW_TRANSITION_INVALID"
             || errorCode === "WORKFLOW_EVENT_INVALID"
             || errorCode === "VALIDATION_INVALID_FIELD"
