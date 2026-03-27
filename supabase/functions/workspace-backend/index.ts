@@ -2565,6 +2565,132 @@ const listActionableDraftQueue = async (
   return items;
 };
 
+const runWorkflowIntegrityCheck = async (
+  client: ReturnType<typeof createClient>,
+  options?: { limit?: number; companyId?: string | null },
+) => {
+  const limit = Math.max(20, Math.min(500, Number(options?.limit ?? 200)));
+  const companyId = typeof options?.companyId === "string" && options.companyId.trim() ? options.companyId.trim() : null;
+
+  let runsQuery = client
+    .from("draft_runs")
+    .select("id, company_id, user_id, document_type, status, created_at")
+    .order("created_at", { ascending: false })
+    .limit(limit);
+  if (companyId) runsQuery = runsQuery.eq("company_id", companyId);
+
+  const { data: runs, error: runsError } = await runsQuery;
+  if (runsError) throw runsError;
+
+  const runIds = (runs ?? []).map((row) => row.id);
+  if (runIds.length === 0) {
+    return {
+      scanned: 0,
+      findings: [],
+      summary: {
+        critical: 0,
+        high: 0,
+        medium: 0,
+      },
+    };
+  }
+
+  const { data: events, error: eventsError } = await client
+    .from("draft_audit_events")
+    .select("draft_run_id, event_type, created_at")
+    .in("draft_run_id", runIds)
+    .order("created_at", { ascending: true })
+    .limit(Math.max(2000, limit * 30));
+  if (eventsError) throw eventsError;
+
+  const eventMap: Record<string, string[]> = {};
+  for (const event of events ?? []) {
+    const key = String(event.draft_run_id);
+    if (!eventMap[key]) eventMap[key] = [];
+    eventMap[key].push(String(event.event_type));
+  }
+
+  const findings: Array<{
+    severity: "critical" | "high" | "medium";
+    draftRunId: string;
+    documentType: string | null;
+    workflowStatus: string;
+    code: string;
+    message: string;
+  }> = [];
+
+  for (const run of runs ?? []) {
+    const runEvents = eventMap[run.id] ?? [];
+    const set = new Set(runEvents);
+    const docType = typeof run.document_type === "string" ? run.document_type : null;
+
+    if (run.status === "signed_off" && !(set.has("final_sign_off") || set.has("legal_final_sign_off") || set.has("external_legal_signed_off"))) {
+      findings.push({
+        severity: "critical",
+        draftRunId: run.id,
+        documentType: docType,
+        workflowStatus: run.status,
+        code: "SIGNED_OFF_WITHOUT_SIGNOFF_EVENT",
+        message: "Draft is signed_off but no sign-off event exists.",
+      });
+    }
+
+    if ((run.status === "approved" || run.status === "signed_off") && !(set.has("review_approved") || set.has("legal_review_approved") || set.has("external_legal_signed_off"))) {
+      findings.push({
+        severity: "high",
+        draftRunId: run.id,
+        documentType: docType,
+        workflowStatus: run.status,
+        code: "APPROVAL_EVENT_MISSING",
+        message: "Draft status implies approval but approval event trail is missing.",
+      });
+    }
+
+    if (set.has("external_legal_signed_off") && !set.has("exported_for_external_legal")) {
+      findings.push({
+        severity: "high",
+        draftRunId: run.id,
+        documentType: docType,
+        workflowStatus: run.status,
+        code: "EXTERNAL_SIGNOFF_WITHOUT_EXPORT",
+        message: "External legal sign-off exists without prior external export event.",
+      });
+    }
+
+    if (set.has("legal_final_sign_off") && !set.has("legal_review_approved")) {
+      findings.push({
+        severity: "medium",
+        draftRunId: run.id,
+        documentType: docType,
+        workflowStatus: run.status,
+        code: "LEGAL_FINAL_WITHOUT_LEGAL_APPROVAL",
+        message: "Legal final sign-off exists without legal review approval event.",
+      });
+    }
+
+    if (set.has("review_approved") && !(set.has("submitted_for_review") || set.has("review_started"))) {
+      findings.push({
+        severity: "medium",
+        draftRunId: run.id,
+        documentType: docType,
+        workflowStatus: run.status,
+        code: "REVIEW_APPROVAL_WITHOUT_SUBMISSION",
+        message: "Review approval exists without review submission/start events.",
+      });
+    }
+  }
+
+  return {
+    scanned: (runs ?? []).length,
+    findings,
+    summary: {
+      critical: findings.filter((item) => item.severity === "critical").length,
+      high: findings.filter((item) => item.severity === "high").length,
+      medium: findings.filter((item) => item.severity === "medium").length,
+    },
+  };
+};
+
 const validateAiDraftScope = async (
   client: ReturnType<typeof createClient>,
   userId: string,
@@ -2976,6 +3102,20 @@ serve(async (req: Request) => {
         env_present: envKeys,
         db_probe_ok: !probeError,
         db_probe_rows: (tablesProbe ?? []).length,
+      });
+    }
+
+    if (req.method === "GET" && path.endsWith("ops/workflow-integrity-check")) {
+      requireRole(roles, ["admin"]);
+      const limitRaw = Number(url.searchParams.get("limit") ?? 200);
+      const limit = Number.isFinite(limitRaw) ? limitRaw : 200;
+      const companyId = url.searchParams.get("company_id");
+      return json(req, 200, {
+        ok: true,
+        data: await runWorkflowIntegrityCheck(client, {
+          limit,
+          companyId,
+        }),
       });
     }
 
