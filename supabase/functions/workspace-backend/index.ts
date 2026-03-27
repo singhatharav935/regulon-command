@@ -2691,6 +2691,120 @@ const runWorkflowIntegrityCheck = async (
   };
 };
 
+const runWorkflowSlaMonitor = async (
+  client: ReturnType<typeof createClient>,
+  options?: {
+    limit?: number;
+    companyId?: string | null;
+    generatedWarnHours?: number;
+    reviewWarnHours?: number;
+    approvedWarnHours?: number;
+  },
+) => {
+  const limit = Math.max(20, Math.min(1000, Number(options?.limit ?? 400)));
+  const companyId = typeof options?.companyId === "string" && options.companyId.trim() ? options.companyId.trim() : null;
+  const generatedWarnHours = Math.max(1, Math.min(720, Number(options?.generatedWarnHours ?? 24)));
+  const reviewWarnHours = Math.max(1, Math.min(720, Number(options?.reviewWarnHours ?? 24)));
+  const approvedWarnHours = Math.max(1, Math.min(720, Number(options?.approvedWarnHours ?? 48)));
+
+  let query = client
+    .from("draft_runs")
+    .select("id, company_id, user_id, document_type, status, created_at, updated_at")
+    .in("status", ["generated", "under_review", "approved"])
+    .order("updated_at", { ascending: true })
+    .limit(limit);
+  if (companyId) query = query.eq("company_id", companyId);
+
+  const { data: runs, error } = await query;
+  if (error) throw error;
+
+  const nowMs = Date.now();
+  const breaches: Array<{
+    severity: "critical" | "high" | "medium";
+    draftRunId: string;
+    companyId: string | null;
+    documentType: string | null;
+    workflowStatus: string;
+    ageHours: number;
+    thresholdHours: number;
+    code: string;
+    message: string;
+  }> = [];
+
+  for (const run of runs ?? []) {
+    const updatedAtMs = Date.parse(String(run.updated_at || run.created_at || ""));
+    if (Number.isNaN(updatedAtMs)) continue;
+    const ageHours = Number(((nowMs - updatedAtMs) / (1000 * 60 * 60)).toFixed(2));
+    const status = String(run.status);
+
+    if (status === "generated" && ageHours >= generatedWarnHours) {
+      breaches.push({
+        severity: ageHours >= generatedWarnHours * 2 ? "high" : "medium",
+        draftRunId: run.id,
+        companyId: run.company_id ?? null,
+        documentType: typeof run.document_type === "string" ? run.document_type : null,
+        workflowStatus: status,
+        ageHours,
+        thresholdHours: generatedWarnHours,
+        code: "DRAFT_STUCK_GENERATED",
+        message: "Draft has not moved from generated to review in SLA window.",
+      });
+      continue;
+    }
+
+    if (status === "under_review" && ageHours >= reviewWarnHours) {
+      breaches.push({
+        severity: ageHours >= reviewWarnHours * 2 ? "critical" : "high",
+        draftRunId: run.id,
+        companyId: run.company_id ?? null,
+        documentType: typeof run.document_type === "string" ? run.document_type : null,
+        workflowStatus: status,
+        ageHours,
+        thresholdHours: reviewWarnHours,
+        code: "DRAFT_STUCK_UNDER_REVIEW",
+        message: "Draft is under review beyond SLA threshold.",
+      });
+      continue;
+    }
+
+    if (status === "approved" && ageHours >= approvedWarnHours) {
+      breaches.push({
+        severity: ageHours >= approvedWarnHours * 2 ? "critical" : "high",
+        draftRunId: run.id,
+        companyId: run.company_id ?? null,
+        documentType: typeof run.document_type === "string" ? run.document_type : null,
+        workflowStatus: status,
+        ageHours,
+        thresholdHours: approvedWarnHours,
+        code: "DRAFT_STUCK_APPROVED",
+        message: "Draft approved but pending final sign-off beyond SLA threshold.",
+      });
+    }
+  }
+
+  breaches.sort((a, b) => {
+    const rank = (v: string) => (v === "critical" ? 0 : v === "high" ? 1 : 2);
+    const bySeverity = rank(a.severity) - rank(b.severity);
+    if (bySeverity !== 0) return bySeverity;
+    return b.ageHours - a.ageHours;
+  });
+
+  return {
+    scanned: (runs ?? []).length,
+    thresholds: {
+      generated_warn_hours: generatedWarnHours,
+      review_warn_hours: reviewWarnHours,
+      approved_warn_hours: approvedWarnHours,
+    },
+    breaches,
+    summary: {
+      critical: breaches.filter((item) => item.severity === "critical").length,
+      high: breaches.filter((item) => item.severity === "high").length,
+      medium: breaches.filter((item) => item.severity === "medium").length,
+    },
+  };
+};
+
 const validateAiDraftScope = async (
   client: ReturnType<typeof createClient>,
   userId: string,
@@ -3115,6 +3229,26 @@ serve(async (req: Request) => {
         data: await runWorkflowIntegrityCheck(client, {
           limit,
           companyId,
+        }),
+      });
+    }
+
+    if (req.method === "GET" && path.endsWith("ops/workflow-sla-monitor")) {
+      requireRole(roles, ["admin"]);
+      const limitRaw = Number(url.searchParams.get("limit") ?? 400);
+      const limit = Number.isFinite(limitRaw) ? limitRaw : 400;
+      const companyId = url.searchParams.get("company_id");
+      const generatedWarnHoursRaw = Number(url.searchParams.get("generated_warn_hours") ?? 24);
+      const reviewWarnHoursRaw = Number(url.searchParams.get("review_warn_hours") ?? 24);
+      const approvedWarnHoursRaw = Number(url.searchParams.get("approved_warn_hours") ?? 48);
+      return json(req, 200, {
+        ok: true,
+        data: await runWorkflowSlaMonitor(client, {
+          limit,
+          companyId,
+          generatedWarnHours: Number.isFinite(generatedWarnHoursRaw) ? generatedWarnHoursRaw : 24,
+          reviewWarnHours: Number.isFinite(reviewWarnHoursRaw) ? reviewWarnHoursRaw : 24,
+          approvedWarnHours: Number.isFinite(approvedWarnHoursRaw) ? approvedWarnHoursRaw : 48,
         }),
       });
     }
