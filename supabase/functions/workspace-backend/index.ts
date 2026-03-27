@@ -1962,6 +1962,12 @@ const assertExpectedDraftVersion = (actualVersionNumber: number, expectedVersion
   }
 };
 
+const assertDraftIsMutableForContentEdit = (currentStatus: string) => {
+  if (currentStatus === "signed_off") {
+    throw new Error("Policy denied: signed_off_drafts_are_immutable");
+  }
+};
+
 const saveDraftSnapshot = async (
   client: ReturnType<typeof createClient>,
   userId: string,
@@ -1981,6 +1987,7 @@ const saveDraftSnapshot = async (
 ) => {
   const review = await loadDraftReview(client, userId, roles, draftRunId);
   const currentStatus = String(review.run.status);
+  assertDraftIsMutableForContentEdit(currentStatus);
   const nextStatus = body.nextStatus || currentStatus;
   const documentType = typeof review.run.document_type === "string" ? review.run.document_type : null;
   const [workflowPolicy, entitlements] = await Promise.all([
@@ -3478,6 +3485,7 @@ serve(async (req: Request) => {
       const eventType = String(body.event_type || "review_saved");
       if (!content) return json(req, 400, { error: "content is required" });
       const currentStatus = String(payload.run.status);
+      assertDraftIsMutableForContentEdit(currentStatus);
       const documentType = typeof payload.run.document_type === "string" ? payload.run.document_type : null;
       const [workflowPolicy, entitlements] = await Promise.all([
         loadAuthorityWorkflowPolicy(client, documentType),
