@@ -346,7 +346,16 @@ const finalizeAiIdempotencyLock = async (
   client: ReturnType<typeof createClient>,
   userId: string,
   requestKey: string,
-  params: { status: "completed" | "failed"; responsePayload?: unknown; errorMessage?: string | null },
+  params: {
+    status: "completed" | "failed";
+    responsePayload?: unknown;
+    errorMessage?: string | null;
+    responseStatus?: number | null;
+    aiModelUsed?: string | null;
+    aiFallbackUsed?: boolean | null;
+    aiAttemptCount?: number | null;
+    modelRouterVersion?: string | null;
+  },
 ) => {
   await client
     .from("ai_request_idempotency")
@@ -354,6 +363,12 @@ const finalizeAiIdempotencyLock = async (
       status: params.status,
       response_payload: params.status === "completed" ? (params.responsePayload ?? null) : null,
       error_message: params.status === "failed" ? (params.errorMessage ?? "ai_request_failed") : null,
+      response_status: params.responseStatus ?? null,
+      ai_model_used: params.aiModelUsed ?? null,
+      ai_fallback_used: params.aiFallbackUsed ?? null,
+      ai_attempt_count: params.aiAttemptCount ?? null,
+      model_router_version: params.modelRouterVersion ?? null,
+      completed_at: new Date().toISOString(),
     })
     .eq("user_id", userId)
     .eq("request_key", requestKey);
@@ -976,12 +991,23 @@ const proxyAiDraft = async (
   });
 
   const contentType = response.headers.get("content-type") || "";
+  const aiModelUsed = response.headers.get("x-regulon-model-used");
+  const aiFallbackUsedHeader = response.headers.get("x-regulon-fallback-used");
+  const aiAttemptCountHeader = response.headers.get("x-regulon-attempt-count");
+  const aiAttemptCount = aiAttemptCountHeader ? Number(aiAttemptCountHeader) : null;
+  const modelRouterVersion = response.headers.get("x-regulon-model-router-version");
+
   if (contentType.includes("application/json")) {
     const body = await response.json().catch(() => ({}));
     await finalizeAiIdempotencyLock(client, userId, requestKey, {
       status: response.ok ? "completed" : "failed",
       responsePayload: response.ok ? body : null,
       errorMessage: response.ok ? null : (typeof body?.error === "string" ? body.error : `ai-draft failed (${response.status})`),
+      responseStatus: response.status,
+      aiModelUsed,
+      aiFallbackUsed: aiFallbackUsedHeader === "true",
+      aiAttemptCount: Number.isFinite(aiAttemptCount as number) ? aiAttemptCount : null,
+      modelRouterVersion,
     });
     return {
       ok: response.ok,
@@ -995,6 +1021,11 @@ const proxyAiDraft = async (
   await finalizeAiIdempotencyLock(client, userId, requestKey, {
     status: "failed",
     errorMessage: text || `ai-draft failed (${response.status})`,
+    responseStatus: response.status,
+    aiModelUsed,
+    aiFallbackUsed: aiFallbackUsedHeader === "true",
+    aiAttemptCount: Number.isFinite(aiAttemptCount as number) ? aiAttemptCount : null,
+    modelRouterVersion,
   });
   return {
     ok: response.ok,
@@ -1041,9 +1072,20 @@ const proxyAiDraftStream = async (
   if (contentType) headers.set("Content-Type", contentType);
   if (cacheControl) headers.set("Cache-Control", cacheControl);
 
+  const aiModelUsed = response.headers.get("x-regulon-model-used");
+  const aiFallbackUsedHeader = response.headers.get("x-regulon-fallback-used");
+  const aiAttemptCountHeader = response.headers.get("x-regulon-attempt-count");
+  const aiAttemptCount = aiAttemptCountHeader ? Number(aiAttemptCountHeader) : null;
+  const modelRouterVersion = response.headers.get("x-regulon-model-router-version");
+
   await finalizeAiIdempotencyLock(client, userId, requestKey, {
     status: response.ok ? "completed" : "failed",
     errorMessage: response.ok ? null : `ai-draft stream failed (${response.status})`,
+    responseStatus: response.status,
+    aiModelUsed,
+    aiFallbackUsed: aiFallbackUsedHeader === "true",
+    aiAttemptCount: Number.isFinite(aiAttemptCount as number) ? aiAttemptCount : null,
+    modelRouterVersion,
   });
 
   if (response.body) {
@@ -1114,6 +1156,83 @@ serve(async (req: Request) => {
     if (req.method === "GET" && path.endsWith("drafting/preferences")) {
       requireRole(roles, ["manager", "admin"]);
       return json(req, 200, { ok: true, data: await loadPracticePreferences(client, user.id) });
+    }
+
+    if (req.method === "GET" && path.endsWith("drafting/ai-ops/stats")) {
+      requireRole(roles, ["admin"]);
+      const sinceHoursRaw = Number(url.searchParams.get("since_hours") ?? 24);
+      const sinceHours = Number.isFinite(sinceHoursRaw) ? Math.max(1, Math.min(168, sinceHoursRaw)) : 24;
+      const sampleLimitRaw = Number(url.searchParams.get("sample_limit") ?? 2000);
+      const sampleLimit = Number.isFinite(sampleLimitRaw) ? Math.max(100, Math.min(5000, sampleLimitRaw)) : 2000;
+      const sinceIso = new Date(Date.now() - sinceHours * 60 * 60 * 1000).toISOString();
+      const lockWindowSeconds = Math.max(15, Number(Deno.env.get("AI_LOCK_WINDOW_SECONDS") ?? "120"));
+
+      const { data: rows, error: rowsError } = await client
+        .from("ai_request_idempotency")
+        .select("status, response_status, ai_model_used, ai_fallback_used, ai_attempt_count, error_message, created_at, updated_at, completed_at")
+        .gte("created_at", sinceIso)
+        .order("created_at", { ascending: false })
+        .limit(sampleLimit);
+      if (rowsError) return json(req, 400, { error: rowsError.message });
+
+      const allRows = rows ?? [];
+      const statusCounts = { processing: 0, completed: 0, failed: 0 };
+      for (const row of allRows) {
+        if (row.status === "processing") statusCounts.processing += 1;
+        if (row.status === "completed") statusCounts.completed += 1;
+        if (row.status === "failed") statusCounts.failed += 1;
+      }
+
+      const modelBreakdown: Record<string, number> = {};
+      let fallbackUsageCount = 0;
+      let attemptsTotal = 0;
+      let attemptsCount = 0;
+      let rateLimitErrorCount = 0;
+      const latenciesMs: number[] = [];
+
+      for (const row of allRows) {
+        if (typeof row.ai_model_used === "string" && row.ai_model_used.trim()) {
+          modelBreakdown[row.ai_model_used] = (modelBreakdown[row.ai_model_used] ?? 0) + 1;
+        }
+        if (row.ai_fallback_used === true) fallbackUsageCount += 1;
+        if (typeof row.ai_attempt_count === "number" && Number.isFinite(row.ai_attempt_count)) {
+          attemptsTotal += row.ai_attempt_count;
+          attemptsCount += 1;
+        }
+        if (typeof row.error_message === "string" && /rate limit|429|too_many/i.test(row.error_message)) {
+          rateLimitErrorCount += 1;
+        }
+        const created = Date.parse(row.created_at ?? "");
+        const completed = Date.parse(row.completed_at ?? "");
+        if (!Number.isNaN(created) && !Number.isNaN(completed) && completed >= created) {
+          latenciesMs.push(completed - created);
+        }
+      }
+
+      latenciesMs.sort((a, b) => a - b);
+      const p95Index = latenciesMs.length > 0 ? Math.floor(latenciesMs.length * 0.95) : -1;
+      const p95LatencyMs = p95Index >= 0 ? latenciesMs[Math.min(latenciesMs.length - 1, p95Index)] : null;
+      const avgLatencyMs = latenciesMs.length > 0 ? Math.round(latenciesMs.reduce((sum, value) => sum + value, 0) / latenciesMs.length) : null;
+      const avgAttemptCount = attemptsCount > 0 ? Number((attemptsTotal / attemptsCount).toFixed(2)) : null;
+      const staleProcessingCount = allRows.filter((row) => row.status === "processing" && isLockFresh(row.updated_at, lockWindowSeconds) === false).length;
+
+      return json(req, 200, {
+        ok: true,
+        since_hours: sinceHours,
+        sampled_rows: allRows.length,
+        counts: {
+          ...statusCounts,
+          stale_processing: staleProcessingCount,
+        },
+        health: {
+          avg_attempt_count: avgAttemptCount,
+          avg_latency_ms: avgLatencyMs,
+          p95_latency_ms: p95LatencyMs,
+          fallback_usage_rate: allRows.length > 0 ? Number((fallbackUsageCount / allRows.length).toFixed(4)) : 0,
+          rate_limit_error_count: rateLimitErrorCount,
+        },
+        model_breakdown: modelBreakdown,
+      });
     }
 
     if (req.method === "GET" && path.endsWith("legal/dashboard")) {
