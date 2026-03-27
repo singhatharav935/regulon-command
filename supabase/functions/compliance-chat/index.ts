@@ -1,6 +1,16 @@
 import { serve } from "https://deno.land/std@0.168.0/http/server.ts";
 import { createClient } from "https://esm.sh/@supabase/supabase-js@2";
 
+type AppPersona = "external_ca" | "admin" | "company_owner" | "in_house_ca" | "in_house_lawyer" | "ca_firm";
+
+const isAppPersona = (value: string | null): value is AppPersona =>
+  value === "external_ca" ||
+  value === "admin" ||
+  value === "company_owner" ||
+  value === "in_house_ca" ||
+  value === "in_house_lawyer" ||
+  value === "ca_firm";
+
 const getCorsHeaders = (req: Request) => {
   const origin = req.headers.get("origin") ?? "";
   const allowlist = (Deno.env.get("ALLOWED_ORIGINS") ?? "")
@@ -24,6 +34,12 @@ const getCorsHeaders = (req: Request) => {
 const unauthorized = (headers: Record<string, string>, message: string) =>
   new Response(JSON.stringify({ error: message }), {
     status: 401,
+    headers: { ...headers, "Content-Type": "application/json" },
+  });
+
+const forbidden = (headers: Record<string, string>, message: string) =>
+  new Response(JSON.stringify({ error: message }), {
+    status: 403,
     headers: { ...headers, "Content-Type": "application/json" },
   });
 
@@ -63,6 +79,9 @@ serve(async (req) => {
     }
 
     let userId: string | null = null;
+    let persona: AppPersona | null = null;
+    let roles: string[] = [];
+    let companyIds: string[] = [];
 
     if (authHeader) {
       const authClient = createClient(supabaseUrl, supabaseAnonKey, {
@@ -79,6 +98,37 @@ serve(async (req) => {
       }
 
       userId = user?.id ?? null;
+
+      if (userId) {
+        const [{ data: roleRows }, { data: personaRow }, { data: companyRows }, { data: entitlementRow }] = await Promise.all([
+          authClient.from("user_roles").select("role").eq("user_id", userId),
+          authClient.from("user_personas").select("persona").eq("user_id", userId).maybeSingle(),
+          authClient.from("company_members").select("company_id").eq("user_id", userId),
+          authClient.from("ca_actor_entitlements").select("assistant_access_enabled").eq("user_id", userId).maybeSingle(),
+        ]);
+
+        roles = (roleRows ?? []).map((row) => String(row.role));
+        companyIds = Array.from(new Set((companyRows ?? []).map((row) => row.company_id)));
+
+        const rowPersona = typeof personaRow?.persona === "string" ? personaRow.persona : null;
+        const metadataPersona = typeof user?.user_metadata?.registration_role === "string"
+          ? user.user_metadata.registration_role
+          : null;
+        persona = isAppPersona(rowPersona) ? rowPersona : isAppPersona(metadataPersona) ? metadataPersona : null;
+
+        if (entitlementRow?.assistant_access_enabled === false) {
+          return forbidden(corsHeaders, "Assistant access is disabled for this account");
+        }
+      }
+    }
+
+    if (!userId) {
+      return unauthorized(corsHeaders, "Assistant requires authenticated user context");
+    }
+
+    const allowedPersonas: AppPersona[] = ["company_owner", "ca_firm", "external_ca", "in_house_ca", "in_house_lawyer", "admin"];
+    if (!persona || !allowedPersonas.includes(persona)) {
+      return forbidden(corsHeaders, "Assistant is not enabled for this role/persona");
     }
 
     const { messages } = await req.json();
@@ -95,6 +145,37 @@ serve(async (req) => {
     const LOVABLE_API_KEY = Deno.env.get("LOVABLE_API_KEY");
     if (!LOVABLE_API_KEY) {
       throw new Error("LOVABLE_API_KEY is not configured");
+    }
+
+    let workspaceSummary = "No workspace data snapshot available.";
+    if (companyIds.length > 0) {
+      const authClient = createClient(supabaseUrl, supabaseAnonKey, {
+        global: { headers: { Authorization: authHeader ?? "" } },
+      });
+      const [tasksResult, deadlinesResult, exposuresResult, draftsResult] = await Promise.all([
+        authClient.from("compliance_tasks").select("id, status, due_date").in("company_id", companyIds).limit(500),
+        authClient.from("deadlines").select("id, due_date").in("company_id", companyIds).limit(300),
+        authClient.from("regulatory_exposure").select("id, status, regulator").in("company_id", companyIds).limit(300),
+        authClient.from("draft_runs").select("id, status, document_type, created_at").in("company_id", companyIds).order("created_at", { ascending: false }).limit(60),
+      ]);
+
+      const tasks = tasksResult.data ?? [];
+      const deadlines = deadlinesResult.data ?? [];
+      const exposures = exposuresResult.data ?? [];
+      const drafts = draftsResult.data ?? [];
+      const overdueTasks = tasks.filter((task) => task.status !== "completed" && typeof task.due_date === "string" && Date.parse(task.due_date) < Date.now()).length;
+      const pendingTasks = tasks.filter((task) => task.status !== "completed").length;
+      const pendingExposures = exposures.filter((item) => item.status !== "compliant").length;
+      const recentDrafts = drafts.slice(0, 10).map((item) => `${item.document_type}:${item.status}`).join(", ");
+
+      workspaceSummary = [
+        `Accessible companies: ${companyIds.length}`,
+        `Open compliance tasks: ${pendingTasks}`,
+        `Overdue tasks: ${overdueTasks}`,
+        `Upcoming deadlines tracked: ${deadlines.length}`,
+        `Open regulator exposures: ${pendingExposures}`,
+        `Recent draft statuses: ${recentDrafts || "none"}`,
+      ].join("\n");
     }
 
     const systemPrompt = `You are REGULON AI Compliance Assistant, a knowledgeable guide for Indian regulatory compliance matters.
@@ -129,6 +210,18 @@ RESPONSE GUIDELINES:
 4. Always include a disclaimer when discussing specific scenarios
 5. Recommend professional consultation for complex matters
 6. Keep responses focused and practical
+
+CURRENT USER CONTEXT:
+- Persona: ${persona}
+- Roles: ${roles.join(", ") || "none"}
+- Workspace telemetry:
+${workspaceSummary}
+
+CONTEXT USAGE RULES:
+- Use workspace telemetry to explain status when user asks "what is happening" or "how is compliance going".
+- Never invent missing numbers; if telemetry is unavailable, say so directly.
+- For company_owner and ca_firm personas, prioritize dashboard-explanation style responses.
+- For CA/lawyer personas, prioritize procedural and execution guidance.
 
 DISCLAIMER TO INCLUDE (when giving specific information):
 "This is general information only. Please consult a qualified Chartered Accountant or Legal Professional for advice specific to your situation."`;
