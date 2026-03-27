@@ -427,6 +427,79 @@ const parseMonthStart = (value: string | null) => {
   return `${trimmed}-01`;
 };
 
+const loadActorFirmId = async (client: ReturnType<typeof createClient>, userId: string) => {
+  const { data, error } = await client
+    .from("ca_firm_members")
+    .select("ca_firm_id")
+    .eq("user_id", userId)
+    .order("created_at", { ascending: true })
+    .limit(1)
+    .maybeSingle();
+  if (error) throw error;
+  return typeof data?.ca_firm_id === "string" ? data.ca_firm_id : null;
+};
+
+const enforceFirmMonthlyQuota = async (
+  client: ReturnType<typeof createClient>,
+  caFirmId: string | null,
+) => {
+  if (!caFirmId) return;
+  const defaultMonthlyLimit = Math.max(500, Number(Deno.env.get("AI_DEFAULT_FIRM_MONTHLY_LIMIT") ?? "15000"));
+  const monthStart = getMonthStartDate();
+
+  const [{ data: quotaRow, error: quotaError }, { data: usageRow, error: usageError }] = await Promise.all([
+    client
+      .from("ai_firm_usage_quotas")
+      .select("monthly_request_limit, hard_block")
+      .eq("ca_firm_id", caFirmId)
+      .maybeSingle(),
+    client
+      .from("ai_firm_monthly_usage")
+      .select("request_count")
+      .eq("ca_firm_id", caFirmId)
+      .eq("month_start", monthStart)
+      .maybeSingle(),
+  ]);
+  if (quotaError) throw quotaError;
+  if (usageError) throw usageError;
+
+  if (quotaRow?.hard_block) {
+    throw new Error("AI quota exceeded: firm_hard_block");
+  }
+
+  const monthlyLimit = quotaRow?.monthly_request_limit ?? defaultMonthlyLimit;
+  const currentCount = Number(usageRow?.request_count ?? 0);
+  if (currentCount >= monthlyLimit) {
+    throw new Error("AI quota exceeded: firm_monthly_limit");
+  }
+};
+
+const incrementFirmMonthlyUsage = async (
+  client: ReturnType<typeof createClient>,
+  caFirmId: string | null,
+) => {
+  if (!caFirmId) return;
+  const monthStart = getMonthStartDate();
+
+  const { data: usageRow, error: loadError } = await client
+    .from("ai_firm_monthly_usage")
+    .select("request_count")
+    .eq("ca_firm_id", caFirmId)
+    .eq("month_start", monthStart)
+    .maybeSingle();
+  if (loadError) throw loadError;
+
+  const nextCount = Number(usageRow?.request_count ?? 0) + 1;
+  const { error: upsertError } = await client
+    .from("ai_firm_monthly_usage")
+    .upsert({
+      ca_firm_id: caFirmId,
+      month_start: monthStart,
+      request_count: nextCount,
+    }, { onConflict: "ca_firm_id,month_start" });
+  if (upsertError) throw upsertError;
+};
+
 const enforceActorMonthlyQuota = async (
   client: ReturnType<typeof createClient>,
   userId: string,
@@ -463,6 +536,9 @@ const enforceActorMonthlyQuota = async (
   if (currentCount >= monthlyLimit) {
     throw new Error("AI quota exceeded: actor_monthly_limit");
   }
+
+  const actorFirmId = await loadActorFirmId(client, userId);
+  await enforceFirmMonthlyQuota(client, actorFirmId);
 };
 
 const incrementActorMonthlyUsage = async (
@@ -488,6 +564,9 @@ const incrementActorMonthlyUsage = async (
       request_count: nextCount,
     }, { onConflict: "user_id,month_start" });
   if (upsertError) throw upsertError;
+
+  const actorFirmId = await loadActorFirmId(client, userId);
+  await incrementFirmMonthlyUsage(client, actorFirmId);
 };
 
 const enforceAiRequestRateLimit = async (
@@ -1858,6 +1937,75 @@ serve(async (req: Request) => {
       });
 
       return json(req, 200, { ok: true, month_start: monthStart, actors });
+    }
+
+    if (req.method === "GET" && path.endsWith("drafting/ai-ops/firm-usage")) {
+      requireRole(roles, ["admin"]);
+      const caFirmId = (url.searchParams.get("ca_firm_id") || "").trim();
+      if (!caFirmId) return json(req, 400, { error: "ca_firm_id is required" });
+      const monthStart = parseMonthStart(url.searchParams.get("month"));
+
+      const [{ data: firm, error: firmError }, { data: quota, error: quotaError }, { data: usage, error: usageError }] = await Promise.all([
+        client.from("ca_firms").select("id, name, registration_number").eq("id", caFirmId).maybeSingle(),
+        client.from("ai_firm_usage_quotas").select("monthly_request_limit, hard_block, updated_at").eq("ca_firm_id", caFirmId).maybeSingle(),
+        client.from("ai_firm_monthly_usage").select("request_count, updated_at").eq("ca_firm_id", caFirmId).eq("month_start", monthStart).maybeSingle(),
+      ]);
+      if (firmError) return json(req, 400, { error: firmError.message });
+      if (quotaError) return json(req, 400, { error: quotaError.message });
+      if (usageError) return json(req, 400, { error: usageError.message });
+      if (!firm) return json(req, 404, { error: "ca firm not found" });
+
+      const defaultMonthlyLimit = Math.max(500, Number(Deno.env.get("AI_DEFAULT_FIRM_MONTHLY_LIMIT") ?? "15000"));
+      const limit = Number(quota?.monthly_request_limit ?? defaultMonthlyLimit);
+      const consumed = Number(usage?.request_count ?? 0);
+      return json(req, 200, {
+        ok: true,
+        firm,
+        month_start: monthStart,
+        quota: {
+          monthly_request_limit: limit,
+          hard_block: Boolean(quota?.hard_block),
+          updated_at: quota?.updated_at ?? null,
+        },
+        usage: {
+          request_count: consumed,
+          remaining: Math.max(0, limit - consumed),
+          utilization_rate: limit > 0 ? Number((consumed / limit).toFixed(4)) : 0,
+          updated_at: usage?.updated_at ?? null,
+        },
+      });
+    }
+
+    if (req.method === "POST" && path.endsWith("drafting/ai-ops/firm-quota")) {
+      requireRole(roles, ["admin"]);
+      const body = await req.json();
+      const caFirmId = String(body.ca_firm_id || "").trim();
+      if (!caFirmId) return json(req, 400, { error: "ca_firm_id is required" });
+
+      const monthlyLimitRaw = Number(body.monthly_request_limit ?? Number.NaN);
+      const monthlyRequestLimit = Number.isFinite(monthlyLimitRaw)
+        ? Math.max(500, Math.min(1000000, Math.floor(monthlyLimitRaw)))
+        : null;
+      if (monthlyRequestLimit === null) return json(req, 400, { error: "monthly_request_limit is required" });
+      const hardBlock = body.hard_block === true;
+
+      const { error } = await client
+        .from("ai_firm_usage_quotas")
+        .upsert({
+          ca_firm_id: caFirmId,
+          monthly_request_limit: monthlyRequestLimit,
+          hard_block: hardBlock,
+        }, { onConflict: "ca_firm_id" });
+      if (error) return json(req, 400, { error: error.message });
+
+      return json(req, 200, {
+        ok: true,
+        data: {
+          ca_firm_id: caFirmId,
+          monthly_request_limit: monthlyRequestLimit,
+          hard_block: hardBlock,
+        },
+      });
     }
 
     if (req.method === "POST" && path.endsWith("drafting/ai-ops/recover-stale")) {
