@@ -8,9 +8,9 @@ import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Badge } from "@/components/ui/badge";
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table";
 import { Button } from "@/components/ui/button";
-import { supabase } from "@/integrations/supabase/client";
 import AIVoiceBriefAgent from "@/components/voice/AIVoiceBriefAgent";
 import { useAuth } from "@/hooks/use-auth";
+import { workspaceBackendRequest } from "@/lib/workspace-backend";
 
 const AppLegalDashboard = () => {
   const { user } = useAuth();
@@ -20,41 +20,11 @@ const AppLegalDashboard = () => {
     enabled: Boolean(user?.id),
     queryFn: async () => {
       if (!user?.id) throw new Error("User is not authenticated");
-      const supabaseAny = supabase as any;
-
-      const { data: memberships, error: membershipError } = await supabase
-        .from("company_members")
-        .select("company_id")
-        .eq("user_id", user.id);
-      if (membershipError) throw membershipError;
-
-      const companyIds = Array.from(new Set((memberships ?? []).map((row) => row.company_id)));
-      if (companyIds.length === 0) {
-        return { companyIds: [], runs: [], events: [] };
-      }
-
-      const { data: runs, error: runsError } = await supabaseAny
-        .from("draft_runs")
-        .select("id, company_id, document_type, draft_mode, status, created_at")
-        .in("company_id", companyIds)
-        .order("created_at", { ascending: false })
-        .limit(100);
-      if (runsError) throw runsError;
-
-      const draftRunIds = Array.from(new Set((runs ?? []).map((run: { id: string }) => run.id)));
-      let events: Array<{ id: string; event_type: string; created_at: string; draft_run_id: string }> = [];
-      if (draftRunIds.length > 0) {
-        const { data: eventsData, error: eventsError } = await supabaseAny
-          .from("draft_audit_events")
-          .select("id, draft_run_id, event_type, created_at")
-          .in("draft_run_id", draftRunIds)
-          .order("created_at", { ascending: false })
-          .limit(200);
-        if (eventsError) throw eventsError;
-        events = eventsData ?? [];
-      }
-
-      return { companyIds, runs: runs ?? [], events };
+      return workspaceBackendRequest<{
+        companyIds: string[];
+        runs: Array<{ id: string; company_id: string | null; document_type: string; draft_mode: string; status: string; created_at: string }>;
+        events: Array<{ id: string; event_type: string; created_at: string; draft_run_id: string }>;
+      }>("/legal/dashboard");
     },
   });
 

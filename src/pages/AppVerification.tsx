@@ -23,8 +23,7 @@ const AppVerification = () => {
   const [notes, setNotes] = useState("");
   const [documentFile, setDocumentFile] = useState<File | null>(null);
   const [submitting, setSubmitting] = useState(false);
-  const verificationOptional =
-    import.meta.env.DEV || import.meta.env.VITE_VERIFICATION_OPTIONAL === "true";
+  const verificationOptional = import.meta.env.DEV;
 
   const requirements = useMemo(() => {
     if (persona === "external_ca" || persona === "in_house_ca") {

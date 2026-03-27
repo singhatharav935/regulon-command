@@ -18,9 +18,9 @@ import AIVoiceBriefAgent from "@/components/voice/AIVoiceBriefAgent";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { useToast } from "@/hooks/use-toast";
-import { supabase } from "@/integrations/supabase/client";
 import { useAuth } from "@/hooks/use-auth";
 import RuntimeErrorBoundary from "@/components/common/RuntimeErrorBoundary";
+import { workspaceBackendRequest } from "@/lib/workspace-backend";
 
 const AppDashboard = () => {
   const { user } = useAuth();
@@ -36,67 +36,15 @@ const AppDashboard = () => {
       if (!user?.id) {
         throw new Error("User is not authenticated");
       }
-
-      const { data: membership, error: membershipError } = await supabase
-        .from("company_members")
-        .select("company_id")
-        .eq("user_id", user.id)
-        .limit(1)
-        .maybeSingle();
-
-      if (membershipError) throw membershipError;
-      if (!membership?.company_id) {
-        return {
-          company: null,
-          exposures: [],
-          tasks: [],
-          documents: [],
-          deadlines: [],
-        };
-      }
-
-      const companyId = membership.company_id;
-
-      const [companyResult, exposuresResult, tasksResult, documentsResult, deadlinesResult] = await Promise.all([
-        supabase.from("companies").select("id, name, industry, compliance_health").eq("id", companyId).single(),
-        supabase
-          .from("regulatory_exposure")
-          .select("id, regulator, status, notes")
-          .eq("company_id", companyId)
-          .order("regulator", { ascending: true }),
-        supabase
-          .from("compliance_tasks")
-          .select("id, title, regulator, priority, status, due_date")
-          .eq("company_id", companyId)
-          .order("due_date", { ascending: true, nullsFirst: false })
-          .limit(20),
-        supabase
-          .from("documents")
-          .select("id, name, file_type, regulator, status, created_at")
-          .eq("company_id", companyId)
-          .order("created_at", { ascending: false })
-          .limit(30),
-        supabase
-          .from("deadlines")
-          .select("id, title, regulator, due_date, is_recurring")
-          .eq("company_id", companyId)
-          .order("due_date", { ascending: true })
-          .limit(20),
-      ]);
-
-      if (companyResult.error) throw companyResult.error;
-      if (exposuresResult.error) throw exposuresResult.error;
-      if (tasksResult.error) throw tasksResult.error;
-      if (documentsResult.error) throw documentsResult.error;
-      if (deadlinesResult.error) throw deadlinesResult.error;
-
-      return {
-        company: companyResult.data,
-        exposures: exposuresResult.data ?? [],
-        tasks: tasksResult.data ?? [],
-        documents: documentsResult.data ?? [],
-        deadlines: deadlinesResult.data ?? [],
-      };
+      return workspaceBackendRequest<{
+        company: { name: string; industry: string | null; compliance_health: number | null } | null;
+        exposures: Array<{ regulator: string; status: string; notes: string | null }>;
+        tasks: Array<{ id: string; title: string; regulator: string; priority: string; status: string; due_date: string | null }>;
+        documents: Array<{ id: string; name: string; file_type: string | null; regulator: string | null; status: string; created_at: string }>;
+        deadlines: Array<{ id: string; title: string; regulator: string; due_date: string; is_recurring: boolean | null }>;
+        draftRuns: Array<{ id: string; document_type: string; draft_mode: string; status: string; created_at: string }>;
+        draftAuditEvents: Array<{ id: string; draft_run_id: string; event_type: string; created_at: string }>;
+      }>("/company/dashboard");
     },
   });
 
@@ -143,6 +91,18 @@ const AppDashboard = () => {
           daysLeft: Math.max(differenceInCalendarDays(dueDate, now), 0),
         };
       }),
+      draftRuns: data.draftRuns.map((run: { id: string; document_type: string; draft_mode: string; status: string; created_at: string }) => ({
+        id: run.id,
+        documentType: run.document_type,
+        draftMode: run.draft_mode,
+        status: run.status,
+        createdAt: format(parseISO(run.created_at), "MMM dd, yyyy HH:mm"),
+      })),
+      draftAuditEvents: data.draftAuditEvents.map((event: { id: string; event_type: string; created_at: string }) => ({
+        id: event.id,
+        eventType: event.event_type,
+        createdAt: format(parseISO(event.created_at), "MMM dd, yyyy HH:mm"),
+      })),
     };
   }, [data]);
 
@@ -183,13 +143,13 @@ const AppDashboard = () => {
 
       setCreatingCompany(true);
       try {
-        const supabaseAny = supabase as any;
-        const { error } = await supabaseAny.rpc("create_company_with_owner", {
-          _name: companyName.trim(),
-          _industry: industry.trim() || null,
+        await workspaceBackendRequest<{ created: boolean }>("/company/workspace", {
+          method: "POST",
+          body: JSON.stringify({
+            name: companyName.trim(),
+            industry: industry.trim() || null,
+          }),
         });
-
-        if (error) throw error;
 
         toast({
           title: "Company workspace created",
@@ -295,6 +255,43 @@ const AppDashboard = () => {
               </div>
               <div className="lg:col-span-1">
                 <UpcomingDeadlines deadlines={mappedData.deadlines} />
+              </div>
+            </div>
+
+            <div className="grid grid-cols-1 lg:grid-cols-2 gap-6 mt-8">
+              <div className="glass-card border border-border/40 rounded-xl p-6">
+                <h2 className="text-lg font-semibold mb-4">Live Draft Workflow</h2>
+                {mappedData.draftRuns.length === 0 ? (
+                  <p className="text-sm text-muted-foreground">No live draft runs for this company yet.</p>
+                ) : (
+                  <div className="space-y-3">
+                    {mappedData.draftRuns.slice(0, 8).map((run) => (
+                      <div key={run.id} className="flex items-center justify-between gap-3 rounded-lg border border-border/40 p-3">
+                        <div>
+                          <p className="font-medium text-sm">{run.documentType}</p>
+                          <p className="text-xs text-muted-foreground">{run.draftMode} · {run.createdAt}</p>
+                        </div>
+                        <span className="text-xs rounded-full border border-border px-3 py-1">{run.status}</span>
+                      </div>
+                    ))}
+                  </div>
+                )}
+              </div>
+
+              <div className="glass-card border border-border/40 rounded-xl p-6">
+                <h2 className="text-lg font-semibold mb-4">Audit Trail Snapshot</h2>
+                {mappedData.draftAuditEvents.length === 0 ? (
+                  <p className="text-sm text-muted-foreground">No draft audit events recorded yet.</p>
+                ) : (
+                  <div className="space-y-3">
+                    {mappedData.draftAuditEvents.slice(0, 8).map((event) => (
+                      <div key={event.id} className="rounded-lg border border-border/40 p-3">
+                        <p className="font-medium text-sm">{event.eventType}</p>
+                        <p className="text-xs text-muted-foreground">{event.createdAt}</p>
+                      </div>
+                    ))}
+                  </div>
+                )}
               </div>
             </div>
           </RuntimeErrorBoundary>

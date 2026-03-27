@@ -15,8 +15,7 @@ interface ProtectedRouteProps {
 }
 
 const verificationRequiredPersonas: AppPersona[] = ["external_ca", "in_house_ca", "in_house_lawyer", "company_owner", "admin", "ca_firm"];
-const VERIFICATION_OPTIONAL_FOR_NOW =
-  import.meta.env.DEV || import.meta.env.VITE_VERIFICATION_OPTIONAL === "true";
+const VERIFICATION_OPTIONAL_FOR_NOW = import.meta.env.DEV;
 
 const inferPersonaFromMetadata = (registrationRole: unknown): AppPersona | null => {
   if (

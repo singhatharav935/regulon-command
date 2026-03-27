@@ -3,8 +3,7 @@ import { Navigate } from "react-router-dom";
 import { useAuth } from "@/hooks/use-auth";
 import type { AppPersona } from "@/hooks/use-auth";
 
-const VERIFICATION_OPTIONAL_FOR_NOW =
-  import.meta.env.DEV || import.meta.env.VITE_VERIFICATION_OPTIONAL === "true";
+const VERIFICATION_OPTIONAL_FOR_NOW = import.meta.env.DEV;
 
 const inferPersonaFromMetadata = (registrationRole: unknown): AppPersona | null => {
   if (

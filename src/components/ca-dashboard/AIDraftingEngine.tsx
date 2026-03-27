@@ -35,6 +35,7 @@ import { Tooltip, TooltipContent, TooltipProvider, TooltipTrigger } from "@/comp
 import { toast } from "sonner";
 import { supabase } from "@/integrations/supabase/client";
 import { useLocation, useNavigate } from "react-router-dom";
+import { workspaceBackendRequest } from "@/lib/workspace-backend";
 
 const documentTypes = [
   { id: "mca-notice", label: "MCA Notice Response", authority: "MCA" },
@@ -101,7 +102,7 @@ const draftModes = [
 ];
 
 const allowLiveDemoFallback =
-  import.meta.env.DEV || import.meta.env.VITE_ENABLE_LIVE_DEMO_FALLBACK === "true";
+  import.meta.env.DEV && import.meta.env.VITE_ENABLE_LIVE_DEMO_FALLBACK === "true";
 
 type LogicLevelId = "regulon_core" | "regulon_nexus_9" | "regulon_sovereign";
 
@@ -1120,6 +1121,13 @@ interface DraftQA {
     evidence_anchor: string;
   }>;
   missing_for_final_filing?: string[];
+  human_review_required?: boolean;
+  prompt_policy_version?: string;
+  qa_policy_version?: string;
+  authority_check?: {
+    authority_detected: string | null;
+    authority_consistent: boolean;
+  };
 }
 
 interface DraftPackage {
@@ -2019,6 +2027,22 @@ const AIDraftingEngine = ({ demoMode = false, includeLawyerReview = true }: AIDr
   );
   const buildContextWithTemplateAndPrompt = (base: string) =>
     `${base}\n\nTemplate policy [${effectiveTemplatePack.label}]: ${effectiveTemplatePack.instructions}\n${promptPolicyDirective}`;
+  const hasBlockingFilingIssues = Boolean(
+    (draftQA?.missing_for_final_filing && draftQA.missing_for_final_filing.length > 0) ||
+    (draftQA?.citation_review ?? []).some((item) => item.jurisdiction_fit === "low" || item.confidence < 0.55) ||
+    (draftQA?.authority_check && !draftQA.authority_check.authority_consistent) ||
+    (typeof draftQA?.filing_score === "number" && draftQA.filing_score < 75),
+  );
+  const finalSignOffDisabledReason =
+    draftQA?.missing_for_final_filing && draftQA.missing_for_final_filing.length > 0
+      ? "Resolve all missing filing items before sign-off."
+      : (draftQA?.citation_review ?? []).some((item) => item.jurisdiction_fit === "low" || item.confidence < 0.55)
+        ? "Review citation confidence and jurisdiction fit before sign-off."
+        : draftQA?.authority_check && !draftQA.authority_check.authority_consistent
+          ? "Authority detection mismatch must be resolved before sign-off."
+          : typeof draftQA?.filing_score === "number" && draftQA.filing_score < 75
+            ? "Filing score must be at least 75 before sign-off."
+            : null;
 
   const checkDraftServiceHealth = async () => {
     setIsCheckingDraftService(true);
@@ -3687,6 +3711,17 @@ const AIDraftingEngine = ({ demoMode = false, includeLawyerReview = true }: AIDr
       .slice(0, 80) || "regulon-draft";
   };
 
+  const assertLiveClientAccessOrThrow = () => {
+    if (demoMode || clientSource !== "live") return;
+    if (!selectedClient) {
+      throw new Error("Select an assigned company before continuing in live mode.");
+    }
+    const hasMembership = clientOptions.some((client) => client.id === selectedClient);
+    if (!hasMembership) {
+      throw new Error("Selected company is outside your assigned tenant scope.");
+    }
+  };
+
   const recordAudit = async (draftRunId: string, eventType: string, payload?: Record<string, unknown>) => {
     if (demoMode) {
       setAuditEvents((prev) => [
@@ -3697,23 +3732,18 @@ const AIDraftingEngine = ({ demoMode = false, includeLawyerReview = true }: AIDr
     }
 
     try {
-      const {
-        data: { user },
-      } = await supabase.auth.getUser();
-      if (!user) return;
-      await supabaseAny.from("draft_audit_events").insert({
-        draft_run_id: draftRunId,
-        user_id: user.id,
-        event_type: eventType,
-        payload: payload ?? null,
+      const data = await workspaceBackendRequest<{
+        versions: DraftVersionItem[];
+        events: DraftAuditEventItem[];
+      }>(`/drafts/${draftRunId}/snapshot`, {
+        method: "POST",
+        body: JSON.stringify({
+          content: lastPersistedDraftContentRef.current || draftContent,
+          eventType,
+          payload,
+        }),
       });
-      const { data } = await supabaseAny
-        .from("draft_audit_events")
-        .select("event_type, created_at")
-        .eq("draft_run_id", draftRunId)
-        .order("created_at", { ascending: false })
-        .limit(10);
-      setAuditEvents(data ?? []);
+      setAuditEvents((data.events ?? []).slice(0, 10));
     } catch {
       // non-blocking
     }
@@ -3725,14 +3755,11 @@ const AIDraftingEngine = ({ demoMode = false, includeLawyerReview = true }: AIDr
       return;
     }
     try {
-      const { data, error } = await supabaseAny
-        .from("draft_audit_events")
-        .select("event_type, created_at")
-        .eq("draft_run_id", draftRunId)
-        .order("created_at", { ascending: false })
-        .limit(10);
-      if (error) throw error;
-      setAuditEvents((data ?? []) as DraftAuditEventItem[]);
+      const data = await workspaceBackendRequest<{
+        versions: DraftVersionItem[];
+        events: DraftAuditEventItem[];
+      }>(`/drafts/${draftRunId}/artifacts`);
+      setAuditEvents((data.events ?? []).slice(0, 10));
     } catch {
       setAuditEvents([]);
     }
@@ -3745,14 +3772,11 @@ const AIDraftingEngine = ({ demoMode = false, includeLawyerReview = true }: AIDr
     }
     setIsLoadingDraftVersions(true);
     try {
-      const { data, error } = await supabaseAny
-        .from("draft_versions")
-        .select("id, draft_run_id, version_number, content, created_at")
-        .eq("draft_run_id", draftRunId)
-        .order("version_number", { ascending: false })
-        .limit(20);
-      if (error) throw error;
-      setDraftVersions((data ?? []) as DraftVersionItem[]);
+      const data = await workspaceBackendRequest<{
+        versions: DraftVersionItem[];
+        events: DraftAuditEventItem[];
+      }>(`/drafts/${draftRunId}/artifacts`);
+      setDraftVersions((data.versions ?? []) as DraftVersionItem[]);
     } catch {
       setDraftVersions([]);
     } finally {
@@ -3787,48 +3811,28 @@ const AIDraftingEngine = ({ demoMode = false, includeLawyerReview = true }: AIDr
 
     setIsSavingDraftVersion(true);
     try {
-      const {
-        data: { user },
-      } = await supabase.auth.getUser();
-      if (!user) throw new Error("No authenticated user for draft persistence.");
-
-      const { data: latestVersion } = await supabaseAny
-        .from("draft_versions")
-        .select("version_number")
-        .eq("draft_run_id", draftRunId)
-        .order("version_number", { ascending: false })
-        .limit(1)
-        .maybeSingle();
-
-      const nextVersionNumber = Number(latestVersion?.version_number ?? 0) + 1;
-
-      const { error: updateError } = await supabaseAny
-        .from("draft_runs")
-        .update({
-          draft_content: content,
-          status: nextStatus ?? workflowStatus,
-          notice_input: maskPII(noticeDetails) || null,
-          qa: draftQA ?? null,
-          package: draftPackage ?? null,
-        })
-        .eq("id", draftRunId);
-      if (updateError) throw updateError;
-
-      const { error: versionError } = await supabaseAny
-        .from("draft_versions")
-        .insert({
-          draft_run_id: draftRunId,
-          user_id: user.id,
-          version_number: nextVersionNumber,
+      const data = await workspaceBackendRequest<{
+        versions: DraftVersionItem[];
+        events: DraftAuditEventItem[];
+      }>(`/drafts/${draftRunId}/snapshot`, {
+        method: "POST",
+        body: JSON.stringify({
           content,
-        });
-      if (versionError) throw versionError;
+          nextStatus: nextStatus ?? workflowStatus,
+          eventType,
+          noticeInput: maskPII(noticeDetails) || null,
+          qa: draftQA ?? null,
+          draftPackage: draftPackage ?? null,
+          payload,
+        }),
+      });
 
       setWorkflowStatus(nextStatus ?? workflowStatus);
       lastPersistedDraftContentRef.current = content.trim();
       setHasUnsavedDraftChanges(false);
-      await recordAudit(draftRunId, eventType, payload);
-      await Promise.all([loadDraftVersions(draftRunId), loadDraftHistory(), loadAuditTrail(draftRunId)]);
+      setDraftVersions((data.versions ?? []) as DraftVersionItem[]);
+      setAuditEvents((data.events ?? []) as DraftAuditEventItem[]);
+      await loadDraftHistory();
       if (successMessage) toast.success(successMessage);
       return true;
     } catch (error) {
@@ -3873,52 +3877,26 @@ const AIDraftingEngine = ({ demoMode = false, includeLawyerReview = true }: AIDr
       if (!user) {
         throw new Error("No authenticated user for persistence.");
       }
-
-      const { data: draftRun, error: draftRunError } = await supabaseAny
-        .from("draft_runs")
-        .insert({
-          user_id: user.id,
-          company_id: clientSource === "live" ? selectedClient : null,
-          document_type: selectedDocType,
-          draft_mode: selectedMode,
-          status: "generated",
-          notice_input: maskPII(noticeDetails) || null,
-          draft_content: content,
+      const data = await workspaceBackendRequest<{ draftRunId: string }>("/drafts", {
+        method: "POST",
+        body: JSON.stringify({
+          companyId: clientSource === "live" ? selectedClient : null,
+          documentType: selectedDocType,
+          draftMode: selectedMode,
+          noticeInput: maskPII(noticeDetails) || null,
+          draftContent: content,
           qa,
-          package: draftPackagePayload,
-        })
-        .select("id")
-        .single();
-      if (draftRunError) throw draftRunError;
-
-      if (draftRun?.id) {
-        const { error: versionError } = await supabaseAny
-          .from("draft_versions")
-          .insert({
-            draft_run_id: draftRun.id,
-            user_id: user.id,
-            version_number: 1,
-            content,
-          });
-        if (versionError) throw versionError;
-
-        setCurrentDraftRunId(draftRun.id);
+          draftPackage: draftPackagePayload,
+          preferPiiMasking,
+        }),
+      });
+      const draftRunId = data?.draftRunId;
+      if (draftRunId) {
+        setCurrentDraftRunId(draftRunId);
         lastPersistedDraftContentRef.current = content.trim();
         setHasUnsavedDraftChanges(false);
-        await recordAudit(draftRun.id, "draft_generated", {
-          document_type: selectedDocType,
-          draft_mode: selectedMode,
-          advanced_mode: advancedMode,
-        });
-        await Promise.all([loadDraftVersions(draftRun.id), loadDraftHistory()]);
+        await Promise.all([loadDraftVersions(draftRunId), loadDraftHistory(), loadAuditTrail(draftRunId)]);
       }
-
-      await supabaseAny.from("practice_preferences").upsert({
-        user_id: user.id,
-        preferred_mode: selectedMode,
-        preferred_document_type: selectedDocType,
-        prefer_pii_masking: preferPiiMasking,
-      });
     } catch {
       // non-blocking persistence
     }
@@ -3954,19 +3932,13 @@ const AIDraftingEngine = ({ demoMode = false, includeLawyerReview = true }: AIDr
         return;
       }
 
-      let query = supabaseAny
-        .from("draft_runs")
-        .select("id, created_at, status, document_type, draft_mode, draft_content, qa, package")
-        .eq("user_id", user.id)
-        .order("created_at", { ascending: false })
-        .limit(20);
-
-      if (selectedClient) query = query.eq("company_id", selectedClient);
-      if (selectedDocType) query = query.eq("document_type", selectedDocType);
-
-      const { data, error } = await query;
-      if (error) throw error;
-      setDraftHistory((data ?? []) as DraftHistoryItem[]);
+      const params = new URLSearchParams();
+      if (selectedClient) params.set("company_id", selectedClient);
+      if (selectedDocType) params.set("document_type", selectedDocType);
+      const data = await workspaceBackendRequest<{ history: DraftHistoryItem[] }>(
+        `/drafts/history${params.toString() ? `?${params.toString()}` : ""}`,
+      );
+      setDraftHistory((data.history ?? []) as DraftHistoryItem[]);
     } catch {
       setDraftHistory([]);
     } finally {
@@ -4021,18 +3993,42 @@ const AIDraftingEngine = ({ demoMode = false, includeLawyerReview = true }: AIDr
       .replace(/&/g, "&amp;")
       .replace(/</g, "&lt;")
       .replace(/>/g, "&gt;");
+    const exportTitle = `${selectedDocLabel} - ${clientOptions.find((client) => client.id === selectedClient)?.name || "Company"}`;
+    const exportStamp = new Date().toLocaleString();
     draftWindow.document.write(`
       <html>
         <head>
-          <title>REGULON Draft Export</title>
+          <title>${exportTitle}</title>
           <style>
-            body { font-family: Arial, sans-serif; padding: 24px; line-height: 1.45; white-space: pre-wrap; }
-            h1 { font-size: 18px; margin-bottom: 16px; }
+            @page { size: A4; margin: 18mm 14mm; }
+            body { font-family: Georgia, "Times New Roman", serif; color: #111827; line-height: 1.55; white-space: pre-wrap; }
+            .sheet { max-width: 760px; margin: 0 auto; }
+            .header { border-bottom: 2px solid #0f172a; padding-bottom: 12px; margin-bottom: 18px; }
+            .brand { font-size: 12px; letter-spacing: 0.14em; text-transform: uppercase; color: #475569; }
+            h1 { font-size: 20px; margin: 6px 0 14px; }
+            .meta { display: grid; grid-template-columns: 1fr 1fr; gap: 8px 24px; font-size: 12px; margin-bottom: 18px; }
+            .meta div strong { display: inline-block; min-width: 110px; }
+            .content { font-size: 13.5px; }
+            .footer { margin-top: 24px; padding-top: 12px; border-top: 1px solid #cbd5e1; font-size: 11px; color: #64748b; }
           </style>
         </head>
         <body>
-          <h1>REGULON Filing Draft</h1>
-          <div>${safeContent}</div>
+          <div class="sheet">
+            <div class="header">
+              <div class="brand">Regulon Filing Draft</div>
+              <h1>${exportTitle}</h1>
+              <div class="meta">
+                <div><strong>Authority:</strong> ${selectedDocLabel}</div>
+                <div><strong>Draft Mode:</strong> ${selectedMode}</div>
+                <div><strong>Status:</strong> ${workflowStatus}</div>
+                <div><strong>Exported At:</strong> ${exportStamp}</div>
+              </div>
+            </div>
+            <div class="content">${safeContent}</div>
+            <div class="footer">
+              AI-assisted compliance draft. Final filing requires authorized professional review and sign-off.
+            </div>
+          </div>
         </body>
       </html>
     `);
@@ -4051,7 +4047,34 @@ const AIDraftingEngine = ({ demoMode = false, includeLawyerReview = true }: AIDr
       .replace(/</g, "&lt;")
       .replace(/>/g, "&gt;")
       .replace(/\n/g, "<br/>");
-    const html = `<html><head><meta charset="utf-8"></head><body>${safeHtml}</body></html>`;
+    const exportTitle = `${selectedDocLabel} - ${clientOptions.find((client) => client.id === selectedClient)?.name || "Company"}`;
+    const html = `
+      <html>
+        <head>
+          <meta charset="utf-8">
+          <style>
+            body { font-family: Georgia, "Times New Roman", serif; color: #111827; margin: 28px; line-height: 1.55; }
+            .brand { font-size: 12px; letter-spacing: 0.14em; text-transform: uppercase; color: #475569; }
+            h1 { font-size: 20px; margin: 6px 0 14px; }
+            table.meta { width: 100%; border-collapse: collapse; margin-bottom: 18px; font-size: 12px; }
+            table.meta td { border: 1px solid #cbd5e1; padding: 6px 8px; vertical-align: top; }
+            .content { font-size: 13.5px; }
+            .footer { margin-top: 24px; padding-top: 12px; border-top: 1px solid #cbd5e1; font-size: 11px; color: #64748b; }
+          </style>
+        </head>
+        <body>
+          <div class="brand">Regulon Filing Draft</div>
+          <h1>${exportTitle}</h1>
+          <table class="meta">
+            <tr><td><strong>Authority</strong></td><td>${selectedDocLabel}</td></tr>
+            <tr><td><strong>Draft Mode</strong></td><td>${selectedMode}</td></tr>
+            <tr><td><strong>Status</strong></td><td>${workflowStatus}</td></tr>
+            <tr><td><strong>Exported At</strong></td><td>${new Date().toLocaleString()}</td></tr>
+          </table>
+          <div class="content">${safeHtml}</div>
+          <div class="footer">AI-assisted compliance draft. Final filing requires authorized professional review and sign-off.</div>
+        </body>
+      </html>`;
     const blob = new Blob([html], { type: "application/msword;charset=utf-8" });
     const link = document.createElement("a");
     const stamp = new Date().toISOString().slice(0, 19).replace(/[:T]/g, "-");
@@ -4122,13 +4145,10 @@ const AIDraftingEngine = ({ demoMode = false, includeLawyerReview = true }: AIDr
     const loadLiveClients = async () => {
       setIsLoadingClients(true);
       try {
-        const {
-          data: { user },
-        } = await supabase.auth.getUser();
-
+        const data = await workspaceBackendRequest<{ clients: ClientOption[] }>("/drafting/clients");
         if (!mounted) return;
 
-        if (!user) {
+        if ((data.clients ?? []).length === 0) {
           if (allowLiveDemoFallback) {
             setClientOptions(demoClients);
             setClientSource("demo");
@@ -4139,56 +4159,7 @@ const AIDraftingEngine = ({ demoMode = false, includeLawyerReview = true }: AIDr
           return;
         }
 
-        const { data: memberships, error: membershipError } = await supabase
-          .from("company_members")
-          .select("company_id")
-          .eq("user_id", user.id);
-
-        if (membershipError) {
-          throw membershipError;
-        }
-
-        const companyIds = Array.from(new Set((memberships ?? []).map((row) => row.company_id)));
-
-        if (companyIds.length === 0) {
-          if (allowLiveDemoFallback) {
-            setClientOptions(demoClients);
-            setClientSource("demo");
-          } else {
-            setClientOptions([]);
-            setClientSource("live");
-          }
-          return;
-        }
-
-        const { data: companies, error: companyError } = await supabase
-          .from("companies")
-          .select("id, name, industry")
-          .in("id", companyIds)
-          .order("name", { ascending: true });
-
-        if (companyError) {
-          throw companyError;
-        }
-
-        if ((companies ?? []).length === 0) {
-          if (allowLiveDemoFallback) {
-            setClientOptions(demoClients);
-            setClientSource("demo");
-          } else {
-            setClientOptions([]);
-            setClientSource("live");
-          }
-          return;
-        }
-
-        const mappedCompanies: ClientOption[] = (companies ?? []).map((company) => ({
-          id: company.id,
-          name: company.name,
-          industry: company.industry ?? "General",
-        }));
-
-        setClientOptions(mappedCompanies);
+        setClientOptions(data.clients ?? []);
         setClientSource("live");
       } catch {
         if (!mounted) return;
@@ -4671,6 +4642,7 @@ const AIDraftingEngine = ({ demoMode = false, includeLawyerReview = true }: AIDr
   };
 
   const requestDraftData = async (requestBody: Record<string, unknown>) => {
+    assertLiveClientAccessOrThrow();
     const mergedPayload = {
       logicLevel: effectiveLogicLevel,
       logicEngine: effectiveLogicProfile.engine,
@@ -4698,6 +4670,7 @@ const AIDraftingEngine = ({ demoMode = false, includeLawyerReview = true }: AIDr
 
     const authToken = await getEffectiveAuthToken();
     const body = JSON.stringify(mergedPayload);
+    const sleep = (ms: number) => new Promise((resolve) => setTimeout(resolve, ms));
 
     const tryRequest = async (withAuthHeaders: boolean) =>
       fetch(DRAFT_URL, {
@@ -4720,6 +4693,16 @@ const AIDraftingEngine = ({ demoMode = false, includeLawyerReview = true }: AIDr
     } catch (networkError) {
       if (secureFunctionAuth) throw networkError;
       response = await tryRequest(false);
+    }
+
+    const shouldRetry = (candidate: Response) => candidate.status === 429 || candidate.status >= 500;
+    let retryAttempt = 0;
+    while (shouldRetry(response) && retryAttempt < 2) {
+      retryAttempt += 1;
+      const retryAfterHeader = response.headers.get("retry-after");
+      const retryDelay = retryAfterHeader ? Number(retryAfterHeader) * 1000 : 900 * retryAttempt;
+      await sleep(Math.max(retryDelay, 900));
+      response = await tryRequest(true);
     }
 
     if (response.status === 429) throw new Error("Rate limit exceeded. Please try again in a moment.");
@@ -5610,6 +5593,9 @@ Return only revised final draft text.`);
     const maskedNoticeDetails = noticeDetails ? maskPII(noticeDetails) : undefined;
 
     const applyOfflineFallback = async (reason?: string) => {
+      if (!demoMode) {
+        throw new Error(reason || "Offline/demo fallback is disabled in live production mode.");
+      }
       const offlineContent = buildOfflineDraft({
         authority: selectedDocLabel,
         companyName: client?.name || "Company",
@@ -8069,7 +8055,7 @@ Return only revised final draft text.`);
                   </Button>
                   <Button
                     size="sm"
-                    disabled={!currentDraftRunId || workflowStatus !== "approved"}
+                    disabled={!currentDraftRunId || workflowStatus !== "approved" || hasBlockingFilingIssues}
                     onClick={() => void persistDraftSnapshot({
                       draftRunId: currentDraftRunId!,
                       content: draftContent,
@@ -8083,6 +8069,9 @@ Return only revised final draft text.`);
                   </Button>
                 </div>
               )}
+              {finalSignOffDisabledReason ? (
+                <p className="text-xs text-amber-300 mt-2">{finalSignOffDisabledReason}</p>
+              ) : null}
             </CardHeader>
             <CardContent>
               <div className="relative">
@@ -8144,6 +8133,31 @@ Return only revised final draft text.`);
                   </ul>
                 </div>
               )}
+
+              <div className="mt-6 p-4 rounded-lg border border-border/50 bg-background/30">
+                <p className="text-sm font-medium mb-2">AI Governance</p>
+                <div className="grid grid-cols-1 md:grid-cols-2 gap-3 text-xs text-muted-foreground">
+                  <div className="rounded border border-border/40 p-3">
+                    <p className="text-foreground font-medium mb-1">Prompt Policy</p>
+                    <p>{draftQA?.prompt_policy_version || "Current runtime prompt policy not recorded yet."}</p>
+                  </div>
+                  <div className="rounded border border-border/40 p-3">
+                    <p className="text-foreground font-medium mb-1">QA Policy</p>
+                    <p>{draftQA?.qa_policy_version || "Current runtime QA policy not recorded yet."}</p>
+                  </div>
+                  <div className="rounded border border-border/40 p-3">
+                    <p className="text-foreground font-medium mb-1">Human Review Gate</p>
+                    <p>{draftQA?.human_review_required === false ? "Not required" : "Mandatory before final filing output."}</p>
+                  </div>
+                  <div className="rounded border border-border/40 p-3">
+                    <p className="text-foreground font-medium mb-1">Authority Check</p>
+                    <p>
+                      {draftQA?.authority_check?.authority_detected || "Unknown authority"} · {" "}
+                      {draftQA?.authority_check?.authority_consistent === false ? "Mismatch detected" : "Consistent"}
+                    </p>
+                  </div>
+                </div>
+              </div>
 
               <div className="mt-6 p-4 rounded-lg border border-border/50 bg-background/30">
                 <div className="flex items-center justify-between mb-2">

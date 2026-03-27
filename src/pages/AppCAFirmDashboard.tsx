@@ -8,10 +8,10 @@ import { Input } from "@/components/ui/input";
 import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table";
-import { supabase } from "@/integrations/supabase/client";
 import { useAuth } from "@/hooks/use-auth";
 import { useToast } from "@/hooks/use-toast";
 import AIVoiceBriefAgent from "@/components/voice/AIVoiceBriefAgent";
+import { workspaceBackendRequest } from "@/lib/workspace-backend";
 
 const AppCAFirmDashboard = () => {
   const { user } = useAuth();
@@ -22,61 +22,17 @@ const AppCAFirmDashboard = () => {
   const [firmJurisdiction, setFirmJurisdiction] = useState("");
   const [creatingFirm, setCreatingFirm] = useState(false);
 
-  const { data, isLoading, refetch } = useQuery({
+  const { data, isLoading, isError, error, refetch } = useQuery({
     queryKey: ["ca-firm", user?.id],
     enabled: Boolean(user?.id),
     queryFn: async () => {
       if (!user?.id) throw new Error("User is not authenticated");
-
-      const supabaseAny = supabase as any;
-      const { data: membership, error: membershipError } = await supabaseAny
-        .from("ca_firm_members")
-        .select("ca_firm_id, role")
-        .eq("user_id", user.id)
-        .limit(1)
-        .maybeSingle();
-
-      if (membershipError) throw membershipError;
-      if (!membership?.ca_firm_id) {
-        return { firm: null, members: [], directory: [], runs: [] };
-      }
-
-      const [firmResult, membersResult, directoryResult] = await Promise.all([
-        supabaseAny.from("ca_firms").select("id, name, registration_number, jurisdiction").eq("id", membership.ca_firm_id).single(),
-        supabaseAny.from("ca_firm_members").select("id, user_id, role").eq("ca_firm_id", membership.ca_firm_id),
-        supabaseAny
-          .from("ca_firm_ca_directory")
-          .select("id, ca_user_id, ca_name, license_number, specialty, status")
-          .eq("ca_firm_id", membership.ca_firm_id)
-          .order("ca_name", { ascending: true }),
-      ]);
-
-      if (firmResult.error) throw firmResult.error;
-      if (membersResult.error) throw membersResult.error;
-      if (directoryResult.error) throw directoryResult.error;
-
-      const caUserIds = Array.from(
-        new Set((directoryResult.data ?? []).map((entry: { ca_user_id: string | null }) => entry.ca_user_id).filter(Boolean)),
-      );
-
-      let runs: Array<{ id: string; user_id: string | null; status: string }> = [];
-      if (caUserIds.length > 0) {
-        const { data: runsData, error: runsError } = await supabaseAny
-          .from("draft_runs")
-          .select("id, user_id, status")
-          .in("user_id", caUserIds)
-          .order("created_at", { ascending: false })
-          .limit(1000);
-        if (runsError) throw runsError;
-        runs = runsData ?? [];
-      }
-
-      return {
-        firm: firmResult.data,
-        members: membersResult.data ?? [],
-        directory: directoryResult.data ?? [],
-        runs,
-      };
+      return workspaceBackendRequest<{
+        firm: { id: string; name: string; registration_number: string; jurisdiction: string | null } | null;
+        members: Array<{ id: string; user_id: string; role: string }>;
+        directory: Array<{ id: string; ca_user_id: string | null; ca_name: string; license_number: string | null; specialty: string | null; status: string | null }>;
+        runs: Array<{ id: string; user_id: string | null; status: string }>;
+      }>("/ca-firm/dashboard");
     },
   });
 
@@ -89,14 +45,14 @@ const AppCAFirmDashboard = () => {
       runCounts.set(run.user_id, (runCounts.get(run.user_id) ?? 0) + 1);
     }
 
-    const enriched = data.directory.map((entry: any) => ({
+    const enriched = data.directory.map((entry) => ({
       ...entry,
       workCount: entry.ca_user_id ? runCounts.get(entry.ca_user_id) ?? 0 : 0,
     }));
 
     const q = search.toLowerCase().trim();
     if (!q) return enriched;
-    return enriched.filter((entry: any) =>
+    return enriched.filter((entry) =>
       entry.ca_name?.toLowerCase().includes(q) ||
       entry.license_number?.toLowerCase().includes(q) ||
       entry.specialty?.toLowerCase().includes(q)
@@ -111,13 +67,14 @@ const AppCAFirmDashboard = () => {
 
     setCreatingFirm(true);
     try {
-      const supabaseAny = supabase as any;
-      const { error } = await supabaseAny.rpc("create_ca_firm_with_owner", {
-        _name: firmName.trim(),
-        _registration_number: firmRegistration.trim(),
-        _jurisdiction: firmJurisdiction.trim() || null,
+      await workspaceBackendRequest<{ created: boolean }>("/ca-firm/workspace", {
+        method: "POST",
+        body: JSON.stringify({
+          name: firmName.trim(),
+          registrationNumber: firmRegistration.trim(),
+          jurisdiction: firmJurisdiction.trim() || null,
+        }),
       });
-      if (error) throw error;
 
       toast({ title: "CA firm created", description: "Your firm workspace is ready." });
       setFirmName("");
@@ -141,6 +98,17 @@ const AppCAFirmDashboard = () => {
         <div className="text-center">
           <div className="w-12 h-12 border-4 border-primary border-t-transparent rounded-full animate-spin mx-auto mb-4" />
           <p className="text-muted-foreground">Loading CA firm workspace...</p>
+        </div>
+      </div>
+    );
+  }
+
+  if (isError) {
+    return (
+      <div className="min-h-screen bg-background flex items-center justify-center p-4">
+        <div className="max-w-lg w-full rounded-xl border border-destructive/30 bg-destructive/5 p-6 text-center">
+          <h1 className="text-xl font-semibold mb-2">Failed to load CA firm workspace</h1>
+          <p className="text-muted-foreground text-sm">{error instanceof Error ? error.message : "Unexpected error"}</p>
         </div>
       </div>
     );
@@ -179,7 +147,7 @@ const AppCAFirmDashboard = () => {
                 dashboardId="app-ca-firm"
                 actorName={data.firm.name}
                 roleLabel="CA Firm Workspace"
-                pendingWork={filteredDirectory.slice(0, 4).map((entry: any) => `${entry.ca_name} has ${entry.workCount} tracked work items`)}
+                pendingWork={filteredDirectory.slice(0, 4).map((entry) => `${entry.ca_name} has ${entry.workCount} tracked work items`)}
                 newRules={[
                   "Firm ops: prioritize overdue filings with backup-owner routing",
                   "Quality: enforce issue detector and AI-fix cycle before submission",
@@ -194,7 +162,7 @@ const AppCAFirmDashboard = () => {
                 <Card className="glass-card border-border/40"><CardContent className="p-4"><p className="text-xs text-muted-foreground">Team Members</p><p className="text-2xl font-bold">{data.members.length}</p></CardContent></Card>
                 <Card className="glass-card border-border/40"><CardContent className="p-4"><p className="text-xs text-muted-foreground">Tracked CAs</p><p className="text-2xl font-bold">{data.directory.length}</p></CardContent></Card>
                 <Card className="glass-card border-border/40"><CardContent className="p-4"><p className="text-xs text-muted-foreground">Total Work Items</p><p className="text-2xl font-bold">{data.runs.length}</p></CardContent></Card>
-                <Card className="glass-card border-border/40"><CardContent className="p-4"><p className="text-xs text-muted-foreground">Active CAs</p><p className="text-2xl font-bold">{data.directory.filter((c: any) => c.status === "active").length}</p></CardContent></Card>
+                <Card className="glass-card border-border/40"><CardContent className="p-4"><p className="text-xs text-muted-foreground">Active CAs</p><p className="text-2xl font-bold">{data.directory.filter((c) => c.status === "active").length}</p></CardContent></Card>
               </div>
 
               <Card className="glass-card border-border/40 mb-6">
@@ -220,7 +188,7 @@ const AppCAFirmDashboard = () => {
                     <TableBody>
                       {filteredDirectory.length === 0 ? (
                         <TableRow><TableCell colSpan={5} className="text-muted-foreground">No CAs found.</TableCell></TableRow>
-                      ) : filteredDirectory.map((entry: any) => (
+                      ) : filteredDirectory.map((entry) => (
                         <TableRow key={entry.id}>
                           <TableCell className="font-medium">{entry.ca_name}</TableCell>
                           <TableCell>{entry.license_number || "-"}</TableCell>

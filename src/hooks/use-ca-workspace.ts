@@ -1,6 +1,6 @@
 import { useEffect, useState } from "react";
-import { supabase } from "@/integrations/supabase/client";
 import { useAuth } from "@/hooks/use-auth";
+import { workspaceBackendRequest } from "@/lib/workspace-backend";
 
 export type CAWorkspaceType = "external_ca" | "regulon_ca";
 
@@ -18,7 +18,6 @@ export const useCAWorkspace = (): CAWorkspaceState => {
 
   useEffect(() => {
     let mounted = true;
-    const supabaseAny = supabase as any;
 
     const load = async () => {
       if (!user) {
@@ -31,25 +30,13 @@ export const useCAWorkspace = (): CAWorkspaceState => {
 
       setLoading(true);
       try {
-        const { data, error } = await supabaseAny
-          .from("ca_workspace_profiles")
-          .select("workspace_type")
-          .eq("user_id", user.id)
-          .maybeSingle();
-
-        if (error) throw error;
+        const data = await workspaceBackendRequest<{ workspaceType: CAWorkspaceType; source: "default" | "profile" }>(
+          "/ca/workspace-profile",
+        );
 
         if (!mounted) return;
-
-        if (data?.workspace_type === "regulon_ca" || data?.workspace_type === "external_ca") {
-          setWorkspaceType(data.workspace_type);
-          setSource("profile");
-          return;
-        }
-
-        // If profile does not exist, keep safe default as external CA.
-        setWorkspaceType("external_ca");
-        setSource("default");
+        setWorkspaceType(data.workspaceType);
+        setSource(data.source);
       } catch {
         if (!mounted) return;
         setWorkspaceType("external_ca");

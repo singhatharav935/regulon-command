@@ -9,11 +9,11 @@ import ComplianceChatbot from "@/components/ca-dashboard/ComplianceChatbot";
 import AIVoiceBriefAgent from "@/components/voice/AIVoiceBriefAgent";
 import { useCAWorkspace } from "@/hooks/use-ca-workspace";
 import { useAuth } from "@/hooks/use-auth";
-import { supabase } from "@/integrations/supabase/client";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table";
 import { Badge } from "@/components/ui/badge";
 import RuntimeErrorBoundary from "@/components/common/RuntimeErrorBoundary";
+import { workspaceBackendRequest } from "@/lib/workspace-backend";
 
 const statusClass: Record<string, string> = {
   pending: "bg-yellow-500/20 text-yellow-300 border-yellow-500/40",
@@ -33,64 +33,13 @@ const AppCADashboard = () => {
     enabled: Boolean(user?.id),
     queryFn: async () => {
       if (!user?.id) throw new Error("User is not authenticated");
-
-      const { data: memberships, error: membershipError } = await supabase
-        .from("company_members")
-        .select("company_id")
-        .eq("user_id", user.id);
-
-      if (membershipError) throw membershipError;
-      const companyIds = Array.from(new Set((memberships ?? []).map((row) => row.company_id)));
-
-      if (companyIds.length === 0) {
-        return { companies: [], tasks: [], deadlines: [], documents: [], drafts: [] };
-      }
-
-      const [companiesResult, tasksResult, deadlinesResult, documentsResult, draftsResult] = await Promise.all([
-        (supabase as any)
-          .from("companies")
-          .select("id, name, industry, compliance_health")
-          .in("id", companyIds)
-          .order("name", { ascending: true }),
-        (supabase as any)
-          .from("compliance_tasks")
-          .select("id, company_id, title, regulator, priority, status, due_date")
-          .in("company_id", companyIds)
-          .order("due_date", { ascending: true, nullsFirst: false })
-          .limit(150),
-        (supabase as any)
-          .from("deadlines")
-          .select("id, company_id, title, regulator, due_date")
-          .in("company_id", companyIds)
-          .order("due_date", { ascending: true })
-          .limit(120),
-        (supabase as any)
-          .from("documents")
-          .select("id, company_id, name, status, created_at")
-          .in("company_id", companyIds)
-          .order("created_at", { ascending: false })
-          .limit(120),
-        (supabase as any)
-          .from("draft_runs")
-          .select("id, company_id, document_type, draft_mode, status, created_at")
-          .eq("user_id", user.id)
-          .order("created_at", { ascending: false })
-          .limit(30),
-      ]);
-
-      if (companiesResult.error) throw companiesResult.error;
-      if (tasksResult.error) throw tasksResult.error;
-      if (deadlinesResult.error) throw deadlinesResult.error;
-      if (documentsResult.error) throw documentsResult.error;
-      if (draftsResult.error) throw draftsResult.error;
-
-      return {
-        companies: companiesResult.data ?? [],
-        tasks: tasksResult.data ?? [],
-        deadlines: deadlinesResult.data ?? [],
-        documents: documentsResult.data ?? [],
-        drafts: draftsResult.data ?? [],
-      };
+      return workspaceBackendRequest<{
+        companies: Array<{ id: string; name: string; industry: string | null; compliance_health: number | null }>;
+        tasks: Array<{ id: string; company_id: string; title: string; regulator: string; priority: string; status: string; due_date: string | null }>;
+        deadlines: Array<{ id: string; company_id: string; title: string; regulator: string; due_date: string }>;
+        documents: Array<{ id: string; company_id: string; name: string; status: string; created_at: string }>;
+        drafts: Array<{ id: string; company_id: string | null; document_type: string; draft_mode: string; status: string; created_at: string }>;
+      }>("/ca/dashboard");
     },
   });
 

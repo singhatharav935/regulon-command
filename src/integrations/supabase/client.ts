@@ -10,10 +10,15 @@ const fallbackUrl = "https://placeholder.supabase.co";
 const fallbackKey = "public-anon-key-placeholder";
 
 if (!hasSupabaseEnv) {
-  // Keep UI routes functional in environments where env vars are not configured yet.
-  console.warn(
-    "[REGULON] Missing VITE_SUPABASE_URL or VITE_SUPABASE_PUBLISHABLE_KEY. Supabase calls will fail until configured."
-  );
+  if (import.meta.env.DEV) {
+    console.warn(
+      "[REGULON] Missing VITE_SUPABASE_URL or VITE_SUPABASE_PUBLISHABLE_KEY. Supabase calls will fail until configured."
+    );
+  } else {
+    throw new Error(
+      "[REGULON] Production configuration error: missing VITE_SUPABASE_URL or VITE_SUPABASE_PUBLISHABLE_KEY."
+    );
+  }
 }
 
 // Import the supabase client like this:

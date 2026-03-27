@@ -4,47 +4,28 @@ import { format, parseISO } from "date-fns";
 import Navbar from "@/components/layout/Navbar";
 import Footer from "@/components/layout/Footer";
 import DashboardTypeNav from "@/components/dashboard/DashboardTypeNav";
-import { supabase } from "@/integrations/supabase/client";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table";
 import { Badge } from "@/components/ui/badge";
 import AIVoiceBriefAgent from "@/components/voice/AIVoiceBriefAgent";
+import { useAuth } from "@/hooks/use-auth";
+import { workspaceBackendRequest } from "@/lib/workspace-backend";
 
 const AppAdminDashboard = () => {
+  const { user } = useAuth();
   const { data, isLoading, isError, error } = useQuery({
-    queryKey: ["admin-workspace"],
+    queryKey: ["admin-workspace", user?.id],
+    enabled: Boolean(user?.id),
     queryFn: async () => {
-      const [
-        companiesResult,
-        tasksResult,
-        docsResult,
-        deadlinesResult,
-        rolesResult,
-        draftsResult,
-      ] = await Promise.all([
-        (supabase as any).from("companies").select("id, name, industry, compliance_health, created_at").order("created_at", { ascending: false }),
-        (supabase as any).from("compliance_tasks").select("id, company_id, title, priority, status, due_date, created_at").order("created_at", { ascending: false }).limit(200),
-        (supabase as any).from("documents").select("id, company_id, status, created_at").order("created_at", { ascending: false }).limit(200),
-        (supabase as any).from("deadlines").select("id, company_id, title, due_date, created_at").order("due_date", { ascending: true }).limit(200),
-        (supabase as any).from("user_roles").select("id, role, user_id"),
-        (supabase as any).from("draft_runs").select("id, user_id, status, document_type, created_at").order("created_at", { ascending: false }).limit(200),
-      ]);
-
-      if (companiesResult.error) throw companiesResult.error;
-      if (tasksResult.error) throw tasksResult.error;
-      if (docsResult.error) throw docsResult.error;
-      if (deadlinesResult.error) throw deadlinesResult.error;
-      if (rolesResult.error) throw rolesResult.error;
-      if (draftsResult.error) throw draftsResult.error;
-
-      return {
-        companies: companiesResult.data ?? [],
-        tasks: tasksResult.data ?? [],
-        documents: docsResult.data ?? [],
-        deadlines: deadlinesResult.data ?? [],
-        roles: rolesResult.data ?? [],
-        drafts: draftsResult.data ?? [],
-      };
+      if (!user?.id) throw new Error("User is not authenticated");
+      return workspaceBackendRequest<{
+        companies: Array<{ id: string; name: string; industry: string | null; compliance_health: number | null; created_at: string }>;
+        tasks: Array<{ id: string; company_id: string; title: string; priority: string; status: string; due_date: string | null; created_at: string }>;
+        documents: Array<{ id: string; company_id: string; status: string; created_at: string }>;
+        deadlines: Array<{ id: string; company_id: string; title: string; due_date: string; created_at: string }>;
+        roles: Array<{ id: string; role: string; user_id: string }>;
+        drafts: Array<{ id: string; user_id: string | null; status: string; document_type: string; created_at: string }>;
+      }>("/admin/dashboard");
     },
   });
 

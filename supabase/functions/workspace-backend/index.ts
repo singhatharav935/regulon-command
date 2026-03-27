@@ -1,0 +1,728 @@
+import { serve } from "https://deno.land/std@0.168.0/http/server.ts";
+import { createClient } from "https://esm.sh/@supabase/supabase-js@2";
+
+const getCorsHeaders = (req: Request) => {
+  const origin = req.headers.get("origin") ?? "";
+  const allowlist = (Deno.env.get("ALLOWED_ORIGINS") ?? "")
+    .split(",")
+    .map((item) => item.trim())
+    .filter(Boolean);
+
+  const isLocalOrigin =
+    origin.startsWith("http://localhost:") ||
+    origin.startsWith("https://localhost:") ||
+    origin.startsWith("http://127.0.0.1:") ||
+    origin.startsWith("https://127.0.0.1:");
+
+  const hasWildcard = allowlist.includes("*");
+  const isAllowlisted = allowlist.includes(origin);
+  const allowOrigin = allowlist.length === 0 ? "*" : (isLocalOrigin || hasWildcard || isAllowlisted ? origin : "null");
+
+  return {
+    "Access-Control-Allow-Origin": allowOrigin,
+    "Access-Control-Allow-Headers": "authorization, x-client-info, apikey, content-type",
+    "Access-Control-Allow-Methods": "GET,POST,OPTIONS",
+  };
+};
+
+const json = (req: Request, status: number, payload: unknown) =>
+  new Response(JSON.stringify(payload), {
+    status,
+    headers: { ...getCorsHeaders(req), "Content-Type": "application/json" },
+  });
+
+const getEnv = () => {
+  const url = Deno.env.get("SUPABASE_URL") || "";
+  const anon = Deno.env.get("SUPABASE_ANON_KEY") || "";
+  if (!url || !anon) {
+    throw new Error("Missing Supabase env configuration");
+  }
+  return { url, anon };
+};
+
+const getUserClient = async (req: Request) => {
+  const { url, anon } = getEnv();
+  const authHeader = req.headers.get("Authorization") || req.headers.get("authorization") || "";
+  if (!authHeader.toLowerCase().startsWith("bearer ")) {
+    throw new Error("Unauthorized");
+  }
+  const token = authHeader.replace(/^bearer\s+/i, "").trim();
+  const client = createClient(url, anon, {
+    global: { headers: { Authorization: `Bearer ${token}` } },
+  });
+  const { data, error } = await client.auth.getUser();
+  if (error || !data?.user) {
+    throw new Error("Unauthorized");
+  }
+  return { client, user: data.user };
+};
+
+const getUserRoles = async (client: ReturnType<typeof createClient>, userId: string) => {
+  const { data, error } = await client.from("user_roles").select("role").eq("user_id", userId);
+  if (error) throw error;
+  return new Set((data ?? []).map((row) => row.role));
+};
+
+const getUserCompanyIds = async (client: ReturnType<typeof createClient>, userId: string) => {
+  const { data, error } = await client.from("company_members").select("company_id").eq("user_id", userId);
+  if (error) throw error;
+  return Array.from(new Set((data ?? []).map((row) => row.company_id)));
+};
+
+const requireRole = (roles: Set<string>, allowed: string[]) => {
+  if (!allowed.some((role) => roles.has(role))) {
+    throw new Error("Forbidden");
+  }
+};
+
+const createCompanyWorkspace = async (client: ReturnType<typeof createClient>, name: string, industry: string | null) => {
+  const { error } = await client.rpc("create_company_with_owner", {
+    _name: name,
+    _industry: industry,
+  });
+  if (error) throw error;
+  return { created: true };
+};
+
+const createCaFirmWorkspace = async (
+  client: ReturnType<typeof createClient>,
+  name: string,
+  registrationNumber: string,
+  jurisdiction: string | null,
+) => {
+  const { error } = await client.rpc("create_ca_firm_with_owner", {
+    _name: name,
+    _registration_number: registrationNumber,
+    _jurisdiction: jurisdiction,
+  });
+  if (error) throw error;
+  return { created: true };
+};
+
+const loadCaWorkspaceProfile = async (client: ReturnType<typeof createClient>, userId: string) => {
+  const { data, error } = await client
+    .from("ca_workspace_profiles")
+    .select("workspace_type")
+    .eq("user_id", userId)
+    .maybeSingle();
+  if (error) throw error;
+
+  const workspaceType = data?.workspace_type === "regulon_ca" || data?.workspace_type === "external_ca"
+    ? data.workspace_type
+    : "external_ca";
+
+  return {
+    workspaceType,
+    source: data?.workspace_type ? "profile" : "default",
+  };
+};
+
+const buildCompanyDashboard = async (client: ReturnType<typeof createClient>, userId: string) => {
+  const companyIds = await getUserCompanyIds(client, userId);
+  const scopedCompanyId = companyIds[0] ?? null;
+  if (!scopedCompanyId) {
+    return {
+      company: null,
+      exposures: [],
+      tasks: [],
+      documents: [],
+      deadlines: [],
+      draftRuns: [],
+      draftAuditEvents: [],
+    };
+  }
+
+  const [companyResult, exposuresResult, tasksResult, documentsResult, deadlinesResult, draftRunsResult] = await Promise.all([
+    client.from("companies").select("id, name, industry, compliance_health").eq("id", scopedCompanyId).single(),
+    client.from("regulatory_exposure").select("id, regulator, status, notes").eq("company_id", scopedCompanyId).order("regulator", { ascending: true }),
+    client.from("compliance_tasks").select("id, title, regulator, priority, status, due_date").eq("company_id", scopedCompanyId).order("due_date", { ascending: true, nullsFirst: false }).limit(30),
+    client.from("documents").select("id, name, file_type, regulator, status, created_at").eq("company_id", scopedCompanyId).order("created_at", { ascending: false }).limit(30),
+    client.from("deadlines").select("id, title, regulator, due_date, is_recurring").eq("company_id", scopedCompanyId).order("due_date", { ascending: true }).limit(30),
+    client.from("draft_runs").select("id, document_type, draft_mode, status, created_at").eq("company_id", scopedCompanyId).order("created_at", { ascending: false }).limit(20),
+  ]);
+
+  if (companyResult.error) throw companyResult.error;
+  if (exposuresResult.error) throw exposuresResult.error;
+  if (tasksResult.error) throw tasksResult.error;
+  if (documentsResult.error) throw documentsResult.error;
+  if (deadlinesResult.error) throw deadlinesResult.error;
+  if (draftRunsResult.error) throw draftRunsResult.error;
+
+  const draftRunIds = (draftRunsResult.data ?? []).map((row) => row.id);
+  let draftAuditEvents: Array<Record<string, unknown>> = [];
+  if (draftRunIds.length > 0) {
+    const { data, error } = await client
+      .from("draft_audit_events")
+      .select("id, draft_run_id, event_type, created_at")
+      .in("draft_run_id", draftRunIds)
+      .order("created_at", { ascending: false })
+      .limit(30);
+    if (error) throw error;
+    draftAuditEvents = data ?? [];
+  }
+
+  return {
+    company: companyResult.data,
+    exposures: exposuresResult.data ?? [],
+    tasks: tasksResult.data ?? [],
+    documents: documentsResult.data ?? [],
+    deadlines: deadlinesResult.data ?? [],
+    draftRuns: draftRunsResult.data ?? [],
+    draftAuditEvents,
+  };
+};
+
+const buildCaDashboard = async (client: ReturnType<typeof createClient>, userId: string) => {
+  const companyIds = await getUserCompanyIds(client, userId);
+  if (companyIds.length === 0) {
+    return { companies: [], tasks: [], deadlines: [], documents: [], drafts: [] };
+  }
+
+  const [companiesResult, tasksResult, deadlinesResult, documentsResult, draftsResult] = await Promise.all([
+    client.from("companies").select("id, name, industry, compliance_health").in("id", companyIds).order("name", { ascending: true }),
+    client.from("compliance_tasks").select("id, company_id, title, regulator, priority, status, due_date").in("company_id", companyIds).order("due_date", { ascending: true, nullsFirst: false }).limit(150),
+    client.from("deadlines").select("id, company_id, title, regulator, due_date").in("company_id", companyIds).order("due_date", { ascending: true }).limit(120),
+    client.from("documents").select("id, company_id, name, status, created_at").in("company_id", companyIds).order("created_at", { ascending: false }).limit(120),
+    client.from("draft_runs").select("id, company_id, document_type, draft_mode, status, created_at").eq("user_id", userId).order("created_at", { ascending: false }).limit(50),
+  ]);
+
+  if (companiesResult.error) throw companiesResult.error;
+  if (tasksResult.error) throw tasksResult.error;
+  if (deadlinesResult.error) throw deadlinesResult.error;
+  if (documentsResult.error) throw documentsResult.error;
+  if (draftsResult.error) throw draftsResult.error;
+
+  return {
+    companies: companiesResult.data ?? [],
+    tasks: tasksResult.data ?? [],
+    deadlines: deadlinesResult.data ?? [],
+    documents: documentsResult.data ?? [],
+    drafts: draftsResult.data ?? [],
+  };
+};
+
+const buildLegalDashboard = async (client: ReturnType<typeof createClient>, userId: string) => {
+  const companyIds = await getUserCompanyIds(client, userId);
+  if (companyIds.length === 0) return { companyIds: [], runs: [], events: [] };
+
+  const { data: runs, error: runsError } = await client
+    .from("draft_runs")
+    .select("id, company_id, document_type, draft_mode, status, created_at")
+    .in("company_id", companyIds)
+    .order("created_at", { ascending: false })
+    .limit(100);
+  if (runsError) throw runsError;
+
+  const runIds = (runs ?? []).map((row) => row.id);
+  let events: Array<Record<string, unknown>> = [];
+  if (runIds.length > 0) {
+    const { data, error } = await client
+      .from("draft_audit_events")
+      .select("id, draft_run_id, event_type, created_at")
+      .in("draft_run_id", runIds)
+      .order("created_at", { ascending: false })
+      .limit(200);
+    if (error) throw error;
+    events = data ?? [];
+  }
+
+  return { companyIds, runs: runs ?? [], events };
+};
+
+const buildCaFirmDashboard = async (client: ReturnType<typeof createClient>, userId: string) => {
+  const { data: membership, error: membershipError } = await client
+    .from("ca_firm_members")
+    .select("ca_firm_id, role")
+    .eq("user_id", userId)
+    .limit(1)
+    .maybeSingle();
+  if (membershipError) throw membershipError;
+  if (!membership?.ca_firm_id) return { firm: null, members: [], directory: [], runs: [] };
+
+  const [firmResult, membersResult, directoryResult] = await Promise.all([
+    client.from("ca_firms").select("id, name, registration_number, jurisdiction").eq("id", membership.ca_firm_id).single(),
+    client.from("ca_firm_members").select("id, user_id, role").eq("ca_firm_id", membership.ca_firm_id),
+    client.from("ca_firm_ca_directory").select("id, ca_user_id, ca_name, license_number, specialty, status").eq("ca_firm_id", membership.ca_firm_id).order("ca_name", { ascending: true }),
+  ]);
+  if (firmResult.error) throw firmResult.error;
+  if (membersResult.error) throw membersResult.error;
+  if (directoryResult.error) throw directoryResult.error;
+
+  const caUserIds = Array.from(new Set((directoryResult.data ?? []).map((entry) => entry.ca_user_id).filter(Boolean)));
+  let runs: Array<Record<string, unknown>> = [];
+  if (caUserIds.length > 0) {
+    const { data, error } = await client
+      .from("draft_runs")
+      .select("id, user_id, status, document_type, created_at")
+      .in("user_id", caUserIds)
+      .order("created_at", { ascending: false })
+      .limit(1000);
+    if (error) throw error;
+    runs = data ?? [];
+  }
+
+  return {
+    firm: firmResult.data,
+    members: membersResult.data ?? [],
+    directory: directoryResult.data ?? [],
+    runs,
+  };
+};
+
+const buildAdminDashboard = async (client: ReturnType<typeof createClient>) => {
+  const [companiesResult, tasksResult, docsResult, deadlinesResult, rolesResult, draftsResult] = await Promise.all([
+    client.from("companies").select("id, name, industry, compliance_health, created_at").order("created_at", { ascending: false }),
+    client.from("compliance_tasks").select("id, company_id, title, priority, status, due_date, created_at").order("created_at", { ascending: false }).limit(200),
+    client.from("documents").select("id, company_id, status, created_at").order("created_at", { ascending: false }).limit(200),
+    client.from("deadlines").select("id, company_id, title, due_date, created_at").order("due_date", { ascending: true }).limit(200),
+    client.from("user_roles").select("id, role, user_id"),
+    client.from("draft_runs").select("id, user_id, status, document_type, created_at").order("created_at", { ascending: false }).limit(200),
+  ]);
+  if (companiesResult.error) throw companiesResult.error;
+  if (tasksResult.error) throw tasksResult.error;
+  if (docsResult.error) throw docsResult.error;
+  if (deadlinesResult.error) throw deadlinesResult.error;
+  if (rolesResult.error) throw rolesResult.error;
+  if (draftsResult.error) throw draftsResult.error;
+
+  return {
+    companies: companiesResult.data ?? [],
+    tasks: tasksResult.data ?? [],
+    documents: docsResult.data ?? [],
+    deadlines: deadlinesResult.data ?? [],
+    roles: rolesResult.data ?? [],
+    drafts: draftsResult.data ?? [],
+  };
+};
+
+const listDraftingClients = async (client: ReturnType<typeof createClient>, userId: string) => {
+  const companyIds = await getUserCompanyIds(client, userId);
+  if (companyIds.length === 0) {
+    return { clients: [] };
+  }
+
+  const { data, error } = await client
+    .from("companies")
+    .select("id, name, industry")
+    .in("id", companyIds)
+    .order("name", { ascending: true });
+  if (error) throw error;
+
+  return {
+    clients: (data ?? []).map((company) => ({
+      id: company.id,
+      name: company.name,
+      industry: company.industry ?? "General",
+    })),
+  };
+};
+
+const listDraftHistory = async (
+  client: ReturnType<typeof createClient>,
+  userId: string,
+  companyId: string | null,
+  documentType: string | null,
+) => {
+  let query = client
+    .from("draft_runs")
+    .select("id, created_at, status, document_type, draft_mode, draft_content, qa, package")
+    .eq("user_id", userId)
+    .order("created_at", { ascending: false })
+    .limit(20);
+
+  if (companyId) {
+    const companyIds = await getUserCompanyIds(client, userId);
+    if (!companyIds.includes(companyId)) {
+      throw new Error("Forbidden");
+    }
+    query = query.eq("company_id", companyId);
+  }
+
+  if (documentType) {
+    query = query.eq("document_type", documentType);
+  }
+
+  const { data, error } = await query;
+  if (error) throw error;
+  return { history: data ?? [] };
+};
+
+const loadDraftArtifacts = async (
+  client: ReturnType<typeof createClient>,
+  userId: string,
+  roles: Set<string>,
+  draftRunId: string,
+) => {
+  const review = await loadDraftReview(client, userId, roles, draftRunId);
+  return {
+    versions: review.versions,
+    events: review.events,
+  };
+};
+
+const createDraftRun = async (
+  client: ReturnType<typeof createClient>,
+  userId: string,
+  payload: {
+    companyId: string | null;
+    documentType: string;
+    draftMode: string;
+    noticeInput: string | null;
+    draftContent: string;
+    qa: unknown;
+    draftPackage: unknown;
+    preferPiiMasking: boolean;
+  },
+) => {
+  if (payload.companyId) {
+    const companyIds = await getUserCompanyIds(client, userId);
+    if (!companyIds.includes(payload.companyId)) {
+      throw new Error("Forbidden");
+    }
+  }
+
+  const { data: draftRun, error: draftRunError } = await client
+    .from("draft_runs")
+    .insert({
+      user_id: userId,
+      company_id: payload.companyId,
+      document_type: payload.documentType,
+      draft_mode: payload.draftMode,
+      status: "generated",
+      notice_input: payload.noticeInput,
+      draft_content: payload.draftContent,
+      qa: payload.qa,
+      package: payload.draftPackage,
+    })
+    .select("id")
+    .single();
+  if (draftRunError || !draftRun) throw draftRunError ?? new Error("Failed to create draft run");
+
+  const { error: versionError } = await client
+    .from("draft_versions")
+    .insert({
+      draft_run_id: draftRun.id,
+      user_id: userId,
+      version_number: 1,
+      content: payload.draftContent,
+    });
+  if (versionError) throw versionError;
+
+  const { error: auditError } = await client
+    .from("draft_audit_events")
+    .insert({
+      draft_run_id: draftRun.id,
+      user_id: userId,
+      event_type: "draft_generated",
+      payload: {
+        document_type: payload.documentType,
+        draft_mode: payload.draftMode,
+        review_surface: "workspace-backend",
+      },
+    });
+  if (auditError) throw auditError;
+
+  const { error: preferenceError } = await client
+    .from("practice_preferences")
+    .upsert({
+      user_id: userId,
+      preferred_mode: payload.draftMode,
+      preferred_document_type: payload.documentType,
+      prefer_pii_masking: payload.preferPiiMasking,
+    });
+  if (preferenceError) throw preferenceError;
+
+  return { draftRunId: draftRun.id };
+};
+
+const saveDraftSnapshot = async (
+  client: ReturnType<typeof createClient>,
+  userId: string,
+  roles: Set<string>,
+  draftRunId: string,
+  body: {
+    content: string;
+    nextStatus?: string;
+    eventType: string;
+    noticeInput?: string | null;
+    qa?: unknown;
+    draftPackage?: unknown;
+    payload?: Record<string, unknown>;
+  },
+) => {
+  const review = await loadDraftReview(client, userId, roles, draftRunId);
+  const currentStatus = String(review.run.status);
+  const nextStatus = body.nextStatus || currentStatus;
+
+  const { data: latestVersion } = await client
+    .from("draft_versions")
+    .select("version_number")
+    .eq("draft_run_id", draftRunId)
+    .order("version_number", { ascending: false })
+    .limit(1)
+    .maybeSingle();
+  const nextVersionNumber = Number(latestVersion?.version_number ?? 0) + 1;
+
+  const { error: updateError } = await client
+    .from("draft_runs")
+    .update({
+      draft_content: body.content,
+      status: nextStatus,
+      notice_input: body.noticeInput ?? undefined,
+      qa: body.qa ?? undefined,
+      package: body.draftPackage ?? undefined,
+    })
+    .eq("id", draftRunId);
+  if (updateError) throw updateError;
+
+  const { error: versionError } = await client
+    .from("draft_versions")
+    .insert({
+      draft_run_id: draftRunId,
+      user_id: userId,
+      version_number: nextVersionNumber,
+      content: body.content,
+    });
+  if (versionError) throw versionError;
+
+  const { error: auditError } = await client
+    .from("draft_audit_events")
+    .insert({
+      draft_run_id: draftRunId,
+      user_id: userId,
+      event_type: body.eventType,
+      payload: {
+        previous_status: currentStatus,
+        next_status: nextStatus,
+        review_surface: "workspace-backend",
+        ...(body.payload ?? {}),
+      },
+    });
+  if (auditError) throw auditError;
+
+  return await loadDraftArtifacts(client, userId, roles, draftRunId);
+};
+
+const loadDraftReview = async (client: ReturnType<typeof createClient>, userId: string, roles: Set<string>, draftRunId: string) => {
+  const { data: run, error: runError } = await client
+    .from("draft_runs")
+    .select("id, status, document_type, draft_mode, draft_content, created_at, company_id")
+    .eq("id", draftRunId)
+    .single();
+  if (runError || !run) throw new Error("Draft not found");
+
+  if (!roles.has("admin") && run.company_id) {
+    const companyIds = await getUserCompanyIds(client, userId);
+    if (!companyIds.includes(run.company_id)) {
+      throw new Error("Forbidden");
+    }
+  }
+
+  const [{ data: versions, error: versionsError }, { data: events, error: eventsError }] = await Promise.all([
+    client.from("draft_versions").select("id, version_number, content, created_at").eq("draft_run_id", draftRunId).order("version_number", { ascending: false }).limit(20),
+    client.from("draft_audit_events").select("id, event_type, created_at").eq("draft_run_id", draftRunId).order("created_at", { ascending: false }).limit(30),
+  ]);
+  if (versionsError) throw versionsError;
+  if (eventsError) throw eventsError;
+
+  return { run, versions: versions ?? [], events: events ?? [] };
+};
+
+serve(async (req: Request) => {
+  const corsHeaders = getCorsHeaders(req);
+  if (corsHeaders["Access-Control-Allow-Origin"] === "null") {
+    return json(req, 403, { error: "Origin not allowed" });
+  }
+  if (req.method === "OPTIONS") return new Response("ok", { headers: corsHeaders });
+
+  try {
+    const url = new URL(req.url);
+    const path = url.pathname.replace(/^\/+/, "");
+    const { client, user } = await getUserClient(req);
+    const roles = await getUserRoles(client, user.id);
+
+    if (req.method === "GET" && path.endsWith("company/dashboard")) {
+      requireRole(roles, ["user", "manager", "admin"]);
+      return json(req, 200, { ok: true, data: await buildCompanyDashboard(client, user.id) });
+    }
+
+    if (req.method === "GET" && path.endsWith("ca/dashboard")) {
+      requireRole(roles, ["manager", "admin"]);
+      return json(req, 200, { ok: true, data: await buildCaDashboard(client, user.id) });
+    }
+
+    if (req.method === "GET" && path.endsWith("ca/workspace-profile")) {
+      requireRole(roles, ["manager", "admin"]);
+      return json(req, 200, { ok: true, data: await loadCaWorkspaceProfile(client, user.id) });
+    }
+
+    if (req.method === "GET" && path.endsWith("legal/dashboard")) {
+      requireRole(roles, ["manager", "admin"]);
+      return json(req, 200, { ok: true, data: await buildLegalDashboard(client, user.id) });
+    }
+
+    if (req.method === "GET" && path.endsWith("ca-firm/dashboard")) {
+      requireRole(roles, ["manager", "admin"]);
+      return json(req, 200, { ok: true, data: await buildCaFirmDashboard(client, user.id) });
+    }
+
+    if (req.method === "GET" && path.endsWith("admin/dashboard")) {
+      requireRole(roles, ["admin"]);
+      return json(req, 200, { ok: true, data: await buildAdminDashboard(client) });
+    }
+
+    if (req.method === "GET" && path.endsWith("drafting/clients")) {
+      requireRole(roles, ["manager", "admin"]);
+      return json(req, 200, { ok: true, data: await listDraftingClients(client, user.id) });
+    }
+
+    if (req.method === "GET" && path.endsWith("drafts/history")) {
+      requireRole(roles, ["manager", "admin"]);
+      const companyId = url.searchParams.get("company_id");
+      const documentType = url.searchParams.get("document_type");
+      return json(req, 200, {
+        ok: true,
+        data: await listDraftHistory(client, user.id, companyId, documentType),
+      });
+    }
+
+    if (req.method === "GET" && path.includes("drafts/") && path.endsWith("/artifacts")) {
+      requireRole(roles, ["manager", "admin"]);
+      const draftRunId = path.split("drafts/")[1].replace("/artifacts", "");
+      return json(req, 200, { ok: true, data: await loadDraftArtifacts(client, user.id, roles, draftRunId) });
+    }
+
+    if (req.method === "GET" && path.includes("draft-review/")) {
+      const draftRunId = path.split("draft-review/")[1];
+      return json(req, 200, { ok: true, data: await loadDraftReview(client, user.id, roles, draftRunId) });
+    }
+
+    if (req.method === "POST" && path.includes("draft-review/") && path.endsWith("/save")) {
+      const draftRunId = path.split("draft-review/")[1].replace("/save", "");
+      const payload = await loadDraftReview(client, user.id, roles, draftRunId);
+      const body = await req.json();
+      const content = String(body.content || "").trim();
+      const nextStatus = body.next_status ? String(body.next_status) : payload.run.status;
+      const eventType = String(body.event_type || "review_saved");
+      if (!content) return json(req, 400, { error: "content is required" });
+
+      const { data: latestVersion } = await client
+        .from("draft_versions")
+        .select("version_number")
+        .eq("draft_run_id", draftRunId)
+        .order("version_number", { ascending: false })
+        .limit(1)
+        .maybeSingle();
+      const nextVersionNumber = Number(latestVersion?.version_number ?? 0) + 1;
+
+      const { error: updateError } = await client
+        .from("draft_runs")
+        .update({ draft_content: content, status: nextStatus })
+        .eq("id", draftRunId);
+      if (updateError) return json(req, 400, { error: updateError.message });
+
+      const { error: versionError } = await client
+        .from("draft_versions")
+        .insert({
+          draft_run_id: draftRunId,
+          user_id: user.id,
+          version_number: nextVersionNumber,
+          content,
+        });
+      if (versionError) return json(req, 400, { error: versionError.message });
+
+      const { error: auditError } = await client
+        .from("draft_audit_events")
+        .insert({
+          draft_run_id: draftRunId,
+          user_id: user.id,
+          event_type: eventType,
+          payload: {
+            previous_status: payload.run.status,
+            next_status: nextStatus,
+            review_surface: "workspace-backend",
+          },
+        });
+      if (auditError) return json(req, 400, { error: auditError.message });
+
+      return json(req, 200, { ok: true, data: await loadDraftReview(client, user.id, roles, draftRunId) });
+    }
+
+    if (req.method === "POST" && path.endsWith("company/workspace")) {
+      requireRole(roles, ["user", "manager", "admin"]);
+      const body = await req.json();
+      const name = String(body.name || "").trim();
+      const industry = typeof body.industry === "string" && body.industry.trim() ? body.industry.trim() : null;
+      if (!name) return json(req, 400, { error: "name is required" });
+      return json(req, 200, { ok: true, data: await createCompanyWorkspace(client, name, industry) });
+    }
+
+    if (req.method === "POST" && path.endsWith("ca-firm/workspace")) {
+      requireRole(roles, ["manager", "admin"]);
+      const body = await req.json();
+      const name = String(body.name || "").trim();
+      const registrationNumber = String(body.registrationNumber || "").trim();
+      const jurisdiction = typeof body.jurisdiction === "string" && body.jurisdiction.trim() ? body.jurisdiction.trim() : null;
+      if (!name || !registrationNumber) {
+        return json(req, 400, { error: "name and registrationNumber are required" });
+      }
+      return json(req, 200, {
+        ok: true,
+        data: await createCaFirmWorkspace(client, name, registrationNumber, jurisdiction),
+      });
+    }
+
+    if (req.method === "POST" && path.endsWith("drafts")) {
+      requireRole(roles, ["manager", "admin"]);
+      const body = await req.json();
+      const draftContent = String(body.draftContent || "").trim();
+      const documentType = String(body.documentType || "").trim();
+      const draftMode = String(body.draftMode || "").trim();
+      if (!draftContent || !documentType || !draftMode) {
+        return json(req, 400, { error: "draftContent, documentType, and draftMode are required" });
+      }
+      return json(req, 200, {
+        ok: true,
+        data: await createDraftRun(client, user.id, {
+          companyId: typeof body.companyId === "string" && body.companyId ? body.companyId : null,
+          documentType,
+          draftMode,
+          noticeInput: typeof body.noticeInput === "string" ? body.noticeInput : null,
+          draftContent,
+          qa: body.qa ?? null,
+          draftPackage: body.draftPackage ?? null,
+          preferPiiMasking: body.preferPiiMasking !== false,
+        }),
+      });
+    }
+
+    if (req.method === "POST" && path.includes("drafts/") && path.endsWith("/snapshot")) {
+      requireRole(roles, ["manager", "admin"]);
+      const draftRunId = path.split("drafts/")[1].replace("/snapshot", "");
+      const body = await req.json();
+      const content = String(body.content || "").trim();
+      const eventType = String(body.eventType || "").trim();
+      if (!content || !eventType) {
+        return json(req, 400, { error: "content and eventType are required" });
+      }
+      return json(req, 200, {
+        ok: true,
+        data: await saveDraftSnapshot(client, user.id, roles, draftRunId, {
+          content,
+          nextStatus: body.nextStatus ? String(body.nextStatus) : undefined,
+          eventType,
+          noticeInput: typeof body.noticeInput === "string" ? body.noticeInput : null,
+          qa: body.qa ?? undefined,
+          draftPackage: body.draftPackage ?? undefined,
+          payload: typeof body.payload === "object" && body.payload ? body.payload : undefined,
+        }),
+      });
+    }
+
+    return json(req, 404, { error: "Route not found" });
+  } catch (error) {
+    const message = error instanceof Error ? error.message : "Internal error";
+    const status = message === "Unauthorized" ? 401 : message === "Forbidden" ? 403 : 500;
+    return json(req, status, { error: message });
+  }
+});

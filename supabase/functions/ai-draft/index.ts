@@ -41,6 +41,11 @@ const getModeDescription = (draftMode: string): string => {
 };
 
 type LogicLevel = "regulon_core" | "regulon_nexus_9" | "regulon_sovereign";
+const PROMPT_POLICY_VERSION = "2026.03.enterprise";
+const QA_POLICY_VERSION = "2026.03.qa-enterprise";
+const MODEL_ROUTER_VERSION = "2026.03.router-v1";
+const AI_MAX_RETRIES = Math.max(1, Number(Deno.env.get("OPENAI_MAX_RETRIES") ?? "2"));
+const AI_RETRY_BASE_MS = Math.max(250, Number(Deno.env.get("OPENAI_RETRY_BASE_MS") ?? "900"));
 
 const normalizeLogicLevel = (value: unknown): LogicLevel | null => {
   if (typeof value !== "string") return null;
@@ -934,7 +939,7 @@ type AIProvider = "openai";
 
 const resolveAIConfig = (
   preferredProvider?: AIProvider,
-): { provider: AIProvider; apiKey: string; model: string; endpoint: string } => {
+): { provider: AIProvider; apiKey: string; model: string; fallbackModel: string | null; endpoint: string } => {
   const openAiApiKey = Deno.env.get("OPENAI_API_KEY");
 
   const openAiConfig = openAiApiKey
@@ -942,6 +947,7 @@ const resolveAIConfig = (
       provider: "openai" as const,
       apiKey: openAiApiKey,
       model: Deno.env.get("OPENAI_MODEL") ?? "gpt-4.1-mini",
+      fallbackModel: Deno.env.get("OPENAI_FALLBACK_MODEL")?.trim() || null,
       endpoint: "https://api.openai.com/v1/chat/completions",
     }
     : null;
@@ -952,28 +958,84 @@ const resolveAIConfig = (
 const aiRequest = async ({
   apiKey,
   model,
+  fallbackModel,
   endpoint,
   messages,
   stream,
 }: {
   apiKey: string;
   model: string;
+  fallbackModel?: string | null;
   endpoint: string;
   messages: Array<{ role: "system" | "user"; content: string | Array<Record<string, unknown>> }>;
   stream: boolean;
 }) => {
-  return fetch(endpoint, {
-    method: "POST",
-    headers: {
-      Authorization: `Bearer ${apiKey}`,
-      "Content-Type": "application/json",
-    },
-    body: JSON.stringify({
-      model,
-      messages,
-      stream,
-    }),
-  });
+  const modelChain = [model, fallbackModel].filter((item, index, list): item is string => Boolean(item) && list.indexOf(item as string) === index);
+  let attempts = 0;
+  let lastResponse: Response | null = null;
+  let lastError: unknown = null;
+
+  for (let modelIndex = 0; modelIndex < modelChain.length; modelIndex += 1) {
+    const activeModel = modelChain[modelIndex];
+    for (let retryIndex = 0; retryIndex < AI_MAX_RETRIES; retryIndex += 1) {
+      attempts += 1;
+      try {
+        const response = await fetch(endpoint, {
+          method: "POST",
+          headers: {
+            Authorization: `Bearer ${apiKey}`,
+            "Content-Type": "application/json",
+          },
+          body: JSON.stringify({
+            model: activeModel,
+            messages,
+            stream,
+          }),
+        });
+
+        const shouldRetry = response.status === 429 || response.status >= 500;
+        if (!shouldRetry) {
+          return new Response(response.body, {
+            status: response.status,
+            statusText: response.statusText,
+            headers: {
+              ...Object.fromEntries(response.headers.entries()),
+              "x-regulon-model-used": activeModel,
+              "x-regulon-fallback-used": String(modelIndex > 0),
+              "x-regulon-attempt-count": String(attempts),
+              "x-regulon-model-router-version": MODEL_ROUTER_VERSION,
+            },
+          });
+        }
+
+        lastResponse = response;
+        const retryAfterHeader = response.headers.get("retry-after");
+        const retryAfterMs = retryAfterHeader ? Number(retryAfterHeader) * 1000 : 0;
+        const waitMs = Math.max(retryAfterMs, AI_RETRY_BASE_MS * (retryIndex + 1) * (modelIndex + 1));
+        await new Promise((resolve) => setTimeout(resolve, waitMs));
+      } catch (error) {
+        lastError = error;
+        const waitMs = AI_RETRY_BASE_MS * (retryIndex + 1) * (modelIndex + 1);
+        await new Promise((resolve) => setTimeout(resolve, waitMs));
+      }
+    }
+  }
+
+  if (lastResponse) {
+    return new Response(lastResponse.body, {
+      status: lastResponse.status,
+      statusText: lastResponse.statusText,
+      headers: {
+        ...Object.fromEntries(lastResponse.headers.entries()),
+        "x-regulon-model-used": modelChain[modelChain.length - 1] ?? model,
+        "x-regulon-fallback-used": String(modelChain.length > 1),
+        "x-regulon-attempt-count": String(attempts),
+        "x-regulon-model-router-version": MODEL_ROUTER_VERSION,
+      },
+    });
+  }
+
+  throw lastError instanceof Error ? lastError : new Error("AI provider request failed after retries.");
 };
 
 interface NoticeIntelligence {
@@ -4519,6 +4581,7 @@ Schema:
     const qaResp = await aiRequest({
       apiKey: aiConfig.apiKey,
       model: aiConfig.model,
+      fallbackModel: aiConfig.fallbackModel,
       endpoint: aiConfig.endpoint,
       stream: false,
       messages: [
@@ -4590,6 +4653,13 @@ Schema:
       citation_review: qaPayload?.citation_review ?? [],
       explainability: qaPayload?.explainability ?? [],
       missing_for_final_filing: mergedMissingForFiling,
+      authority_check: {
+        authority_detected: extractedNotice?.notice_snapshot?.authority ?? null,
+        authority_consistent: Boolean(extractedNotice?.notice_snapshot?.authority || documentType),
+      },
+      human_review_required: true,
+      prompt_policy_version: PROMPT_POLICY_VERSION,
+      qa_policy_version: QA_POLICY_VERSION,
     };
 
     let capturedTrainingCaseId: string | null = null;
@@ -4719,6 +4789,10 @@ Schema:
       draft: finalDraft,
       metadata: {
         aiProvider: aiConfig.provider,
+        aiModelUsed: response.headers.get("x-regulon-model-used") ?? aiConfig.model,
+        aiFallbackUsed: response.headers.get("x-regulon-fallback-used") === "true",
+        aiAttemptCount: Number(response.headers.get("x-regulon-attempt-count") ?? "1"),
+        modelRouterVersion: MODEL_ROUTER_VERSION,
         documentType,
         companyName,
         draftMode,
@@ -4739,6 +4813,8 @@ Schema:
         copyRiskMatchedCaseId,
         generatedAt: new Date().toISOString(),
         version: "3.0-advanced",
+        promptPolicyVersion: PROMPT_POLICY_VERSION,
+        qaPolicyVersion: QA_POLICY_VERSION,
       },
       qa: {
         ...finalQaPayload,

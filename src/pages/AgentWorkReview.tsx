@@ -8,7 +8,7 @@ import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@
 import { Textarea } from "@/components/ui/textarea";
 import { useToast } from "@/hooks/use-toast";
 import { useAuth } from "@/hooks/use-auth";
-import { supabase } from "@/integrations/supabase/client";
+import { workspaceBackendRequest } from "@/lib/workspace-backend";
 
 type ReviewItem = {
   id: string;
@@ -73,36 +73,15 @@ const AgentWorkReview = () => {
     if (!draftRunId) return;
     setLoadingLiveDraft(true);
     try {
-      const supabaseAny = supabase as any;
-      const { data: run, error: runError } = await supabaseAny
-        .from("draft_runs")
-        .select("id, status, document_type, draft_mode, draft_content, created_at, company_id")
-        .eq("id", draftRunId)
-        .single();
-      if (runError) throw runError;
-
-      const [{ data: versions, error: versionsError }, { data: events, error: eventsError }] = await Promise.all([
-        supabaseAny
-          .from("draft_versions")
-          .select("id, version_number, content, created_at")
-          .eq("draft_run_id", draftRunId)
-          .order("version_number", { ascending: false })
-          .limit(20),
-        supabaseAny
-          .from("draft_audit_events")
-          .select("id, event_type, created_at")
-          .eq("draft_run_id", draftRunId)
-          .order("created_at", { ascending: false })
-          .limit(30),
-      ]);
-
-      if (versionsError) throw versionsError;
-      if (eventsError) throw eventsError;
-
-      setLiveDraft(run as LiveDraftReview);
-      setLiveEdit(run?.draft_content ?? "");
-      setLiveVersions(versions ?? []);
-      setLiveAuditEvents(events ?? []);
+      const data = await workspaceBackendRequest<{
+        run: LiveDraftReview | null;
+        versions: Array<{ id: string; version_number: number; content: string; created_at: string }>;
+        events: Array<{ id: string; event_type: string; created_at: string }>;
+      }>(`/draft-review/${draftRunId}`);
+      setLiveDraft((data?.run ?? null) as LiveDraftReview | null);
+      setLiveEdit((data?.run?.draft_content ?? "") as string);
+      setLiveVersions((data?.versions ?? []) as Array<{ id: string; version_number: number; content: string; created_at: string }>);
+      setLiveAuditEvents((data?.events ?? []) as Array<{ id: string; event_type: string; created_at: string }>);
     } catch (error) {
       setLiveDraft(null);
       setLiveVersions([]);
@@ -121,63 +100,34 @@ const AgentWorkReview = () => {
     if (!draftRunId || !liveDraft || !user?.id) return;
     setSavingLiveDraft(true);
     try {
-      const supabaseAny = supabase as any;
-      const { data: latestVersion } = await supabaseAny
-        .from("draft_versions")
-        .select("version_number")
-        .eq("draft_run_id", draftRunId)
-        .order("version_number", { ascending: false })
-        .limit(1)
-        .maybeSingle();
-
-      const versionNumber = Number(latestVersion?.version_number ?? 0) + 1;
       const targetStatus = nextStatus ?? liveDraft.status;
-
-      const { error: updateError } = await supabaseAny
-        .from("draft_runs")
-        .update({
-          draft_content: liveEdit,
-          status: targetStatus,
-        })
-        .eq("id", draftRunId);
-      if (updateError) throw updateError;
-
-      const { error: versionError } = await supabaseAny
-        .from("draft_versions")
-        .insert({
-          draft_run_id: draftRunId,
-          user_id: user.id,
-          version_number: versionNumber,
-          content: liveEdit,
-        });
-      if (versionError) throw versionError;
-
       const eventType =
         nextStatus === "approved"
           ? "legal_review_approved"
           : nextStatus === "signed_off"
             ? "legal_final_sign_off"
             : "legal_review_saved";
-
-      const { error: auditError } = await supabaseAny
-        .from("draft_audit_events")
-        .insert({
-          draft_run_id: draftRunId,
-          user_id: user.id,
+      const data = await workspaceBackendRequest<{
+        run: LiveDraftReview | null;
+        versions: Array<{ id: string; version_number: number; content: string; created_at: string }>;
+        events: Array<{ id: string; event_type: string; created_at: string }>;
+      }>(`/draft-review/${draftRunId}/save`, {
+        method: "POST",
+        body: JSON.stringify({
+          content: liveEdit,
+          next_status: targetStatus,
           event_type: eventType,
-          payload: {
-            previous_status: liveDraft.status,
-            next_status: targetStatus,
-            review_surface: "agent-work-review",
-          },
-        });
-      if (auditError) throw auditError;
+        }),
+      });
 
       toast({
         title: nextStatus ? "Review status updated" : "Review edits saved",
         description: nextStatus ? `Draft moved to ${targetStatus}.` : "A new review version was saved.",
       });
-      await loadLiveDraft();
+      setLiveDraft((data?.run ?? null) as LiveDraftReview | null);
+      setLiveEdit((data?.run?.draft_content ?? "") as string);
+      setLiveVersions((data?.versions ?? []) as Array<{ id: string; version_number: number; content: string; created_at: string }>);
+      setLiveAuditEvents((data?.events ?? []) as Array<{ id: string; event_type: string; created_at: string }>);
     } catch (error) {
       toast({
         title: "Failed to save live review",
