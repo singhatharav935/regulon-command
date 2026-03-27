@@ -20,7 +20,7 @@ const getCorsHeaders = (req: Request) => {
 
   return {
     "Access-Control-Allow-Origin": allowOrigin,
-    "Access-Control-Allow-Headers": "authorization, x-client-info, apikey, content-type",
+    "Access-Control-Allow-Headers": "authorization, x-client-info, apikey, content-type, x-dispatch-token",
     "Access-Control-Allow-Methods": "GET,POST,PATCH,OPTIONS",
   };
 };
@@ -111,6 +111,20 @@ const isDispatchTokenAuthorized = (req: Request) => {
   return headerToken === configuredToken || bearerToken === configuredToken;
 };
 
+const getRetryBackoffMs = (attempts: number) => {
+  // 1, 2, 4, 8, 16 minutes capped at 16 minutes.
+  const minutes = Math.min(16, Math.max(1, 2 ** Math.max(0, attempts - 1)));
+  return minutes * 60 * 1000;
+};
+
+const shouldSkipFailedRowForBackoff = (attempts: number, updatedAt: string | null) => {
+  if (!updatedAt) return false;
+  const updated = Date.parse(updatedAt);
+  if (Number.isNaN(updated)) return false;
+  const nextEligibleAt = updated + getRetryBackoffMs(attempts);
+  return Date.now() < nextEligibleAt;
+};
+
 serve(async (req: Request) => {
   if (req.method === "OPTIONS") return new Response(null, { headers: getCorsHeaders(req) });
 
@@ -139,24 +153,44 @@ serve(async (req: Request) => {
       const body = await req.json().catch(() => ({}));
       const limitRaw = Number(body?.limit ?? 20);
       const limit = Number.isFinite(limitRaw) ? Math.max(1, Math.min(100, limitRaw)) : 20;
+      const maxAttemptsRaw = Number(body?.max_attempts ?? 5);
+      const maxAttempts = Number.isFinite(maxAttemptsRaw) ? Math.max(1, Math.min(10, maxAttemptsRaw)) : 5;
+      const dryRun = body?.dry_run === true;
 
       const { data: queuedRows, error: loadError } = await admin
         .from("agent_notifications_outbox")
-        .select("id, payload, attempts, status")
+        .select("id, payload, attempts, status, updated_at")
         .eq("channel", "email")
         .in("status", ["queued", "failed"])
-        .lt("attempts", 5)
+        .lt("attempts", maxAttempts)
         .order("created_at", { ascending: true })
-        .limit(limit);
+        .limit(limit * 3);
       if (loadError) return json(req, 400, { error: loadError.message });
 
-      const rows = queuedRows ?? [];
+      const candidateRows = queuedRows ?? [];
+      const rows = candidateRows
+        .filter((row) => !(row.status === "failed" && shouldSkipFailedRowForBackoff(Number(row.attempts ?? 0), row.updated_at ?? null)))
+        .slice(0, limit);
+      const skippedBackoff = Math.max(0, candidateRows.length - rows.length);
       if (!rows.length) {
-        return json(req, 200, { ok: true, processed: 0, sent: 0, failed: 0 });
+        return json(req, 200, { ok: true, processed: 0, sent: 0, failed: 0, skipped_backoff: skippedBackoff, dry_run: dryRun });
       }
 
       let sent = 0;
       let failed = 0;
+      const errors: string[] = [];
+
+      if (dryRun) {
+        return json(req, 200, {
+          ok: true,
+          processed: rows.length,
+          sent: 0,
+          failed: 0,
+          skipped_backoff: skippedBackoff,
+          dry_run: true,
+          sample_ids: rows.slice(0, 10).map((row) => row.id),
+        });
+      }
 
       for (const row of rows) {
         const { data: claimedRow } = await admin
@@ -189,6 +223,7 @@ serve(async (req: Request) => {
         } catch (sendError) {
           failed += 1;
           const errorMessage = sendError instanceof Error ? sendError.message : "email_dispatch_failed";
+          errors.push(errorMessage);
           await admin
             .from("agent_notifications_outbox")
             .update({ status: "failed", last_error: errorMessage.slice(0, 500) })
@@ -196,7 +231,15 @@ serve(async (req: Request) => {
         }
       }
 
-      return json(req, 200, { ok: true, processed: rows.length, sent, failed });
+      return json(req, 200, {
+        ok: true,
+        processed: rows.length,
+        sent,
+        failed,
+        skipped_backoff: skippedBackoff,
+        dry_run: false,
+        error_samples: Array.from(new Set(errors)).slice(0, 5),
+      });
     }
 
     const { client, user } = await getUserClient(req);
