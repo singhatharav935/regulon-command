@@ -201,7 +201,6 @@ const assertAiOperationActorAllowed = ({
   if (!persona) return;
 
   const caPersonas: AppPersona[] = ["external_ca", "in_house_ca", "ca_firm"];
-  const caOrLegalPersonas: AppPersona[] = [...caPersonas, "in_house_lawyer"];
 
   if (operation === "draft" || operation === "generate" || operation === "apply-fix" || operation === "fix") {
     if (!caPersonas.includes(persona)) {
@@ -211,8 +210,8 @@ const assertAiOperationActorAllowed = ({
   }
 
   if (operation === "recheck" || operation === "notice-ocr" || operation === "notice-details") {
-    if (!caOrLegalPersonas.includes(persona)) {
-      throw new Error("Policy denied: ai_operation_requires_ca_or_legal_persona");
+    if (!caPersonas.includes(persona)) {
+      throw new Error("Policy denied: ai_operation_requires_ca_persona");
     }
     return;
   }
@@ -283,25 +282,23 @@ const parseMonthStart = (value: string | null) => {
   return `${trimmed}-01`;
 };
 
-const enforceCompanyMonthlyQuota = async (
+const enforceActorMonthlyQuota = async (
   client: ReturnType<typeof createClient>,
-  companyId: string | null,
+  userId: string,
 ) => {
-  if (!companyId) return;
-
-  const defaultMonthlyLimit = Math.max(100, Number(Deno.env.get("AI_DEFAULT_COMPANY_MONTHLY_LIMIT") ?? "2000"));
+  const defaultMonthlyLimit = Math.max(100, Number(Deno.env.get("AI_DEFAULT_ACTOR_MONTHLY_LIMIT") ?? "4000"));
   const monthStart = getMonthStartDate();
 
   const [{ data: quotaRow, error: quotaError }, { data: usageRow, error: usageError }] = await Promise.all([
     client
-      .from("ai_company_usage_quotas")
+      .from("ai_actor_usage_quotas")
       .select("monthly_request_limit, hard_block")
-      .eq("company_id", companyId)
+      .eq("user_id", userId)
       .maybeSingle(),
     client
-      .from("ai_company_monthly_usage")
+      .from("ai_actor_monthly_usage")
       .select("request_count")
-      .eq("company_id", companyId)
+      .eq("user_id", userId)
       .eq("month_start", monthStart)
       .maybeSingle(),
   ]);
@@ -309,54 +306,51 @@ const enforceCompanyMonthlyQuota = async (
   if (usageError) throw usageError;
 
   if (quotaRow?.hard_block) {
-    throw new Error("AI quota exceeded: company_hard_block");
+    throw new Error("AI quota exceeded: actor_hard_block");
   }
 
   const monthlyLimit = quotaRow?.monthly_request_limit ?? defaultMonthlyLimit;
   const currentCount = Number(usageRow?.request_count ?? 0);
   if (currentCount >= monthlyLimit) {
-    throw new Error("AI quota exceeded: company_monthly_limit");
+    throw new Error("AI quota exceeded: actor_monthly_limit");
   }
 };
 
-const incrementCompanyMonthlyUsage = async (
+const incrementActorMonthlyUsage = async (
   client: ReturnType<typeof createClient>,
-  companyId: string | null,
+  userId: string,
 ) => {
-  if (!companyId) return;
   const monthStart = getMonthStartDate();
 
   const { data: usageRow, error: loadError } = await client
-    .from("ai_company_monthly_usage")
+    .from("ai_actor_monthly_usage")
     .select("request_count")
-    .eq("company_id", companyId)
+    .eq("user_id", userId)
     .eq("month_start", monthStart)
     .maybeSingle();
   if (loadError) throw loadError;
 
   const nextCount = Number(usageRow?.request_count ?? 0) + 1;
   const { error: upsertError } = await client
-    .from("ai_company_monthly_usage")
+    .from("ai_actor_monthly_usage")
     .upsert({
-      company_id: companyId,
+      user_id: userId,
       month_start: monthStart,
       request_count: nextCount,
-    }, { onConflict: "company_id,month_start" });
+    }, { onConflict: "user_id,month_start" });
   if (upsertError) throw upsertError;
 };
 
 const enforceAiRequestRateLimit = async (
   client: ReturnType<typeof createClient>,
   userId: string,
-  companyId: string | null,
 ) => {
   const maxRequestsPerMinute = Math.max(5, Number(Deno.env.get("AI_MAX_REQUESTS_PER_MINUTE") ?? "30"));
   const maxConcurrentRequests = Math.max(1, Number(Deno.env.get("AI_MAX_CONCURRENT_REQUESTS") ?? "3"));
-  const maxCompanyRequestsPerMinute = Math.max(10, Number(Deno.env.get("AI_MAX_COMPANY_REQUESTS_PER_MINUTE") ?? "90"));
   const lockWindowSeconds = Math.max(15, Number(Deno.env.get("AI_LOCK_WINDOW_SECONDS") ?? "120"));
   const minuteAgoIso = new Date(Date.now() - 60 * 1000).toISOString();
 
-  const requests = [
+  const [recentResult, processingResult] = await Promise.all([
     client
       .from("ai_request_idempotency")
       .select("id")
@@ -369,34 +363,17 @@ const enforceAiRequestRateLimit = async (
       .eq("user_id", userId)
       .eq("status", "processing")
       .limit(maxConcurrentRequests + 5),
-  ];
-
-  if (companyId) {
-    requests.push(
-      client
-        .from("ai_request_idempotency")
-        .select("id")
-        .eq("company_id", companyId)
-        .gte("created_at", minuteAgoIso)
-        .limit(maxCompanyRequestsPerMinute + 1),
-    );
-  }
-
-  const [recentResult, processingResult, companyResult] = await Promise.all(requests);
+  ]);
   const recentRows = "data" in recentResult ? recentResult.data : null;
   const recentError = "error" in recentResult ? recentResult.error : null;
   const processingRows = "data" in processingResult ? processingResult.data : null;
   const processingError = "error" in processingResult ? processingResult.error : null;
-  const companyRows = companyResult && "data" in companyResult ? companyResult.data : null;
-  const companyError = companyResult && "error" in companyResult ? companyResult.error : null;
 
   if (recentError) throw recentError;
   if (processingError) throw processingError;
-  if (companyError) throw companyError;
 
   const recentCount = (recentRows ?? []).length;
   const freshInFlightCount = (processingRows ?? []).filter((row) => isLockFresh(row.updated_at, lockWindowSeconds)).length;
-  const companyRecentCount = (companyRows ?? []).length;
 
   if (freshInFlightCount >= maxConcurrentRequests) {
     throw new Error("AI rate limit exceeded: too_many_inflight");
@@ -404,11 +381,8 @@ const enforceAiRequestRateLimit = async (
   if (recentCount >= maxRequestsPerMinute) {
     throw new Error("AI rate limit exceeded: too_many_requests");
   }
-  if (companyId && companyRecentCount >= maxCompanyRequestsPerMinute) {
-    throw new Error("AI rate limit exceeded: company_quota");
-  }
 
-  await enforceCompanyMonthlyQuota(client, companyId);
+  await enforceActorMonthlyQuota(client, userId);
 };
 
 const prepareAiIdempotencyLock = async (
@@ -440,7 +414,7 @@ const prepareAiIdempotencyLock = async (
     throw new Error("AI request already in progress");
   }
 
-  await enforceAiRequestRateLimit(client, userId, scopedCompanyId);
+  await enforceAiRequestRateLimit(client, userId);
 
   const { error: lockError } = await client
     .from("ai_request_idempotency")
@@ -471,7 +445,6 @@ const finalizeAiIdempotencyLock = async (
     aiFallbackUsed?: boolean | null;
     aiAttemptCount?: number | null;
     modelRouterVersion?: string | null;
-    companyId?: string | null;
   },
 ) => {
   let shouldCountUsage = false;
@@ -502,7 +475,7 @@ const finalizeAiIdempotencyLock = async (
     .eq("request_key", requestKey);
 
   if (params.status === "completed" && shouldCountUsage) {
-    await incrementCompanyMonthlyUsage(client, params.companyId ?? null);
+    await incrementActorMonthlyUsage(client, userId);
   }
 };
 
@@ -1164,7 +1137,6 @@ const proxyAiDraft = async (
       aiFallbackUsed: aiFallbackUsedHeader === "true",
       aiAttemptCount: Number.isFinite(aiAttemptCount as number) ? aiAttemptCount : null,
       modelRouterVersion,
-      companyId,
     });
     return {
       ok: response.ok,
@@ -1183,7 +1155,6 @@ const proxyAiDraft = async (
     aiFallbackUsed: aiFallbackUsedHeader === "true",
     aiAttemptCount: Number.isFinite(aiAttemptCount as number) ? aiAttemptCount : null,
     modelRouterVersion,
-    companyId,
   });
   return {
     ok: response.ok,
@@ -1244,7 +1215,6 @@ const proxyAiDraftStream = async (
     aiFallbackUsed: aiFallbackUsedHeader === "true",
     aiAttemptCount: Number.isFinite(aiAttemptCount as number) ? aiAttemptCount : null,
     modelRouterVersion,
-    companyId,
   });
 
   if (response.body) {
@@ -1411,29 +1381,33 @@ serve(async (req: Request) => {
       });
     }
 
-    if (req.method === "GET" && path.endsWith("drafting/ai-ops/company-usage")) {
+    if (req.method === "GET" && path.endsWith("drafting/ai-ops/actor-usage")) {
       requireRole(roles, ["admin"]);
-      const companyId = (url.searchParams.get("company_id") || "").trim();
-      if (!companyId) return json(req, 400, { error: "company_id is required" });
+      const actorUserId = (url.searchParams.get("user_id") || "").trim();
+      if (!actorUserId) return json(req, 400, { error: "user_id is required" });
 
       const monthStart = parseMonthStart(url.searchParams.get("month"));
-      const [{ data: company, error: companyError }, { data: quota, error: quotaError }, { data: usage, error: usageError }] = await Promise.all([
-        client.from("companies").select("id, name").eq("id", companyId).maybeSingle(),
-        client.from("ai_company_usage_quotas").select("monthly_request_limit, hard_block, updated_at").eq("company_id", companyId).maybeSingle(),
-        client.from("ai_company_monthly_usage").select("request_count, updated_at").eq("company_id", companyId).eq("month_start", monthStart).maybeSingle(),
+      const [{ data: actorProfile, error: actorError }, { data: quota, error: quotaError }, { data: usage, error: usageError }] = await Promise.all([
+        client.from("profiles").select("user_id, full_name, email").eq("user_id", actorUserId).maybeSingle(),
+        client.from("ai_actor_usage_quotas").select("monthly_request_limit, hard_block, updated_at").eq("user_id", actorUserId).maybeSingle(),
+        client.from("ai_actor_monthly_usage").select("request_count, updated_at").eq("user_id", actorUserId).eq("month_start", monthStart).maybeSingle(),
       ]);
-      if (companyError) return json(req, 400, { error: companyError.message });
+      if (actorError) return json(req, 400, { error: actorError.message });
       if (quotaError) return json(req, 400, { error: quotaError.message });
       if (usageError) return json(req, 400, { error: usageError.message });
-      if (!company) return json(req, 404, { error: "company not found" });
+      if (!actorProfile) return json(req, 404, { error: "actor user not found" });
 
-      const defaultMonthlyLimit = Math.max(100, Number(Deno.env.get("AI_DEFAULT_COMPANY_MONTHLY_LIMIT") ?? "2000"));
+      const defaultMonthlyLimit = Math.max(100, Number(Deno.env.get("AI_DEFAULT_ACTOR_MONTHLY_LIMIT") ?? "4000"));
       const limit = Number(quota?.monthly_request_limit ?? defaultMonthlyLimit);
       const consumed = Number(usage?.request_count ?? 0);
 
       return json(req, 200, {
         ok: true,
-        company: { id: company.id, name: company.name },
+        actor: {
+          user_id: actorProfile.user_id,
+          full_name: actorProfile.full_name,
+          email: actorProfile.email,
+        },
         month_start: monthStart,
         quota: {
           monthly_request_limit: limit,
@@ -1449,11 +1423,11 @@ serve(async (req: Request) => {
       });
     }
 
-    if (req.method === "POST" && path.endsWith("drafting/ai-ops/company-quota")) {
+    if (req.method === "POST" && path.endsWith("drafting/ai-ops/actor-quota")) {
       requireRole(roles, ["admin"]);
       const body = await req.json();
-      const companyId = String(body.company_id || "").trim();
-      if (!companyId) return json(req, 400, { error: "company_id is required" });
+      const actorUserId = String(body.user_id || "").trim();
+      if (!actorUserId) return json(req, 400, { error: "user_id is required" });
 
       const monthlyLimitRaw = Number(body.monthly_request_limit ?? Number.NaN);
       const monthlyRequestLimit = Number.isFinite(monthlyLimitRaw)
@@ -1465,59 +1439,61 @@ serve(async (req: Request) => {
       const hardBlock = body.hard_block === true;
 
       const { error: upsertError } = await client
-        .from("ai_company_usage_quotas")
+        .from("ai_actor_usage_quotas")
         .upsert({
-          company_id: companyId,
+          user_id: actorUserId,
           monthly_request_limit: monthlyRequestLimit,
           hard_block: hardBlock,
-        }, { onConflict: "company_id" });
+        }, { onConflict: "user_id" });
       if (upsertError) return json(req, 400, { error: upsertError.message });
 
       return json(req, 200, {
         ok: true,
         data: {
-          company_id: companyId,
+          user_id: actorUserId,
           monthly_request_limit: monthlyRequestLimit,
           hard_block: hardBlock,
         },
       });
     }
 
-    if (req.method === "GET" && path.endsWith("drafting/ai-ops/company-usage-summary")) {
+    if (req.method === "GET" && path.endsWith("drafting/ai-ops/actor-usage-summary")) {
       requireRole(roles, ["admin"]);
       const monthStart = parseMonthStart(url.searchParams.get("month"));
       const limitRaw = Number(url.searchParams.get("limit") ?? 100);
       const limit = Number.isFinite(limitRaw) ? Math.max(10, Math.min(1000, limitRaw)) : 100;
 
       const { data: usageRows, error: usageError } = await client
-        .from("ai_company_monthly_usage")
-        .select("company_id, request_count, updated_at")
+        .from("ai_actor_monthly_usage")
+        .select("user_id, request_count, updated_at")
         .eq("month_start", monthStart)
         .order("request_count", { ascending: false })
         .limit(limit);
       if (usageError) return json(req, 400, { error: usageError.message });
 
       const rows = usageRows ?? [];
-      if (!rows.length) return json(req, 200, { ok: true, month_start: monthStart, companies: [] });
+      if (!rows.length) return json(req, 200, { ok: true, month_start: monthStart, actors: [] });
 
-      const companyIds = Array.from(new Set(rows.map((row) => row.company_id)));
-      const [{ data: companyRows, error: companyError }, { data: quotaRows, error: quotaError }] = await Promise.all([
-        client.from("companies").select("id, name").in("id", companyIds),
-        client.from("ai_company_usage_quotas").select("company_id, monthly_request_limit, hard_block").in("company_id", companyIds),
+      const actorUserIds = Array.from(new Set(rows.map((row) => row.user_id)));
+      const [{ data: profileRows, error: profileError }, { data: quotaRows, error: quotaError }] = await Promise.all([
+        client.from("profiles").select("user_id, full_name, email").in("user_id", actorUserIds),
+        client.from("ai_actor_usage_quotas").select("user_id, monthly_request_limit, hard_block").in("user_id", actorUserIds),
       ]);
-      if (companyError) return json(req, 400, { error: companyError.message });
+      if (profileError) return json(req, 400, { error: profileError.message });
       if (quotaError) return json(req, 400, { error: quotaError.message });
 
-      const companyMap = new Map((companyRows ?? []).map((row) => [row.id, row.name]));
-      const quotaMap = new Map((quotaRows ?? []).map((row) => [row.company_id, row]));
-      const defaultMonthlyLimit = Math.max(100, Number(Deno.env.get("AI_DEFAULT_COMPANY_MONTHLY_LIMIT") ?? "2000"));
+      const profileMap = new Map((profileRows ?? []).map((row) => [row.user_id, row]));
+      const quotaMap = new Map((quotaRows ?? []).map((row) => [row.user_id, row]));
+      const defaultMonthlyLimit = Math.max(100, Number(Deno.env.get("AI_DEFAULT_ACTOR_MONTHLY_LIMIT") ?? "4000"));
 
-      const companies = rows.map((row) => {
-        const quota = quotaMap.get(row.company_id);
+      const actors = rows.map((row) => {
+        const quota = quotaMap.get(row.user_id);
+        const profile = profileMap.get(row.user_id);
         const limitValue = Number(quota?.monthly_request_limit ?? defaultMonthlyLimit);
         return {
-          company_id: row.company_id,
-          company_name: companyMap.get(row.company_id) ?? "Unknown Company",
+          user_id: row.user_id,
+          full_name: profile?.full_name ?? null,
+          email: profile?.email ?? null,
           request_count: row.request_count,
           monthly_request_limit: limitValue,
           hard_block: Boolean(quota?.hard_block),
@@ -1526,7 +1502,7 @@ serve(async (req: Request) => {
         };
       });
 
-      return json(req, 200, { ok: true, month_start: monthStart, companies });
+      return json(req, 200, { ok: true, month_start: monthStart, actors });
     }
 
     if (req.method === "POST" && path.endsWith("drafting/ai-ops/recover-stale")) {
