@@ -149,10 +149,16 @@ const assertEventActorAllowed = ({
   roles,
   persona,
   eventType,
+  legalLaneEnabled,
+  legalReviewRequired,
+  finalSignoffMode,
 }: {
   roles: Set<string>;
   persona: AppPersona | null;
   eventType: string;
+  legalLaneEnabled: boolean;
+  legalReviewRequired: boolean;
+  finalSignoffMode: "ca_only" | "lawyer_only" | "dual";
 }) => {
   if (roles.has("admin")) return;
   if (!roles.has("manager")) {
@@ -162,19 +168,100 @@ const assertEventActorAllowed = ({
   // Backward compatibility: legacy accounts may not have user_personas hydrated yet.
   if (!persona) return;
 
+  const caPersonas: AppPersona[] = ["external_ca", "in_house_ca", "ca_firm"];
+  const isCaPersona = caPersonas.includes(persona);
+  const isLawyerPersona = persona === "in_house_lawyer";
+
   if (eventType === "legal_review_approved" || eventType === "legal_final_sign_off" || eventType === "legal_review_saved") {
     if (persona !== "in_house_lawyer") {
       throw new Error("Policy denied: legal_review_events_require_in_house_lawyer");
     }
+    if (!legalLaneEnabled) {
+      throw new Error("Policy denied: legal_lane_not_enabled_for_this_actor");
+    }
     return;
   }
 
-  if (eventType === "review_approved" || eventType === "final_sign_off" || eventType === "submitted_for_review" || eventType === "review_started") {
-    if (persona !== "external_ca" && persona !== "in_house_ca" && persona !== "ca_firm") {
+  if (eventType === "review_approved") {
+    if (!isCaPersona) {
       throw new Error("Policy denied: ca_review_events_require_ca_persona");
     }
     return;
   }
+
+  if (eventType === "submitted_for_review" || eventType === "review_started") {
+    if (!isCaPersona) {
+      throw new Error("Policy denied: ca_review_events_require_ca_persona");
+    }
+    if (!legalLaneEnabled) {
+      throw new Error("Policy denied: legal_lane_not_enabled_for_this_actor");
+    }
+    return;
+  }
+
+  if (eventType === "final_sign_off") {
+    if (!isCaPersona) {
+      throw new Error("Policy denied: ca_review_events_require_ca_persona");
+    }
+    if (legalReviewRequired && finalSignoffMode !== "ca_only") {
+      throw new Error("Policy denied: legal_signoff_required_for_this_authority");
+    }
+    return;
+  }
+
+  if (eventType === "manual_version_saved") {
+    if (!isCaPersona && !isLawyerPersona) {
+      throw new Error("Policy denied: review_edit_requires_ca_or_lawyer");
+    }
+  }
+};
+
+const loadAuthorityWorkflowPolicy = async (client: ReturnType<typeof createClient>, documentType: string | null) => {
+  if (!documentType) {
+    return {
+      legalReviewRequired: false,
+      finalSignoffMode: "ca_only" as const,
+    };
+  }
+
+  const { data, error } = await client
+    .from("authority_workflow_policies")
+    .select("legal_review_required, final_signoff_mode")
+    .eq("document_type", documentType)
+    .maybeSingle();
+  if (error) throw error;
+
+  const finalSignoffMode =
+    data?.final_signoff_mode === "lawyer_only" || data?.final_signoff_mode === "dual" || data?.final_signoff_mode === "ca_only"
+      ? data.final_signoff_mode
+      : "ca_only";
+
+  return {
+    legalReviewRequired: data?.legal_review_required === true,
+    finalSignoffMode,
+  };
+};
+
+const loadActorEntitlements = async (client: ReturnType<typeof createClient>, userId: string) => {
+  const { data, error } = await client
+    .from("ca_actor_entitlements")
+    .select("regulon_legal_lane_enabled, assistant_access_enabled, plan_monthly_request_limit")
+    .eq("user_id", userId)
+    .maybeSingle();
+  if (error) throw error;
+  return {
+    regulonLegalLaneEnabled: data?.regulon_legal_lane_enabled === true,
+    assistantAccessEnabled: data?.assistant_access_enabled !== false,
+    planMonthlyRequestLimit: typeof data?.plan_monthly_request_limit === "number"
+      ? data.plan_monthly_request_limit
+      : null,
+  };
+};
+
+const resolveLegalLaneEnabled = (persona: AppPersona | null, entitlements: { regulonLegalLaneEnabled: boolean }) => {
+  if (persona === "in_house_ca" || persona === "in_house_lawyer" || persona === "admin") return true;
+  if (persona === "external_ca" || persona === "ca_firm") return entitlements.regulonLegalLaneEnabled;
+  return false;
 };
 
 const normalizeAiOperation = (payload: Record<string, unknown>) => {
@@ -210,8 +297,8 @@ const assertAiOperationActorAllowed = ({
   }
 
   if (operation === "recheck" || operation === "notice-ocr" || operation === "notice-details") {
-    if (!caPersonas.includes(persona)) {
-      throw new Error("Policy denied: ai_operation_requires_ca_persona");
+    if (!caPersonas.includes(persona) && persona !== "in_house_lawyer") {
+      throw new Error("Policy denied: ai_operation_requires_ca_or_lawyer_persona");
     }
     return;
   }
@@ -288,6 +375,7 @@ const enforceActorMonthlyQuota = async (
 ) => {
   const defaultMonthlyLimit = Math.max(100, Number(Deno.env.get("AI_DEFAULT_ACTOR_MONTHLY_LIMIT") ?? "4000"));
   const monthStart = getMonthStartDate();
+  const entitlements = await loadActorEntitlements(client, userId);
 
   const [{ data: quotaRow, error: quotaError }, { data: usageRow, error: usageError }] = await Promise.all([
     client
@@ -309,7 +397,10 @@ const enforceActorMonthlyQuota = async (
     throw new Error("AI quota exceeded: actor_hard_block");
   }
 
-  const monthlyLimit = quotaRow?.monthly_request_limit ?? defaultMonthlyLimit;
+  const configuredLimit = quotaRow?.monthly_request_limit ?? defaultMonthlyLimit;
+  const monthlyLimit = entitlements.planMonthlyRequestLimit
+    ? Math.min(configuredLimit, entitlements.planMonthlyRequestLimit)
+    : configuredLimit;
   const currentCount = Number(usageRow?.request_count ?? 0);
   if (currentCount >= monthlyLimit) {
     throw new Error("AI quota exceeded: actor_monthly_limit");
@@ -979,9 +1070,22 @@ const saveDraftSnapshot = async (
   const review = await loadDraftReview(client, userId, roles, draftRunId);
   const currentStatus = String(review.run.status);
   const nextStatus = body.nextStatus || currentStatus;
+  const documentType = typeof review.run.document_type === "string" ? review.run.document_type : null;
+  const [workflowPolicy, entitlements] = await Promise.all([
+    loadAuthorityWorkflowPolicy(client, documentType),
+    loadActorEntitlements(client, userId),
+  ]);
+  const legalLaneEnabled = resolveLegalLaneEnabled(persona, entitlements);
   assertValidWorkflowTransition(currentStatus, nextStatus);
   assertValidEventTypeForTransition(currentStatus, nextStatus, body.eventType);
-  assertEventActorAllowed({ roles, persona, eventType: body.eventType });
+  assertEventActorAllowed({
+    roles,
+    persona,
+    eventType: body.eventType,
+    legalLaneEnabled,
+    legalReviewRequired: workflowPolicy.legalReviewRequired,
+    finalSignoffMode: workflowPolicy.finalSignoffMode,
+  });
 
   const { data: latestVersion } = await client
     .from("draft_versions")
@@ -1285,6 +1389,141 @@ serve(async (req: Request) => {
     if (req.method === "GET" && path.endsWith("drafting/preferences")) {
       requireRole(roles, ["manager", "admin"]);
       return json(req, 200, { ok: true, data: await loadPracticePreferences(client, user.id) });
+    }
+
+    if (req.method === "GET" && path.endsWith("drafting/ai-ops/actor-entitlement")) {
+      requireRole(roles, ["admin"]);
+      const actorUserId = (url.searchParams.get("user_id") || "").trim();
+      if (!actorUserId) return json(req, 400, { error: "user_id is required" });
+
+      const [{ data: profile, error: profileError }, { data: entitlement, error: entitlementError }] = await Promise.all([
+        client.from("profiles").select("user_id, full_name, email").eq("user_id", actorUserId).maybeSingle(),
+        client
+          .from("ca_actor_entitlements")
+          .select("regulon_legal_lane_enabled, assistant_access_enabled, plan_monthly_request_limit, notes, updated_at")
+          .eq("user_id", actorUserId)
+          .maybeSingle(),
+      ]);
+      if (profileError) return json(req, 400, { error: profileError.message });
+      if (entitlementError) return json(req, 400, { error: entitlementError.message });
+      if (!profile) return json(req, 404, { error: "actor user not found" });
+
+      return json(req, 200, {
+        ok: true,
+        actor: {
+          user_id: profile.user_id,
+          full_name: profile.full_name,
+          email: profile.email,
+        },
+        entitlement: {
+          regulon_legal_lane_enabled: entitlement?.regulon_legal_lane_enabled === true,
+          assistant_access_enabled: entitlement?.assistant_access_enabled !== false,
+          plan_monthly_request_limit: entitlement?.plan_monthly_request_limit ?? null,
+          notes: entitlement?.notes ?? null,
+          updated_at: entitlement?.updated_at ?? null,
+        },
+      });
+    }
+
+    if (req.method === "POST" && path.endsWith("drafting/ai-ops/actor-entitlement")) {
+      requireRole(roles, ["admin"]);
+      const body = await req.json();
+      const actorUserId = String(body.user_id || "").trim();
+      if (!actorUserId) return json(req, 400, { error: "user_id is required" });
+
+      const legalLaneEnabled = body.regulon_legal_lane_enabled === true;
+      const assistantAccessEnabled = body.assistant_access_enabled !== false;
+      const planLimitRaw = body.plan_monthly_request_limit;
+      const planMonthlyRequestLimit =
+        planLimitRaw === null || typeof planLimitRaw === "undefined"
+          ? null
+          : Number.isFinite(Number(planLimitRaw))
+            ? Math.max(100, Math.min(500000, Math.floor(Number(planLimitRaw))))
+            : null;
+      if (typeof planLimitRaw !== "undefined" && planLimitRaw !== null && planMonthlyRequestLimit === null) {
+        return json(req, 400, { error: "plan_monthly_request_limit must be numeric or null" });
+      }
+
+      const notes = typeof body.notes === "string" && body.notes.trim() ? body.notes.trim().slice(0, 1000) : null;
+
+      const { error: upsertError } = await client
+        .from("ca_actor_entitlements")
+        .upsert({
+          user_id: actorUserId,
+          regulon_legal_lane_enabled: legalLaneEnabled,
+          assistant_access_enabled: assistantAccessEnabled,
+          plan_monthly_request_limit: planMonthlyRequestLimit,
+          notes,
+        }, { onConflict: "user_id" });
+      if (upsertError) return json(req, 400, { error: upsertError.message });
+
+      return json(req, 200, {
+        ok: true,
+        data: {
+          user_id: actorUserId,
+          regulon_legal_lane_enabled: legalLaneEnabled,
+          assistant_access_enabled: assistantAccessEnabled,
+          plan_monthly_request_limit: planMonthlyRequestLimit,
+          notes,
+        },
+      });
+    }
+
+    if (req.method === "GET" && path.endsWith("drafting/workflow-policy")) {
+      requireRole(roles, ["admin"]);
+      const documentType = (url.searchParams.get("document_type") || "").trim();
+      if (!documentType) return json(req, 400, { error: "document_type is required" });
+
+      const { data, error } = await client
+        .from("authority_workflow_policies")
+        .select("document_type, legal_review_required, final_signoff_mode, notes, updated_at")
+        .eq("document_type", documentType)
+        .maybeSingle();
+      if (error) return json(req, 400, { error: error.message });
+
+      return json(req, 200, {
+        ok: true,
+        data: data ?? {
+          document_type: documentType,
+          legal_review_required: false,
+          final_signoff_mode: "ca_only",
+          notes: null,
+          updated_at: null,
+        },
+      });
+    }
+
+    if (req.method === "POST" && path.endsWith("drafting/workflow-policy")) {
+      requireRole(roles, ["admin"]);
+      const body = await req.json();
+      const documentType = String(body.document_type || "").trim();
+      if (!documentType) return json(req, 400, { error: "document_type is required" });
+      const legalReviewRequired = body.legal_review_required === true;
+      const finalSignoffMode =
+        body.final_signoff_mode === "lawyer_only" || body.final_signoff_mode === "dual" || body.final_signoff_mode === "ca_only"
+          ? body.final_signoff_mode
+          : "ca_only";
+      const notes = typeof body.notes === "string" && body.notes.trim() ? body.notes.trim().slice(0, 1000) : null;
+
+      const { error } = await client
+        .from("authority_workflow_policies")
+        .upsert({
+          document_type: documentType,
+          legal_review_required: legalReviewRequired,
+          final_signoff_mode: finalSignoffMode,
+          notes,
+        }, { onConflict: "document_type" });
+      if (error) return json(req, 400, { error: error.message });
+
+      return json(req, 200, {
+        ok: true,
+        data: {
+          document_type: documentType,
+          legal_review_required: legalReviewRequired,
+          final_signoff_mode: finalSignoffMode,
+          notes,
+        },
+      });
     }
 
     if (req.method === "GET" && path.endsWith("drafting/ai-ops/stats")) {
@@ -1646,9 +1885,22 @@ serve(async (req: Request) => {
       const eventType = String(body.event_type || "review_saved");
       if (!content) return json(req, 400, { error: "content is required" });
       const currentStatus = String(payload.run.status);
+      const documentType = typeof payload.run.document_type === "string" ? payload.run.document_type : null;
+      const [workflowPolicy, entitlements] = await Promise.all([
+        loadAuthorityWorkflowPolicy(client, documentType),
+        loadActorEntitlements(client, user.id),
+      ]);
+      const legalLaneEnabled = resolveLegalLaneEnabled(persona, entitlements);
       assertValidWorkflowTransition(currentStatus, nextStatus);
       assertValidEventTypeForTransition(currentStatus, nextStatus, eventType);
-      assertEventActorAllowed({ roles, persona, eventType });
+      assertEventActorAllowed({
+        roles,
+        persona,
+        eventType,
+        legalLaneEnabled,
+        legalReviewRequired: workflowPolicy.legalReviewRequired,
+        finalSignoffMode: workflowPolicy.finalSignoffMode,
+      });
 
       const { data: latestVersion } = await client
         .from("draft_versions")
