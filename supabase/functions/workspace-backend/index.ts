@@ -268,13 +268,18 @@ const isOlderThanMinutes = (timestamp: string | null | undefined, minutes: numbe
   return parsed <= Date.now() - (minutes * 60 * 1000);
 };
 
-const enforceAiRequestRateLimit = async (client: ReturnType<typeof createClient>, userId: string) => {
+const enforceAiRequestRateLimit = async (
+  client: ReturnType<typeof createClient>,
+  userId: string,
+  companyId: string | null,
+) => {
   const maxRequestsPerMinute = Math.max(5, Number(Deno.env.get("AI_MAX_REQUESTS_PER_MINUTE") ?? "30"));
   const maxConcurrentRequests = Math.max(1, Number(Deno.env.get("AI_MAX_CONCURRENT_REQUESTS") ?? "3"));
+  const maxCompanyRequestsPerMinute = Math.max(10, Number(Deno.env.get("AI_MAX_COMPANY_REQUESTS_PER_MINUTE") ?? "90"));
   const lockWindowSeconds = Math.max(15, Number(Deno.env.get("AI_LOCK_WINDOW_SECONDS") ?? "120"));
   const minuteAgoIso = new Date(Date.now() - 60 * 1000).toISOString();
 
-  const [{ data: recentRows, error: recentError }, { data: processingRows, error: processingError }] = await Promise.all([
+  const requests = [
     client
       .from("ai_request_idempotency")
       .select("id")
@@ -287,18 +292,43 @@ const enforceAiRequestRateLimit = async (client: ReturnType<typeof createClient>
       .eq("user_id", userId)
       .eq("status", "processing")
       .limit(maxConcurrentRequests + 5),
-  ]);
+  ];
+
+  if (companyId) {
+    requests.push(
+      client
+        .from("ai_request_idempotency")
+        .select("id")
+        .eq("company_id", companyId)
+        .gte("created_at", minuteAgoIso)
+        .limit(maxCompanyRequestsPerMinute + 1),
+    );
+  }
+
+  const [recentResult, processingResult, companyResult] = await Promise.all(requests);
+  const recentRows = "data" in recentResult ? recentResult.data : null;
+  const recentError = "error" in recentResult ? recentResult.error : null;
+  const processingRows = "data" in processingResult ? processingResult.data : null;
+  const processingError = "error" in processingResult ? processingResult.error : null;
+  const companyRows = companyResult && "data" in companyResult ? companyResult.data : null;
+  const companyError = companyResult && "error" in companyResult ? companyResult.error : null;
+
   if (recentError) throw recentError;
   if (processingError) throw processingError;
+  if (companyError) throw companyError;
 
   const recentCount = (recentRows ?? []).length;
   const freshInFlightCount = (processingRows ?? []).filter((row) => isLockFresh(row.updated_at, lockWindowSeconds)).length;
+  const companyRecentCount = (companyRows ?? []).length;
 
   if (freshInFlightCount >= maxConcurrentRequests) {
     throw new Error("AI rate limit exceeded: too_many_inflight");
   }
   if (recentCount >= maxRequestsPerMinute) {
     throw new Error("AI rate limit exceeded: too_many_requests");
+  }
+  if (companyId && companyRecentCount >= maxCompanyRequestsPerMinute) {
+    throw new Error("AI rate limit exceeded: company_quota");
   }
 };
 
@@ -307,8 +337,8 @@ const prepareAiIdempotencyLock = async (
   userId: string,
   operation: string,
   payload: Record<string, unknown>,
+  scopedCompanyId: string | null,
 ) => {
-  const companyId = typeof payload.companyId === "string" ? payload.companyId : null;
   const lockWindowSeconds = Math.max(15, Number(Deno.env.get("AI_LOCK_WINDOW_SECONDS") ?? "120"));
   const requestFingerprint = stableStringify({ operation, payload });
   const requestKey = await sha256Hex(requestFingerprint);
@@ -331,13 +361,13 @@ const prepareAiIdempotencyLock = async (
     throw new Error("AI request already in progress");
   }
 
-  await enforceAiRequestRateLimit(client, userId);
+  await enforceAiRequestRateLimit(client, userId, scopedCompanyId);
 
   const { error: lockError } = await client
     .from("ai_request_idempotency")
     .upsert({
       user_id: userId,
-      company_id: companyId,
+      company_id: scopedCompanyId,
       request_key: requestKey,
       operation,
       status: "processing",
@@ -946,9 +976,10 @@ const validateAiDraftScope = async (
   assertAiOperationActorAllowed({ roles, persona, operation });
   assertAiOperationPayloadShape(operation, payload);
 
-  const companyId = typeof payload.companyId === "string" ? payload.companyId : null;
+  let companyId = typeof payload.companyId === "string" ? payload.companyId : null;
+  let companyIds: string[] | null = null;
   if (companyId) {
-    const companyIds = await getUserCompanyIds(client, userId);
+    companyIds = await getUserCompanyIds(client, userId);
     if (!companyIds.includes(companyId)) {
       throw new Error("Forbidden");
     }
@@ -957,11 +988,33 @@ const validateAiDraftScope = async (
   const draftRunId = typeof payload.draftRunId === "string" ? payload.draftRunId : null;
   if (draftRunId) {
     const review = await loadDraftReview(client, userId, roles, draftRunId);
+    const draftCompanyId = typeof review.run.company_id === "string" ? review.run.company_id : null;
+    if (companyId && draftCompanyId && draftCompanyId !== companyId) {
+      throw new Error("Forbidden");
+    }
+    if (!companyId && draftCompanyId) {
+      companyId = draftCompanyId;
+    }
     const requestedDocumentType = parseDocumentType(payload);
     if (requestedDocumentType && requestedDocumentType !== String(review.run.document_type)) {
       throw new Error("documentType does not match draftRunId");
     }
   }
+
+  if (!roles.has("admin") && !companyId) {
+    const membershipIds = companyIds ?? await getUserCompanyIds(client, userId);
+    if (membershipIds.length === 1) {
+      companyId = membershipIds[0];
+    } else {
+      throw new Error("companyId is required for multi-tenant AI operations");
+    }
+  }
+
+  if (companyId) {
+    payload.companyId = companyId;
+  }
+
+  return { companyId };
 };
 
 const proxyAiDraft = async (
@@ -972,9 +1025,9 @@ const proxyAiDraft = async (
   token: string,
   payload: Record<string, unknown>,
 ) => {
-  await validateAiDraftScope(client, userId, roles, persona, payload);
+  const { companyId } = await validateAiDraftScope(client, userId, roles, persona, payload);
   const operation = normalizeAiOperation(payload);
-  const { requestKey, cachedResponse } = await prepareAiIdempotencyLock(client, userId, operation, payload);
+  const { requestKey, cachedResponse } = await prepareAiIdempotencyLock(client, userId, operation, payload, companyId);
 
   if (cachedResponse) {
     return {
@@ -1051,9 +1104,9 @@ const proxyAiDraftStream = async (
   token: string,
   payload: Record<string, unknown>,
 ) => {
-  await validateAiDraftScope(client, userId, roles, persona, payload);
+  const { companyId } = await validateAiDraftScope(client, userId, roles, persona, payload);
   const operation = normalizeAiOperation(payload);
-  const { requestKey } = await prepareAiIdempotencyLock(client, userId, operation, payload);
+  const { requestKey } = await prepareAiIdempotencyLock(client, userId, operation, payload, companyId);
   const { url, anon } = getEnv();
   let response: Response;
   try {
