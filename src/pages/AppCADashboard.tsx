@@ -13,6 +13,7 @@ import { supabase } from "@/integrations/supabase/client";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table";
 import { Badge } from "@/components/ui/badge";
+import RuntimeErrorBoundary from "@/components/common/RuntimeErrorBoundary";
 
 const statusClass: Record<string, string> = {
   pending: "bg-yellow-500/20 text-yellow-300 border-yellow-500/40",
@@ -185,32 +186,35 @@ const AppCADashboard = () => {
             </p>
           </div>
 
-          <AIVoiceBriefAgent
-            dashboardId="app-ca"
-            actorName="CA"
-            roleLabel={isRegulonCA ? "Regulon In-House CA Workspace" : "External CA Workspace"}
-            pendingWork={mapped?.tasks.filter((task) => task.status !== "completed").slice(0, 4).map((task) => `${task.title} (${task.regulator})`) || []}
-            newRules={[
-              "MCA: Chronology and officer-defense tables must remain explicit",
-              "Cross-regulator: Keep annexure-linked evidence for every key rebuttal",
-            ]}
-            autopilotActions={[
-              "Re-ranked draft queue by due date and risk",
-              "Prepared hearing-ready summary notes for critical matters",
-            ]}
-          />
+          <RuntimeErrorBoundary scopeLabel="CA Voice Agent">
+            <AIVoiceBriefAgent
+              dashboardId="app-ca"
+              actorName="CA"
+              roleLabel={isRegulonCA ? "Regulon In-House CA Workspace" : "External CA Workspace"}
+              pendingWork={mapped?.tasks.filter((task) => task.status !== "completed").slice(0, 4).map((task) => `${task.title} (${task.regulator})`) || []}
+              newRules={[
+                "MCA: Chronology and officer-defense tables must remain explicit",
+                "Cross-regulator: Keep annexure-linked evidence for every key rebuttal",
+              ]}
+              autopilotActions={[
+                "Re-ranked draft queue by due date and risk",
+                "Prepared hearing-ready summary notes for critical matters",
+              ]}
+            />
+          </RuntimeErrorBoundary>
 
-          {!mapped || mapped.stats.assignedCompanies === 0 ? (
-            <Card className="glass-card border-border/40 mb-8">
-              <CardHeader>
-                <CardTitle>No companies assigned</CardTitle>
-              </CardHeader>
-              <CardContent className="text-sm text-muted-foreground">
-                Ask platform admin/company owner to assign you in <code>company_members</code> to start live CA operations.
-              </CardContent>
-            </Card>
-          ) : (
-            <>
+          <RuntimeErrorBoundary scopeLabel="CA Dashboard Content">
+            {!mapped || mapped.stats.assignedCompanies === 0 ? (
+              <Card className="glass-card border-border/40 mb-8">
+                <CardHeader>
+                  <CardTitle>No companies assigned</CardTitle>
+                </CardHeader>
+                <CardContent className="text-sm text-muted-foreground">
+                  Ask platform admin/company owner to assign you in <code>company_members</code> to start live CA operations.
+                </CardContent>
+              </Card>
+            ) : (
+              <>
               <div className="grid grid-cols-2 md:grid-cols-5 gap-4 mb-8">
                 <Card className="glass-card border-border/40"><CardContent className="p-4"><p className="text-xs text-muted-foreground">Assigned Companies</p><p className="text-2xl font-bold">{mapped.stats.assignedCompanies}</p></CardContent></Card>
                 <Card className="glass-card border-border/40"><CardContent className="p-4"><p className="text-xs text-muted-foreground">Pending Tasks</p><p className="text-2xl font-bold">{mapped.stats.pendingTasks}</p></CardContent></Card>
@@ -316,10 +320,13 @@ const AppCADashboard = () => {
                   </Table>
                 </CardContent>
               </Card>
-            </>
-          )}
+              </>
+            )}
+          </RuntimeErrorBoundary>
 
-          <AIDraftingEngine includeLawyerReview={isRegulonCA} />
+          <RuntimeErrorBoundary scopeLabel="CA Drafting Engine">
+            <AIDraftingEngine includeLawyerReview={isRegulonCA} />
+          </RuntimeErrorBoundary>
         </div>
       </main>
 

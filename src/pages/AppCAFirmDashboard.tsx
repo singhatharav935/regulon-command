@@ -41,7 +41,7 @@ const AppCAFirmDashboard = () => {
         return { firm: null, members: [], directory: [], runs: [] };
       }
 
-      const [firmResult, membersResult, directoryResult, runsResult] = await Promise.all([
+      const [firmResult, membersResult, directoryResult] = await Promise.all([
         supabaseAny.from("ca_firms").select("id, name, registration_number, jurisdiction").eq("id", membership.ca_firm_id).single(),
         supabaseAny.from("ca_firm_members").select("id, user_id, role").eq("ca_firm_id", membership.ca_firm_id),
         supabaseAny
@@ -49,23 +49,33 @@ const AppCAFirmDashboard = () => {
           .select("id, ca_user_id, ca_name, license_number, specialty, status")
           .eq("ca_firm_id", membership.ca_firm_id)
           .order("ca_name", { ascending: true }),
-        supabaseAny
-          .from("draft_runs")
-          .select("id, user_id, status")
-          .order("created_at", { ascending: false })
-          .limit(1000),
       ]);
 
       if (firmResult.error) throw firmResult.error;
       if (membersResult.error) throw membersResult.error;
       if (directoryResult.error) throw directoryResult.error;
-      if (runsResult.error) throw runsResult.error;
+
+      const caUserIds = Array.from(
+        new Set((directoryResult.data ?? []).map((entry: { ca_user_id: string | null }) => entry.ca_user_id).filter(Boolean)),
+      );
+
+      let runs: Array<{ id: string; user_id: string | null; status: string }> = [];
+      if (caUserIds.length > 0) {
+        const { data: runsData, error: runsError } = await supabaseAny
+          .from("draft_runs")
+          .select("id, user_id, status")
+          .in("user_id", caUserIds)
+          .order("created_at", { ascending: false })
+          .limit(1000);
+        if (runsError) throw runsError;
+        runs = runsData ?? [];
+      }
 
       return {
         firm: firmResult.data,
         members: membersResult.data ?? [],
         directory: directoryResult.data ?? [],
-        runs: runsResult.data ?? [],
+        runs,
       };
     },
   });

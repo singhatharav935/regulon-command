@@ -29,6 +29,21 @@ const rolePriority: Record<AppRole, number> = {
 
 const sortRoles = (roles: AppRole[]) => [...roles].sort((a, b) => rolePriority[b] - rolePriority[a]);
 
+const inferPersonaFromUserMetadata = (user: User | null): AppPersona | null => {
+  const raw = user?.user_metadata?.registration_role;
+  if (
+    raw === "external_ca" ||
+    raw === "admin" ||
+    raw === "company_owner" ||
+    raw === "in_house_ca" ||
+    raw === "in_house_lawyer" ||
+    raw === "ca_firm"
+  ) {
+    return raw;
+  }
+  return null;
+};
+
 const withTimeout = async <T,>(promise: Promise<T>, timeoutMs: number, fallbackValue: T): Promise<T> => {
   let timer: ReturnType<typeof setTimeout> | undefined;
 
@@ -57,16 +72,16 @@ export const AuthProvider = ({ children }: { children: ReactNode }) => {
   useEffect(() => {
     let mounted = true;
 
-    const loadIdentity = async (userId: string) => {
+    const loadIdentity = async (activeUser: User) => {
       const { data, error } = await supabase
         .from("user_roles")
         .select("role")
-        .eq("user_id", userId);
+        .eq("user_id", activeUser.id);
 
       if (!mounted) return;
       if (error) {
         setRoles([]);
-        setPersona(null);
+        setPersona(inferPersonaFromUserMetadata(activeUser));
         setVerificationStatus(null);
         setIsVerified(false);
         return;
@@ -79,7 +94,7 @@ export const AuthProvider = ({ children }: { children: ReactNode }) => {
       const { data: personaData } = await supabaseAny
         .from("user_personas")
         .select("persona")
-        .eq("user_id", userId)
+        .eq("user_id", activeUser.id)
         .maybeSingle();
 
       const nextPersona = personaData?.persona as AppPersona | undefined;
@@ -100,14 +115,14 @@ export const AuthProvider = ({ children }: { children: ReactNode }) => {
         } else if (nextRoles.includes("user")) {
           setPersona("company_owner");
         } else {
-          setPersona(null);
+          setPersona(inferPersonaFromUserMetadata(activeUser));
         }
       }
 
       const { data: verificationData } = await supabaseAny
         .from("user_verifications")
         .select("status,is_verified")
-        .eq("user_id", userId)
+        .eq("user_id", activeUser.id)
         .maybeSingle();
 
       const nextStatus = verificationData?.status as VerificationStatus | undefined;
@@ -134,7 +149,7 @@ export const AuthProvider = ({ children }: { children: ReactNode }) => {
         setUser(initialSession?.user ?? null);
 
         if (initialSession?.user) {
-          await loadIdentity(initialSession.user.id);
+          await loadIdentity(initialSession.user);
         } else {
           setRoles([]);
           setPersona(null);
@@ -160,22 +175,22 @@ export const AuthProvider = ({ children }: { children: ReactNode }) => {
 
     const {
       data: { subscription },
-    } = supabase.auth.onAuthStateChange(async (_event, nextSession) => {
+    } = supabase.auth.onAuthStateChange((_event, nextSession) => {
       if (!mounted) return;
 
       setSession(nextSession);
       setUser(nextSession?.user ?? null);
+      setLoading(false);
 
       if (nextSession?.user) {
-        await loadIdentity(nextSession.user.id);
+        // Do not block auth state propagation on profile/role fetches.
+        void loadIdentity(nextSession.user);
       } else {
         setRoles([]);
         setPersona(null);
         setVerificationStatus(null);
         setIsVerified(false);
       }
-
-      setLoading(false);
     });
 
     return () => {

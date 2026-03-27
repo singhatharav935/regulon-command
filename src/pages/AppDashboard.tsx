@@ -20,6 +20,7 @@ import { Input } from "@/components/ui/input";
 import { useToast } from "@/hooks/use-toast";
 import { supabase } from "@/integrations/supabase/client";
 import { useAuth } from "@/hooks/use-auth";
+import RuntimeErrorBoundary from "@/components/common/RuntimeErrorBoundary";
 
 const AppDashboard = () => {
   const { user } = useAuth();
@@ -248,51 +249,55 @@ const AppDashboard = () => {
         <div className="container mx-auto px-4 max-w-7xl">
           <DashboardTypeNav activeType="company" routePrefix="/app" />
 
-          <AIVoiceBriefAgent
-            dashboardId="app-company"
-            actorName={mappedData.company.name}
-            roleLabel="Company Compliance Workspace"
-            pendingWork={mappedData.tasks.filter((task) => task.status !== "completed").slice(0, 4).map((task) => `${task.title} (${task.regulator})`)}
-            newRules={mappedData.exposures.slice(0, 4).map((item) => `${item.regulator}: ${item.notes || "status updated"}`)}
-            autopilotActions={[
-              "Prepared upcoming deadline alerts for client stakeholders",
-              "Updated regulator exposure summary with current task posture",
-            ]}
-          />
+          <RuntimeErrorBoundary scopeLabel="Company Voice Agent">
+            <AIVoiceBriefAgent
+              dashboardId="app-company"
+              actorName={mappedData.company.name}
+              roleLabel="Company Compliance Workspace"
+              pendingWork={mappedData.tasks.filter((task) => task.status !== "completed").slice(0, 4).map((task) => `${task.title} (${task.regulator})`)}
+              newRules={mappedData.exposures.slice(0, 4).map((item) => `${item.regulator}: ${item.notes || "status updated"}`)}
+              autopilotActions={[
+                "Prepared upcoming deadline alerts for client stakeholders",
+                "Updated regulator exposure summary with current task posture",
+              ]}
+            />
+          </RuntimeErrorBoundary>
 
-          <DashboardHeader
-            companyName={mappedData.company.name}
-            industry={mappedData.company.industry}
-            complianceHealth={mappedData.company.complianceHealth}
-          />
+          <RuntimeErrorBoundary scopeLabel="Company Dashboard Content">
+            <DashboardHeader
+              companyName={mappedData.company.name}
+              industry={mappedData.company.industry}
+              complianceHealth={mappedData.company.complianceHealth}
+            />
 
-          <RegulatoryExposurePanel exposures={mappedData.exposures} />
+            <RegulatoryExposurePanel exposures={mappedData.exposures} />
 
-          <AIBusinessIntelligencePanel
-            companyName={mappedData.company.name}
-            industry={mappedData.company.industry}
-            complianceHealth={mappedData.company.complianceHealth}
-            exposures={mappedData.exposures}
-            tasks={mappedData.tasks}
-            deadlines={mappedData.deadlines}
-          />
+            <AIBusinessIntelligencePanel
+              companyName={mappedData.company.name}
+              industry={mappedData.company.industry}
+              complianceHealth={mappedData.company.complianceHealth}
+              exposures={mappedData.exposures}
+              tasks={mappedData.tasks}
+              deadlines={mappedData.deadlines}
+            />
 
-          <ComplianceGapSection />
-          <UpcomingLawImpactSection />
-          <AuditEvidenceVault />
+            <ComplianceGapSection />
+            <UpcomingLawImpactSection />
+            <AuditEvidenceVault />
 
-          <QuickActions />
+            <QuickActions />
 
-          <ComplianceTasksTable tasks={mappedData.tasks} />
+            <ComplianceTasksTable tasks={mappedData.tasks} />
 
-          <div className="grid grid-cols-1 lg:grid-cols-3 gap-8">
-            <div className="lg:col-span-2">
-              <DocumentVault documents={mappedData.documents} />
+            <div className="grid grid-cols-1 lg:grid-cols-3 gap-8">
+              <div className="lg:col-span-2">
+                <DocumentVault documents={mappedData.documents} />
+              </div>
+              <div className="lg:col-span-1">
+                <UpcomingDeadlines deadlines={mappedData.deadlines} />
+              </div>
             </div>
-            <div className="lg:col-span-1">
-              <UpcomingDeadlines deadlines={mappedData.deadlines} />
-            </div>
-          </div>
+          </RuntimeErrorBoundary>
         </div>
       </main>
 

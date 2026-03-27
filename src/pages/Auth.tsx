@@ -1,4 +1,4 @@
-import { useState, useEffect } from "react";
+import { useState, useEffect, useRef } from "react";
 import { useLocation, useNavigate, useSearchParams } from "react-router-dom";
 import { motion } from "framer-motion";
 import { Mail, Lock, User, ArrowLeft, Eye, EyeOff, Shield, Briefcase, Building2, Users, Gavel, UserCheck } from "lucide-react";
@@ -11,6 +11,75 @@ import { z } from "zod";
 
 const emailSchema = z.string().email("Please enter a valid email address");
 const passwordSchema = z.string().min(6, "Password must be at least 6 characters");
+const AUTH_TIMEOUT_MS = 15000;
+
+const withTimeout = async <T,>(promise: Promise<T>, timeoutMs: number, timeoutMessage: string): Promise<T> => {
+  let timer: ReturnType<typeof setTimeout> | undefined;
+  const timeoutPromise = new Promise<never>((_, reject) => {
+    timer = setTimeout(() => reject(new Error(timeoutMessage)), timeoutMs);
+  });
+  try {
+    return await Promise.race([promise, timeoutPromise]);
+  } finally {
+    if (timer) clearTimeout(timer);
+  }
+};
+
+type RestLoginResponse = {
+  access_token?: string;
+  refresh_token?: string;
+  error_description?: string;
+  msg?: string;
+  error?: string;
+};
+
+const signInViaRest = async (email: string, password: string): Promise<{ accessToken: string; refreshToken: string }> => {
+  const supabaseUrl = import.meta.env.VITE_SUPABASE_URL as string;
+  const publishableKey = import.meta.env.VITE_SUPABASE_PUBLISHABLE_KEY as string;
+  if (!supabaseUrl || !publishableKey) {
+    throw new Error("Supabase env missing. Set VITE_SUPABASE_URL and VITE_SUPABASE_PUBLISHABLE_KEY.");
+  }
+
+  const controller = new AbortController();
+  const timeout = setTimeout(() => controller.abort(), AUTH_TIMEOUT_MS);
+  try {
+    const res = await fetch(`${supabaseUrl}/auth/v1/token?grant_type=password`, {
+      method: "POST",
+      headers: {
+        apikey: publishableKey,
+        "Content-Type": "application/json",
+      },
+      body: JSON.stringify({ email, password }),
+      signal: controller.signal,
+    });
+    const payload = (await res.json().catch(() => ({}))) as RestLoginResponse;
+
+    if (!res.ok || !payload?.access_token || !payload?.refresh_token) {
+      const details =
+        payload?.error_description ||
+        payload?.msg ||
+        payload?.error ||
+        `Login failed (HTTP ${res.status}).`;
+      throw new Error(details);
+    }
+
+    return {
+      accessToken: payload.access_token,
+      refreshToken: payload.refresh_token,
+    };
+  } catch (error) {
+    if (error instanceof DOMException && error.name === "AbortError") {
+      throw new Error("Login request timed out. Please check Supabase connection and retry.");
+    }
+    if (error instanceof TypeError) {
+      throw new Error("Cannot reach Supabase auth host. Verify VITE_SUPABASE_URL and internet access.");
+    }
+    throw error;
+  } finally {
+    clearTimeout(timeout);
+  }
+};
+
 
 const personas = [
   {
@@ -85,6 +154,7 @@ const Auth = () => {
   const [showPassword, setShowPassword] = useState(false);
   const [loading, setLoading] = useState(false);
   const [errors, setErrors] = useState<{ email?: string; password?: string; fullName?: string }>({});
+  const submitFailSafeRef = useRef<ReturnType<typeof setTimeout> | null>(null);
 
   useEffect(() => {
     const syncMode = searchParams.get("mode") === "signup" ? "signup" : "login";
@@ -92,6 +162,15 @@ const Auth = () => {
     setMode(syncMode);
     setSelectedPersona(syncPersona);
   }, [searchParams]);
+
+  useEffect(() => {
+    return () => {
+      if (submitFailSafeRef.current) {
+        clearTimeout(submitFailSafeRef.current);
+        submitFailSafeRef.current = null;
+      }
+    };
+  }, []);
 
   const updateMode = (nextMode: "login" | "signup") => {
     setMode(nextMode);
@@ -126,20 +205,8 @@ const Auth = () => {
     if (Object.keys(newErrors).length > 0) return false;
 
     if (mode === "signup") {
-      if (!entityName.trim()) {
-        toast({ title: "Entity name is required", variant: "destructive" });
-        return false;
-      }
       if (roleNeedsRegistrationNumber(selectedPersona) && registrationNumber.trim().length < 3) {
         toast({ title: "Registration number is required", variant: "destructive" });
-        return false;
-      }
-      if (roleNeedsLicenseNumber(selectedPersona) && licenseNumber.trim().length < 3) {
-        toast({ title: "License number is required", variant: "destructive" });
-        return false;
-      }
-      if (jurisdiction.trim().length < 2) {
-        toast({ title: "Jurisdiction is required", variant: "destructive" });
         return false;
       }
     }
@@ -147,65 +214,48 @@ const Auth = () => {
     return true;
   };
 
-  const resolveUserPersona = async (userId: string): Promise<Persona | null> => {
-    const supabaseAny = supabase as any;
-
-    const { data: personaData } = await supabaseAny
-      .from("user_personas")
-      .select("persona")
-      .eq("user_id", userId)
-      .maybeSingle();
-
-    if (isPersona(personaData?.persona ?? null)) return personaData.persona;
-
-    const { data: roleRows } = await supabaseAny
-      .from("user_roles")
-      .select("role")
-      .eq("user_id", userId);
-
-    const roles: string[] = (roleRows ?? []).map((row: { role: string }) => row.role);
-
-    if (roles.includes("admin")) return "admin";
-
-    if (roles.includes("manager")) {
-      const { data: caWorkspace } = await supabaseAny
-        .from("ca_workspace_profiles")
-        .select("workspace_type")
-        .eq("user_id", userId)
-        .maybeSingle();
-
-      if (caWorkspace?.workspace_type === "regulon_ca") return "in_house_ca";
-      return "external_ca";
-    }
-
-    return roles.includes("user") ? "company_owner" : null;
-  };
-
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
+    if (loading) return;
     if (!validateForm()) return;
 
     setLoading(true);
+    submitFailSafeRef.current = setTimeout(() => {
+      setLoading(false);
+      toast({
+        title: "Error",
+        description: "Request timed out. Please check internet/Supabase connection and try again.",
+        variant: "destructive",
+      });
+    }, AUTH_TIMEOUT_MS + 1000);
 
     try {
       if (mode === "login") {
-        const { error } = await supabase.auth.signInWithPassword({ email, password });
-        if (error) throw error;
-
-        const {
-          data: { user },
-          error: userError,
-        } = await supabase.auth.getUser();
-
-        if (userError) throw userError;
-
-        if (user) {
-          const accountPersona = await resolveUserPersona(user.id);
-          if (accountPersona && accountPersona !== selectedPersona) {
-            await supabase.auth.signOut();
-            throw new Error(`This account is registered as ${accountPersona.replaceAll("_", " ")}. Select that role to login.`);
+        let loginError: any = null;
+        try {
+          const sdkLogin = await withTimeout(
+            supabase.auth.signInWithPassword({ email, password }),
+            AUTH_TIMEOUT_MS,
+            "SDK login timed out.",
+          );
+          loginError = sdkLogin.error;
+        } catch (sdkError: any) {
+          if (typeof sdkError?.message === "string" && sdkError.message.includes("timed out")) {
+            const rest = await signInViaRest(email, password);
+            const setSession = await withTimeout(
+              supabase.auth.setSession({
+                access_token: rest.accessToken,
+                refresh_token: rest.refreshToken,
+              }),
+              10000,
+              "Auth session setup timed out after REST login.",
+            );
+            loginError = setSession.error;
+          } else {
+            throw sdkError;
           }
         }
+        if (loginError) throw loginError;
 
         toast({ title: "Welcome back", description: "Login successful. Redirecting to your workspace." });
         navigate(returnPath || "/app", { replace: true });
@@ -261,6 +311,10 @@ const Auth = () => {
       }
       toast({ title: "Error", description: message, variant: "destructive" });
     } finally {
+      if (submitFailSafeRef.current) {
+        clearTimeout(submitFailSafeRef.current);
+        submitFailSafeRef.current = null;
+      }
       setLoading(false);
     }
   };
@@ -325,7 +379,7 @@ const Auth = () => {
                 </div>
 
                 <div className="space-y-2">
-                  <Label>Entity / Organization Name</Label>
+                  <Label>Entity / Organization Name (Optional)</Label>
                   <Input value={entityName} onChange={(e) => setEntityName(e.target.value)} placeholder="Entity name" />
                 </div>
 
@@ -338,13 +392,13 @@ const Auth = () => {
 
                 {roleNeedsLicenseNumber(selectedPersona) && (
                   <div className="space-y-2">
-                    <Label>Professional License Number</Label>
+                    <Label>Professional License Number (Optional)</Label>
                     <Input value={licenseNumber} onChange={(e) => setLicenseNumber(e.target.value)} placeholder="CA/Lawyer license number" />
                   </div>
                 )}
 
                 <div className="space-y-2">
-                  <Label>Jurisdiction</Label>
+                  <Label>Jurisdiction (Optional)</Label>
                   <Input value={jurisdiction} onChange={(e) => setJurisdiction(e.target.value)} placeholder="State/Council/Jurisdiction" />
                 </div>
               </>

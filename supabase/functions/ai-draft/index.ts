@@ -40,6 +40,34 @@ const getModeDescription = (draftMode: string): string => {
   return modes[draftMode] || modes.balanced;
 };
 
+type LogicLevel = "regulon_core" | "regulon_nexus_9" | "regulon_sovereign";
+
+const normalizeLogicLevel = (value: unknown): LogicLevel | null => {
+  if (typeof value !== "string") return null;
+  const normalized = value.trim().toLowerCase();
+  if (!normalized) return null;
+  if (normalized === "regulon_core" || normalized === "core" || normalized === "quick_draft") return "regulon_core";
+  if (normalized === "regulon_nexus_9" || normalized === "nexus-9" || normalized === "expert_analysis") return "regulon_nexus_9";
+  if (normalized === "regulon_sovereign" || normalized === "sovereign" || normalized === "supreme_research") return "regulon_sovereign";
+  return null;
+};
+
+const inferLogicLevelFromDraftMode = (draftMode: string | null | undefined): LogicLevel => {
+  const normalized = String(draftMode ?? "").trim().toLowerCase();
+  if (normalized === "conservative") return "regulon_core";
+  if (normalized === "aggressive") return "regulon_sovereign";
+  return "regulon_nexus_9";
+};
+
+const getLogicLevelDescription = (logicLevel: LogicLevel): string => {
+  const profiles: Record<LogicLevel, string> = {
+    regulon_core: "REGULON_CORE™: Foundational reliability and administrative speed. Keep response concise, procedural, and filing-safe. Avoid deep judicial expansion unless strictly needed.",
+    regulon_nexus_9: "REGULON_NEXUS-9™: Professional-grade expert analysis. Execute para-wise statutory mapping and robust legal rebuttal with precise section-rule anchoring.",
+    regulon_sovereign: "REGULON_SOVEREIGN™: Supreme research depth. Use maximum judicial reasoning depth, include litigation-grade positioning, and strengthen formal legal-submission architecture.",
+  };
+  return profiles[logicLevel];
+};
+
 const getDocumentTypePrompt = (documentType: string): string => {
   const prompts: Record<string, string> = {
     "gst-show-cause": `
@@ -902,48 +930,23 @@ const sanitizeNoticeDetailsInput = (raw: string, fallback: string) => {
   return cleaned;
 };
 
-type AIProvider = "lovable" | "openai";
+type AIProvider = "openai";
 
 const resolveAIConfig = (
   preferredProvider?: AIProvider,
 ): { provider: AIProvider; apiKey: string; model: string; endpoint: string } => {
-  const lovableApiKey = Deno.env.get("LOVABLE_API_KEY");
   const openAiApiKey = Deno.env.get("OPENAI_API_KEY");
-
-  const lovableConfig = lovableApiKey
-    ? {
-      provider: "lovable" as const,
-      apiKey: lovableApiKey,
-      model: Deno.env.get("LOVABLE_MODEL") ?? "google/gemini-3-flash-preview",
-      endpoint: "https://ai.gateway.lovable.dev/v1/chat/completions",
-    }
-    : null;
 
   const openAiConfig = openAiApiKey
     ? {
       provider: "openai" as const,
       apiKey: openAiApiKey,
-      model: Deno.env.get("OPENAI_MODEL") ?? "gpt-4o-mini",
+      model: Deno.env.get("OPENAI_MODEL") ?? "gpt-4.1-mini",
       endpoint: "https://api.openai.com/v1/chat/completions",
     }
     : null;
-
-  // Preferred routing:
-  // - notice-details intake -> Lovable first
-  // - draft/recheck/fix flows -> OpenAI first
-  if (preferredProvider === "lovable") {
-    if (lovableConfig) return lovableConfig;
-    if (openAiConfig) return openAiConfig;
-  } else if (preferredProvider === "openai") {
-    if (openAiConfig) return openAiConfig;
-    if (lovableConfig) return lovableConfig;
-  } else {
-    // Backward-compatible default: Lovable first, then OpenAI
-    if (lovableConfig) return lovableConfig;
-    if (openAiConfig) return openAiConfig;
-  }
-
-  throw new Error("No AI provider key configured. Set LOVABLE_API_KEY or OPENAI_API_KEY.");
+  if (openAiConfig) return openAiConfig;
+  throw new Error("No OpenAI key configured. Set OPENAI_API_KEY in Supabase Edge Function secrets.");
 };
 
 const aiRequest = async ({
@@ -3404,6 +3407,7 @@ serve(async (req) => {
       companyName,
       companyId,
       draftMode,
+      logicLevel,
       industry,
       context,
       noticeDetails,
@@ -3426,7 +3430,9 @@ serve(async (req) => {
     } = await req.json();
 
     const normalizedOperation = typeof operation === "string" ? operation.trim().toLowerCase() : "draft";
-    const aiConfig = resolveAIConfig(normalizedOperation === "notice-details" ? "lovable" : "openai");
+    const effectiveLogicLevel: LogicLevel =
+      normalizeLogicLevel(logicLevel) ?? inferLogicLevelFromDraftMode(draftMode);
+    const aiConfig = resolveAIConfig("openai");
     const normalizedGstReplyType: GstReplyType | null =
       typeof gstReplyTypeOverride === "string" && gstReplyTypeOverride.trim()
         ? normalizeGstReplyType(gstReplyTypeOverride)
@@ -3963,6 +3969,9 @@ NON-NEGOTIABLE OUTPUT RULES
 DRAFT MODE: ${draftMode.toUpperCase()}
 ${modeDescription}
 
+LOGIC LEVEL ENGINE: ${effectiveLogicLevel.toUpperCase()}
+${getLogicLevelDescription(effectiveLogicLevel)}
+
 UNIVERSAL STANDARDS
 1. Facts -> Law -> Application -> Conclusion.
 2. Para-wise rebuttal only for allegations present.
@@ -4187,6 +4196,7 @@ Dataset policy:
           documentType,
           companyName,
           draftMode,
+          logicLevel: effectiveLogicLevel,
           industry,
           mcaReplyType,
           incomeTaxReplyType,
@@ -4712,6 +4722,7 @@ Schema:
         documentType,
         companyName,
         draftMode,
+        logicLevel: effectiveLogicLevel,
         industry,
         mcaReplyType,
         gstReplyType: effectiveGstReplyType,

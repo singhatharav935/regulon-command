@@ -1,38 +1,60 @@
 import { useQuery } from "@tanstack/react-query";
 import { format, parseISO } from "date-fns";
+import { useNavigate } from "react-router-dom";
 import Navbar from "@/components/layout/Navbar";
 import Footer from "@/components/layout/Footer";
 import DashboardTypeNav from "@/components/dashboard/DashboardTypeNav";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Badge } from "@/components/ui/badge";
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table";
+import { Button } from "@/components/ui/button";
 import { supabase } from "@/integrations/supabase/client";
 import AIVoiceBriefAgent from "@/components/voice/AIVoiceBriefAgent";
+import { useAuth } from "@/hooks/use-auth";
 
 const AppLegalDashboard = () => {
+  const { user } = useAuth();
+  const navigate = useNavigate();
   const { data, isLoading, isError, error } = useQuery({
-    queryKey: ["legal-workspace"],
+    queryKey: ["legal-workspace", user?.id],
+    enabled: Boolean(user?.id),
     queryFn: async () => {
-      const [runsResult, eventsResult] = await Promise.all([
-        (supabase as any)
-          .from("draft_runs")
-          .select("id, document_type, draft_mode, status, created_at")
-          .order("created_at", { ascending: false })
-          .limit(100),
-        (supabase as any)
+      if (!user?.id) throw new Error("User is not authenticated");
+      const supabaseAny = supabase as any;
+
+      const { data: memberships, error: membershipError } = await supabase
+        .from("company_members")
+        .select("company_id")
+        .eq("user_id", user.id);
+      if (membershipError) throw membershipError;
+
+      const companyIds = Array.from(new Set((memberships ?? []).map((row) => row.company_id)));
+      if (companyIds.length === 0) {
+        return { companyIds: [], runs: [], events: [] };
+      }
+
+      const { data: runs, error: runsError } = await supabaseAny
+        .from("draft_runs")
+        .select("id, company_id, document_type, draft_mode, status, created_at")
+        .in("company_id", companyIds)
+        .order("created_at", { ascending: false })
+        .limit(100);
+      if (runsError) throw runsError;
+
+      const draftRunIds = Array.from(new Set((runs ?? []).map((run: { id: string }) => run.id)));
+      let events: Array<{ id: string; event_type: string; created_at: string; draft_run_id: string }> = [];
+      if (draftRunIds.length > 0) {
+        const { data: eventsData, error: eventsError } = await supabaseAny
           .from("draft_audit_events")
-          .select("id, event_type, created_at")
+          .select("id, draft_run_id, event_type, created_at")
+          .in("draft_run_id", draftRunIds)
           .order("created_at", { ascending: false })
-          .limit(200),
-      ]);
+          .limit(200);
+        if (eventsError) throw eventsError;
+        events = eventsData ?? [];
+      }
 
-      if (runsResult.error) throw runsResult.error;
-      if (eventsResult.error) throw eventsResult.error;
-
-      return {
-        runs: runsResult.data ?? [],
-        events: eventsResult.data ?? [],
-      };
+      return { companyIds, runs: runs ?? [], events };
     },
   });
 
@@ -101,6 +123,14 @@ const AppLegalDashboard = () => {
             <Card className="glass-card border-border/40"><CardContent className="p-4"><p className="text-xs text-muted-foreground">Signed Off</p><p className="text-2xl font-bold">{signedOff}</p></CardContent></Card>
           </div>
 
+          {data && data.companyIds.length === 0 ? (
+            <Card className="glass-card border-border/40 mb-8">
+              <CardContent className="p-6 text-sm text-muted-foreground">
+                No company assignment found for this legal workspace yet. Assign the lawyer to a company in `company_members` to activate live review queues.
+              </CardContent>
+            </Card>
+          ) : null}
+
           <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
             <Card className="glass-card border-border/40">
               <CardHeader>
@@ -108,23 +138,33 @@ const AppLegalDashboard = () => {
               </CardHeader>
               <CardContent className="overflow-x-auto">
                 <Table>
-                  <TableHeader>
-                    <TableRow>
-                      <TableHead>Document Type</TableHead>
-                      <TableHead>Draft Mode</TableHead>
-                      <TableHead>Status</TableHead>
-                      <TableHead>Created</TableHead>
-                    </TableRow>
-                  </TableHeader>
-                  <TableBody>
-                    {data?.runs.length === 0 ? (
-                      <TableRow><TableCell colSpan={4} className="text-muted-foreground">No draft runs available.</TableCell></TableRow>
-                    ) : data?.runs.slice(0, 40).map((run) => (
+                    <TableHeader>
+                      <TableRow>
+                        <TableHead>Document Type</TableHead>
+                        <TableHead>Draft Mode</TableHead>
+                        <TableHead>Status</TableHead>
+                        <TableHead>Created</TableHead>
+                        <TableHead>Action</TableHead>
+                      </TableRow>
+                    </TableHeader>
+                    <TableBody>
+                      {data?.runs.length === 0 ? (
+                        <TableRow><TableCell colSpan={5} className="text-muted-foreground">No draft runs available.</TableCell></TableRow>
+                      ) : data?.runs.slice(0, 40).map((run) => (
                       <TableRow key={run.id}>
                         <TableCell>{run.document_type}</TableCell>
                         <TableCell>{run.draft_mode}</TableCell>
                         <TableCell><Badge variant="outline">{run.status}</Badge></TableCell>
                         <TableCell>{format(parseISO(run.created_at), "MMM dd, yyyy HH:mm")}</TableCell>
+                        <TableCell>
+                          <Button
+                            size="sm"
+                            variant="outline"
+                            onClick={() => navigate(`/app/agent-work-review?draftRunId=${encodeURIComponent(run.id)}&returnPath=${encodeURIComponent("/app/legal-dashboard")}`)}
+                          >
+                            Review
+                          </Button>
+                        </TableCell>
                       </TableRow>
                     ))}
                   </TableBody>

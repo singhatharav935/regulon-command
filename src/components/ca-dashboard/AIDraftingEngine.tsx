@@ -4,6 +4,7 @@ import {
   FileText, 
   Building2, 
   AlertTriangle, 
+  AlertCircle,
   CheckCircle2, 
   Scale, 
   Shield,
@@ -14,7 +15,8 @@ import {
   Loader2,
   Edit3,
   Eye,
-  Upload
+  Upload,
+  Download
 } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
@@ -29,6 +31,7 @@ import {
 } from "@/components/ui/select";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
+import { Tooltip, TooltipContent, TooltipProvider, TooltipTrigger } from "@/components/ui/tooltip";
 import { toast } from "sonner";
 import { supabase } from "@/integrations/supabase/client";
 import { useLocation, useNavigate } from "react-router-dom";
@@ -67,10 +70,69 @@ type ClientOption = {
   industry: string;
 };
 
+type DraftHistoryItem = {
+  id: string;
+  created_at: string;
+  status: string;
+  document_type: string | null;
+  draft_mode: string | null;
+  draft_content: string | null;
+  qa: DraftQA | null;
+  package: DraftPackage | null;
+};
+
+type DraftVersionItem = {
+  id: string;
+  draft_run_id: string;
+  version_number: number;
+  content: string;
+  created_at: string;
+};
+
+type DraftAuditEventItem = {
+  event_type: string;
+  created_at: string;
+};
+
 const draftModes = [
   { id: "conservative", label: "Conservative", description: "Lowest risk, compliance-first language", color: "text-green-500" },
   { id: "balanced", label: "Balanced", description: "Standard industry practice", color: "text-yellow-500" },
   { id: "aggressive", label: "Assertive", description: "Legally defensible, assertive stance", color: "text-orange-500" },
+];
+
+const allowLiveDemoFallback =
+  import.meta.env.DEV || import.meta.env.VITE_ENABLE_LIVE_DEMO_FALLBACK === "true";
+
+type LogicLevelId = "regulon_core" | "regulon_nexus_9" | "regulon_sovereign";
+
+const logicLevelProfiles: Array<{
+  id: LogicLevelId;
+  label: string;
+  engine: string;
+  description: string;
+  guidance: string;
+}> = [
+  {
+    id: "regulon_core",
+    label: "Quick Draft",
+    engine: "REGULON_CORE™",
+    description: "Foundational reliability and administrative speed.",
+    guidance: "Best for standard compliance replies, extension requests, and first acknowledgments.",
+  },
+  {
+    id: "regulon_nexus_9",
+    label: "Expert Analysis",
+    engine: "REGULON_NEXUS-9™",
+    description: "Systematic statutory rebuttal with professional-grade legal anchoring.",
+    guidance: "Best for para-wise rebuttal, statutory mapping, and filing-ready professional submissions.",
+  },
+  {
+    id: "regulon_sovereign",
+    label: "Supreme Research",
+    engine: "REGULON_SOVEREIGN™",
+    description: "Maximum judicial-depth strategy for high-stakes matters.",
+    guidance: "Best for appeals/litigation strategy with deep case-law positioning and formal legal submissions.",
+  },
 ];
 
 const mcaReplyTypeOptions = [
@@ -1585,6 +1647,7 @@ const AIDraftingEngine = ({ demoMode = false, includeLawyerReview = true }: AIDr
   const [selectedDocType, setSelectedDocType] = useState<string>("");
   const [lastTemplateDocType, setLastTemplateDocType] = useState<string>("");
   const [selectedMode, setSelectedMode] = useState<string>("balanced");
+  const [logicLevelOverride, setLogicLevelOverride] = useState<LogicLevelId | "auto">("auto");
   const [templatePackOverride, setTemplatePackOverride] = useState<TemplatePackId>("auto");
   const [templateCatalogView, setTemplateCatalogView] = useState<TemplateCatalogView>("recommended");
   const [templateSearch, setTemplateSearch] = useState("");
@@ -1621,7 +1684,7 @@ const AIDraftingEngine = ({ demoMode = false, includeLawyerReview = true }: AIDr
   const [showFormatDetails, setShowFormatDetails] = useState(false);
   const [currentDraftRunId, setCurrentDraftRunId] = useState<string | null>(null);
   const [workflowStatus, setWorkflowStatus] = useState<WorkflowStatus>("generated");
-  const [auditEvents, setAuditEvents] = useState<Array<{ event_type: string; created_at: string }>>([]);
+  const [auditEvents, setAuditEvents] = useState<DraftAuditEventItem[]>([]);
   const [draftQA, setDraftQA] = useState<DraftQA | null>(null);
   const [draftPackage, setDraftPackage] = useState<DraftPackage | null>(null);
   const [mcaHasChecked, setMcaHasChecked] = useState(false);
@@ -1682,9 +1745,22 @@ const AIDraftingEngine = ({ demoMode = false, includeLawyerReview = true }: AIDr
   const [isApplyingCustomFix, setIsApplyingCustomFix] = useState(false);
   const [currentSteps, setCurrentSteps] = useState<ReviewStep[]>(initialReviewSteps);
   const [generationError, setGenerationError] = useState<string | null>(null);
+  const [draftServiceStatus, setDraftServiceStatus] = useState<"checking" | "online" | "offline">("checking");
+  const [draftServiceMessage, setDraftServiceMessage] = useState("Checking live AI backend...");
+  const [isCheckingDraftService, setIsCheckingDraftService] = useState(false);
+  const [draftHistory, setDraftHistory] = useState<DraftHistoryItem[]>([]);
+  const [isLoadingDraftHistory, setIsLoadingDraftHistory] = useState(false);
+  const [draftVersions, setDraftVersions] = useState<DraftVersionItem[]>([]);
+  const [isLoadingDraftVersions, setIsLoadingDraftVersions] = useState(false);
+  const [isSavingDraftVersion, setIsSavingDraftVersion] = useState(false);
+  const [hasUnsavedDraftChanges, setHasUnsavedDraftChanges] = useState(false);
 
-  const DRAFT_URL = `${import.meta.env.VITE_SUPABASE_URL}/functions/v1/ai-draft`;
-  const hasDraftEndpoint = typeof import.meta.env.VITE_SUPABASE_URL === "string" && import.meta.env.VITE_SUPABASE_URL.startsWith("http");
+  const DRAFT_URL = import.meta.env.DEV
+    ? "/api/ai-draft"
+    : `${import.meta.env.VITE_SUPABASE_URL}/functions/v1/ai-draft`;
+  const hasDraftEndpoint =
+    import.meta.env.DEV ||
+    (typeof import.meta.env.VITE_SUPABASE_URL === "string" && import.meta.env.VITE_SUPABASE_URL.startsWith("http"));
   const secureFunctionAuth = import.meta.env.VITE_ENABLE_SECURE_FUNCTION_AUTH === "true";
   const supabaseUrl = (import.meta.env.VITE_SUPABASE_URL as string) || "";
   const supabasePublishableKey = (import.meta.env.VITE_SUPABASE_PUBLISHABLE_KEY as string) || "";
@@ -1752,6 +1828,59 @@ const AIDraftingEngine = ({ demoMode = false, includeLawyerReview = true }: AIDr
     contractReplyTypeOverride, inferredContractReplyType,
     customReplyTypeOverride, inferredCustomReplyType,
   ]);
+  const recommendedLogicLevel = useMemo<LogicLevelId>(() => {
+    const normalizedNotice = noticeDetails.trim().toLowerCase();
+    const highStakesSignals = [
+      "high court",
+      "supreme court",
+      "nclt",
+      "itat",
+      "appeal",
+      "writ",
+      "litigation",
+      "prosecution",
+      "adjudication officer",
+      "fraud",
+      "section 74",
+      "section 447",
+      "sebi summons",
+    ];
+    const mediumSignals = [
+      "show cause",
+      "scrutiny",
+      "assessment",
+      "penalty",
+      "demand",
+      "interest",
+      "reconciliation",
+      "disallowance",
+      "non-compliance",
+    ];
+    const hasHighSignal = highStakesSignals.some((s) => normalizedNotice.includes(s));
+    const hasMediumSignal = mediumSignals.some((s) => normalizedNotice.includes(s));
+
+    if (selectedMode === "aggressive" || hasHighSignal || noticeLength > 2600) {
+      return "regulon_sovereign";
+    }
+    if (selectedMode === "balanced" || hasMediumSignal || noticeLength > 850) {
+      return "regulon_nexus_9";
+    }
+    return "regulon_core";
+  }, [selectedMode, noticeDetails, noticeLength]);
+  const effectiveLogicLevel = logicLevelOverride === "auto" ? recommendedLogicLevel : logicLevelOverride;
+  const effectiveLogicProfile = useMemo(
+    () => logicLevelProfiles.find((item) => item.id === effectiveLogicLevel) ?? logicLevelProfiles[1],
+    [effectiveLogicLevel],
+  );
+  const logicRecommendationReason = useMemo(() => {
+    if (effectiveLogicLevel === "regulon_sovereign") {
+      return "AI Agent flagged high-stakes complexity. Supreme Research recommended.";
+    }
+    if (effectiveLogicLevel === "regulon_nexus_9") {
+      return "AI Agent detected statutory rebuttal complexity. Expert Analysis recommended.";
+    }
+    return "AI Agent detected standard procedural scope. Quick Draft recommended.";
+  }, [effectiveLogicLevel]);
   const templatePackOptions = useMemo(
     () => getTemplatePackOptionsBySelection(selectedDocType, effectiveNoticeClass),
     [selectedDocType, effectiveNoticeClass],
@@ -1890,6 +2019,52 @@ const AIDraftingEngine = ({ demoMode = false, includeLawyerReview = true }: AIDr
   );
   const buildContextWithTemplateAndPrompt = (base: string) =>
     `${base}\n\nTemplate policy [${effectiveTemplatePack.label}]: ${effectiveTemplatePack.instructions}\n${promptPolicyDirective}`;
+
+  const checkDraftServiceHealth = async () => {
+    setIsCheckingDraftService(true);
+    try {
+      if (!hasDraftEndpoint) {
+        setDraftServiceStatus("offline");
+        setDraftServiceMessage("Draft endpoint is not configured (missing VITE_SUPABASE_URL).");
+        return;
+      }
+
+      const response = await fetch(DRAFT_URL, {
+        method: "OPTIONS",
+      });
+
+      if (response.ok) {
+        setDraftServiceStatus("online");
+        setDraftServiceMessage("Live drafting backend is reachable.");
+      } else {
+        setDraftServiceStatus("offline");
+        setDraftServiceMessage(`Live drafting backend returned status ${response.status}.`);
+      }
+    } catch {
+      setDraftServiceStatus("offline");
+      setDraftServiceMessage("Live drafting backend is unreachable.");
+    } finally {
+      setIsCheckingDraftService(false);
+    }
+  };
+
+  useEffect(() => {
+    let mounted = true;
+    const run = async () => {
+      if (!mounted) return;
+      await checkDraftServiceHealth();
+    };
+    void run();
+
+    const interval = setInterval(() => {
+      void run();
+    }, 30000);
+
+    return () => {
+      mounted = false;
+      clearInterval(interval);
+    };
+  }, [DRAFT_URL, hasDraftEndpoint]);
   useEffect(() => {
     if (!promptPackOverride || promptPackOverride === "auto") return;
     const valid = promptPackOptions.some((item) => item.id === promptPackOverride);
@@ -1898,6 +2073,7 @@ const AIDraftingEngine = ({ demoMode = false, includeLawyerReview = true }: AIDr
     }
   }, [promptPackOverride, promptPackOptions]);
   const supabaseAny = supabase as any;
+  const lastPersistedDraftContentRef = useRef("");
   const getMcaAutoFixNotes = (
     issues: Array<{ issue: string; suggestion: string }>,
     suggestions: Array<{ title: string; suggestion: string; implemented: boolean }>,
@@ -3501,6 +3677,16 @@ const AIDraftingEngine = ({ demoMode = false, includeLawyerReview = true }: AIDr
       .replace(/\b\d{2}[A-Z]{5}\d{4}[A-Z]\d[Z][A-Z0-9]\b/gi, "[REDACTED_GSTIN]");
   };
 
+  const buildExportFileNameBase = () => {
+    const clientName = clientOptions.find((client) => client.id === selectedClient)?.name || "draft";
+    const docLabel = selectedDocLabel || "document";
+    const raw = `${clientName}-${docLabel}`.toLowerCase();
+    return raw
+      .replace(/[^a-z0-9]+/g, "-")
+      .replace(/^-+|-+$/g, "")
+      .slice(0, 80) || "regulon-draft";
+  };
+
   const recordAudit = async (draftRunId: string, eventType: string, payload?: Record<string, unknown>) => {
     if (demoMode) {
       setAuditEvents((prev) => [
@@ -3533,12 +3719,363 @@ const AIDraftingEngine = ({ demoMode = false, includeLawyerReview = true }: AIDr
     }
   };
 
+  const loadAuditTrail = async (draftRunId: string | null) => {
+    if (!draftRunId || demoMode || draftRunId.startsWith("demo-")) {
+      setAuditEvents([]);
+      return;
+    }
+    try {
+      const { data, error } = await supabaseAny
+        .from("draft_audit_events")
+        .select("event_type, created_at")
+        .eq("draft_run_id", draftRunId)
+        .order("created_at", { ascending: false })
+        .limit(10);
+      if (error) throw error;
+      setAuditEvents((data ?? []) as DraftAuditEventItem[]);
+    } catch {
+      setAuditEvents([]);
+    }
+  };
+
+  const loadDraftVersions = async (draftRunId: string | null) => {
+    if (!draftRunId || demoMode || draftRunId.startsWith("demo-")) {
+      setDraftVersions([]);
+      return;
+    }
+    setIsLoadingDraftVersions(true);
+    try {
+      const { data, error } = await supabaseAny
+        .from("draft_versions")
+        .select("id, draft_run_id, version_number, content, created_at")
+        .eq("draft_run_id", draftRunId)
+        .order("version_number", { ascending: false })
+        .limit(20);
+      if (error) throw error;
+      setDraftVersions((data ?? []) as DraftVersionItem[]);
+    } catch {
+      setDraftVersions([]);
+    } finally {
+      setIsLoadingDraftVersions(false);
+    }
+  };
+
+  const persistDraftSnapshot = async ({
+    draftRunId,
+    content,
+    nextStatus,
+    eventType,
+    payload,
+    successMessage,
+  }: {
+    draftRunId: string;
+    content: string;
+    nextStatus?: WorkflowStatus;
+    eventType: string;
+    payload?: Record<string, unknown>;
+    successMessage?: string;
+  }) => {
+    if (!draftRunId || demoMode || draftRunId.startsWith("demo-")) {
+      if (draftRunId) {
+        setWorkflowStatus(nextStatus ?? workflowStatus);
+        await recordAudit(draftRunId, eventType, payload);
+      }
+      setHasUnsavedDraftChanges(false);
+      lastPersistedDraftContentRef.current = content.trim();
+      return true;
+    }
+
+    setIsSavingDraftVersion(true);
+    try {
+      const {
+        data: { user },
+      } = await supabase.auth.getUser();
+      if (!user) throw new Error("No authenticated user for draft persistence.");
+
+      const { data: latestVersion } = await supabaseAny
+        .from("draft_versions")
+        .select("version_number")
+        .eq("draft_run_id", draftRunId)
+        .order("version_number", { ascending: false })
+        .limit(1)
+        .maybeSingle();
+
+      const nextVersionNumber = Number(latestVersion?.version_number ?? 0) + 1;
+
+      const { error: updateError } = await supabaseAny
+        .from("draft_runs")
+        .update({
+          draft_content: content,
+          status: nextStatus ?? workflowStatus,
+          notice_input: maskPII(noticeDetails) || null,
+          qa: draftQA ?? null,
+          package: draftPackage ?? null,
+        })
+        .eq("id", draftRunId);
+      if (updateError) throw updateError;
+
+      const { error: versionError } = await supabaseAny
+        .from("draft_versions")
+        .insert({
+          draft_run_id: draftRunId,
+          user_id: user.id,
+          version_number: nextVersionNumber,
+          content,
+        });
+      if (versionError) throw versionError;
+
+      setWorkflowStatus(nextStatus ?? workflowStatus);
+      lastPersistedDraftContentRef.current = content.trim();
+      setHasUnsavedDraftChanges(false);
+      await recordAudit(draftRunId, eventType, payload);
+      await Promise.all([loadDraftVersions(draftRunId), loadDraftHistory(), loadAuditTrail(draftRunId)]);
+      if (successMessage) toast.success(successMessage);
+      return true;
+    } catch (error) {
+      toast.error(error instanceof Error ? error.message : "Failed to save draft version.");
+      return false;
+    } finally {
+      setIsSavingDraftVersion(false);
+    }
+  };
+
+  const persistNewDraftRun = async ({
+    content,
+    qa,
+    draftPackagePayload,
+    advancedMode,
+  }: {
+    content: string;
+    qa: DraftQA | null;
+    draftPackagePayload: DraftPackage | null;
+    advancedMode: boolean;
+  }) => {
+    try {
+      if (demoMode) {
+        const demoRunId = `demo-${Date.now()}`;
+        setCurrentDraftRunId(demoRunId);
+        setAuditEvents([{ event_type: "draft_generated", created_at: new Date().toISOString() }]);
+        setDraftVersions([]);
+        lastPersistedDraftContentRef.current = content.trim();
+        setHasUnsavedDraftChanges(false);
+        await recordAudit(demoRunId, "draft_generated", {
+          document_type: selectedDocType,
+          draft_mode: selectedMode,
+          advanced_mode: advancedMode,
+          mode: "demo",
+        });
+        return;
+      }
+
+      const {
+        data: { user },
+      } = await supabase.auth.getUser();
+      if (!user) {
+        throw new Error("No authenticated user for persistence.");
+      }
+
+      const { data: draftRun, error: draftRunError } = await supabaseAny
+        .from("draft_runs")
+        .insert({
+          user_id: user.id,
+          company_id: clientSource === "live" ? selectedClient : null,
+          document_type: selectedDocType,
+          draft_mode: selectedMode,
+          status: "generated",
+          notice_input: maskPII(noticeDetails) || null,
+          draft_content: content,
+          qa,
+          package: draftPackagePayload,
+        })
+        .select("id")
+        .single();
+      if (draftRunError) throw draftRunError;
+
+      if (draftRun?.id) {
+        const { error: versionError } = await supabaseAny
+          .from("draft_versions")
+          .insert({
+            draft_run_id: draftRun.id,
+            user_id: user.id,
+            version_number: 1,
+            content,
+          });
+        if (versionError) throw versionError;
+
+        setCurrentDraftRunId(draftRun.id);
+        lastPersistedDraftContentRef.current = content.trim();
+        setHasUnsavedDraftChanges(false);
+        await recordAudit(draftRun.id, "draft_generated", {
+          document_type: selectedDocType,
+          draft_mode: selectedMode,
+          advanced_mode: advancedMode,
+        });
+        await Promise.all([loadDraftVersions(draftRun.id), loadDraftHistory()]);
+      }
+
+      await supabaseAny.from("practice_preferences").upsert({
+        user_id: user.id,
+        preferred_mode: selectedMode,
+        preferred_document_type: selectedDocType,
+        prefer_pii_masking: preferPiiMasking,
+      });
+    } catch {
+      // non-blocking persistence
+    }
+  };
+
+  const assertLiveClientAccess = () => {
+    if (demoMode) return true;
+    if (clientSource !== "live") return true;
+    if (!selectedClient) {
+      toast.error("Select an assigned company before generating a live draft.");
+      return false;
+    }
+    const hasMembership = clientOptions.some((client) => client.id === selectedClient);
+    if (!hasMembership) {
+      toast.error("Selected company is outside your assigned tenant scope.");
+      return false;
+    }
+    return true;
+  };
+
+  const loadDraftHistory = async () => {
+    if (demoMode || clientSource !== "live") {
+      setDraftHistory([]);
+      return;
+    }
+    setIsLoadingDraftHistory(true);
+    try {
+      const {
+        data: { user },
+      } = await supabase.auth.getUser();
+      if (!user) {
+        setDraftHistory([]);
+        return;
+      }
+
+      let query = supabaseAny
+        .from("draft_runs")
+        .select("id, created_at, status, document_type, draft_mode, draft_content, qa, package")
+        .eq("user_id", user.id)
+        .order("created_at", { ascending: false })
+        .limit(20);
+
+      if (selectedClient) query = query.eq("company_id", selectedClient);
+      if (selectedDocType) query = query.eq("document_type", selectedDocType);
+
+      const { data, error } = await query;
+      if (error) throw error;
+      setDraftHistory((data ?? []) as DraftHistoryItem[]);
+    } catch {
+      setDraftHistory([]);
+    } finally {
+      setIsLoadingDraftHistory(false);
+    }
+  };
+
+  const handleRestoreDraftVersion = (item: DraftHistoryItem) => {
+    if (!item?.draft_content?.trim()) {
+      toast.error("Selected version does not have draft content.");
+      return;
+    }
+    setDraftContent(item.draft_content);
+    setDraftGenerated(true);
+    setCurrentDraftRunId(item.id);
+    setWorkflowStatus(
+      item.status === "signed_off" ? "signed_off" : item.status === "under_review" ? "under_review" : "generated",
+    );
+    setDraftQA((item.qa as DraftQA | null) ?? null);
+    setDraftPackage((item.package as DraftPackage | null) ?? null);
+    lastPersistedDraftContentRef.current = item.draft_content.trim();
+    setHasUnsavedDraftChanges(false);
+    void Promise.all([loadAuditTrail(item.id), loadDraftVersions(item.id)]);
+    toast.success("Draft version restored.");
+  };
+
+  const handleRestoreSavedVersion = (item: DraftVersionItem) => {
+    if (!item?.content?.trim()) {
+      toast.error("Selected snapshot does not contain draft content.");
+      return;
+    }
+    setDraftContent(item.content);
+    setDraftGenerated(true);
+    setCurrentDraftRunId(item.draft_run_id);
+    lastPersistedDraftContentRef.current = item.content.trim();
+    setHasUnsavedDraftChanges(false);
+    void loadAuditTrail(item.draft_run_id);
+    toast.success(`Version ${item.version_number} restored.`);
+  };
+
+  const handleExportDraftPDF = () => {
+    if (!draftContent.trim()) {
+      toast.error("Generate draft first.");
+      return;
+    }
+    const draftWindow = window.open("", "_blank", "width=900,height=1000");
+    if (!draftWindow) {
+      toast.error("Popup blocked. Allow popups to export PDF.");
+      return;
+    }
+    const safeContent = draftContent
+      .replace(/&/g, "&amp;")
+      .replace(/</g, "&lt;")
+      .replace(/>/g, "&gt;");
+    draftWindow.document.write(`
+      <html>
+        <head>
+          <title>REGULON Draft Export</title>
+          <style>
+            body { font-family: Arial, sans-serif; padding: 24px; line-height: 1.45; white-space: pre-wrap; }
+            h1 { font-size: 18px; margin-bottom: 16px; }
+          </style>
+        </head>
+        <body>
+          <h1>REGULON Filing Draft</h1>
+          <div>${safeContent}</div>
+        </body>
+      </html>
+    `);
+    draftWindow.document.close();
+    draftWindow.focus();
+    draftWindow.print();
+  };
+
+  const handleExportDraftDoc = () => {
+    if (!draftContent.trim()) {
+      toast.error("Generate draft first.");
+      return;
+    }
+    const safeHtml = draftContent
+      .replace(/&/g, "&amp;")
+      .replace(/</g, "&lt;")
+      .replace(/>/g, "&gt;")
+      .replace(/\n/g, "<br/>");
+    const html = `<html><head><meta charset="utf-8"></head><body>${safeHtml}</body></html>`;
+    const blob = new Blob([html], { type: "application/msword;charset=utf-8" });
+    const link = document.createElement("a");
+    const stamp = new Date().toISOString().slice(0, 19).replace(/[:T]/g, "-");
+    link.href = URL.createObjectURL(blob);
+    link.download = `${buildExportFileNameBase()}-${stamp}.doc`;
+    document.body.appendChild(link);
+    link.click();
+    link.remove();
+    URL.revokeObjectURL(link.href);
+    toast.success("Word export downloaded.");
+  };
+
   const openDraftApprovalReviewPage = () => {
     if (!draftGenerated || !draftContent.trim() || !selectedDocType) {
       toast.error("Generate draft first, then open approval review.");
       return;
     }
     const reviewPath = inAppArea ? "/app/agent-work-review" : "/agent-work-review";
+    if (!demoMode && currentDraftRunId && !currentDraftRunId.startsWith("demo-")) {
+      navigate(
+        `${reviewPath}?draftRunId=${encodeURIComponent(currentDraftRunId)}&returnPath=${encodeURIComponent(location.pathname)}`,
+      );
+      return;
+    }
     const reviewStorageKey = `regulon:agent-work-review:${draftReviewDashboardKey}`;
     const approvalStorageKey = `regulon:voice-agent:approval-status:${draftReviewDashboardKey}`;
     const nowIso = new Date().toISOString();
@@ -3567,7 +4104,9 @@ const AIDraftingEngine = ({ demoMode = false, includeLawyerReview = true }: AIDr
       window.localStorage.setItem(reviewStorageKey, JSON.stringify(reviewPayload));
       window.localStorage.setItem(approvalStorageKey, JSON.stringify({ [reviewItemId]: "pending" }));
     }
-    navigate(`${reviewPath}?dashboardId=${encodeURIComponent(draftReviewDashboardKey)}`);
+    navigate(
+      `${reviewPath}?dashboardId=${encodeURIComponent(draftReviewDashboardKey)}&returnPath=${encodeURIComponent(location.pathname)}`,
+    );
   };
 
   useEffect(() => {
@@ -3590,8 +4129,13 @@ const AIDraftingEngine = ({ demoMode = false, includeLawyerReview = true }: AIDr
         if (!mounted) return;
 
         if (!user) {
-          setClientOptions(demoClients);
-          setClientSource("demo");
+          if (allowLiveDemoFallback) {
+            setClientOptions(demoClients);
+            setClientSource("demo");
+          } else {
+            setClientOptions([]);
+            setClientSource("live");
+          }
           return;
         }
 
@@ -3607,8 +4151,13 @@ const AIDraftingEngine = ({ demoMode = false, includeLawyerReview = true }: AIDr
         const companyIds = Array.from(new Set((memberships ?? []).map((row) => row.company_id)));
 
         if (companyIds.length === 0) {
-          setClientOptions(demoClients);
-          setClientSource("demo");
+          if (allowLiveDemoFallback) {
+            setClientOptions(demoClients);
+            setClientSource("demo");
+          } else {
+            setClientOptions([]);
+            setClientSource("live");
+          }
           return;
         }
 
@@ -3623,8 +4172,13 @@ const AIDraftingEngine = ({ demoMode = false, includeLawyerReview = true }: AIDr
         }
 
         if ((companies ?? []).length === 0) {
-          setClientOptions(demoClients);
-          setClientSource("demo");
+          if (allowLiveDemoFallback) {
+            setClientOptions(demoClients);
+            setClientSource("demo");
+          } else {
+            setClientOptions([]);
+            setClientSource("live");
+          }
           return;
         }
 
@@ -3638,8 +4192,13 @@ const AIDraftingEngine = ({ demoMode = false, includeLawyerReview = true }: AIDr
         setClientSource("live");
       } catch {
         if (!mounted) return;
-        setClientOptions(demoClients);
-        setClientSource("demo");
+        if (allowLiveDemoFallback) {
+          setClientOptions(demoClients);
+          setClientSource("demo");
+        } else {
+          setClientOptions([]);
+          setClientSource("live");
+        }
       } finally {
         if (mounted) {
           setIsLoadingClients(false);
@@ -3652,7 +4211,7 @@ const AIDraftingEngine = ({ demoMode = false, includeLawyerReview = true }: AIDr
     return () => {
       mounted = false;
     };
-  }, [demoMode]);
+  }, [demoMode, allowLiveDemoFallback]);
 
   useEffect(() => {
     if (demoMode) return;
@@ -3690,6 +4249,31 @@ const AIDraftingEngine = ({ demoMode = false, includeLawyerReview = true }: AIDr
       setSelectedClient("");
     }
   }, [clientOptions, selectedClient]);
+
+  useEffect(() => {
+    if (demoMode) return;
+    void loadDraftHistory();
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [demoMode, clientSource, selectedClient, selectedDocType, currentDraftRunId]);
+
+  useEffect(() => {
+    if (!currentDraftRunId) {
+      setDraftVersions([]);
+      setAuditEvents([]);
+      setHasUnsavedDraftChanges(false);
+      lastPersistedDraftContentRef.current = "";
+      return;
+    }
+    void Promise.all([loadDraftVersions(currentDraftRunId), loadAuditTrail(currentDraftRunId)]);
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [currentDraftRunId]);
+
+  useEffect(() => {
+    if (!currentDraftRunId || !draftGenerated) {
+      return;
+    }
+    setHasUnsavedDraftChanges(draftContent.trim() !== lastPersistedDraftContentRef.current);
+  }, [currentDraftRunId, draftGenerated, draftContent]);
 
   useEffect(() => {
     if (!selectedDocType) return;
@@ -4087,8 +4671,10 @@ const AIDraftingEngine = ({ demoMode = false, includeLawyerReview = true }: AIDr
   };
 
   const requestDraftData = async (requestBody: Record<string, unknown>) => {
-    const authToken = await getEffectiveAuthToken();
-    const body = JSON.stringify({
+    const mergedPayload = {
+      logicLevel: effectiveLogicLevel,
+      logicEngine: effectiveLogicProfile.engine,
+      logicAgentRecommendation: recommendedLogicLevel,
       templatePackId: effectiveTemplatePack.id,
       templatePackLabel: effectiveTemplatePack.label,
       templatePackDirective: effectiveTemplatePack.instructions,
@@ -4096,7 +4682,22 @@ const AIDraftingEngine = ({ demoMode = false, includeLawyerReview = true }: AIDr
       promptPackLabel: effectivePromptPack.label,
       promptPackDirective: effectivePromptPack.instructions,
       ...requestBody,
-    });
+    };
+
+    try {
+      const { data, error } = await supabase.functions.invoke("ai-draft", {
+        body: mergedPayload,
+      });
+      if (error) {
+        throw error;
+      }
+      return data;
+    } catch (invokeError) {
+      // Fallback to raw fetch path for environments where invoke is unavailable.
+    }
+
+    const authToken = await getEffectiveAuthToken();
+    const body = JSON.stringify(mergedPayload);
 
     const tryRequest = async (withAuthHeaders: boolean) =>
       fetch(DRAFT_URL, {
@@ -4939,6 +5540,7 @@ Return only revised final draft text.`);
 
   const handleGenerateDraft = async () => {
     if (!selectedClient || !selectedDocType) return;
+    if (!assertLiveClientAccess()) return;
 
     if (selectedDocType === "mca-notice" && !advancedMode) {
       toast.error("MCA drafting requires Advanced Mode for strict legal quality gates.");
@@ -5081,7 +5683,7 @@ Return only revised final draft text.`);
         authToken = session?.access_token ?? authToken;
       }
 
-      const requestBody = JSON.stringify({
+      const requestPayload = {
         documentType: selectedDocType,
         companyName: client?.name || "Company",
         companyId: clientSource === "live" ? selectedClient : undefined,
@@ -5142,7 +5744,46 @@ Return only revised final draft text.`);
         ),
         noticeDetails: maskedNoticeDetails || undefined,
         stream: !advancedMode,
-      });
+      };
+
+      if (advancedMode) {
+        const data = await requestDraftData(requestPayload as Record<string, unknown>);
+        const content = data?.draft as string | undefined;
+        if (!content) {
+          throw new Error("Advanced draft generation returned empty content.");
+        }
+        const patched = selectedDocType === "mca-notice"
+          ? enforceMcaHardFixes(content, noticeDetails, mcaReplyTypeOverride !== "auto" ? mcaReplyTypeOverride : inferredMcaReplyType)
+          : content;
+        setDraftContent(patched);
+        setDraftQA((data?.qa ?? null) as DraftQA | null);
+        setDraftPackage((data?.package ?? null) as DraftPackage | null);
+        const generatedCaseId = (data?.metadata as { trainingCaseId?: string } | undefined)?.trainingCaseId;
+        if (selectedDocType === "mca-notice") setMcaTrainingCaseId(generatedCaseId || null);
+        if (selectedDocType === "gst-show-cause") setGstTrainingCaseId(generatedCaseId || null);
+        if (selectedDocType === "income-tax-response") setIncomeTaxTrainingCaseId(generatedCaseId || null);
+        if (selectedDocType === "rbi-filing") setRbiTrainingCaseId(generatedCaseId || null);
+        if (selectedDocType === "sebi-compliance") setSebiTrainingCaseId(generatedCaseId || null);
+        if (selectedDocType === "customs-response") setCustomsTrainingCaseId(generatedCaseId || null);
+        if (selectedDocType === "contract-review") setContractTrainingCaseId(generatedCaseId || null);
+        if (selectedDocType === "custom-draft") setCustomTrainingCaseId(generatedCaseId || null);
+        setDraftGenerated(true);
+        setShowFormatDetails(false);
+        setWorkflowStatus("generated");
+        setCurrentSteps(prev => prev.map(step => {
+          if (step.id === 1) return { ...step, status: "completed" as StepStatus };
+          if (step.id === 2) return { ...step, status: "current" as StepStatus };
+          return step;
+        }));
+        await persistNewDraftRun({
+          content,
+          qa: (data?.qa ?? null) as DraftQA | null,
+          draftPackagePayload: (data?.package ?? null) as DraftPackage | null,
+          advancedMode,
+        });
+        toast.success("Advanced filing-ready draft generated successfully!");
+        return;
+      }
 
       const tryRequest = async (withAuthHeaders: boolean) =>
         fetch(DRAFT_URL, {
@@ -5156,7 +5797,7 @@ Return only revised final draft text.`);
             : {
                 "Content-Type": "application/json",
               },
-          body: requestBody,
+          body: JSON.stringify(requestPayload),
         });
 
       let response: Response;
@@ -5221,57 +5862,12 @@ Return only revised final draft text.`);
           if (step.id === 2) return { ...step, status: "current" as StepStatus };
           return step;
         }));
-        try {
-          if (demoMode) {
-            const demoRunId = `demo-${Date.now()}`;
-            setCurrentDraftRunId(demoRunId);
-            await recordAudit(demoRunId, "draft_generated", {
-              document_type: selectedDocType,
-              draft_mode: selectedMode,
-              advanced_mode: advancedMode,
-              mode: "demo",
-            });
-          } else {
-            const {
-              data: { user },
-            } = await supabase.auth.getUser();
-            if (!user) {
-              throw new Error("No authenticated user for persistence.");
-            }
-
-            const { data: draftRun } = await supabaseAny
-              .from("draft_runs")
-              .insert({
-                user_id: user.id,
-                company_id: clientSource === "live" ? selectedClient : null,
-                document_type: selectedDocType,
-                draft_mode: selectedMode,
-                status: "generated",
-                notice_input: maskedNoticeDetails ?? null,
-                draft_content: content,
-                qa: data?.qa ?? null,
-                package: data?.package ?? null,
-              })
-              .select("id")
-              .single();
-            if (draftRun?.id) {
-              setCurrentDraftRunId(draftRun.id);
-              await recordAudit(draftRun.id, "draft_generated", {
-                document_type: selectedDocType,
-                draft_mode: selectedMode,
-                advanced_mode: advancedMode,
-              });
-            }
-            await supabaseAny.from("practice_preferences").upsert({
-              user_id: user.id,
-              preferred_mode: selectedMode,
-              preferred_document_type: selectedDocType,
-              prefer_pii_masking: preferPiiMasking,
-            });
-          }
-        } catch {
-          // non-blocking persistence
-        }
+        await persistNewDraftRun({
+          content,
+          qa: (data?.qa ?? null) as DraftQA | null,
+          draftPackagePayload: (data?.package ?? null) as DraftPackage | null,
+          advancedMode,
+        });
         toast.success("Advanced filing-ready draft generated successfully!");
         return;
       }
@@ -5358,7 +5954,7 @@ Return only revised final draft text.`);
       transition={{ delay: 0.2 }}
       className="glass-card p-6 mb-8"
     >
-      <div className="flex items-center gap-3 mb-6">
+      <div className="flex items-center gap-3 mb-3">
         <div className="p-3 rounded-xl bg-cyan-500/10">
           <Sparkles className="w-6 h-6 text-cyan-500" />
         </div>
@@ -5371,6 +5967,38 @@ Return only revised final draft text.`);
         <Badge className="ml-auto bg-cyan-500/20 text-cyan-500 border-cyan-500/30">
           CA-Only Access
         </Badge>
+      </div>
+      <div className="mb-6 flex items-center justify-between gap-3 rounded-lg border border-border/60 bg-background/30 px-3 py-2">
+        <div className="flex items-center gap-2">
+          <Badge
+            className={
+              draftServiceStatus === "online"
+                ? "bg-emerald-500/15 text-emerald-400 border-emerald-500/30"
+                : draftServiceStatus === "offline"
+                  ? "bg-red-500/15 text-red-400 border-red-500/30"
+                  : "bg-amber-500/15 text-amber-400 border-amber-500/30"
+            }
+          >
+            {draftServiceStatus === "online"
+              ? "Live AI Online"
+              : draftServiceStatus === "offline"
+                ? "Live AI Offline"
+                : "Checking AI"}
+          </Badge>
+          <p className="text-xs text-muted-foreground">{draftServiceMessage}</p>
+        </div>
+        <Button
+          type="button"
+          variant="outline"
+          size="sm"
+          className="h-8 px-3"
+          disabled={isCheckingDraftService}
+          onClick={() => {
+            void checkDraftServiceHealth();
+          }}
+        >
+          {isCheckingDraftService ? "Checking..." : "Recheck Backend"}
+        </Button>
       </div>
 
       <Tabs defaultValue="create" className="w-full">
@@ -5391,7 +6019,7 @@ Return only revised final draft text.`);
                   Select Client
                 </label>
                 <Select value={selectedClient} onValueChange={setSelectedClient}>
-                  <SelectTrigger className="bg-background/50">
+                  <SelectTrigger className="bg-background/50" disabled={clientOptions.length === 0}>
                     <SelectValue placeholder="Choose a company..." />
                   </SelectTrigger>
                   <SelectContent>
@@ -5406,9 +6034,16 @@ Return only revised final draft text.`);
                   {isLoadingClients
                     ? "Loading client list..."
                     : clientSource === "live"
-                      ? "Live clients loaded from your account."
-                      : "Using demo clients (no live company mapping found)."}
+                      ? clientOptions.length > 0
+                        ? "Live clients loaded from your account."
+                        : "No assigned live companies found. Ask admin/company owner to assign you in company_members."
+                      : "Using demo clients for sandbox mode."}
                 </p>
+                {!demoMode && clientSource === "live" && selectedClient && (
+                  <p className="text-[11px] text-green-400 mt-1">
+                    Tenant isolation: draft operations restricted to your assigned company scope.
+                  </p>
+                )}
               </div>
 
               {/* Document Type */}
@@ -5830,6 +6465,75 @@ Return only revised final draft text.`);
                 </div>
               </div>
 
+              <div>
+                <label className="block text-sm font-medium text-foreground mb-2">
+                  <Sparkles className="w-4 h-4 inline-block mr-2" />
+                  REGULON Sovereign Engine
+                </label>
+                <div className="mb-2 flex items-center justify-between gap-2">
+                  <Badge variant="secondary" className="bg-primary/10 text-primary border border-primary/30">
+                    AI Agent Suggestion: {logicLevelProfiles.find((lvl) => lvl.id === recommendedLogicLevel)?.engine}
+                  </Badge>
+                  <p className="text-[11px] text-muted-foreground">{logicRecommendationReason}</p>
+                </div>
+                <div className="grid grid-cols-1 md:grid-cols-3 gap-2">
+                  <button
+                    type="button"
+                    onClick={() => setLogicLevelOverride("auto")}
+                    className={`p-3 rounded-lg border text-left transition-all ${
+                      logicLevelOverride === "auto"
+                        ? "border-primary bg-primary/10"
+                        : "border-border/50 hover:border-primary/30"
+                    }`}
+                  >
+                    <p className="font-medium text-sm text-primary">Auto (AI Agent)</p>
+                    <p className="text-xs text-muted-foreground">
+                      Auto-switches engine depth from notice complexity and risk profile.
+                    </p>
+                  </button>
+                  {logicLevelProfiles.map((level) => {
+                    const isSelected = effectiveLogicLevel === level.id && logicLevelOverride !== "auto";
+                    return (
+                      <button
+                        key={level.id}
+                        type="button"
+                        onClick={() => setLogicLevelOverride(level.id)}
+                        className={`p-3 rounded-lg border text-left transition-all ${
+                          isSelected
+                            ? "border-primary bg-primary/10"
+                            : "border-border/50 hover:border-primary/30"
+                        }`}
+                      >
+                        <div className="flex items-start justify-between gap-2">
+                          <div>
+                            <p className="font-medium text-sm text-foreground">{level.engine}</p>
+                            <p className="text-xs text-muted-foreground">{level.label}</p>
+                          </div>
+                          <TooltipProvider>
+                            <Tooltip>
+                              <TooltipTrigger asChild>
+                                <span className="inline-flex items-center justify-center text-muted-foreground hover:text-foreground">
+                                  <AlertCircle className="w-4 h-4" />
+                                </span>
+                              </TooltipTrigger>
+                              <TooltipContent side="top" className="max-w-xs text-xs">
+                                <p className="font-medium mb-1">{level.engine}</p>
+                                <p>{level.description}</p>
+                                <p className="mt-1 text-muted-foreground">{level.guidance}</p>
+                              </TooltipContent>
+                            </Tooltip>
+                          </TooltipProvider>
+                        </div>
+                        <p className="text-xs text-muted-foreground mt-1">{level.description}</p>
+                      </button>
+                    );
+                  })}
+                </div>
+                <p className="text-xs text-muted-foreground mt-2">
+                  Active engine: <span className="text-foreground font-medium">{effectiveLogicProfile.engine}</span> ({effectiveLogicProfile.label}).
+                </p>
+              </div>
+
               {/* Notice Details */}
               <div>
                 <label className="block text-sm font-medium text-foreground mb-2">
@@ -5996,11 +6700,18 @@ Return only revised final draft text.`);
                   <Edit3 className="w-4 h-4 inline-block mr-2" />
                   Draft Content
                 </label>
-                {draftGenerated && (
-                  <Badge className="bg-green-500/20 text-green-500 border-green-500/30">
-                    Filing-Ready
-                  </Badge>
-                )}
+                <div className="flex items-center gap-2">
+                  {hasUnsavedDraftChanges ? (
+                    <Badge variant="outline" className="border-amber-500/40 text-amber-300">
+                      Unsaved changes
+                    </Badge>
+                  ) : null}
+                  {draftGenerated && (
+                    <Badge className="bg-green-500/20 text-green-500 border-green-500/30">
+                      Filing-Ready
+                    </Badge>
+                  )}
+                </div>
               </div>
               <Textarea 
                 placeholder="Draft will appear here after generation. The engine produces a filing-ready document with proper legal structure, section citations, and prayer for reliefs..."
@@ -6011,6 +6722,39 @@ Return only revised final draft text.`);
               <p className="text-xs text-muted-foreground mt-2">
                 All edits are tracked line-by-line for audit compliance. Structure: Facts → Law → Application → Conclusion.
               </p>
+              {draftGenerated && (
+                <div className="mt-2 grid grid-cols-1 md:grid-cols-2 gap-2">
+                  <Button
+                    type="button"
+                    variant="outline"
+                    disabled={!currentDraftRunId || isSavingDraftVersion || !hasUnsavedDraftChanges}
+                    onClick={() => void persistDraftSnapshot({
+                      draftRunId: currentDraftRunId!,
+                      content: draftContent,
+                      eventType: "manual_version_saved",
+                      payload: { status: workflowStatus },
+                      successMessage: "Draft version saved.",
+                    })}
+                  >
+                    {isSavingDraftVersion ? (
+                      <>
+                        <Loader2 className="w-4 h-4 mr-2 animate-spin" />
+                        Saving...
+                      </>
+                    ) : (
+                      "Save Version"
+                    )}
+                  </Button>
+                  <Button type="button" variant="outline" onClick={handleExportDraftPDF}>
+                    <Download className="w-4 h-4 mr-2" />
+                    Export PDF (Print-ready)
+                  </Button>
+                  <Button type="button" variant="outline" onClick={handleExportDraftDoc}>
+                    <Download className="w-4 h-4 mr-2" />
+                    Export Word (.doc)
+                  </Button>
+                </div>
+              )}
 
               {draftGenerated && (
                 <div className="mt-3">
@@ -7289,14 +8033,14 @@ Return only revised final draft text.`);
                     size="sm"
                     variant="outline"
                     disabled={!currentDraftRunId || workflowStatus !== "generated"}
-                    onClick={async () => {
-                      if (!currentDraftRunId) return;
-                      if (!demoMode) {
-                        await supabaseAny.from("draft_runs").update({ status: "under_review" }).eq("id", currentDraftRunId);
-                      }
-                      setWorkflowStatus("under_review");
-                      await recordAudit(currentDraftRunId, "submitted_for_review");
-                    }}
+                    onClick={() => void persistDraftSnapshot({
+                      draftRunId: currentDraftRunId!,
+                      content: draftContent,
+                      nextStatus: "under_review",
+                      eventType: "submitted_for_review",
+                      payload: { previous_status: workflowStatus },
+                      successMessage: "Draft moved to review.",
+                    })}
                   >
                     Submit for Review
                   </Button>
@@ -7306,19 +8050,34 @@ Return only revised final draft text.`);
                     disabled={!currentDraftRunId || workflowStatus !== "under_review"}
                     onClick={openDraftApprovalReviewPage}
                   >
-                    Approve (Open Review Page)
+                    Open Review Page
+                  </Button>
+                  <Button
+                    size="sm"
+                    variant="outline"
+                    disabled={!currentDraftRunId || workflowStatus !== "under_review"}
+                    onClick={() => void persistDraftSnapshot({
+                      draftRunId: currentDraftRunId!,
+                      content: draftContent,
+                      nextStatus: "approved",
+                      eventType: "review_approved",
+                      payload: { reviewed_in: "draft-engine" },
+                      successMessage: "Draft marked approved.",
+                    })}
+                  >
+                    Mark Approved
                   </Button>
                   <Button
                     size="sm"
                     disabled={!currentDraftRunId || workflowStatus !== "approved"}
-                    onClick={async () => {
-                      if (!currentDraftRunId) return;
-                      if (!demoMode) {
-                        await supabaseAny.from("draft_runs").update({ status: "signed_off" }).eq("id", currentDraftRunId);
-                      }
-                      setWorkflowStatus("signed_off");
-                      await recordAudit(currentDraftRunId, "final_sign_off");
-                    }}
+                    onClick={() => void persistDraftSnapshot({
+                      draftRunId: currentDraftRunId!,
+                      content: draftContent,
+                      nextStatus: "signed_off",
+                      eventType: "final_sign_off",
+                      payload: { previous_status: workflowStatus },
+                      successMessage: "Final sign-off recorded.",
+                    })}
                   >
                     Final Sign-off
                   </Button>
@@ -7385,6 +8144,79 @@ Return only revised final draft text.`);
                   </ul>
                 </div>
               )}
+
+              <div className="mt-6 p-4 rounded-lg border border-border/50 bg-background/30">
+                <div className="flex items-center justify-between mb-2">
+                  <p className="text-sm font-medium">Saved Draft Runs (Live)</p>
+                  <Button
+                    type="button"
+                    size="sm"
+                    variant="outline"
+                    onClick={() => void Promise.all([loadDraftHistory(), loadDraftVersions(currentDraftRunId), loadAuditTrail(currentDraftRunId)])}
+                    disabled={isLoadingDraftHistory || isLoadingDraftVersions}
+                  >
+                    {isLoadingDraftHistory ? (
+                      <>
+                        <Loader2 className="w-4 h-4 mr-2 animate-spin" />
+                        Refreshing...
+                      </>
+                    ) : (
+                      "Refresh"
+                    )}
+                  </Button>
+                </div>
+                {draftHistory.length === 0 ? (
+                  <p className="text-xs text-muted-foreground">
+                    {demoMode || clientSource !== "live"
+                      ? "Version history is available in live mode."
+                      : "No saved versions found for current selection."}
+                  </p>
+                ) : (
+                  <ul className="space-y-2">
+                    {draftHistory.slice(0, 10).map((item) => (
+                      <li key={item.id} className="flex flex-wrap items-center justify-between gap-2 rounded border border-border/40 p-2">
+                        <div className="text-xs text-muted-foreground">
+                          <p className="text-foreground font-medium">{item.document_type || "unknown-doc"} • {item.status}</p>
+                          <p>{new Date(item.created_at).toLocaleString()}</p>
+                        </div>
+                        <Button type="button" size="sm" variant="outline" onClick={() => handleRestoreDraftVersion(item)}>
+                          Restore Version
+                        </Button>
+                      </li>
+                    ))}
+                  </ul>
+                )}
+              </div>
+
+              <div className="mt-6 p-4 rounded-lg border border-border/50 bg-background/30">
+                <div className="flex items-center justify-between mb-2">
+                  <p className="text-sm font-medium">Current Run Versions</p>
+                  {currentDraftRunId ? (
+                    <span className="text-xs text-muted-foreground">{currentDraftRunId}</span>
+                  ) : null}
+                </div>
+                {draftVersions.length === 0 ? (
+                  <p className="text-xs text-muted-foreground">
+                    {demoMode
+                      ? "Version snapshots are stored for live runs."
+                      : "No saved snapshots for the current run yet."}
+                  </p>
+                ) : (
+                  <ul className="space-y-2">
+                    {draftVersions.map((item) => (
+                      <li key={item.id} className="flex flex-wrap items-center justify-between gap-2 rounded border border-border/40 p-2">
+                        <div className="text-xs text-muted-foreground">
+                          <p className="text-foreground font-medium">Version {item.version_number}</p>
+                          <p>{new Date(item.created_at).toLocaleString()}</p>
+                        </div>
+                        <Button type="button" size="sm" variant="outline" onClick={() => handleRestoreSavedVersion(item)}>
+                          Restore Snapshot
+                        </Button>
+                      </li>
+                    ))}
+                  </ul>
+                )}
+              </div>
             </CardContent>
           </Card>
         </TabsContent>

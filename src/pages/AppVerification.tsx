@@ -23,6 +23,8 @@ const AppVerification = () => {
   const [notes, setNotes] = useState("");
   const [documentFile, setDocumentFile] = useState<File | null>(null);
   const [submitting, setSubmitting] = useState(false);
+  const verificationOptional =
+    import.meta.env.DEV || import.meta.env.VITE_VERIFICATION_OPTIONAL === "true";
 
   const requirements = useMemo(() => {
     if (persona === "external_ca" || persona === "in_house_ca") {
@@ -63,30 +65,27 @@ const AppVerification = () => {
 
   const handleSubmit = async () => {
     if (!user || !persona) return;
-
-    if (hasField("entity") && entityName.trim().length < 2) {
-      toast({ title: "Entity name is required", variant: "destructive" });
-      return;
-    }
-
-    if (hasField("registration") && registrationNumber.trim().length < 3) {
-      toast({ title: "Registration number is required", variant: "destructive" });
-      return;
-    }
-
-    if (hasField("license") && licenseNumber.trim().length < 3) {
-      toast({ title: "License number is required", variant: "destructive" });
-      return;
-    }
-
-    if (hasField("jurisdiction") && jurisdiction.trim().length < 2) {
-      toast({ title: "Jurisdiction is required", variant: "destructive" });
-      return;
-    }
-
-    if (hasField("document") && !documentFile) {
-      toast({ title: "Verification document is required", variant: "destructive" });
-      return;
+    if (!verificationOptional) {
+      if (hasField("entity") && !entityName.trim()) {
+        toast({ title: "Entity name is required", variant: "destructive" });
+        return;
+      }
+      if (hasField("registration") && !registrationNumber.trim()) {
+        toast({ title: "Registration number is required", variant: "destructive" });
+        return;
+      }
+      if (hasField("license") && !licenseNumber.trim()) {
+        toast({ title: "License number is required", variant: "destructive" });
+        return;
+      }
+      if (hasField("jurisdiction") && !jurisdiction.trim()) {
+        toast({ title: "Jurisdiction is required", variant: "destructive" });
+        return;
+      }
+      if (hasField("document") && !documentFile) {
+        toast({ title: "Verification document is required", variant: "destructive" });
+        return;
+      }
     }
 
     setSubmitting(true);
@@ -147,7 +146,9 @@ const AppVerification = () => {
             <CardHeader>
               <CardTitle>{requirements.title}</CardTitle>
               <p className="text-sm text-muted-foreground">
-                Submit mandatory KYC/professional details before dashboard access.
+                {verificationOptional
+                  ? "Verification details are optional in preview mode. You can submit now or continue to dashboard."
+                  : "Submit mandatory KYC/professional details before dashboard access."}
               </p>
             </CardHeader>
             <CardContent className="space-y-4">
@@ -157,35 +158,35 @@ const AppVerification = () => {
 
               {hasField("entity") && (
                 <div className="space-y-2">
-                  <Label>Entity / Firm / Company Name</Label>
+                  <Label>Entity / Firm / Company Name{verificationOptional ? " (Optional)" : ""}</Label>
                   <Input value={entityName} onChange={(e) => setEntityName(e.target.value)} />
                 </div>
               )}
 
               {hasField("registration") && (
                 <div className="space-y-2">
-                  <Label>Registration Number</Label>
+                  <Label>Registration Number{verificationOptional ? " (Optional)" : ""}</Label>
                   <Input value={registrationNumber} onChange={(e) => setRegistrationNumber(e.target.value)} />
                 </div>
               )}
 
               {hasField("license") && (
                 <div className="space-y-2">
-                  <Label>Professional License Number</Label>
+                  <Label>Professional License Number{verificationOptional ? " (Optional)" : ""}</Label>
                   <Input value={licenseNumber} onChange={(e) => setLicenseNumber(e.target.value)} />
                 </div>
               )}
 
               {hasField("jurisdiction") && (
                 <div className="space-y-2">
-                  <Label>Jurisdiction / State Council</Label>
+                  <Label>Jurisdiction / State Council{verificationOptional ? " (Optional)" : ""}</Label>
                   <Input value={jurisdiction} onChange={(e) => setJurisdiction(e.target.value)} />
                 </div>
               )}
 
               {hasField("document") && (
                 <div className="space-y-2">
-                  <Label>Upload Verification Document</Label>
+                  <Label>Upload Verification Document{verificationOptional ? " (Optional)" : ""}</Label>
                   <Input type="file" accept=".pdf,.png,.jpg,.jpeg" onChange={(e) => setDocumentFile(e.target.files?.[0] ?? null)} />
                 </div>
               )}
@@ -199,11 +200,11 @@ const AppVerification = () => {
                 <Button onClick={handleSubmit} disabled={submitting} className="btn-glow">
                   {submitting ? "Submitting..." : "Submit Verification"}
                 </Button>
-                {isVerified && (
+                {verificationOptional ? (
                   <Button variant="outline" onClick={() => navigate("/app")}>
                     Continue to Dashboard
                   </Button>
-                )}
+                ) : null}
               </div>
             </CardContent>
           </Card>

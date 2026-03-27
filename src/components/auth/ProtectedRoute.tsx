@@ -1,3 +1,4 @@
+import { useEffect, useState } from "react";
 import { Navigate, useLocation } from "react-router-dom";
 import type { ReactElement } from "react";
 import { useAuth } from "@/hooks/use-auth";
@@ -14,12 +15,38 @@ interface ProtectedRouteProps {
 }
 
 const verificationRequiredPersonas: AppPersona[] = ["external_ca", "in_house_ca", "in_house_lawyer", "company_owner", "admin", "ca_firm"];
+const VERIFICATION_OPTIONAL_FOR_NOW =
+  import.meta.env.DEV || import.meta.env.VITE_VERIFICATION_OPTIONAL === "true";
+
+const inferPersonaFromMetadata = (registrationRole: unknown): AppPersona | null => {
+  if (
+    registrationRole === "external_ca" ||
+    registrationRole === "admin" ||
+    registrationRole === "company_owner" ||
+    registrationRole === "in_house_ca" ||
+    registrationRole === "in_house_lawyer" ||
+    registrationRole === "ca_firm"
+  ) {
+    return registrationRole;
+  }
+  return null;
+};
 
 const ProtectedRoute = ({ children, allowRoles, allowPersonas, requireVerified = true }: ProtectedRouteProps) => {
   const { loading, user, roles, persona, isVerified } = useAuth();
   const location = useLocation();
+  const [forceResolve, setForceResolve] = useState(false);
+  const unresolvedIdentity = Boolean(user) && !persona && roles.length === 0;
+  const fallbackPersona = inferPersonaFromMetadata(user?.user_metadata?.registration_role);
+  const effectivePersona = persona ?? fallbackPersona;
 
-  if (loading) {
+  useEffect(() => {
+    if (!loading) return;
+    const timer = setTimeout(() => setForceResolve(true), 5000);
+    return () => clearTimeout(timer);
+  }, [loading]);
+
+  if (loading && !forceResolve) {
     return (
       <div className="min-h-screen bg-background flex items-center justify-center">
         <div className="text-center">
@@ -30,8 +57,29 @@ const ProtectedRoute = ({ children, allowRoles, allowPersonas, requireVerified =
     );
   }
 
+  if (loading && forceResolve) {
+    return <Navigate to="/auth" replace state={{ from: location.pathname }} />;
+  }
+
   if (!user) {
     return <Navigate to="/auth" replace state={{ from: location.pathname }} />;
+  }
+
+  // Use user metadata as a temporary fallback while role/persona rows hydrate.
+  if (unresolvedIdentity) {
+    if (allowPersonas && allowPersonas.length > 0 && (!effectivePersona || !allowPersonas.includes(effectivePersona))) {
+      return <Navigate to="/app" replace />;
+    }
+
+    if (requireVerified && effectivePersona && verificationRequiredPersonas.includes(effectivePersona) && !VERIFICATION_OPTIONAL_FOR_NOW && !isVerified) {
+      return <Navigate to="/app/verification" replace />;
+    }
+
+    if (!allowRoles || allowRoles.length === 0 || effectivePersona) {
+      return children;
+    }
+
+    return <Navigate to="/app" replace />;
   }
 
   if (allowRoles && allowRoles.length > 0) {
@@ -43,7 +91,7 @@ const ProtectedRoute = ({ children, allowRoles, allowPersonas, requireVerified =
   }
 
   if (allowPersonas && allowPersonas.length > 0) {
-    const hasAllowedPersona = persona ? allowPersonas.includes(persona) : false;
+    const hasAllowedPersona = effectivePersona ? allowPersonas.includes(effectivePersona) : false;
     const hasAllowedRole = allowRoles && allowRoles.length > 0
       ? allowRoles.some((role) => roles.includes(role))
       : false;
@@ -54,7 +102,7 @@ const ProtectedRoute = ({ children, allowRoles, allowPersonas, requireVerified =
     }
   }
 
-  if (requireVerified && persona && verificationRequiredPersonas.includes(persona) && !isVerified) {
+  if (!VERIFICATION_OPTIONAL_FOR_NOW && requireVerified && effectivePersona && verificationRequiredPersonas.includes(effectivePersona) && !isVerified) {
     return <Navigate to="/app/verification" replace />;
   }
 
