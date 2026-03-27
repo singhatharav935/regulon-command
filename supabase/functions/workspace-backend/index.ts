@@ -75,6 +75,20 @@ const requireRole = (roles: Set<string>, allowed: string[]) => {
   }
 };
 
+const ALLOWED_WORKFLOW_TRANSITIONS: Record<string, string[]> = {
+  generated: ["generated", "under_review"],
+  under_review: ["under_review", "approved"],
+  approved: ["approved", "signed_off"],
+  signed_off: ["signed_off"],
+};
+
+const assertValidWorkflowTransition = (currentStatus: string, nextStatus: string) => {
+  const allowed = ALLOWED_WORKFLOW_TRANSITIONS[currentStatus] ?? [currentStatus];
+  if (!allowed.includes(nextStatus)) {
+    throw new Error(`Invalid workflow transition: ${currentStatus} -> ${nextStatus}`);
+  }
+};
+
 const createCompanyWorkspace = async (client: ReturnType<typeof createClient>, name: string, industry: string | null) => {
   const { error } = await client.rpc("create_company_with_owner", {
     _name: name,
@@ -115,6 +129,16 @@ const loadCaWorkspaceProfile = async (client: ReturnType<typeof createClient>, u
     workspaceType,
     source: data?.workspace_type ? "profile" : "default",
   };
+};
+
+const loadPracticePreferences = async (client: ReturnType<typeof createClient>, userId: string) => {
+  const { data, error } = await client
+    .from("practice_preferences")
+    .select("preferred_mode, preferred_document_type, prefer_pii_masking")
+    .eq("user_id", userId)
+    .maybeSingle();
+  if (error) throw error;
+  return data ?? null;
 };
 
 const buildCompanyDashboard = async (client: ReturnType<typeof createClient>, userId: string) => {
@@ -453,6 +477,7 @@ const saveDraftSnapshot = async (
   const review = await loadDraftReview(client, userId, roles, draftRunId);
   const currentStatus = String(review.run.status);
   const nextStatus = body.nextStatus || currentStatus;
+  assertValidWorkflowTransition(currentStatus, nextStatus);
 
   const { data: latestVersion } = await client
     .from("draft_versions")
@@ -556,6 +581,11 @@ serve(async (req: Request) => {
       return json(req, 200, { ok: true, data: await loadCaWorkspaceProfile(client, user.id) });
     }
 
+    if (req.method === "GET" && path.endsWith("drafting/preferences")) {
+      requireRole(roles, ["manager", "admin"]);
+      return json(req, 200, { ok: true, data: await loadPracticePreferences(client, user.id) });
+    }
+
     if (req.method === "GET" && path.endsWith("legal/dashboard")) {
       requireRole(roles, ["manager", "admin"]);
       return json(req, 200, { ok: true, data: await buildLegalDashboard(client, user.id) });
@@ -605,6 +635,7 @@ serve(async (req: Request) => {
       const nextStatus = body.next_status ? String(body.next_status) : payload.run.status;
       const eventType = String(body.event_type || "review_saved");
       if (!content) return json(req, 400, { error: "content is required" });
+      assertValidWorkflowTransition(String(payload.run.status), nextStatus);
 
       const { data: latestVersion } = await client
         .from("draft_versions")
@@ -722,7 +753,14 @@ serve(async (req: Request) => {
     return json(req, 404, { error: "Route not found" });
   } catch (error) {
     const message = error instanceof Error ? error.message : "Internal error";
-    const status = message === "Unauthorized" ? 401 : message === "Forbidden" ? 403 : 500;
+    const status =
+      message === "Unauthorized"
+        ? 401
+        : message === "Forbidden"
+          ? 403
+          : message.startsWith("Invalid workflow transition:")
+            ? 400
+            : 500;
     return json(req, status, { error: message });
   }
 });

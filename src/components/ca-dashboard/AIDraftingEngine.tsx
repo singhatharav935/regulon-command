@@ -2096,7 +2096,6 @@ const AIDraftingEngine = ({ demoMode = false, includeLawyerReview = true }: AIDr
       setPromptPackOverride("auto");
     }
   }, [promptPackOverride, promptPackOptions]);
-  const supabaseAny = supabase as any;
   const lastPersistedDraftContentRef = useRef("");
   const getMcaAutoFixNotes = (
     issues: Array<{ issue: string; suggestion: string }>,
@@ -4190,15 +4189,11 @@ const AIDraftingEngine = ({ demoMode = false, includeLawyerReview = true }: AIDr
     let mounted = true;
     const loadPreferences = async () => {
       try {
-        const {
-          data: { user },
-        } = await supabase.auth.getUser();
-        if (!user || !mounted) return;
-        const { data } = await supabaseAny
-          .from("practice_preferences")
-          .select("preferred_mode, preferred_document_type, prefer_pii_masking")
-          .eq("user_id", user.id)
-          .maybeSingle();
+        const data = await workspaceBackendRequest<{
+          preferred_mode?: string | null;
+          preferred_document_type?: string | null;
+          prefer_pii_masking?: boolean | null;
+        } | null>("/drafting/preferences");
         if (!mounted || !data) return;
         if (data.preferred_mode) setSelectedMode(data.preferred_mode);
         if (data.preferred_document_type) setSelectedDocType(data.preferred_document_type);
