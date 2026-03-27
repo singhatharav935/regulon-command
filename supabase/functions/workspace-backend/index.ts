@@ -1469,6 +1469,61 @@ const loadDraftPolicyStatus = async (
   };
 };
 
+const listActionableDraftQueue = async (
+  client: ReturnType<typeof createClient>,
+  userId: string,
+  roles: Set<string>,
+  persona: AppPersona | null,
+  options?: { limit?: number },
+) => {
+  const limit = Math.max(10, Math.min(150, Number(options?.limit ?? 50)));
+  const companyIds = await getUserCompanyIds(client, userId);
+
+  let query = client
+    .from("draft_runs")
+    .select("id, company_id, document_type, draft_mode, status, created_at")
+    .order("created_at", { ascending: false })
+    .limit(limit * 2);
+
+  if (!roles.has("admin")) {
+    if (companyIds.length === 0) return [];
+    query = query.in("company_id", companyIds);
+  }
+
+  const { data: runs, error: runsError } = await query;
+  if (runsError) throw runsError;
+
+  const items = [];
+  for (const run of runs ?? []) {
+    const policy = await loadDraftPolicyStatus(client, userId, roles, persona, run.id);
+    const checkpoint = policy.checkpoints;
+    const nextAction = (() => {
+      if (!checkpoint.submittedForReview) return "submit_for_review";
+      if (policy.policy.legalReviewRequired && !checkpoint.legalReviewApproved) {
+        return policy.policy.legalLaneEnabled ? "request_legal_review" : "export_for_external_legal";
+      }
+      if (!checkpoint.finalSignedOff) return "final_signoff";
+      return "none";
+    })();
+
+    items.push({
+      draftRunId: run.id,
+      companyId: run.company_id,
+      documentType: run.document_type,
+      draftMode: run.draft_mode,
+      workflowStatus: run.status,
+      createdAt: run.created_at,
+      lane: policy.lane,
+      nextAction,
+      blockers: policy.blockers,
+      checkpoints: policy.checkpoints,
+    });
+    if (items.length >= limit) break;
+  }
+
+  return items;
+};
+
 const validateAiDraftScope = async (
   client: ReturnType<typeof createClient>,
   userId: string,
@@ -2322,6 +2377,16 @@ serve(async (req: Request) => {
     if (req.method === "GET" && path.endsWith("drafting/clients")) {
       requireRole(roles, ["manager", "admin"]);
       return json(req, 200, { ok: true, data: await listDraftingClients(client, user.id) });
+    }
+
+    if (req.method === "GET" && path.endsWith("drafting/actionable-queue")) {
+      requireRole(roles, ["manager", "admin"]);
+      const limitRaw = Number(url.searchParams.get("limit") ?? 50);
+      const limit = Number.isFinite(limitRaw) ? limitRaw : 50;
+      return json(req, 200, {
+        ok: true,
+        data: await listActionableDraftQueue(client, user.id, roles, persona, { limit }),
+      });
     }
 
     if (req.method === "GET" && path.endsWith("drafts/history")) {
