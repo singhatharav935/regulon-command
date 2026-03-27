@@ -884,6 +884,7 @@ const resolveErrorCode = (message: string) => {
   if (message.startsWith("Forbidden")) return "ACCESS_FORBIDDEN";
   if (message === "Draft not found" || message === "Draft export not found") return "RESOURCE_NOT_FOUND";
   if (message.startsWith("Draft version conflict:")) return "WORKFLOW_VERSION_CONFLICT";
+  if (message.startsWith("Draft state conflict:")) return "WORKFLOW_STATE_CONFLICT";
   if (message === "Unsupported workflow action") return "VALIDATION_INVALID_FIELD";
   if (message === "expectedVersionNumber must be a positive integer") return "VALIDATION_INVALID_FIELD";
   if (message.startsWith("Policy denied:")) return "WORKFLOW_ACTOR_FORBIDDEN";
@@ -1796,6 +1797,7 @@ const rollbackDraftToVersion = async (
 ) => {
   const review = await loadDraftReview(client, userId, roles, draftRunId);
   const currentStatus = String(review.run.status);
+  assertDraftIsMutableForContentEdit(currentStatus);
   const documentType = typeof review.run.document_type === "string" ? review.run.document_type : null;
   const [workflowPolicy, entitlements] = await Promise.all([
     loadAuthorityWorkflowPolicy(client, documentType),
@@ -1834,11 +1836,9 @@ const rollbackDraftToVersion = async (
   assertExpectedDraftVersion(latestVersionNumber, body.expectedVersionNumber);
   const nextVersionNumber = latestVersionNumber + 1;
 
-  const { error: updateError } = await client
-    .from("draft_runs")
-    .update({ draft_content: targetVersion.content })
-    .eq("id", draftRunId);
-  if (updateError) throw updateError;
+  await updateDraftRunWithStatusGuard(client, draftRunId, currentStatus, {
+    draft_content: targetVersion.content,
+  });
 
   const { error: versionError } = await client
     .from("draft_versions")
@@ -2081,6 +2081,26 @@ const isUniqueConstraintViolation = (error: unknown) => {
   return code === "23505";
 };
 
+const updateDraftRunWithStatusGuard = async (
+  client: ReturnType<typeof createClient>,
+  draftRunId: string,
+  expectedCurrentStatus: string,
+  patch: Record<string, unknown>,
+) => {
+  const { data, error } = await client
+    .from("draft_runs")
+    .update(patch)
+    .eq("id", draftRunId)
+    .eq("status", expectedCurrentStatus)
+    .select("id")
+    .limit(1)
+    .maybeSingle();
+  if (error) throw error;
+  if (!data) {
+    throw new Error(`Draft state conflict: expected_status=${expectedCurrentStatus}`);
+  }
+};
+
 const saveDraftSnapshot = async (
   client: ReturnType<typeof createClient>,
   userId: string,
@@ -2131,17 +2151,13 @@ const saveDraftSnapshot = async (
   assertExpectedDraftVersion(latestVersionNumber, body.expectedVersionNumber);
   const nextVersionNumber = latestVersionNumber + 1;
 
-  const { error: updateError } = await client
-    .from("draft_runs")
-    .update({
-      draft_content: body.content,
-      status: nextStatus,
-      notice_input: body.noticeInput ?? undefined,
-      qa: body.qa ?? undefined,
-      package: body.draftPackage ?? undefined,
-    })
-    .eq("id", draftRunId);
-  if (updateError) throw updateError;
+  await updateDraftRunWithStatusGuard(client, draftRunId, currentStatus, {
+    draft_content: body.content,
+    status: nextStatus,
+    notice_input: body.noticeInput ?? undefined,
+    qa: body.qa ?? undefined,
+    package: body.draftPackage ?? undefined,
+  });
 
   const { error: versionError } = await client
     .from("draft_versions")
@@ -2298,11 +2314,7 @@ const advanceDraftWorkflowState = async (
     persona,
   });
 
-  const { error: updateError } = await client
-    .from("draft_runs")
-    .update({ status: nextStatus })
-    .eq("id", draftRunId);
-  if (updateError) throw updateError;
+  await updateDraftRunWithStatusGuard(client, draftRunId, currentStatus, { status: nextStatus });
 
   const { error: auditError } = await client
     .from("draft_audit_events")
@@ -2805,6 +2817,32 @@ const runWorkflowSlaMonitor = async (
   };
 };
 
+const getRouteAccessMatrix = () => ({
+  dashboards: [
+    { route: "GET /company/dashboard", roles: ["user", "manager", "admin"] },
+    { route: "GET /ca/dashboard", roles: ["manager", "admin"] },
+    { route: "GET /legal/dashboard", roles: ["manager", "admin"] },
+    { route: "GET /ca-firm/dashboard", roles: ["manager", "admin"] },
+    { route: "GET /admin/dashboard", roles: ["admin"] },
+  ],
+  drafts: [
+    { route: "POST /drafts", roles: ["manager", "admin"] },
+    { route: "POST /drafts/:id/snapshot", roles: ["manager", "admin"] },
+    { route: "POST /drafts/:id/rollback", roles: ["manager", "admin"] },
+    { route: "POST /drafts/:id/workflow-action", roles: ["manager", "admin"] },
+    { route: "POST /drafts/:id/exports", roles: ["manager", "admin"] },
+    { route: "POST /drafts/:id/external-legal/export", roles: ["manager", "admin"] },
+    { route: "POST /drafts/:id/external-legal/signoff", roles: ["manager", "admin"] },
+  ],
+  adminOps: [
+    { route: "GET /ops/config-check", roles: ["admin"] },
+    { route: "GET /ops/workflow-integrity-check", roles: ["admin"] },
+    { route: "GET /ops/workflow-sla-monitor", roles: ["admin"] },
+    { route: "GET /ops/route-access-matrix", roles: ["admin"] },
+    { route: "GET /drafting/ai-ops/*", roles: ["admin"] },
+  ],
+});
+
 const validateAiDraftScope = async (
   client: ReturnType<typeof createClient>,
   userId: string,
@@ -3250,6 +3288,14 @@ serve(async (req: Request) => {
           reviewWarnHours: Number.isFinite(reviewWarnHoursRaw) ? reviewWarnHoursRaw : 24,
           approvedWarnHours: Number.isFinite(approvedWarnHoursRaw) ? approvedWarnHoursRaw : 48,
         }),
+      });
+    }
+
+    if (req.method === "GET" && path.endsWith("ops/route-access-matrix")) {
+      requireRole(roles, ["admin"]);
+      return json(req, 200, {
+        ok: true,
+        data: getRouteAccessMatrix(),
       });
     }
 
@@ -4020,11 +4066,10 @@ serve(async (req: Request) => {
       assertExpectedDraftVersion(latestVersionNumber, expectedVersionNumber);
       const nextVersionNumber = latestVersionNumber + 1;
 
-      const { error: updateError } = await client
-        .from("draft_runs")
-        .update({ draft_content: content, status: nextStatus })
-        .eq("id", draftRunId);
-      if (updateError) return json(req, 400, { error: updateError.message });
+      await updateDraftRunWithStatusGuard(client, draftRunId, currentStatus, {
+        draft_content: content,
+        status: nextStatus,
+      });
 
       const { error: versionError } = await client
         .from("draft_versions")
@@ -4335,6 +4380,7 @@ serve(async (req: Request) => {
           ? 403
         : errorCode === "AI_REQUEST_IN_PROGRESS"
             || errorCode === "WORKFLOW_VERSION_CONFLICT"
+            || errorCode === "WORKFLOW_STATE_CONFLICT"
             ? 409
             : errorCode === "AI_RATE_LIMITED"
               ? 429
