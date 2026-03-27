@@ -123,13 +123,13 @@ const ALLOWED_WORKFLOW_TRANSITIONS: Record<string, string[]> = {
 };
 
 const ALLOWED_EVENT_TYPES_BY_TRANSITION: Record<string, string[]> = {
-  "generated->generated": ["manual_version_saved", "review_saved", "legal_review_saved", "draft_generated", "exported_for_external_legal"],
+  "generated->generated": ["manual_version_saved", "review_saved", "legal_review_saved", "draft_generated", "exported_for_external_legal", "version_rollback_applied"],
   "generated->under_review": ["submitted_for_review", "review_started"],
-  "under_review->under_review": ["manual_version_saved", "review_saved", "legal_review_saved", "exported_for_external_legal"],
+  "under_review->under_review": ["manual_version_saved", "review_saved", "legal_review_saved", "exported_for_external_legal", "version_rollback_applied"],
   "under_review->approved": ["review_approved", "legal_review_approved"],
-  "approved->approved": ["manual_version_saved", "review_saved", "legal_review_saved", "external_legal_signed_off"],
+  "approved->approved": ["manual_version_saved", "review_saved", "legal_review_saved", "external_legal_signed_off", "version_rollback_applied"],
   "approved->signed_off": ["final_sign_off", "legal_final_sign_off", "external_legal_signed_off"],
-  "signed_off->signed_off": ["manual_version_saved", "review_saved"],
+  "signed_off->signed_off": ["manual_version_saved", "review_saved", "version_rollback_applied"],
 };
 
 const assertValidWorkflowTransition = (currentStatus: string, nextStatus: string) => {
@@ -1447,6 +1447,96 @@ const listDraftExports = async (
   }));
 
   return withUrls;
+};
+
+const rollbackDraftToVersion = async (
+  client: ReturnType<typeof createClient>,
+  userId: string,
+  roles: Set<string>,
+  persona: AppPersona | null,
+  draftRunId: string,
+  body: { targetVersionNumber: number; note?: string | null },
+) => {
+  const review = await loadDraftReview(client, userId, roles, draftRunId);
+  const currentStatus = String(review.run.status);
+  const documentType = typeof review.run.document_type === "string" ? review.run.document_type : null;
+  const [workflowPolicy, entitlements] = await Promise.all([
+    loadAuthorityWorkflowPolicy(client, documentType),
+    loadActorEntitlements(client, userId),
+  ]);
+  const legalLaneEnabled = resolveLegalLaneEnabled(persona, entitlements);
+
+  const eventType = "version_rollback_applied";
+  assertValidWorkflowTransition(currentStatus, currentStatus);
+  assertValidEventTypeForTransition(currentStatus, currentStatus, eventType);
+  assertEventActorAllowed({
+    roles,
+    persona,
+    eventType,
+    legalLaneEnabled,
+    legalReviewRequired: workflowPolicy.legalReviewRequired,
+    finalSignoffMode: workflowPolicy.finalSignoffMode,
+  });
+
+  let targetVersion = review.versions.find((item) => Number(item.version_number) === body.targetVersionNumber);
+  if (!targetVersion) {
+    const { data, error } = await client
+      .from("draft_versions")
+      .select("id, version_number, content, created_at")
+      .eq("draft_run_id", draftRunId)
+      .eq("version_number", body.targetVersionNumber)
+      .maybeSingle();
+    if (error) throw error;
+    targetVersion = data ?? undefined;
+  }
+  if (!targetVersion || typeof targetVersion.content !== "string" || !targetVersion.content.trim()) {
+    throw new Error("targetVersionNumber is required and must reference an existing non-empty version");
+  }
+
+  const { data: latestVersion } = await client
+    .from("draft_versions")
+    .select("version_number")
+    .eq("draft_run_id", draftRunId)
+    .order("version_number", { ascending: false })
+    .limit(1)
+    .maybeSingle();
+  const nextVersionNumber = Number(latestVersion?.version_number ?? 0) + 1;
+
+  const { error: updateError } = await client
+    .from("draft_runs")
+    .update({ draft_content: targetVersion.content })
+    .eq("id", draftRunId);
+  if (updateError) throw updateError;
+
+  const { error: versionError } = await client
+    .from("draft_versions")
+    .insert({
+      draft_run_id: draftRunId,
+      user_id: userId,
+      version_number: nextVersionNumber,
+      content: targetVersion.content,
+    });
+  if (versionError) throw versionError;
+
+  const { error: auditError } = await client
+    .from("draft_audit_events")
+    .insert({
+      draft_run_id: draftRunId,
+      user_id: userId,
+      event_type: eventType,
+      payload: {
+        review_surface: "workspace-backend",
+        previous_status: currentStatus,
+        next_status: currentStatus,
+        restored_from_version: body.targetVersionNumber,
+        restored_into_version: nextVersionNumber,
+        note: body.note ?? null,
+      },
+    });
+  if (auditError) throw auditError;
+
+  await queueWorkflowNotifications(client, draftRunId, eventType, currentStatus, userId);
+  return await loadDraftArtifacts(client, userId, roles, draftRunId);
 };
 
 const createDraftRun = async (
@@ -3072,6 +3162,23 @@ serve(async (req: Request) => {
           qa: body.qa ?? undefined,
           draftPackage: body.draftPackage ?? undefined,
           payload: typeof body.payload === "object" && body.payload ? body.payload : undefined,
+        }),
+      });
+    }
+
+    if (req.method === "POST" && path.includes("drafts/") && path.endsWith("/rollback")) {
+      requireRole(roles, ["manager", "admin"]);
+      const draftRunId = path.split("drafts/")[1].replace("/rollback", "");
+      const body = await req.json().catch(() => ({}));
+      const targetVersionRaw = Number(body.targetVersionNumber);
+      if (!Number.isInteger(targetVersionRaw) || targetVersionRaw <= 0) {
+        return json(req, 400, { error: "targetVersionNumber is required" });
+      }
+      return json(req, 200, {
+        ok: true,
+        data: await rollbackDraftToVersion(client, user.id, roles, persona, draftRunId, {
+          targetVersionNumber: targetVersionRaw,
+          note: typeof body.note === "string" ? body.note.trim() : null,
         }),
       });
     }
