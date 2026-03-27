@@ -2084,6 +2084,71 @@ const appendDraftAuditEvent = async (
   return await loadDraftArtifacts(client, userId, roles, draftRunId);
 };
 
+const advanceDraftWorkflowState = async (
+  client: ReturnType<typeof createClient>,
+  userId: string,
+  roles: Set<string>,
+  persona: AppPersona | null,
+  draftRunId: string,
+  body: {
+    nextStatus: string;
+    eventType: string;
+    payload?: Record<string, unknown>;
+  },
+) => {
+  const review = await loadDraftReview(client, userId, roles, draftRunId);
+  const currentStatus = String(review.run.status);
+  const nextStatus = body.nextStatus;
+  const documentType = typeof review.run.document_type === "string" ? review.run.document_type : null;
+  const [workflowPolicy, entitlements] = await Promise.all([
+    loadAuthorityWorkflowPolicy(client, documentType),
+    loadActorEntitlements(client, userId),
+  ]);
+  const legalLaneEnabled = resolveLegalLaneEnabled(persona, entitlements);
+  assertValidWorkflowTransition(currentStatus, nextStatus);
+  assertValidEventTypeForTransition(currentStatus, nextStatus, body.eventType);
+  assertEventActorAllowed({
+    roles,
+    persona,
+    eventType: body.eventType,
+    legalLaneEnabled,
+    legalReviewRequired: workflowPolicy.legalReviewRequired,
+    finalSignoffMode: workflowPolicy.finalSignoffMode,
+  });
+  assertWorkflowBlockingConditions({
+    eventType: body.eventType,
+    existingEvents: review.events,
+    legalReviewRequired: workflowPolicy.legalReviewRequired,
+    finalSignoffMode: workflowPolicy.finalSignoffMode,
+    legalLaneEnabled,
+    persona,
+  });
+
+  const { error: updateError } = await client
+    .from("draft_runs")
+    .update({ status: nextStatus })
+    .eq("id", draftRunId);
+  if (updateError) throw updateError;
+
+  const { error: auditError } = await client
+    .from("draft_audit_events")
+    .insert({
+      draft_run_id: draftRunId,
+      user_id: userId,
+      event_type: body.eventType,
+      payload: {
+        previous_status: currentStatus,
+        next_status: nextStatus,
+        review_surface: "workspace-backend",
+        ...(body.payload ?? {}),
+      },
+    });
+  if (auditError) throw auditError;
+
+  await queueWorkflowNotifications(client, draftRunId, body.eventType, nextStatus, userId);
+  return await loadDraftArtifacts(client, userId, roles, draftRunId);
+};
+
 const loadDraftPolicyStatus = async (
   client: ReturnType<typeof createClient>,
   userId: string,
@@ -3508,6 +3573,9 @@ serve(async (req: Request) => {
       const draftRunId = path.split("drafts/")[1].replace("/export-mark", "");
       const body = await req.json().catch(() => ({}));
       const eventType = String(body.eventType || "exported_for_external_legal");
+      if (eventType !== "exported_for_external_legal" && eventType !== "external_legal_signed_off") {
+        return json(req, 400, { error: "eventType must be exported_for_external_legal or external_legal_signed_off" });
+      }
       return json(req, 200, {
         ok: true,
         data: await appendDraftAuditEvent(
@@ -3518,6 +3586,62 @@ serve(async (req: Request) => {
           draftRunId,
           eventType,
           typeof body.payload === "object" && body.payload ? body.payload as Record<string, unknown> : undefined,
+        ),
+      });
+    }
+
+    if (req.method === "POST" && path.includes("drafts/") && path.endsWith("/external-legal/export")) {
+      requireRole(roles, ["manager", "admin"]);
+      const draftRunId = path.split("drafts/")[1].replace("/external-legal/export", "");
+      const body = await req.json().catch(() => ({}));
+      const counselName = typeof body.counsel_name === "string" && body.counsel_name.trim() ? body.counsel_name.trim().slice(0, 160) : null;
+      const counselEmail = typeof body.counsel_email === "string" && body.counsel_email.trim() ? body.counsel_email.trim().slice(0, 220) : null;
+      const note = typeof body.note === "string" && body.note.trim() ? body.note.trim().slice(0, 1000) : null;
+      return json(req, 200, {
+        ok: true,
+        data: await appendDraftAuditEvent(
+          client,
+          user.id,
+          roles,
+          persona,
+          draftRunId,
+          "exported_for_external_legal",
+          {
+            counsel_name: counselName,
+            counsel_email: counselEmail,
+            note,
+          },
+        ),
+      });
+    }
+
+    if (req.method === "POST" && path.includes("drafts/") && path.endsWith("/external-legal/signoff")) {
+      requireRole(roles, ["manager", "admin"]);
+      const draftRunId = path.split("drafts/")[1].replace("/external-legal/signoff", "");
+      const body = await req.json().catch(() => ({}));
+      const signedOffAtRaw = typeof body.signed_off_at === "string" ? body.signed_off_at.trim() : "";
+      const signedOffAt = signedOffAtRaw && !Number.isNaN(Date.parse(signedOffAtRaw))
+        ? new Date(signedOffAtRaw).toISOString()
+        : new Date().toISOString();
+      const counselName = typeof body.counsel_name === "string" && body.counsel_name.trim() ? body.counsel_name.trim().slice(0, 160) : null;
+      const note = typeof body.note === "string" && body.note.trim() ? body.note.trim().slice(0, 1000) : null;
+      return json(req, 200, {
+        ok: true,
+        data: await advanceDraftWorkflowState(
+          client,
+          user.id,
+          roles,
+          persona,
+          draftRunId,
+          {
+            nextStatus: "signed_off",
+            eventType: "external_legal_signed_off",
+            payload: {
+              signed_off_at: signedOffAt,
+              counsel_name: counselName,
+              note,
+            },
+          },
         ),
       });
     }
