@@ -168,6 +168,49 @@ const assertEventActorAllowed = ({
   }
 };
 
+const normalizeAiOperation = (payload: Record<string, unknown>) => {
+  const operation = typeof payload.operation === "string" ? payload.operation.trim().toLowerCase() : "";
+  if (operation) return operation;
+  return "draft";
+};
+
+const assertAiOperationActorAllowed = ({
+  roles,
+  persona,
+  operation,
+}: {
+  roles: Set<string>;
+  persona: AppPersona | null;
+  operation: string;
+}) => {
+  if (roles.has("admin")) return;
+  if (!roles.has("manager")) {
+    throw new Error("Policy denied: manager_role_required_for_ai_operations");
+  }
+
+  // Backward compatibility: legacy accounts may not have persona rows yet.
+  if (!persona) return;
+
+  const caPersonas: AppPersona[] = ["external_ca", "in_house_ca", "ca_firm"];
+  const caOrLegalPersonas: AppPersona[] = [...caPersonas, "in_house_lawyer"];
+
+  if (operation === "draft" || operation === "generate" || operation === "apply-fix" || operation === "fix") {
+    if (!caPersonas.includes(persona)) {
+      throw new Error("Policy denied: draft_generation_requires_ca_persona");
+    }
+    return;
+  }
+
+  if (operation === "recheck" || operation === "notice-ocr" || operation === "notice-details") {
+    if (!caOrLegalPersonas.includes(persona)) {
+      throw new Error("Policy denied: ai_operation_requires_ca_or_legal_persona");
+    }
+    return;
+  }
+
+  throw new Error(`Policy denied: unsupported_ai_operation:${operation}`);
+};
+
 const resolveErrorCode = (message: string) => {
   if (message === "Unauthorized") return "AUTH_UNAUTHORIZED";
   if (message.startsWith("Forbidden")) return "ACCESS_FORBIDDEN";
@@ -624,8 +667,12 @@ const validateAiDraftScope = async (
   client: ReturnType<typeof createClient>,
   userId: string,
   roles: Set<string>,
+  persona: AppPersona | null,
   payload: Record<string, unknown>,
 ) => {
+  const operation = normalizeAiOperation(payload);
+  assertAiOperationActorAllowed({ roles, persona, operation });
+
   const companyId = typeof payload.companyId === "string" ? payload.companyId : null;
   if (companyId) {
     const companyIds = await getUserCompanyIds(client, userId);
@@ -644,10 +691,11 @@ const proxyAiDraft = async (
   client: ReturnType<typeof createClient>,
   userId: string,
   roles: Set<string>,
+  persona: AppPersona | null,
   token: string,
   payload: Record<string, unknown>,
 ) => {
-  await validateAiDraftScope(client, userId, roles, payload);
+  await validateAiDraftScope(client, userId, roles, persona, payload);
 
   const { url, anon } = getEnv();
   const response = await fetch(`${url}/functions/v1/ai-draft`, {
@@ -685,10 +733,11 @@ const proxyAiDraftStream = async (
   client: ReturnType<typeof createClient>,
   userId: string,
   roles: Set<string>,
+  persona: AppPersona | null,
   token: string,
   payload: Record<string, unknown>,
 ) => {
-  await validateAiDraftScope(client, userId, roles, payload);
+  await validateAiDraftScope(client, userId, roles, persona, payload);
   const { url, anon } = getEnv();
   const response = await fetch(`${url}/functions/v1/ai-draft`, {
     method: "POST",
@@ -949,7 +998,7 @@ serve(async (req: Request) => {
       if (!body || typeof body !== "object") {
         return json(req, 400, { error: "request body is required" });
       }
-      const result = await proxyAiDraft(client, user.id, roles, token, body as Record<string, unknown>);
+      const result = await proxyAiDraft(client, user.id, roles, persona, token, body as Record<string, unknown>);
       if (!result.ok) {
         return json(req, result.status, { error: result.error || "ai-draft request failed" });
       }
@@ -962,7 +1011,7 @@ serve(async (req: Request) => {
       if (!body || typeof body !== "object") {
         return json(req, 400, { error: "request body is required" });
       }
-      return await proxyAiDraftStream(req, client, user.id, roles, token, body as Record<string, unknown>);
+      return await proxyAiDraftStream(req, client, user.id, roles, persona, token, body as Record<string, unknown>);
     }
 
     return json(req, 404, { error: "Route not found" });
