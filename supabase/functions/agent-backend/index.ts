@@ -136,6 +136,13 @@ const shouldSkipFailedRowForBackoff = (attempts: number, updatedAt: string | nul
   return Date.now() < nextEligibleAt;
 };
 
+const isOlderThanMinutes = (timestamp: string | null, minutes: number) => {
+  if (!timestamp) return false;
+  const parsed = Date.parse(timestamp);
+  if (Number.isNaN(parsed)) return false;
+  return parsed <= Date.now() - (minutes * 60 * 1000);
+};
+
 serve(async (req: Request) => {
   if (req.method === "OPTIONS") return new Response(null, { headers: getCorsHeaders(req) });
 
@@ -146,6 +153,10 @@ serve(async (req: Request) => {
 
     if (req.method === "GET" && path.endsWith("notifications/stats")) {
       await assertDispatchAuthorized(req);
+      const staleProcessingMinutesRaw = Number(url.searchParams.get("stale_processing_minutes") ?? 15);
+      const staleProcessingMinutes = Number.isFinite(staleProcessingMinutesRaw)
+        ? Math.max(1, Math.min(240, staleProcessingMinutesRaw))
+        : 15;
 
       const [queued, processing, sent, failed] = await Promise.all([
         admin.from("agent_notifications_outbox").select("id", { count: "exact", head: true }).eq("channel", "email").eq("status", "queued"),
@@ -178,6 +189,17 @@ serve(async (req: Request) => {
           : null,
       }));
 
+      const { data: processingRows, error: processingRowsError } = await admin
+        .from("agent_notifications_outbox")
+        .select("id, updated_at")
+        .eq("channel", "email")
+        .eq("status", "processing")
+        .order("updated_at", { ascending: true })
+        .limit(500);
+      if (processingRowsError) return json(req, 400, { error: processingRowsError.message });
+
+      const staleProcessing = (processingRows ?? []).filter((row) => isOlderThanMinutes(row.updated_at ?? null, staleProcessingMinutes));
+
       return json(req, 200, {
         ok: true,
         counts: {
@@ -185,7 +207,10 @@ serve(async (req: Request) => {
           processing: processing.count ?? 0,
           sent: sent.count ?? 0,
           failed: failed.count ?? 0,
+          stale_processing: staleProcessing.length,
         },
+        stale_processing_minutes: staleProcessingMinutes,
+        stale_processing_sample_ids: staleProcessing.slice(0, 10).map((row) => row.id),
         recent_failures: failureSamples,
       });
     }
@@ -218,6 +243,48 @@ serve(async (req: Request) => {
       if (requeueError) return json(req, 400, { error: requeueError.message });
 
       return json(req, 200, { ok: true, requeued: ids.length });
+    }
+
+    if (req.method === "POST" && path.endsWith("notifications/recover-processing")) {
+      await assertDispatchAuthorized(req);
+
+      const body = await req.json().catch(() => ({}));
+      const limitRaw = Number(body?.limit ?? 100);
+      const limit = Number.isFinite(limitRaw) ? Math.max(1, Math.min(1000, limitRaw)) : 100;
+      const staleMinutesRaw = Number(body?.stale_minutes ?? 15);
+      const staleMinutes = Number.isFinite(staleMinutesRaw) ? Math.max(1, Math.min(240, staleMinutesRaw)) : 15;
+
+      const { data: processingRows, error: processingRowsError } = await admin
+        .from("agent_notifications_outbox")
+        .select("id, updated_at")
+        .eq("channel", "email")
+        .eq("status", "processing")
+        .order("updated_at", { ascending: true })
+        .limit(limit * 2);
+      if (processingRowsError) return json(req, 400, { error: processingRowsError.message });
+
+      const staleRows = (processingRows ?? [])
+        .filter((row) => isOlderThanMinutes(row.updated_at ?? null, staleMinutes))
+        .slice(0, limit);
+      const staleIds = staleRows.map((row) => row.id);
+
+      if (!staleIds.length) {
+        return json(req, 200, { ok: true, recovered: 0, stale_minutes: staleMinutes });
+      }
+
+      const { error: recoverError } = await admin
+        .from("agent_notifications_outbox")
+        .update({ status: "failed", last_error: "Recovered from stale processing state" })
+        .in("id", staleIds)
+        .eq("status", "processing");
+      if (recoverError) return json(req, 400, { error: recoverError.message });
+
+      return json(req, 200, {
+        ok: true,
+        recovered: staleIds.length,
+        stale_minutes: staleMinutes,
+        sample_ids: staleIds.slice(0, 10),
+      });
     }
 
     if (req.method === "POST" && path.endsWith("notifications/dispatch")) {
