@@ -1192,6 +1192,102 @@ const loadDraftArtifacts = async (
   };
 };
 
+const loadDraftTimeline = async (
+  client: ReturnType<typeof createClient>,
+  userId: string,
+  roles: Set<string>,
+  draftRunId: string,
+  options?: { limit?: number; eventType?: string | null },
+) => {
+  const review = await loadDraftReview(client, userId, roles, draftRunId);
+  const limit = Math.max(10, Math.min(200, Number(options?.limit ?? 80)));
+  const eventType = typeof options?.eventType === "string" && options.eventType.trim()
+    ? options.eventType.trim()
+    : null;
+
+  let eventsQuery = client
+    .from("draft_audit_events")
+    .select("id, draft_run_id, user_id, event_type, payload, created_at")
+    .eq("draft_run_id", draftRunId)
+    .order("created_at", { ascending: false })
+    .limit(limit);
+  if (eventType) eventsQuery = eventsQuery.eq("event_type", eventType);
+
+  const [{ data: events, error: eventsError }, { data: versions, error: versionsError }, { data: exports, error: exportsError }, { data: filingChecks, error: filingChecksError }] = await Promise.all([
+    eventsQuery,
+    client
+      .from("draft_versions")
+      .select("id, draft_run_id, user_id, version_number, created_at")
+      .eq("draft_run_id", draftRunId)
+      .order("version_number", { ascending: false })
+      .limit(limit),
+    client
+      .from("draft_exports")
+      .select("id, draft_run_id, requested_by, format, status, file_name, created_at, completed_at")
+      .eq("draft_run_id", draftRunId)
+      .order("created_at", { ascending: false })
+      .limit(limit),
+    client
+      .from("draft_filing_checks")
+      .select("id, draft_run_id, user_id, score, ready, blockers, warnings, created_at")
+      .eq("draft_run_id", draftRunId)
+      .order("created_at", { ascending: false })
+      .limit(limit),
+  ]);
+  if (eventsError) throw eventsError;
+  if (versionsError) throw versionsError;
+  if (exportsError) throw exportsError;
+  if (filingChecksError) throw filingChecksError;
+
+  const userIds = Array.from(new Set([
+    ...(events ?? []).map((row) => row.user_id).filter((v): v is string => typeof v === "string"),
+    ...(versions ?? []).map((row) => row.user_id).filter((v): v is string => typeof v === "string"),
+    ...(exports ?? []).map((row) => row.requested_by).filter((v): v is string => typeof v === "string"),
+    ...(filingChecks ?? []).map((row) => row.user_id).filter((v): v is string => typeof v === "string"),
+  ]));
+
+  const actorMap: Record<string, { full_name: string | null; email: string | null }> = {};
+  if (userIds.length > 0) {
+    const { data: profiles, error: profilesError } = await client
+      .from("profiles")
+      .select("user_id, full_name, email")
+      .in("user_id", userIds);
+    if (profilesError) throw profilesError;
+    for (const profile of profiles ?? []) {
+      actorMap[profile.user_id] = {
+        full_name: profile.full_name ?? null,
+        email: profile.email ?? null,
+      };
+    }
+  }
+
+  return {
+    draftRunId,
+    currentStatus: review.run.status,
+    documentType: review.run.document_type,
+    companyId: review.run.company_id,
+    eventFilter: eventType,
+    events: (events ?? []).map((row) => ({
+      ...row,
+      actor: actorMap[row.user_id] ?? null,
+    })),
+    versions: (versions ?? []).map((row) => ({
+      ...row,
+      actor: actorMap[row.user_id] ?? null,
+    })),
+    exports: (exports ?? []).map((row) => ({
+      ...row,
+      actor: actorMap[row.requested_by] ?? null,
+    })),
+    filingChecks: (filingChecks ?? []).map((row) => ({
+      ...row,
+      blockers: parseJsonArrayStrings(row.blockers),
+      warnings: parseJsonArrayStrings(row.warnings),
+      actor: actorMap[row.user_id] ?? null,
+    })),
+  };
+};
+
 const toFilingFileSafe = (value: string) =>
   value.toLowerCase().replace(/[^a-z0-9-_]+/g, "-").replace(/-{2,}/g, "-").replace(/(^-|-$)/g, "") || "draft";
 
@@ -3563,6 +3659,18 @@ serve(async (req: Request) => {
       return json(req, 200, {
         ok: true,
         data: await loadDraftWorkflowActions(client, user.id, roles, persona, draftRunId),
+      });
+    }
+
+    if (req.method === "GET" && path.includes("drafts/") && path.endsWith("/timeline")) {
+      requireRole(roles, ["manager", "admin"]);
+      const draftRunId = path.split("drafts/")[1].replace("/timeline", "");
+      const limitRaw = Number(url.searchParams.get("limit") ?? 80);
+      const limit = Number.isFinite(limitRaw) ? limitRaw : 80;
+      const eventType = url.searchParams.get("event_type");
+      return json(req, 200, {
+        ok: true,
+        data: await loadDraftTimeline(client, user.id, roles, draftRunId, { limit, eventType }),
       });
     }
 
