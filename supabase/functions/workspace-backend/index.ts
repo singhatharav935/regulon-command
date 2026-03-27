@@ -1968,6 +1968,23 @@ const assertDraftIsMutableForContentEdit = (currentStatus: string) => {
   }
 };
 
+const ONE_TIME_WORKFLOW_EVENTS = new Set([
+  "exported_for_external_legal",
+  "external_legal_signed_off",
+  "review_approved",
+  "legal_review_approved",
+  "final_sign_off",
+  "legal_final_sign_off",
+]);
+
+const isOneTimeWorkflowEvent = (eventType: string) => ONE_TIME_WORKFLOW_EVENTS.has(eventType);
+
+const isUniqueConstraintViolation = (error: unknown) => {
+  if (!error || typeof error !== "object") return false;
+  const code = "code" in error ? String((error as { code?: unknown }).code ?? "") : "";
+  return code === "23505";
+};
+
 const saveDraftSnapshot = async (
   client: ReturnType<typeof createClient>,
   userId: string,
@@ -2053,7 +2070,12 @@ const saveDraftSnapshot = async (
         ...(body.payload ?? {}),
       },
     });
-  if (auditError) throw auditError;
+  if (auditError) {
+    if (isUniqueConstraintViolation(auditError) && isOneTimeWorkflowEvent(body.eventType)) {
+      return await loadDraftArtifacts(client, userId, roles, draftRunId);
+    }
+    throw auditError;
+  }
 
   await queueWorkflowNotifications(client, draftRunId, body.eventType, nextStatus, userId);
 
@@ -2073,8 +2095,7 @@ const appendDraftAuditEvent = async (
   const currentStatus = String(review.run.status);
   const existingEventSet = new Set(review.events.map((item) => String(item.event_type)));
   const idempotentOneTimeEvents = new Set([
-    "exported_for_external_legal",
-    "external_legal_signed_off",
+    ...ONE_TIME_WORKFLOW_EVENTS,
     "filing_export_generated",
     "filing_readiness_assessed",
   ]);
@@ -2118,7 +2139,12 @@ const appendDraftAuditEvent = async (
         ...(payload ?? {}),
       },
     });
-  if (error) throw error;
+  if (error) {
+    if (isUniqueConstraintViolation(error) && isOneTimeWorkflowEvent(eventType)) {
+      return await loadDraftArtifacts(client, userId, roles, draftRunId);
+    }
+    throw error;
+  }
 
   return await loadDraftArtifacts(client, userId, roles, draftRunId);
 };
@@ -2195,7 +2221,12 @@ const advanceDraftWorkflowState = async (
         ...(body.payload ?? {}),
       },
     });
-  if (auditError) throw auditError;
+  if (auditError) {
+    if (isUniqueConstraintViolation(auditError) && isOneTimeWorkflowEvent(body.eventType)) {
+      return await loadDraftArtifacts(client, userId, roles, draftRunId);
+    }
+    throw auditError;
+  }
 
   await queueWorkflowNotifications(client, draftRunId, body.eventType, nextStatus, userId);
   return await loadDraftArtifacts(client, userId, roles, draftRunId);
@@ -3543,7 +3574,11 @@ serve(async (req: Request) => {
             review_surface: "workspace-backend",
           },
         });
-      if (auditError) return json(req, 400, { error: auditError.message });
+      if (auditError) {
+        if (!(isUniqueConstraintViolation(auditError) && isOneTimeWorkflowEvent(eventType))) {
+          return json(req, 400, { error: auditError.message });
+        }
+      }
 
       await queueWorkflowNotifications(client, draftRunId, eventType, nextStatus, user.id);
 
