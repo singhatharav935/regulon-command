@@ -1,4 +1,5 @@
 import { useState, useEffect } from "react";
+import { useQuery } from "@tanstack/react-query";
 import CinematicEntry from "@/components/CinematicEntry";
 import Navbar from "@/components/layout/Navbar";
 import Footer from "@/components/layout/Footer";
@@ -12,9 +13,27 @@ import TeamSection from "@/components/platform/TeamSection";
 import ComplianceShowcase from "@/components/platform/ComplianceShowcase";
 import FAQSection from "@/components/platform/FAQSection";
 import BackgroundEffects from "@/components/BackgroundEffects";
+import { workspacePublicRequest } from "@/lib/workspace-backend";
 
 const Index = () => {
   const [showCinematic, setShowCinematic] = useState(true);
+  const { data: landingOverview } = useQuery({
+    queryKey: ["landing-overview"],
+    queryFn: async () =>
+      workspacePublicRequest<{
+        title?: string;
+        subtitle?: string;
+        description?: string;
+        cta_primary_label?: string;
+        cta_secondary_label?: string;
+        stat_regulators_covered?: number;
+        stat_regulatory_blueprints?: string;
+        stat_reasoning_prompts?: string;
+        stat_review_model?: string;
+      }>("/public/landing/overview"),
+    staleTime: 60_000,
+    retry: 1,
+  });
 
   useEffect(() => {
     const hasSeenIntro = sessionStorage.getItem("regulon-intro-seen");
@@ -37,7 +56,7 @@ const Index = () => {
       <BackgroundEffects />
       <Navbar />
       <main>
-        <HeroSection />
+        <HeroSection content={landingOverview ?? null} />
         <ComplianceShowcase />
         <RegulatorsSection />
         <CapabilitiesSection />

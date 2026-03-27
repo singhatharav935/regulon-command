@@ -67,3 +67,27 @@ export const workspaceBackendStreamRequest = async (
     body: JSON.stringify(payload),
   });
 };
+
+export const workspacePublicRequest = async <T>(
+  path: string,
+  init?: RequestInit,
+): Promise<T> => {
+  const publishableKey = import.meta.env.VITE_SUPABASE_PUBLISHABLE_KEY;
+  const response = await fetch(`${getWorkspaceBackendBaseUrl()}${path}`, {
+    ...init,
+    headers: {
+      "Content-Type": "application/json",
+      ...(publishableKey ? { apikey: publishableKey } : {}),
+      ...(init?.headers ?? {}),
+    },
+  });
+
+  const payload = (await response.json().catch(() => ({}))) as WorkspaceBackendEnvelope<T>;
+  if (!response.ok) {
+    const message = payload?.error || `Workspace backend public request failed (${response.status}).`;
+    const code = payload?.error_code;
+    throw new Error(code ? `${message} [${code}]` : message);
+  }
+
+  return payload.data as T;
+};

@@ -3,6 +3,7 @@ import { createClient } from "https://esm.sh/@supabase/supabase-js@2";
 import { PDFDocument, StandardFonts, rgb } from "https://esm.sh/pdf-lib@1.17.1";
 import { Document, Packer, Paragraph, HeadingLevel, TextRun } from "https://esm.sh/docx@9.5.1";
 import { buildOpsRunbooks, buildRegressionChecklist, computePrelaunchGate } from "./ops-contract.ts";
+import { normalizeLandingLead } from "./landing-contract.ts";
 
 const getCorsHeaders = (req: Request) => {
   const origin = req.headers.get("origin") ?? "";
@@ -67,6 +68,70 @@ const getServiceClient = () => {
   return createClient(url, serviceRole, {
     auth: { autoRefreshToken: false, persistSession: false },
   });
+};
+
+const getRequestIp = (req: Request) => {
+  const forwardedFor = req.headers.get("x-forwarded-for");
+  if (forwardedFor && forwardedFor.trim()) {
+    return forwardedFor.split(",")[0].trim();
+  }
+  const realIp = req.headers.get("x-real-ip");
+  if (realIp && realIp.trim()) return realIp.trim();
+  const cfIp = req.headers.get("cf-connecting-ip");
+  if (cfIp && cfIp.trim()) return cfIp.trim();
+  return "unknown";
+};
+
+const hashText = async (text: string) => {
+  const data = new TextEncoder().encode(text);
+  const digest = await crypto.subtle.digest("SHA-256", data);
+  const bytes = Array.from(new Uint8Array(digest));
+  return bytes.map((value) => value.toString(16).padStart(2, "0")).join("");
+};
+
+const enforcePublicRateLimit = async (
+  serviceClient: ReturnType<typeof createClient>,
+  req: Request,
+  route: string,
+  options: { limit: number; windowSeconds: number },
+) => {
+  const ip = getRequestIp(req);
+  const userAgent = (req.headers.get("user-agent") || "").slice(0, 256);
+  const keyHash = await hashText(`${ip}|${userAgent}`);
+  const windowSeconds = Math.max(30, options.windowSeconds);
+  const windowBucket = Math.floor(Date.now() / (windowSeconds * 1000));
+
+  const { data: existing, error: existingError } = await serviceClient
+    .from("landing_public_rate_limits")
+    .select("id, request_count")
+    .eq("key_hash", keyHash)
+    .eq("route", route)
+    .eq("window_bucket", windowBucket)
+    .maybeSingle();
+  if (existingError) throw existingError;
+
+  if (!existing) {
+    const { error: insertError } = await serviceClient.from("landing_public_rate_limits").insert({
+      key_hash: keyHash,
+      route,
+      window_bucket: windowBucket,
+      request_count: 1,
+    });
+    if (insertError) throw insertError;
+    return;
+  }
+
+  if (Number(existing.request_count ?? 0) >= options.limit) {
+    throw new Error(`Public rate limit exceeded: ${route}`);
+  }
+
+  const { error: updateError } = await serviceClient
+    .from("landing_public_rate_limits")
+    .update({
+      request_count: Number(existing.request_count ?? 0) + 1,
+    })
+    .eq("id", existing.id);
+  if (updateError) throw updateError;
 };
 
 const getUserRoles = async (client: ReturnType<typeof createClient>, userId: string) => {
@@ -892,6 +957,7 @@ const resolveErrorCode = (message: string) => {
   if (message === "AI request already in progress") return "AI_REQUEST_IN_PROGRESS";
   if (message.startsWith("AI rate limit exceeded:")) return "AI_RATE_LIMITED";
   if (message.startsWith("AI quota exceeded:")) return "AI_QUOTA_EXCEEDED";
+  if (message.startsWith("Public rate limit exceeded:")) return "AI_RATE_LIMITED";
   if (message.startsWith("Unsupported documentType:")) return "VALIDATION_INVALID_FIELD";
   if (message.startsWith("Invalid workflow transition:")) return "WORKFLOW_TRANSITION_INVALID";
   if (message.startsWith("Invalid event type for transition:")) return "WORKFLOW_EVENT_INVALID";
@@ -2883,6 +2949,12 @@ const getRouteAccessMatrix = () => ({
     { route: "GET /ops/workflow-integrity-check", roles: ["admin"] },
     { route: "GET /ops/workflow-sla-monitor", roles: ["admin"] },
     { route: "GET /ops/route-access-matrix", roles: ["admin"] },
+    { route: "GET /ops/landing/leads", roles: ["admin"] },
+    { route: "GET /ops/landing/metrics", roles: ["admin"] },
+    { route: "POST /ops/landing/leads/:id/status", roles: ["admin"] },
+    { route: "GET /ops/runbooks", roles: ["admin"] },
+    { route: "GET /ops/regression-checklist", roles: ["admin"] },
+    { route: "GET /ops/prelaunch-gate", roles: ["admin"] },
     { route: "GET /drafting/ai-ops/*", roles: ["admin"] },
   ],
 });
@@ -3198,6 +3270,137 @@ const loadDraftReview = async (client: ReturnType<typeof createClient>, userId: 
   return { run, versions: versions ?? [], events: events ?? [] };
 };
 
+const loadLandingOverview = async (serviceClient: ReturnType<typeof createClient>) => {
+  const [{ data: content, error: contentError }, { count: leads7d, error: leadsError }] = await Promise.all([
+    serviceClient
+      .from("landing_public_content")
+      .select("key, title, subtitle, description, cta_primary_label, cta_secondary_label, stat_regulators_covered, stat_regulatory_blueprints, stat_reasoning_prompts, stat_review_model, metadata")
+      .eq("key", "homepage")
+      .maybeSingle(),
+    serviceClient
+      .from("landing_leads")
+      .select("id", { count: "exact", head: true })
+      .gte("created_at", new Date(Date.now() - 7 * 24 * 60 * 60 * 1000).toISOString()),
+  ]);
+  if (contentError) throw contentError;
+  if (leadsError) throw leadsError;
+
+  const fallback = {
+    title: "REGULON",
+    subtitle: "Compliance & Regulatory Command Platform",
+    description:
+      "AI-powered, human-verified regulatory execution for businesses. Complete compliance coverage across MCA, GST, Income Tax, RBI & SEBI.",
+    cta_primary_label: "Get Started",
+    cta_secondary_label: "Login to Dashboard",
+    stat_regulators_covered: 5,
+    stat_regulatory_blueprints: "10K+",
+    stat_reasoning_prompts: "5K+",
+    stat_review_model: "CA+Law",
+    metadata: {},
+  };
+
+  return {
+    ...fallback,
+    ...(content ?? {}),
+    telemetry: {
+      leads_last_7d: leads7d ?? 0,
+    },
+  };
+};
+
+const createLandingLead = async (
+  serviceClient: ReturnType<typeof createClient>,
+  req: Request,
+  payload: Record<string, unknown>,
+) => {
+  await enforcePublicRateLimit(serviceClient, req, "landing-lead", { limit: 8, windowSeconds: 60 });
+  const normalized = normalizeLandingLead({
+    name: typeof payload.name === "string" ? payload.name : null,
+    email: typeof payload.email === "string" ? payload.email : null,
+    phone: typeof payload.phone === "string" ? payload.phone : null,
+    companyName: typeof payload.companyName === "string" ? payload.companyName : null,
+    inquiryType: typeof payload.inquiryType === "string" ? payload.inquiryType : null,
+    message: typeof payload.message === "string" ? payload.message : null,
+    source: typeof payload.source === "string" ? payload.source : null,
+  });
+
+  const ipHash = await hashText(getRequestIp(req));
+  const userAgent = (req.headers.get("user-agent") || "").slice(0, 500);
+
+  const { data, error } = await serviceClient
+    .from("landing_leads")
+    .insert({
+      ...normalized,
+      ip_hash: ipHash,
+      user_agent: userAgent,
+    })
+    .select("id, status, created_at")
+    .single();
+  if (error || !data) throw error ?? new Error("Failed to create landing lead");
+  return data;
+};
+
+const listLandingLeads = async (
+  client: ReturnType<typeof createClient>,
+  options?: { status?: string | null; inquiryType?: string | null; limit?: number; offset?: number },
+) => {
+  const limit = Math.max(10, Math.min(200, Number(options?.limit ?? 50)));
+  const offset = Math.max(0, Number(options?.offset ?? 0));
+  let query = client
+    .from("landing_leads")
+    .select("id, name, email, phone, company_name, inquiry_type, message, source, status, notes, created_at, updated_at")
+    .order("created_at", { ascending: false })
+    .range(offset, offset + limit - 1);
+  if (options?.status && options.status.trim()) query = query.eq("status", options.status.trim());
+  if (options?.inquiryType && options.inquiryType.trim()) query = query.eq("inquiry_type", options.inquiryType.trim());
+  const { data, error } = await query;
+  if (error) throw error;
+  return data ?? [];
+};
+
+const loadLandingMetrics = async (client: ReturnType<typeof createClient>) => {
+  const now = Date.now();
+  const since24h = new Date(now - 24 * 60 * 60 * 1000).toISOString();
+  const since7d = new Date(now - 7 * 24 * 60 * 60 * 1000).toISOString();
+  const since30d = new Date(now - 30 * 24 * 60 * 60 * 1000).toISOString();
+  const [allResult, dayResult, weekResult, monthResult, statusResult, inquiryResult] = await Promise.all([
+    client.from("landing_leads").select("id", { count: "exact", head: true }),
+    client.from("landing_leads").select("id", { count: "exact", head: true }).gte("created_at", since24h),
+    client.from("landing_leads").select("id", { count: "exact", head: true }).gte("created_at", since7d),
+    client.from("landing_leads").select("id", { count: "exact", head: true }).gte("created_at", since30d),
+    client.from("landing_leads").select("status"),
+    client.from("landing_leads").select("inquiry_type"),
+  ]);
+
+  if (allResult.error) throw allResult.error;
+  if (dayResult.error) throw dayResult.error;
+  if (weekResult.error) throw weekResult.error;
+  if (monthResult.error) throw monthResult.error;
+  if (statusResult.error) throw statusResult.error;
+  if (inquiryResult.error) throw inquiryResult.error;
+
+  const byStatus: Record<string, number> = {};
+  for (const row of statusResult.data ?? []) {
+    const key = typeof row.status === "string" && row.status.trim() ? row.status.trim() : "unknown";
+    byStatus[key] = (byStatus[key] ?? 0) + 1;
+  }
+
+  const byInquiryType: Record<string, number> = {};
+  for (const row of inquiryResult.data ?? []) {
+    const key = typeof row.inquiry_type === "string" && row.inquiry_type.trim() ? row.inquiry_type.trim() : "unknown";
+    byInquiryType[key] = (byInquiryType[key] ?? 0) + 1;
+  }
+
+  return {
+    total: allResult.count ?? 0,
+    leads_24h: dayResult.count ?? 0,
+    leads_7d: weekResult.count ?? 0,
+    leads_30d: monthResult.count ?? 0,
+    by_status: byStatus,
+    by_inquiry_type: byInquiryType,
+  };
+};
+
 serve(async (req: Request) => {
   const corsHeaders = getCorsHeaders(req);
   if (corsHeaders["Access-Control-Allow-Origin"] === "null") {
@@ -3215,6 +3418,26 @@ serve(async (req: Request) => {
         service: "workspace-backend",
         time: new Date().toISOString(),
       });
+    }
+
+    if (path.endsWith("public/landing/overview") || path.endsWith("public/landing/lead")) {
+      const serviceClient = getServiceClient();
+      if (!serviceClient) {
+        return json(req, 500, { error: "Server is not configured for public landing APIs" });
+      }
+
+      if (req.method === "GET" && path.endsWith("public/landing/overview")) {
+        await enforcePublicRateLimit(serviceClient, req, "landing-overview", { limit: 60, windowSeconds: 60 });
+        return json(req, 200, { ok: true, data: await loadLandingOverview(serviceClient) });
+      }
+
+      if (req.method === "POST" && path.endsWith("public/landing/lead")) {
+        const body = await req.json().catch(() => ({}));
+        if (!body || typeof body !== "object") {
+          return json(req, 400, { error: "request body is required" });
+        }
+        return json(req, 200, { ok: true, data: await createLandingLead(serviceClient, req, body as Record<string, unknown>) });
+      }
     }
 
     const { client, user, token } = await getUserClient(req);
@@ -3370,6 +3593,52 @@ serve(async (req: Request) => {
           generated_at: new Date().toISOString(),
         },
       });
+    }
+
+    if (req.method === "GET" && path.endsWith("ops/landing/leads")) {
+      requireRole(roles, ["admin"]);
+      const status = url.searchParams.get("status");
+      const inquiryType = url.searchParams.get("inquiry_type");
+      const limitRaw = Number(url.searchParams.get("limit") ?? 50);
+      const offsetRaw = Number(url.searchParams.get("offset") ?? 0);
+      return json(req, 200, {
+        ok: true,
+        data: await listLandingLeads(client, {
+          status,
+          inquiryType,
+          limit: Number.isFinite(limitRaw) ? limitRaw : 50,
+          offset: Number.isFinite(offsetRaw) ? offsetRaw : 0,
+        }),
+      });
+    }
+
+    if (req.method === "GET" && path.endsWith("ops/landing/metrics")) {
+      requireRole(roles, ["admin"]);
+      return json(req, 200, {
+        ok: true,
+        data: await loadLandingMetrics(client),
+      });
+    }
+
+    if (req.method === "POST" && path.includes("ops/landing/leads/") && path.endsWith("/status")) {
+      requireRole(roles, ["admin"]);
+      const leadId = path.split("ops/landing/leads/")[1].replace("/status", "");
+      const body = await req.json().catch(() => ({}));
+      const statusRaw = typeof body.status === "string" ? body.status.trim().toLowerCase() : "";
+      const allowedStatuses = new Set(["new", "contacted", "qualified", "closed", "spam"]);
+      if (!allowedStatuses.has(statusRaw)) {
+        return json(req, 400, { error: "status must be one of: new, contacted, qualified, closed, spam" });
+      }
+      const notes = typeof body.notes === "string" && body.notes.trim() ? body.notes.trim().slice(0, 2000) : null;
+      const { data, error } = await client
+        .from("landing_leads")
+        .update({ status: statusRaw, notes })
+        .eq("id", leadId)
+        .select("id, status, notes, updated_at")
+        .maybeSingle();
+      if (error) return json(req, 400, { error: error.message });
+      if (!data) return json(req, 404, { error: "landing lead not found" });
+      return json(req, 200, { ok: true, data });
     }
 
     if (req.method === "GET" && path.endsWith("drafting/ai-ops/actor-entitlement")) {
