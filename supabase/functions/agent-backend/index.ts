@@ -109,6 +109,17 @@ const normalizeEmailPayload = (payload: Record<string, unknown>) => {
   return { to, subject, bodyText, dedupeKey };
 };
 
+const isUuid = (value: string) => /^[0-9a-f]{8}-[0-9a-f]{4}-[1-5][0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$/i.test(value);
+
+const parseNotificationIds = (value: unknown) => {
+  if (!Array.isArray(value)) return [];
+  return Array.from(new Set(
+    value
+      .map((item) => (typeof item === "string" ? item.trim() : ""))
+      .filter((item) => item.length > 0 && isUuid(item)),
+  ));
+};
+
 const parseBearerToken = (req: Request) => {
   const authHeader = req.headers.get("Authorization") || req.headers.get("authorization") || "";
   if (!authHeader.toLowerCase().startsWith("bearer ")) return "";
@@ -293,6 +304,79 @@ serve(async (req: Request) => {
       if (requeueError) return json(req, 400, { error: requeueError.message });
 
       return json(req, 200, { ok: true, requeued: ids.length });
+    }
+
+    if (req.method === "POST" && path.endsWith("notifications/retry-by-id")) {
+      await assertDispatchAuthorized(req);
+
+      const body = await req.json().catch(() => ({}));
+      const ids = parseNotificationIds(body?.ids);
+      if (!ids.length) {
+        return json(req, 400, { error: "ids is required and must contain valid UUID values" });
+      }
+
+      const { data: targetRows, error: targetRowsError } = await admin
+        .from("agent_notifications_outbox")
+        .select("id, status, channel")
+        .eq("channel", "email")
+        .in("id", ids);
+      if (targetRowsError) return json(req, 400, { error: targetRowsError.message });
+
+      const retryableIds = (targetRows ?? [])
+        .filter((row) => row.status === "failed" || row.status === "processing")
+        .map((row) => row.id);
+
+      if (!retryableIds.length) {
+        return json(req, 200, { ok: true, retried: 0, skipped: ids.length });
+      }
+
+      const { error: retryError } = await admin
+        .from("agent_notifications_outbox")
+        .update({ status: "queued", last_error: null, attempts: 0 })
+        .in("id", retryableIds);
+      if (retryError) return json(req, 400, { error: retryError.message });
+
+      return json(req, 200, {
+        ok: true,
+        retried: retryableIds.length,
+        skipped: Math.max(0, ids.length - retryableIds.length),
+      });
+    }
+
+    if (req.method === "POST" && path.endsWith("notifications/cancel-queued")) {
+      await assertDispatchAuthorized(req);
+
+      const body = await req.json().catch(() => ({}));
+      const ids = parseNotificationIds(body?.ids);
+      if (!ids.length) {
+        return json(req, 400, { error: "ids is required and must contain valid UUID values" });
+      }
+
+      const { data: queuedRows, error: queuedRowsError } = await admin
+        .from("agent_notifications_outbox")
+        .select("id")
+        .eq("channel", "email")
+        .eq("status", "queued")
+        .in("id", ids);
+      if (queuedRowsError) return json(req, 400, { error: queuedRowsError.message });
+
+      const queuedIds = (queuedRows ?? []).map((row) => row.id);
+      if (!queuedIds.length) {
+        return json(req, 200, { ok: true, cancelled: 0, skipped: ids.length });
+      }
+
+      const { error: cancelError } = await admin
+        .from("agent_notifications_outbox")
+        .update({ status: "failed", last_error: "Cancelled by operator request" })
+        .in("id", queuedIds)
+        .eq("status", "queued");
+      if (cancelError) return json(req, 400, { error: cancelError.message });
+
+      return json(req, 200, {
+        ok: true,
+        cancelled: queuedIds.length,
+        skipped: Math.max(0, ids.length - queuedIds.length),
+      });
     }
 
     if (req.method === "POST" && path.endsWith("notifications/recover-processing")) {
