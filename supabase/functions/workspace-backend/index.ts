@@ -1,5 +1,7 @@
 import { serve } from "https://deno.land/std@0.168.0/http/server.ts";
 import { createClient } from "https://esm.sh/@supabase/supabase-js@2";
+import { PDFDocument, StandardFonts, rgb } from "https://esm.sh/pdf-lib@1.17.1";
+import { Document, Packer, Paragraph, HeadingLevel, TextRun } from "https://esm.sh/docx@9.5.1";
 
 const getCorsHeaders = (req: Request) => {
   const origin = req.headers.get("origin") ?? "";
@@ -125,8 +127,8 @@ const ALLOWED_EVENT_TYPES_BY_TRANSITION: Record<string, string[]> = {
   "generated->under_review": ["submitted_for_review", "review_started"],
   "under_review->under_review": ["manual_version_saved", "review_saved", "legal_review_saved", "exported_for_external_legal"],
   "under_review->approved": ["review_approved", "legal_review_approved"],
-  "approved->approved": ["manual_version_saved", "review_saved", "legal_review_saved"],
-  "approved->signed_off": ["final_sign_off", "legal_final_sign_off"],
+  "approved->approved": ["manual_version_saved", "review_saved", "legal_review_saved", "external_legal_signed_off"],
+  "approved->signed_off": ["final_sign_off", "legal_final_sign_off", "external_legal_signed_off"],
   "signed_off->signed_off": ["manual_version_saved", "review_saved"],
 };
 
@@ -219,6 +221,16 @@ const assertEventActorAllowed = ({
     return;
   }
 
+  if (eventType === "external_legal_signed_off") {
+    if (!(persona === "external_ca" || persona === "ca_firm")) {
+      throw new Error("Policy denied: external_legal_signoff_requires_external_ca_or_firm");
+    }
+    if (legalLaneEnabled) {
+      throw new Error("Policy denied: external_legal_signoff_not_allowed_when_internal_lane_enabled");
+    }
+    return;
+  }
+
   if (eventType === "manual_version_saved") {
     if (!isCaPersona && !isLawyerPersona) {
       throw new Error("Policy denied: review_edit_requires_ca_or_lawyer");
@@ -270,6 +282,15 @@ const assertWorkflowBlockingConditions = ({
   if (eventType === "legal_final_sign_off") {
     if (!eventSet.has("review_approved") && finalSignoffMode === "dual") {
       throw new Error("Policy denied: legal_final_signoff_dual_mode_requires_ca_approval");
+    }
+  }
+
+  if (eventType === "external_legal_signed_off") {
+    if (!eventSet.has("exported_for_external_legal")) {
+      throw new Error("Policy denied: external_legal_signoff_requires_export_event");
+    }
+    if (legalReviewRequired) {
+      throw new Error("Policy denied: external_legal_signoff_not_allowed_when_internal_legal_review_required");
     }
   }
 };
@@ -1165,6 +1186,267 @@ const loadDraftArtifacts = async (
     versions: review.versions,
     events: review.events,
   };
+};
+
+const toFilingFileSafe = (value: string) =>
+  value.toLowerCase().replace(/[^a-z0-9-_]+/g, "-").replace(/-{2,}/g, "-").replace(/(^-|-$)/g, "") || "draft";
+
+const chunkLines = (input: string, maxLen = 95) => {
+  const normalized = input.replace(/\r\n/g, "\n").split("\n");
+  const out: string[] = [];
+  for (const line of normalized) {
+    if (line.length <= maxLen) {
+      out.push(line);
+      continue;
+    }
+    let remaining = line;
+    while (remaining.length > maxLen) {
+      const boundary = remaining.lastIndexOf(" ", maxLen);
+      const index = boundary > 20 ? boundary : maxLen;
+      out.push(remaining.slice(0, index).trimEnd());
+      remaining = remaining.slice(index).trimStart();
+    }
+    out.push(remaining);
+  }
+  return out;
+};
+
+const buildExportBaseName = (documentType: string | null, draftMode: string | null, draftRunId: string) => {
+  const doc = toFilingFileSafe(documentType || "draft");
+  const mode = toFilingFileSafe(draftMode || "response");
+  const shortId = draftRunId.slice(0, 8);
+  return `${doc}-${mode}-${shortId}`;
+};
+
+const createDraftPdfBytes = async (options: {
+  title: string;
+  documentType: string | null;
+  draftMode: string | null;
+  content: string;
+  draftRunId: string;
+}) => {
+  const pdf = await PDFDocument.create();
+  const font = await pdf.embedFont(StandardFonts.Helvetica);
+  const bold = await pdf.embedFont(StandardFonts.HelveticaBold);
+
+  const margin = 42;
+  const width = 595.28;
+  const height = 841.89;
+  const contentWidth = width - margin * 2;
+  const bodySize = 10.5;
+  const lineHeight = 14;
+  let page = pdf.addPage([width, height]);
+  let y = height - margin;
+
+  const drawHeader = () => {
+    page.drawText(options.title, { x: margin, y, size: 15, font: bold, color: rgb(0.06, 0.08, 0.12) });
+    y -= 20;
+    const meta = `Type: ${options.documentType || "n/a"} | Mode: ${options.draftMode || "n/a"} | Draft: ${options.draftRunId}`;
+    page.drawText(meta, { x: margin, y, size: 9.5, font, color: rgb(0.36, 0.39, 0.45) });
+    y -= 18;
+    page.drawLine({
+      start: { x: margin, y },
+      end: { x: width - margin, y },
+      color: rgb(0.82, 0.84, 0.88),
+      thickness: 1,
+    });
+    y -= 18;
+  };
+
+  drawHeader();
+  const lines = chunkLines(options.content || "");
+  const minY = margin;
+  for (const line of lines) {
+    if (y < minY) {
+      page = pdf.addPage([width, height]);
+      y = height - margin;
+      drawHeader();
+    }
+    page.drawText(line, { x: margin, y, size: bodySize, font, maxWidth: contentWidth, color: rgb(0.08, 0.1, 0.14) });
+    y -= lineHeight;
+  }
+
+  return await pdf.save();
+};
+
+const createDraftDocxBytes = async (options: {
+  title: string;
+  documentType: string | null;
+  draftMode: string | null;
+  content: string;
+  draftRunId: string;
+}) => {
+  const paragraphs = options.content
+    .replace(/\r\n/g, "\n")
+    .split("\n")
+    .map((line) => new Paragraph({ children: [new TextRun(line || " ")] }));
+
+  const doc = new Document({
+    sections: [{
+      children: [
+        new Paragraph({
+          heading: HeadingLevel.TITLE,
+          children: [new TextRun({ text: options.title, bold: true })],
+        }),
+        new Paragraph(`Type: ${options.documentType || "n/a"}`),
+        new Paragraph(`Mode: ${options.draftMode || "n/a"}`),
+        new Paragraph(`Draft ID: ${options.draftRunId}`),
+        new Paragraph(" "),
+        ...paragraphs,
+      ],
+    }],
+  });
+  return await Packer.toUint8Array(doc);
+};
+
+const createDraftExport = async (
+  client: ReturnType<typeof createClient>,
+  userId: string,
+  roles: Set<string>,
+  persona: AppPersona | null,
+  draftRunId: string,
+  body: { format: "pdf" | "docx" },
+) => {
+  const review = await loadDraftReview(client, userId, roles, draftRunId);
+  const run = review.run;
+  const content = typeof run.draft_content === "string" ? run.draft_content : "";
+  if (!content.trim()) {
+    throw new Error("Validation failed: draft content is empty");
+  }
+
+  const baseName = buildExportBaseName(
+    typeof run.document_type === "string" ? run.document_type : null,
+    typeof run.draft_mode === "string" ? run.draft_mode : null,
+    run.id,
+  );
+  const fileName = `${baseName}.${body.format}`;
+  const title = `REGULON Filing Draft`;
+  const now = new Date();
+
+  const serviceClient = getServiceClient();
+  if (!serviceClient) {
+    throw new Error("Missing Supabase service role configuration");
+  }
+
+  const byteData = body.format === "pdf"
+    ? await createDraftPdfBytes({
+      title,
+      documentType: run.document_type,
+      draftMode: run.draft_mode,
+      content,
+      draftRunId: run.id,
+    })
+    : await createDraftDocxBytes({
+      title,
+      documentType: run.document_type,
+      draftMode: run.draft_mode,
+      content,
+      draftRunId: run.id,
+    });
+
+  const storagePath = `${userId}/${run.id}/${now.toISOString().replace(/[:.]/g, "-")}-${fileName}`;
+  const mimeType = body.format === "pdf"
+    ? "application/pdf"
+    : "application/vnd.openxmlformats-officedocument.wordprocessingml.document";
+
+  const { error: uploadError } = await serviceClient
+    .storage
+    .from("draft-exports")
+    .upload(storagePath, byteData, {
+      contentType: mimeType,
+      upsert: false,
+      cacheControl: "3600",
+    });
+  if (uploadError) {
+    throw new Error(`Failed to upload draft export: ${uploadError.message}`);
+  }
+
+  const { data: exportRow, error: exportInsertError } = await client
+    .from("draft_exports")
+    .insert({
+      draft_run_id: run.id,
+      requested_by: userId,
+      company_id: run.company_id,
+      format: body.format,
+      status: "generated",
+      file_name: fileName,
+      mime_type: mimeType,
+      storage_path: storagePath,
+      metadata: {
+        source: "workspace-backend",
+        workflow_status: run.status,
+      },
+      completed_at: new Date().toISOString(),
+    })
+    .select("id, draft_run_id, requested_by, company_id, format, status, file_name, mime_type, storage_path, metadata, created_at, completed_at")
+    .single();
+  if (exportInsertError || !exportRow) {
+    throw exportInsertError ?? new Error("Failed to persist export metadata");
+  }
+
+  const { data: signedUrlData, error: signedUrlError } = await serviceClient.storage
+    .from("draft-exports")
+    .createSignedUrl(storagePath, 60 * 15);
+  if (signedUrlError) {
+    throw new Error(`Failed to create export URL: ${signedUrlError.message}`);
+  }
+
+  await appendDraftAuditEvent(
+    client,
+    userId,
+    roles,
+    persona,
+    run.id,
+    "filing_export_generated",
+    {
+      export_generated: true,
+      export_format: body.format,
+      export_id: exportRow.id,
+      file_name: fileName,
+      storage_path: storagePath,
+    },
+  );
+
+  return {
+    ...exportRow,
+    download_url: signedUrlData.signedUrl,
+    download_url_expires_in_seconds: 60 * 15,
+  };
+};
+
+const listDraftExports = async (
+  client: ReturnType<typeof createClient>,
+  userId: string,
+  roles: Set<string>,
+  draftRunId: string,
+  options?: { limit?: number },
+) => {
+  const review = await loadDraftReview(client, userId, roles, draftRunId);
+  const limit = Math.max(1, Math.min(50, Number(options?.limit ?? 20)));
+  const { data, error } = await client
+    .from("draft_exports")
+    .select("id, draft_run_id, requested_by, company_id, format, status, file_name, mime_type, storage_path, error_message, metadata, created_at, completed_at")
+    .eq("draft_run_id", review.run.id)
+    .order("created_at", { ascending: false })
+    .limit(limit);
+  if (error) throw error;
+
+  const serviceClient = getServiceClient();
+  const rows = data ?? [];
+  if (!serviceClient) return rows;
+
+  const withUrls = await Promise.all(rows.map(async (row) => {
+    if (!row.storage_path) return { ...row, download_url: null };
+    const { data: signed, error: signedError } = await serviceClient.storage
+      .from("draft-exports")
+      .createSignedUrl(row.storage_path, 60 * 10);
+    if (signedError) {
+      return { ...row, download_url: null, download_url_error: signedError.message };
+    }
+    return { ...row, download_url: signed.signedUrl, download_url_expires_in_seconds: 60 * 10 };
+  }));
+
+  return withUrls;
 };
 
 const createDraftRun = async (
@@ -2628,6 +2910,17 @@ serve(async (req: Request) => {
       return json(req, 200, { ok: true, data: await loadDraftArtifacts(client, user.id, roles, draftRunId) });
     }
 
+    if (req.method === "GET" && path.includes("drafts/") && path.endsWith("/exports")) {
+      requireRole(roles, ["manager", "admin"]);
+      const draftRunId = path.split("drafts/")[1].replace("/exports", "");
+      const limitRaw = Number(url.searchParams.get("limit") ?? 20);
+      const limit = Number.isFinite(limitRaw) ? limitRaw : 20;
+      return json(req, 200, {
+        ok: true,
+        data: await listDraftExports(client, user.id, roles, draftRunId, { limit }),
+      });
+    }
+
     if (req.method === "GET" && path.includes("drafts/") && path.endsWith("/policy-status")) {
       requireRole(roles, ["manager", "admin"]);
       const draftRunId = path.split("drafts/")[1].replace("/policy-status", "");
@@ -2779,6 +3072,22 @@ serve(async (req: Request) => {
           qa: body.qa ?? undefined,
           draftPackage: body.draftPackage ?? undefined,
           payload: typeof body.payload === "object" && body.payload ? body.payload : undefined,
+        }),
+      });
+    }
+
+    if (req.method === "POST" && path.includes("drafts/") && path.endsWith("/exports")) {
+      requireRole(roles, ["manager", "admin"]);
+      const draftRunId = path.split("drafts/")[1].replace("/exports", "");
+      const body = await req.json().catch(() => ({}));
+      const format = String(body.format || "pdf").trim().toLowerCase();
+      if (format !== "pdf" && format !== "docx") {
+        return json(req, 400, { error: "format must be pdf or docx" });
+      }
+      return json(req, 200, {
+        ok: true,
+        data: await createDraftExport(client, user.id, roles, persona, draftRunId, {
+          format: format as "pdf" | "docx",
         }),
       });
     }
