@@ -211,10 +211,45 @@ const assertAiOperationActorAllowed = ({
   throw new Error(`Policy denied: unsupported_ai_operation:${operation}`);
 };
 
+const SUPPORTED_AI_DOCUMENT_TYPES = new Set([
+  "mca-notice",
+  "gst-show-cause",
+  "income-tax-response",
+  "rbi-filing",
+  "sebi-compliance",
+  "customs-response",
+  "contract-review",
+  "custom-draft",
+]);
+
+const parseDocumentType = (payload: Record<string, unknown>) => {
+  const documentType = typeof payload.documentType === "string" ? payload.documentType.trim() : "";
+  return documentType || null;
+};
+
+const assertAiOperationPayloadShape = (operation: string, payload: Record<string, unknown>) => {
+  const documentType = parseDocumentType(payload);
+  const requiresDocumentType = operation === "draft" ||
+    operation === "generate" ||
+    operation === "apply-fix" ||
+    operation === "fix" ||
+    operation === "recheck" ||
+    operation === "notice-details";
+
+  if (requiresDocumentType && !documentType) {
+    throw new Error("documentType is required for this operation");
+  }
+
+  if (documentType && !SUPPORTED_AI_DOCUMENT_TYPES.has(documentType)) {
+    throw new Error(`Unsupported documentType: ${documentType}`);
+  }
+};
+
 const resolveErrorCode = (message: string) => {
   if (message === "Unauthorized") return "AUTH_UNAUTHORIZED";
   if (message.startsWith("Forbidden")) return "ACCESS_FORBIDDEN";
   if (message.startsWith("Policy denied:")) return "WORKFLOW_ACTOR_FORBIDDEN";
+  if (message.startsWith("Unsupported documentType:")) return "VALIDATION_INVALID_FIELD";
   if (message.startsWith("Invalid workflow transition:")) return "WORKFLOW_TRANSITION_INVALID";
   if (message.startsWith("Invalid event type for transition:")) return "WORKFLOW_EVENT_INVALID";
   if (message.includes(" is required") || message.includes(" are required")) return "VALIDATION_REQUIRED_FIELD";
@@ -672,6 +707,7 @@ const validateAiDraftScope = async (
 ) => {
   const operation = normalizeAiOperation(payload);
   assertAiOperationActorAllowed({ roles, persona, operation });
+  assertAiOperationPayloadShape(operation, payload);
 
   const companyId = typeof payload.companyId === "string" ? payload.companyId : null;
   if (companyId) {
@@ -683,7 +719,11 @@ const validateAiDraftScope = async (
 
   const draftRunId = typeof payload.draftRunId === "string" ? payload.draftRunId : null;
   if (draftRunId) {
-    await loadDraftReview(client, userId, roles, draftRunId);
+    const review = await loadDraftReview(client, userId, roles, draftRunId);
+    const requestedDocumentType = parseDocumentType(payload);
+    if (requestedDocumentType && requestedDocumentType !== String(review.run.document_type)) {
+      throw new Error("documentType does not match draftRunId");
+    }
   }
 };
 
@@ -1025,6 +1065,7 @@ serve(async (req: Request) => {
           ? 403
           : errorCode === "WORKFLOW_TRANSITION_INVALID"
             || errorCode === "WORKFLOW_EVENT_INVALID"
+            || errorCode === "VALIDATION_INVALID_FIELD"
             || errorCode === "VALIDATION_REQUIRED_FIELD"
             ? 400
             : 500;
