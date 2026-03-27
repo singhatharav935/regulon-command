@@ -1413,6 +1413,62 @@ const appendDraftAuditEvent = async (
   return await loadDraftArtifacts(client, userId, roles, draftRunId);
 };
 
+const loadDraftPolicyStatus = async (
+  client: ReturnType<typeof createClient>,
+  userId: string,
+  roles: Set<string>,
+  persona: AppPersona | null,
+  draftRunId: string,
+) => {
+  const review = await loadDraftReview(client, userId, roles, draftRunId);
+  const documentType = typeof review.run.document_type === "string" ? review.run.document_type : null;
+  const [workflowPolicy, entitlements] = await Promise.all([
+    loadAuthorityWorkflowPolicy(client, documentType),
+    loadActorEntitlements(client, userId),
+  ]);
+  const legalLaneEnabled = resolveLegalLaneEnabled(persona, entitlements);
+
+  const eventSet = new Set(review.events.map((event) => event.event_type));
+  const blockers: string[] = [];
+  if (!eventSet.has("submitted_for_review") && !eventSet.has("review_started")) {
+    blockers.push("CA review submission is pending.");
+  }
+  if (workflowPolicy.legalReviewRequired && workflowPolicy.finalSignoffMode !== "ca_only" && !eventSet.has("legal_review_approved")) {
+    blockers.push("Legal review approval is required before final sign-off.");
+  }
+  if (workflowPolicy.finalSignoffMode === "dual" && !eventSet.has("review_approved")) {
+    blockers.push("CA review approval is required in dual-signoff mode.");
+  }
+  if ((persona === "external_ca" || persona === "ca_firm") && !legalLaneEnabled) {
+    blockers.push("External CA lane active: legal sign-off must happen outside REGULON unless add-on is enabled.");
+  }
+
+  const lane = (persona === "external_ca" || persona === "ca_firm") && !legalLaneEnabled
+    ? "external_legal_outside_regulon"
+    : "internal_regulon_legal_lane";
+
+  return {
+    draftRunId,
+    status: review.run.status,
+    documentType: review.run.document_type,
+    lane,
+    policy: {
+      legalReviewRequired: workflowPolicy.legalReviewRequired,
+      finalSignoffMode: workflowPolicy.finalSignoffMode,
+      legalLaneEnabled,
+      regulonLegalLaneEntitled: entitlements.regulonLegalLaneEnabled,
+    },
+    checkpoints: {
+      submittedForReview: eventSet.has("submitted_for_review") || eventSet.has("review_started"),
+      reviewApproved: eventSet.has("review_approved"),
+      legalReviewApproved: eventSet.has("legal_review_approved"),
+      exportedForExternalLegal: eventSet.has("exported_for_external_legal"),
+      finalSignedOff: eventSet.has("final_sign_off") || eventSet.has("legal_final_sign_off"),
+    },
+    blockers,
+  };
+};
+
 const validateAiDraftScope = async (
   client: ReturnType<typeof createClient>,
   userId: string,
@@ -2282,6 +2338,15 @@ serve(async (req: Request) => {
       requireRole(roles, ["manager", "admin"]);
       const draftRunId = path.split("drafts/")[1].replace("/artifacts", "");
       return json(req, 200, { ok: true, data: await loadDraftArtifacts(client, user.id, roles, draftRunId) });
+    }
+
+    if (req.method === "GET" && path.includes("drafts/") && path.endsWith("/policy-status")) {
+      requireRole(roles, ["manager", "admin"]);
+      const draftRunId = path.split("drafts/")[1].replace("/policy-status", "");
+      return json(req, 200, {
+        ok: true,
+        data: await loadDraftPolicyStatus(client, user.id, roles, persona, draftRunId),
+      });
     }
 
     if (req.method === "GET" && path.includes("draft-review/")) {
