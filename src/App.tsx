@@ -34,6 +34,24 @@ const App = () => (
         <BrowserRouter>
           <Routes>
             <Route path="/" element={<Index />} />
+            <Route path="/platform" element={<Index />} />
+            <Route path="/platform/how-it-works" element={<Index />} />
+            <Route path="/platform/infrastructure" element={<Index />} />
+            <Route path="/platform/ai-human-review" element={<Index />} />
+            <Route path="/platform/regulators" element={<Index />} />
+            <Route path="/platform/ai-assistant" element={<Index />} />
+            <Route path="/platform/audit" element={<Index />} />
+            <Route path="/solutions/roc" element={<Index />} />
+            <Route path="/solutions/gst" element={<Index />} />
+            <Route path="/solutions/income-tax" element={<Index />} />
+            <Route path="/solutions/labour-law" element={<Index />} />
+            <Route path="/solutions/rbi" element={<Index />} />
+            <Route path="/solutions/sebi" element={<Index />} />
+            <Route path="/solutions/contracts" element={<Index />} />
+            <Route path="/customers" element={<Index />} />
+            <Route path="/security" element={<Index />} />
+            <Route path="/resources" element={<Index />} />
+            <Route path="/about" element={<Index />} />
             <Route path="/auth" element={<Auth />} />
             <Route path="/dashboard" element={<Dashboard />} />
             <Route path="/ca-dashboard" element={<CADashboard />} />
