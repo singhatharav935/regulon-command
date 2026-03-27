@@ -123,13 +123,13 @@ const ALLOWED_WORKFLOW_TRANSITIONS: Record<string, string[]> = {
 };
 
 const ALLOWED_EVENT_TYPES_BY_TRANSITION: Record<string, string[]> = {
-  "generated->generated": ["manual_version_saved", "review_saved", "legal_review_saved", "draft_generated", "exported_for_external_legal", "version_rollback_applied"],
+  "generated->generated": ["manual_version_saved", "review_saved", "legal_review_saved", "draft_generated", "exported_for_external_legal", "version_rollback_applied", "filing_export_generated", "filing_readiness_assessed", "filing_export_download_link_issued"],
   "generated->under_review": ["submitted_for_review", "review_started"],
-  "under_review->under_review": ["manual_version_saved", "review_saved", "legal_review_saved", "exported_for_external_legal", "version_rollback_applied"],
+  "under_review->under_review": ["manual_version_saved", "review_saved", "legal_review_saved", "exported_for_external_legal", "version_rollback_applied", "filing_export_generated", "filing_readiness_assessed", "filing_export_download_link_issued"],
   "under_review->approved": ["review_approved", "legal_review_approved"],
-  "approved->approved": ["manual_version_saved", "review_saved", "legal_review_saved", "external_legal_signed_off", "version_rollback_applied"],
+  "approved->approved": ["manual_version_saved", "review_saved", "legal_review_saved", "external_legal_signed_off", "version_rollback_applied", "filing_export_generated", "filing_readiness_assessed", "filing_export_download_link_issued"],
   "approved->signed_off": ["final_sign_off", "legal_final_sign_off", "external_legal_signed_off"],
-  "signed_off->signed_off": ["manual_version_saved", "review_saved", "version_rollback_applied"],
+  "signed_off->signed_off": ["manual_version_saved", "review_saved", "version_rollback_applied", "filing_export_generated", "filing_readiness_assessed", "filing_export_download_link_issued"],
 };
 
 const assertValidWorkflowTransition = (currentStatus: string, nextStatus: string) => {
@@ -2046,6 +2046,16 @@ const appendDraftAuditEvent = async (
 ) => {
   const review = await loadDraftReview(client, userId, roles, draftRunId);
   const currentStatus = String(review.run.status);
+  const existingEventSet = new Set(review.events.map((item) => String(item.event_type)));
+  const idempotentOneTimeEvents = new Set([
+    "exported_for_external_legal",
+    "external_legal_signed_off",
+    "filing_export_generated",
+    "filing_readiness_assessed",
+  ]);
+  if (idempotentOneTimeEvents.has(eventType) && existingEventSet.has(eventType)) {
+    return await loadDraftArtifacts(client, userId, roles, draftRunId);
+  }
   assertValidWorkflowTransition(currentStatus, currentStatus);
   assertValidEventTypeForTransition(currentStatus, currentStatus, eventType);
   const documentType = typeof review.run.document_type === "string" ? review.run.document_type : null;
@@ -2103,6 +2113,19 @@ const advanceDraftWorkflowState = async (
   const review = await loadDraftReview(client, userId, roles, draftRunId);
   const currentStatus = String(review.run.status);
   const nextStatus = body.nextStatus;
+  const existingEventSet = new Set(review.events.map((item) => String(item.event_type)));
+  const idempotentTransitionEvents = new Set([
+    "submitted_for_review",
+    "review_started",
+    "review_approved",
+    "legal_review_approved",
+    "final_sign_off",
+    "legal_final_sign_off",
+    "external_legal_signed_off",
+  ]);
+  if (idempotentTransitionEvents.has(body.eventType) && existingEventSet.has(body.eventType)) {
+    return await loadDraftArtifacts(client, userId, roles, draftRunId);
+  }
   const documentType = typeof review.run.document_type === "string" ? review.run.document_type : null;
   const [workflowPolicy, entitlements] = await Promise.all([
     loadAuthorityWorkflowPolicy(client, documentType),
