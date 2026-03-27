@@ -882,6 +882,7 @@ const assertAiOperationPayloadShape = (operation: string, payload: Record<string
 const resolveErrorCode = (message: string) => {
   if (message === "Unauthorized") return "AUTH_UNAUTHORIZED";
   if (message.startsWith("Forbidden")) return "ACCESS_FORBIDDEN";
+  if (message === "Draft not found" || message === "Draft export not found") return "RESOURCE_NOT_FOUND";
   if (message.startsWith("Policy denied:")) return "WORKFLOW_ACTOR_FORBIDDEN";
   if (message === "AI request already in progress") return "AI_REQUEST_IN_PROGRESS";
   if (message.startsWith("AI rate limit exceeded:")) return "AI_RATE_LIMITED";
@@ -1447,6 +1448,59 @@ const listDraftExports = async (
   }));
 
   return withUrls;
+};
+
+const getDraftExportDownloadLink = async (
+  client: ReturnType<typeof createClient>,
+  userId: string,
+  roles: Set<string>,
+  exportId: string,
+  ttlSeconds = 600,
+) => {
+  const safeTtl = Math.max(60, Math.min(60 * 60, Number.isFinite(ttlSeconds) ? ttlSeconds : 600));
+  const { data: row, error } = await client
+    .from("draft_exports")
+    .select("id, draft_run_id, requested_by, company_id, format, status, file_name, mime_type, storage_path, metadata, created_at, completed_at")
+    .eq("id", exportId)
+    .maybeSingle();
+  if (error) throw error;
+  if (!row) throw new Error("Draft export not found");
+  if (!row.storage_path) throw new Error("Draft export file is unavailable");
+
+  await loadDraftReview(client, userId, roles, row.draft_run_id);
+
+  const serviceClient = getServiceClient();
+  if (!serviceClient) {
+    throw new Error("Missing Supabase service role configuration");
+  }
+
+  const { data: signed, error: signedError } = await serviceClient.storage
+    .from("draft-exports")
+    .createSignedUrl(row.storage_path, safeTtl);
+  if (signedError) {
+    throw new Error(`Failed to create export URL: ${signedError.message}`);
+  }
+
+  const { error: auditError } = await client
+    .from("draft_audit_events")
+    .insert({
+      draft_run_id: row.draft_run_id,
+      user_id: userId,
+      event_type: "filing_export_download_link_issued",
+      payload: {
+        review_surface: "workspace-backend",
+        export_id: row.id,
+        export_format: row.format,
+        requested_ttl_seconds: safeTtl,
+      },
+    });
+  if (auditError) throw auditError;
+
+  return {
+    ...row,
+    download_url: signed.signedUrl,
+    download_url_expires_in_seconds: safeTtl,
+  };
 };
 
 const parseJsonArrayStrings = (value: unknown): string[] => {
@@ -3168,6 +3222,17 @@ serve(async (req: Request) => {
       });
     }
 
+    if (req.method === "GET" && path.includes("draft-exports/") && path.endsWith("/download-link")) {
+      requireRole(roles, ["manager", "admin"]);
+      const exportId = path.split("draft-exports/")[1].replace("/download-link", "");
+      const ttlRaw = Number(url.searchParams.get("ttl") ?? 600);
+      const ttl = Number.isFinite(ttlRaw) ? ttlRaw : 600;
+      return json(req, 200, {
+        ok: true,
+        data: await getDraftExportDownloadLink(client, user.id, roles, exportId, ttl),
+      });
+    }
+
     if (req.method === "GET" && path.endsWith("drafts/history")) {
       requireRole(roles, ["manager", "admin"]);
       const companyId = url.searchParams.get("company_id");
@@ -3472,6 +3537,8 @@ serve(async (req: Request) => {
     const status =
       errorCode === "AUTH_UNAUTHORIZED"
         ? 401
+        : errorCode === "RESOURCE_NOT_FOUND"
+          ? 404
         : errorCode === "ACCESS_FORBIDDEN" || errorCode === "WORKFLOW_ACTOR_FORBIDDEN"
           ? 403
           : errorCode === "AI_REQUEST_IN_PROGRESS"
