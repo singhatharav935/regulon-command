@@ -2,6 +2,13 @@ import { motion } from "framer-motion";
 import { ArrowRight, Shield, Users, FileCheck, Building2 } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { useNavigate } from "react-router-dom";
+import { useState } from "react";
+import { Dialog, DialogContent, DialogDescription, DialogFooter, DialogHeader, DialogTitle } from "@/components/ui/dialog";
+import { Label } from "@/components/ui/label";
+import { Input } from "@/components/ui/input";
+import { Textarea } from "@/components/ui/textarea";
+import { workspacePublicRequest } from "@/lib/workspace-backend";
+import { toast } from "sonner";
 
 type HeroSectionProps = {
   content?: {
@@ -19,6 +26,16 @@ type HeroSectionProps = {
 
 const HeroSection = ({ content }: HeroSectionProps) => {
   const navigate = useNavigate();
+  const [leadDialogOpen, setLeadDialogOpen] = useState(false);
+  const [leadType, setLeadType] = useState<"onboarding" | "expert">("onboarding");
+  const [isSubmittingLead, setIsSubmittingLead] = useState(false);
+  const [leadForm, setLeadForm] = useState({
+    name: "",
+    email: "",
+    phone: "",
+    companyName: "",
+    message: "",
+  });
   const title = content?.title || "REGULON";
   const subtitle = content?.subtitle || "Compliance & Regulatory Command Platform";
   const description = content?.description ||
@@ -29,6 +46,38 @@ const HeroSection = ({ content }: HeroSectionProps) => {
   const statBlueprints = content?.stat_regulatory_blueprints || "10K+";
   const statPrompts = content?.stat_reasoning_prompts || "5K+";
   const statReview = content?.stat_review_model || "CA+Law";
+
+  const openLeadDialog = (type: "onboarding" | "expert") => {
+    setLeadType(type);
+    setLeadDialogOpen(true);
+  };
+
+  const submitLead = async () => {
+    try {
+      setIsSubmittingLead(true);
+      await workspacePublicRequest<{ id: string }>("/public/landing/lead", {
+        method: "POST",
+        body: JSON.stringify({
+          ...leadForm,
+          inquiryType: leadType,
+          source: "landing-hero",
+        }),
+      });
+      toast.success("Request submitted. Our team will contact you.");
+      setLeadDialogOpen(false);
+      setLeadForm({
+        name: "",
+        email: "",
+        phone: "",
+        companyName: "",
+        message: "",
+      });
+    } catch (error) {
+      toast.error(error instanceof Error ? error.message : "Failed to submit request");
+    } finally {
+      setIsSubmittingLead(false);
+    }
+  };
 
   return (
     <section className="relative min-h-[90vh] flex items-center justify-center pt-16 overflow-hidden">
@@ -105,10 +154,10 @@ const HeroSection = ({ content }: HeroSectionProps) => {
             <Button size="lg" variant="outline" className="h-12 px-8" onClick={() => navigate("/auth?mode=login&role=company_owner")}>
               {ctaSecondary}
             </Button>
-            <Button size="lg" variant="ghost" className="h-12 px-8">
+            <Button size="lg" variant="ghost" className="h-12 px-8" onClick={() => openLeadDialog("onboarding")}>
               Request Onboarding
             </Button>
-            <Button size="lg" variant="ghost" className="h-12 px-8">
+            <Button size="lg" variant="ghost" className="h-12 px-8" onClick={() => openLeadDialog("expert")}>
               Talk to Expert
             </Button>
           </motion.div>
@@ -150,6 +199,71 @@ const HeroSection = ({ content }: HeroSectionProps) => {
           </motion.div>
         </div>
       </div>
+
+      <Dialog open={leadDialogOpen} onOpenChange={setLeadDialogOpen}>
+        <DialogContent>
+          <DialogHeader>
+            <DialogTitle>{leadType === "expert" ? "Talk to Expert" : "Request Onboarding"}</DialogTitle>
+            <DialogDescription>
+              Fill details and REGULON team will contact you.
+            </DialogDescription>
+          </DialogHeader>
+          <div className="space-y-3">
+            <div className="space-y-1">
+              <Label htmlFor="lead-name">Name</Label>
+              <Input
+                id="lead-name"
+                value={leadForm.name}
+                onChange={(event) => setLeadForm((prev) => ({ ...prev, name: event.target.value }))}
+                placeholder="Your name"
+              />
+            </div>
+            <div className="space-y-1">
+              <Label htmlFor="lead-email">Email</Label>
+              <Input
+                id="lead-email"
+                type="email"
+                value={leadForm.email}
+                onChange={(event) => setLeadForm((prev) => ({ ...prev, email: event.target.value }))}
+                placeholder="you@company.com"
+              />
+            </div>
+            <div className="space-y-1">
+              <Label htmlFor="lead-phone">Phone</Label>
+              <Input
+                id="lead-phone"
+                value={leadForm.phone}
+                onChange={(event) => setLeadForm((prev) => ({ ...prev, phone: event.target.value }))}
+                placeholder="+91..."
+              />
+            </div>
+            <div className="space-y-1">
+              <Label htmlFor="lead-company">Company</Label>
+              <Input
+                id="lead-company"
+                value={leadForm.companyName}
+                onChange={(event) => setLeadForm((prev) => ({ ...prev, companyName: event.target.value }))}
+                placeholder="Company name"
+              />
+            </div>
+            <div className="space-y-1">
+              <Label htmlFor="lead-message">Requirement</Label>
+              <Textarea
+                id="lead-message"
+                value={leadForm.message}
+                onChange={(event) => setLeadForm((prev) => ({ ...prev, message: event.target.value }))}
+                placeholder="Tell us what you need"
+                rows={4}
+              />
+            </div>
+          </div>
+          <DialogFooter>
+            <Button onClick={submitLead} disabled={isSubmittingLead}>
+              {isSubmittingLead ? "Submitting..." : "Submit"}
+            </Button>
+          </DialogFooter>
+        </DialogContent>
+      </Dialog>
     </section>
   );
 };
