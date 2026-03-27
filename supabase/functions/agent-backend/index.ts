@@ -97,6 +97,18 @@ const sendEmailViaResend = async ({
   }
 };
 
+const isValidEmail = (value: string) => /^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(value);
+
+const normalizeEmailPayload = (payload: Record<string, unknown>) => {
+  const to = typeof payload.to === "string" ? payload.to.trim() : "";
+  const subject = typeof payload.subject === "string" ? payload.subject.trim().slice(0, 200) : "Regulon Notification";
+  const bodyText = typeof payload.body_text === "string"
+    ? payload.body_text.slice(0, 20000)
+    : "You have a new workflow update.";
+  const dedupeKey = typeof payload.dedupe_key === "string" ? payload.dedupe_key.trim().slice(0, 150) : "";
+  return { to, subject, bodyText, dedupeKey };
+};
+
 const parseBearerToken = (req: Request) => {
   const authHeader = req.headers.get("Authorization") || req.headers.get("authorization") || "";
   if (!authHeader.toLowerCase().startsWith("bearer ")) return "";
@@ -213,6 +225,44 @@ serve(async (req: Request) => {
         stale_processing_sample_ids: staleProcessing.slice(0, 10).map((row) => row.id),
         recent_failures: failureSamples,
       });
+    }
+
+    if (req.method === "GET" && path.endsWith("notifications/pending")) {
+      await assertDispatchAuthorized(req);
+
+      const status = (url.searchParams.get("status") || "queued").trim();
+      const limitRaw = Number(url.searchParams.get("limit") ?? 50);
+      const limit = Number.isFinite(limitRaw) ? Math.max(1, Math.min(200, limitRaw)) : 50;
+      const allowedStatuses = new Set(["queued", "failed", "processing", "sent"]);
+      if (!allowedStatuses.has(status)) {
+        return json(req, 400, { error: "status must be one of queued, failed, processing, sent" });
+      }
+
+      const { data: rows, error } = await admin
+        .from("agent_notifications_outbox")
+        .select("id, status, attempts, last_error, created_at, updated_at, payload")
+        .eq("channel", "email")
+        .eq("status", status)
+        .order("updated_at", { ascending: false })
+        .limit(limit);
+      if (error) return json(req, 400, { error: error.message });
+
+      const items = (rows ?? []).map((row) => {
+        const payload = row.payload && typeof row.payload === "object" ? row.payload as Record<string, unknown> : {};
+        return {
+          id: row.id,
+          status: row.status,
+          attempts: row.attempts,
+          last_error: row.last_error,
+          created_at: row.created_at,
+          updated_at: row.updated_at,
+          to: typeof payload.to === "string" ? payload.to : null,
+          subject: typeof payload.subject === "string" ? payload.subject : null,
+          dedupe_key: typeof payload.dedupe_key === "string" ? payload.dedupe_key : null,
+        };
+      });
+
+      return json(req, 200, { ok: true, status, count: items.length, items });
     }
 
     if (req.method === "POST" && path.endsWith("notifications/requeue-failed")) {
@@ -353,10 +403,30 @@ serve(async (req: Request) => {
           const payload = claimedRow.payload && typeof claimedRow.payload === "object"
             ? claimedRow.payload as Record<string, unknown>
             : {};
-          const to = typeof payload.to === "string" ? payload.to.trim() : "";
-          const subject = typeof payload.subject === "string" ? payload.subject.trim() : "Regulon Notification";
-          const bodyText = typeof payload.body_text === "string" ? payload.body_text : "You have a new workflow update.";
+          const { to, subject, bodyText, dedupeKey } = normalizeEmailPayload(payload);
           if (!to) throw new Error("missing_to_email");
+          if (!isValidEmail(to)) throw new Error("invalid_to_email");
+          if (!subject) throw new Error("missing_subject");
+
+          if (dedupeKey) {
+            const { data: existingSent } = await admin
+              .from("agent_notifications_outbox")
+              .select("id")
+              .eq("channel", "email")
+              .eq("status", "sent")
+              .contains("payload", { dedupe_key: dedupeKey })
+              .limit(1)
+              .maybeSingle();
+            if (existingSent?.id) {
+              const { error: duplicateUpdateError } = await admin
+                .from("agent_notifications_outbox")
+                .update({ status: "sent", last_error: "duplicate_dedupe_key_skipped" })
+                .eq("id", row.id);
+              if (duplicateUpdateError) throw duplicateUpdateError;
+              sent += 1;
+              continue;
+            }
+          }
 
           await sendEmailViaResend({ apiKey: resendApiKey, from: emailFrom, to, subject, bodyText });
 
