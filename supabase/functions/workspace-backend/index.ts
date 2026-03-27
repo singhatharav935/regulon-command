@@ -236,6 +236,31 @@ const parseDocumentType = (payload: Record<string, unknown>) => {
   return documentType || null;
 };
 
+const stableStringify = (value: unknown): string => {
+  if (value === null || typeof value !== "object") {
+    return JSON.stringify(value);
+  }
+  if (Array.isArray(value)) {
+    return `[${value.map((item) => stableStringify(item)).join(",")}]`;
+  }
+  const record = value as Record<string, unknown>;
+  const keys = Object.keys(record).sort();
+  return `{${keys.map((key) => `${JSON.stringify(key)}:${stableStringify(record[key])}`).join(",")}}`;
+};
+
+const sha256Hex = async (input: string) => {
+  const encoded = new TextEncoder().encode(input);
+  const hashBuffer = await crypto.subtle.digest("SHA-256", encoded);
+  return Array.from(new Uint8Array(hashBuffer)).map((item) => item.toString(16).padStart(2, "0")).join("");
+};
+
+const isLockFresh = (updatedAt: string | null | undefined, thresholdSeconds: number) => {
+  if (!updatedAt) return false;
+  const parsed = Date.parse(updatedAt);
+  if (Number.isNaN(parsed)) return false;
+  return parsed >= Date.now() - (thresholdSeconds * 1000);
+};
+
 const assertAiOperationPayloadShape = (operation: string, payload: Record<string, unknown>) => {
   const documentType = parseDocumentType(payload);
   const requiresDocumentType = operation === "draft" ||
@@ -258,6 +283,7 @@ const resolveErrorCode = (message: string) => {
   if (message === "Unauthorized") return "AUTH_UNAUTHORIZED";
   if (message.startsWith("Forbidden")) return "ACCESS_FORBIDDEN";
   if (message.startsWith("Policy denied:")) return "WORKFLOW_ACTOR_FORBIDDEN";
+  if (message === "AI request already in progress") return "AI_REQUEST_IN_PROGRESS";
   if (message.startsWith("Unsupported documentType:")) return "VALIDATION_INVALID_FIELD";
   if (message.startsWith("Invalid workflow transition:")) return "WORKFLOW_TRANSITION_INVALID";
   if (message.startsWith("Invalid event type for transition:")) return "WORKFLOW_EVENT_INVALID";
@@ -826,6 +852,44 @@ const proxyAiDraft = async (
   payload: Record<string, unknown>,
 ) => {
   await validateAiDraftScope(client, userId, roles, persona, payload);
+  const operation = normalizeAiOperation(payload);
+  const companyId = typeof payload.companyId === "string" ? payload.companyId : null;
+  const lockWindowSeconds = Math.max(15, Number(Deno.env.get("AI_LOCK_WINDOW_SECONDS") ?? "120"));
+  const requestFingerprint = stableStringify({ operation, payload });
+  const requestKey = await sha256Hex(requestFingerprint);
+
+  const { data: existingLock } = await client
+    .from("ai_request_idempotency")
+    .select("id, status, response_payload, updated_at")
+    .eq("user_id", userId)
+    .eq("request_key", requestKey)
+    .maybeSingle();
+
+  if (existingLock?.status === "completed" && existingLock.response_payload) {
+    return {
+      ok: true,
+      status: 200,
+      body: existingLock.response_payload as Record<string, unknown>,
+      error: null,
+    };
+  }
+
+  if (existingLock?.status === "processing" && isLockFresh(existingLock.updated_at, lockWindowSeconds)) {
+    throw new Error("AI request already in progress");
+  }
+
+  const { error: lockError } = await client
+    .from("ai_request_idempotency")
+    .upsert({
+      user_id: userId,
+      company_id: companyId,
+      request_key: requestKey,
+      operation,
+      status: "processing",
+      response_payload: null,
+      error_message: null,
+    }, { onConflict: "user_id,request_key" });
+  if (lockError) throw lockError;
 
   const { url, anon } = getEnv();
   const response = await fetch(`${url}/functions/v1/ai-draft`, {
@@ -834,6 +898,7 @@ const proxyAiDraft = async (
       "Content-Type": "application/json",
       Authorization: `Bearer ${token}`,
       apikey: anon,
+      "x-request-id": requestKey,
     },
     body: JSON.stringify(payload),
   });
@@ -841,6 +906,15 @@ const proxyAiDraft = async (
   const contentType = response.headers.get("content-type") || "";
   if (contentType.includes("application/json")) {
     const body = await response.json().catch(() => ({}));
+    await client
+      .from("ai_request_idempotency")
+      .update({
+        status: response.ok ? "completed" : "failed",
+        response_payload: response.ok ? body : null,
+        error_message: response.ok ? null : (typeof body?.error === "string" ? body.error : `ai-draft failed (${response.status})`),
+      })
+      .eq("user_id", userId)
+      .eq("request_key", requestKey);
     return {
       ok: response.ok,
       status: response.status,
@@ -850,6 +924,15 @@ const proxyAiDraft = async (
   }
 
   const text = await response.text().catch(() => "");
+  await client
+    .from("ai_request_idempotency")
+    .update({
+      status: "failed",
+      response_payload: null,
+      error_message: text || `ai-draft failed (${response.status})`,
+    })
+    .eq("user_id", userId)
+    .eq("request_key", requestKey);
   return {
     ok: response.ok,
     status: response.status,
@@ -1155,6 +1238,8 @@ serve(async (req: Request) => {
         ? 401
         : errorCode === "ACCESS_FORBIDDEN" || errorCode === "WORKFLOW_ACTOR_FORBIDDEN"
           ? 403
+          : errorCode === "AI_REQUEST_IN_PROGRESS"
+            ? 409
           : errorCode === "WORKFLOW_TRANSITION_INVALID"
             || errorCode === "WORKFLOW_EVENT_INVALID"
             || errorCode === "VALIDATION_INVALID_FIELD"
