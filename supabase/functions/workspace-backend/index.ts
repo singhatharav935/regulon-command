@@ -121,9 +121,9 @@ const ALLOWED_WORKFLOW_TRANSITIONS: Record<string, string[]> = {
 };
 
 const ALLOWED_EVENT_TYPES_BY_TRANSITION: Record<string, string[]> = {
-  "generated->generated": ["manual_version_saved", "review_saved", "legal_review_saved", "draft_generated"],
+  "generated->generated": ["manual_version_saved", "review_saved", "legal_review_saved", "draft_generated", "exported_for_external_legal"],
   "generated->under_review": ["submitted_for_review", "review_started"],
-  "under_review->under_review": ["manual_version_saved", "review_saved", "legal_review_saved"],
+  "under_review->under_review": ["manual_version_saved", "review_saved", "legal_review_saved", "exported_for_external_legal"],
   "under_review->approved": ["review_approved", "legal_review_approved"],
   "approved->approved": ["manual_version_saved", "review_saved", "legal_review_saved"],
   "approved->signed_off": ["final_sign_off", "legal_final_sign_off"],
@@ -203,8 +203,18 @@ const assertEventActorAllowed = ({
     if (!isCaPersona) {
       throw new Error("Policy denied: ca_review_events_require_ca_persona");
     }
+    if (!legalLaneEnabled && (persona === "external_ca" || persona === "ca_firm")) {
+      throw new Error("Policy denied: external_ca_export_only_lane_active");
+    }
     if (legalReviewRequired && finalSignoffMode !== "ca_only") {
       throw new Error("Policy denied: legal_signoff_required_for_this_authority");
+    }
+    return;
+  }
+
+  if (eventType === "exported_for_external_legal") {
+    if (!(persona === "external_ca" || persona === "ca_firm")) {
+      throw new Error("Policy denied: export_for_external_legal_requires_external_ca_or_firm");
     }
     return;
   }
@@ -212,6 +222,54 @@ const assertEventActorAllowed = ({
   if (eventType === "manual_version_saved") {
     if (!isCaPersona && !isLawyerPersona) {
       throw new Error("Policy denied: review_edit_requires_ca_or_lawyer");
+    }
+  }
+};
+
+const assertWorkflowBlockingConditions = ({
+  eventType,
+  existingEvents,
+  legalReviewRequired,
+  finalSignoffMode,
+  legalLaneEnabled,
+  persona,
+}: {
+  eventType: string;
+  existingEvents: Array<{ event_type: string }>;
+  legalReviewRequired: boolean;
+  finalSignoffMode: "ca_only" | "lawyer_only" | "dual";
+  legalLaneEnabled: boolean;
+  persona: AppPersona | null;
+}) => {
+  const eventSet = new Set(existingEvents.map((event) => event.event_type));
+
+  if (eventType === "review_approved") {
+    if (!eventSet.has("submitted_for_review") && !eventSet.has("review_started")) {
+      throw new Error("Policy denied: review_approved_requires_review_submission");
+    }
+    return;
+  }
+
+  if (eventType === "final_sign_off") {
+    if (persona === "external_ca" || persona === "ca_firm") {
+      if (!legalLaneEnabled) {
+        throw new Error("Policy denied: external_ca_export_only_lane_active");
+      }
+    }
+    if (legalReviewRequired && finalSignoffMode !== "ca_only") {
+      if (!eventSet.has("legal_review_approved")) {
+        throw new Error("Policy denied: final_signoff_requires_legal_review_approval");
+      }
+    }
+    if (finalSignoffMode === "dual" && !eventSet.has("review_approved")) {
+      throw new Error("Policy denied: final_signoff_dual_mode_requires_ca_approval");
+    }
+    return;
+  }
+
+  if (eventType === "legal_final_sign_off") {
+    if (!eventSet.has("review_approved") && finalSignoffMode === "dual") {
+      throw new Error("Policy denied: legal_final_signoff_dual_mode_requires_ca_approval");
     }
   }
 };
@@ -1086,6 +1144,14 @@ const saveDraftSnapshot = async (
     legalReviewRequired: workflowPolicy.legalReviewRequired,
     finalSignoffMode: workflowPolicy.finalSignoffMode,
   });
+  assertWorkflowBlockingConditions({
+    eventType: body.eventType,
+    existingEvents: review.events,
+    legalReviewRequired: workflowPolicy.legalReviewRequired,
+    finalSignoffMode: workflowPolicy.finalSignoffMode,
+    legalLaneEnabled,
+    persona,
+  });
 
   const { data: latestVersion } = await client
     .from("draft_versions")
@@ -1134,6 +1200,56 @@ const saveDraftSnapshot = async (
   if (auditError) throw auditError;
 
   await queueWorkflowNotifications(client, draftRunId, body.eventType, nextStatus, userId);
+
+  return await loadDraftArtifacts(client, userId, roles, draftRunId);
+};
+
+const appendDraftAuditEvent = async (
+  client: ReturnType<typeof createClient>,
+  userId: string,
+  roles: Set<string>,
+  persona: AppPersona | null,
+  draftRunId: string,
+  eventType: string,
+  payload?: Record<string, unknown>,
+) => {
+  const review = await loadDraftReview(client, userId, roles, draftRunId);
+  const documentType = typeof review.run.document_type === "string" ? review.run.document_type : null;
+  const [workflowPolicy, entitlements] = await Promise.all([
+    loadAuthorityWorkflowPolicy(client, documentType),
+    loadActorEntitlements(client, userId),
+  ]);
+  const legalLaneEnabled = resolveLegalLaneEnabled(persona, entitlements);
+
+  assertEventActorAllowed({
+    roles,
+    persona,
+    eventType,
+    legalLaneEnabled,
+    legalReviewRequired: workflowPolicy.legalReviewRequired,
+    finalSignoffMode: workflowPolicy.finalSignoffMode,
+  });
+  assertWorkflowBlockingConditions({
+    eventType,
+    existingEvents: review.events,
+    legalReviewRequired: workflowPolicy.legalReviewRequired,
+    finalSignoffMode: workflowPolicy.finalSignoffMode,
+    legalLaneEnabled,
+    persona,
+  });
+
+  const { error } = await client
+    .from("draft_audit_events")
+    .insert({
+      draft_run_id: draftRunId,
+      user_id: userId,
+      event_type: eventType,
+      payload: {
+        review_surface: "workspace-backend",
+        ...(payload ?? {}),
+      },
+    });
+  if (error) throw error;
 
   return await loadDraftArtifacts(client, userId, roles, draftRunId);
 };
@@ -2014,6 +2130,25 @@ serve(async (req: Request) => {
           draftPackage: body.draftPackage ?? undefined,
           payload: typeof body.payload === "object" && body.payload ? body.payload : undefined,
         }),
+      });
+    }
+
+    if (req.method === "POST" && path.includes("drafts/") && path.endsWith("/export-mark")) {
+      requireRole(roles, ["manager", "admin"]);
+      const draftRunId = path.split("drafts/")[1].replace("/export-mark", "");
+      const body = await req.json().catch(() => ({}));
+      const eventType = String(body.eventType || "exported_for_external_legal");
+      return json(req, 200, {
+        ok: true,
+        data: await appendDraftAuditEvent(
+          client,
+          user.id,
+          roles,
+          persona,
+          draftRunId,
+          eventType,
+          typeof body.payload === "object" && body.payload ? body.payload as Record<string, unknown> : undefined,
+        ),
       });
     }
 
