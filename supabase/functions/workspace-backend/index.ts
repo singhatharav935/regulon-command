@@ -1780,6 +1780,7 @@ const rollbackDraftToVersion = async (
 const createDraftRun = async (
   client: ReturnType<typeof createClient>,
   userId: string,
+  roles: Set<string>,
   payload: {
     companyId: string | null;
     documentType: string;
@@ -1791,10 +1792,17 @@ const createDraftRun = async (
     preferPiiMasking: boolean;
   },
 ) => {
-  if (payload.companyId) {
+  let resolvedCompanyId = payload.companyId;
+  if (!roles.has("admin")) {
     const companyIds = await getUserCompanyIds(client, userId);
-    if (!companyIds.includes(payload.companyId)) {
-      throw new Error("Forbidden");
+    if (resolvedCompanyId) {
+      if (!companyIds.includes(resolvedCompanyId)) {
+        throw new Error("Forbidden");
+      }
+    } else if (companyIds.length === 1) {
+      resolvedCompanyId = companyIds[0];
+    } else {
+      throw new Error("companyId is required for draft runs");
     }
   }
 
@@ -1802,7 +1810,7 @@ const createDraftRun = async (
     .from("draft_runs")
     .insert({
       user_id: userId,
-      company_id: payload.companyId,
+      company_id: resolvedCompanyId,
       document_type: payload.documentType,
       draft_mode: payload.draftMode,
       status: "generated",
@@ -2470,14 +2478,20 @@ const proxyAiDraftStream = async (
 const loadDraftReview = async (client: ReturnType<typeof createClient>, userId: string, roles: Set<string>, draftRunId: string) => {
   const { data: run, error: runError } = await client
     .from("draft_runs")
-    .select("id, status, document_type, draft_mode, draft_content, created_at, company_id")
+    .select("id, user_id, status, document_type, draft_mode, draft_content, created_at, company_id")
     .eq("id", draftRunId)
     .single();
   if (runError || !run) throw new Error("Draft not found");
 
-  if (!roles.has("admin") && run.company_id) {
-    const companyIds = await getUserCompanyIds(client, userId);
-    if (!companyIds.includes(run.company_id)) {
+  if (!roles.has("admin")) {
+    if (run.user_id === userId) {
+      // Always allow owner access.
+    } else if (run.company_id) {
+      const companyIds = await getUserCompanyIds(client, userId);
+      if (!companyIds.includes(run.company_id)) {
+        throw new Error("Forbidden");
+      }
+    } else {
       throw new Error("Forbidden");
     }
   }
@@ -3399,7 +3413,7 @@ serve(async (req: Request) => {
       }
       return json(req, 200, {
         ok: true,
-        data: await createDraftRun(client, user.id, {
+        data: await createDraftRun(client, user.id, roles, {
           companyId: typeof body.companyId === "string" && body.companyId ? body.companyId : null,
           documentType,
           draftMode,
