@@ -883,7 +883,9 @@ const resolveErrorCode = (message: string) => {
   if (message === "Unauthorized") return "AUTH_UNAUTHORIZED";
   if (message.startsWith("Forbidden")) return "ACCESS_FORBIDDEN";
   if (message === "Draft not found" || message === "Draft export not found") return "RESOURCE_NOT_FOUND";
+  if (message.startsWith("Draft version conflict:")) return "WORKFLOW_VERSION_CONFLICT";
   if (message === "Unsupported workflow action") return "VALIDATION_INVALID_FIELD";
+  if (message === "expectedVersionNumber must be a positive integer") return "VALIDATION_INVALID_FIELD";
   if (message.startsWith("Policy denied:")) return "WORKFLOW_ACTOR_FORBIDDEN";
   if (message === "AI request already in progress") return "AI_REQUEST_IN_PROGRESS";
   if (message.startsWith("AI rate limit exceeded:")) return "AI_RATE_LIMITED";
@@ -1694,7 +1696,7 @@ const rollbackDraftToVersion = async (
   roles: Set<string>,
   persona: AppPersona | null,
   draftRunId: string,
-  body: { targetVersionNumber: number; note?: string | null },
+  body: { targetVersionNumber: number; expectedVersionNumber?: number; note?: string | null },
 ) => {
   const review = await loadDraftReview(client, userId, roles, draftRunId);
   const currentStatus = String(review.run.status);
@@ -1732,14 +1734,9 @@ const rollbackDraftToVersion = async (
     throw new Error("targetVersionNumber is required and must reference an existing non-empty version");
   }
 
-  const { data: latestVersion } = await client
-    .from("draft_versions")
-    .select("version_number")
-    .eq("draft_run_id", draftRunId)
-    .order("version_number", { ascending: false })
-    .limit(1)
-    .maybeSingle();
-  const nextVersionNumber = Number(latestVersion?.version_number ?? 0) + 1;
+  const latestVersionNumber = await getLatestDraftVersionNumber(client, draftRunId);
+  assertExpectedDraftVersion(latestVersionNumber, body.expectedVersionNumber);
+  const nextVersionNumber = latestVersionNumber + 1;
 
   const { error: updateError } = await client
     .from("draft_runs")
@@ -1940,6 +1937,31 @@ const queueWorkflowNotifications = async (
   }
 };
 
+const getLatestDraftVersionNumber = async (
+  client: ReturnType<typeof createClient>,
+  draftRunId: string,
+) => {
+  const { data: latestVersion, error } = await client
+    .from("draft_versions")
+    .select("version_number")
+    .eq("draft_run_id", draftRunId)
+    .order("version_number", { ascending: false })
+    .limit(1)
+    .maybeSingle();
+  if (error) throw error;
+  return Number(latestVersion?.version_number ?? 0);
+};
+
+const assertExpectedDraftVersion = (actualVersionNumber: number, expectedVersionNumber?: number | null) => {
+  if (typeof expectedVersionNumber !== "number") return;
+  if (!Number.isFinite(expectedVersionNumber) || expectedVersionNumber <= 0 || !Number.isInteger(expectedVersionNumber)) {
+    throw new Error("expectedVersionNumber must be a positive integer");
+  }
+  if (actualVersionNumber !== expectedVersionNumber) {
+    throw new Error(`Draft version conflict: expected=${expectedVersionNumber} actual=${actualVersionNumber}`);
+  }
+};
+
 const saveDraftSnapshot = async (
   client: ReturnType<typeof createClient>,
   userId: string,
@@ -1950,6 +1972,7 @@ const saveDraftSnapshot = async (
     content: string;
     nextStatus?: string;
     eventType: string;
+    expectedVersionNumber?: number;
     noticeInput?: string | null;
     qa?: unknown;
     draftPackage?: unknown;
@@ -1984,14 +2007,9 @@ const saveDraftSnapshot = async (
     persona,
   });
 
-  const { data: latestVersion } = await client
-    .from("draft_versions")
-    .select("version_number")
-    .eq("draft_run_id", draftRunId)
-    .order("version_number", { ascending: false })
-    .limit(1)
-    .maybeSingle();
-  const nextVersionNumber = Number(latestVersion?.version_number ?? 0) + 1;
+  const latestVersionNumber = await getLatestDraftVersionNumber(client, draftRunId);
+  assertExpectedDraftVersion(latestVersionNumber, body.expectedVersionNumber);
+  const nextVersionNumber = latestVersionNumber + 1;
 
   const { error: updateError } = await client
     .from("draft_runs")
@@ -3448,6 +3466,12 @@ serve(async (req: Request) => {
       const payload = await loadDraftReview(client, user.id, roles, draftRunId);
       const body = await req.json();
       const content = String(body.content || "").trim();
+      const expectedVersionNumberRaw = body.expected_version_number;
+      const expectedVersionNumber = typeof expectedVersionNumberRaw === "number"
+        ? expectedVersionNumberRaw
+        : Number.isFinite(Number(expectedVersionNumberRaw))
+          ? Number(expectedVersionNumberRaw)
+          : null;
       const nextStatus = body.next_status ? String(body.next_status) : payload.run.status;
       const eventType = String(body.event_type || "review_saved");
       if (!content) return json(req, 400, { error: "content is required" });
@@ -3469,14 +3493,9 @@ serve(async (req: Request) => {
         finalSignoffMode: workflowPolicy.finalSignoffMode,
       });
 
-      const { data: latestVersion } = await client
-        .from("draft_versions")
-        .select("version_number")
-        .eq("draft_run_id", draftRunId)
-        .order("version_number", { ascending: false })
-        .limit(1)
-        .maybeSingle();
-      const nextVersionNumber = Number(latestVersion?.version_number ?? 0) + 1;
+      const latestVersionNumber = await getLatestDraftVersionNumber(client, draftRunId);
+      assertExpectedDraftVersion(latestVersionNumber, expectedVersionNumber);
+      const nextVersionNumber = latestVersionNumber + 1;
 
       const { error: updateError } = await client
         .from("draft_runs")
@@ -3567,6 +3586,12 @@ serve(async (req: Request) => {
       const body = await req.json();
       const content = String(body.content || "").trim();
       const eventType = String(body.eventType || "").trim();
+      const expectedVersionRaw = body.expectedVersionNumber;
+      const expectedVersionNumber = typeof expectedVersionRaw === "number"
+        ? expectedVersionRaw
+        : Number.isFinite(Number(expectedVersionRaw))
+          ? Number(expectedVersionRaw)
+          : null;
       if (!content || !eventType) {
         return json(req, 400, { error: "content and eventType are required" });
       }
@@ -3576,6 +3601,7 @@ serve(async (req: Request) => {
           content,
           nextStatus: body.nextStatus ? String(body.nextStatus) : undefined,
           eventType,
+          expectedVersionNumber: expectedVersionNumber ?? undefined,
           noticeInput: typeof body.noticeInput === "string" ? body.noticeInput : null,
           qa: body.qa ?? undefined,
           draftPackage: body.draftPackage ?? undefined,
@@ -3589,6 +3615,12 @@ serve(async (req: Request) => {
       const draftRunId = path.split("drafts/")[1].replace("/rollback", "");
       const body = await req.json().catch(() => ({}));
       const targetVersionRaw = Number(body.targetVersionNumber);
+      const expectedVersionRaw = body.expectedVersionNumber;
+      const expectedVersionNumber = typeof expectedVersionRaw === "number"
+        ? expectedVersionRaw
+        : Number.isFinite(Number(expectedVersionRaw))
+          ? Number(expectedVersionRaw)
+          : null;
       if (!Number.isInteger(targetVersionRaw) || targetVersionRaw <= 0) {
         return json(req, 400, { error: "targetVersionNumber is required" });
       }
@@ -3596,6 +3628,7 @@ serve(async (req: Request) => {
         ok: true,
         data: await rollbackDraftToVersion(client, user.id, roles, persona, draftRunId, {
           targetVersionNumber: targetVersionRaw,
+          expectedVersionNumber: expectedVersionNumber ?? undefined,
           note: typeof body.note === "string" ? body.note.trim() : null,
         }),
       });
@@ -3773,7 +3806,8 @@ serve(async (req: Request) => {
           ? 404
         : errorCode === "ACCESS_FORBIDDEN" || errorCode === "WORKFLOW_ACTOR_FORBIDDEN"
           ? 403
-          : errorCode === "AI_REQUEST_IN_PROGRESS"
+        : errorCode === "AI_REQUEST_IN_PROGRESS"
+            || errorCode === "WORKFLOW_VERSION_CONFLICT"
             ? 409
             : errorCode === "AI_RATE_LIMITED"
               ? 429
