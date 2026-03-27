@@ -63,6 +63,35 @@ const getUserRoles = async (client: ReturnType<typeof createClient>, userId: str
   return new Set((data ?? []).map((row) => row.role));
 };
 
+type AppPersona = "external_ca" | "admin" | "company_owner" | "in_house_ca" | "in_house_lawyer" | "ca_firm";
+
+const isAppPersona = (value: string | null): value is AppPersona =>
+  value === "external_ca" ||
+  value === "admin" ||
+  value === "company_owner" ||
+  value === "in_house_ca" ||
+  value === "in_house_lawyer" ||
+  value === "ca_firm";
+
+const getUserPersona = async (client: ReturnType<typeof createClient>, userId: string, user: { user_metadata?: Record<string, unknown> }) => {
+  const { data, error } = await client
+    .from("user_personas")
+    .select("persona")
+    .eq("user_id", userId)
+    .maybeSingle();
+  if (error) throw error;
+
+  const rowPersona = typeof data?.persona === "string" ? data.persona : null;
+  if (isAppPersona(rowPersona)) return rowPersona;
+
+  const metadataPersona = typeof user.user_metadata?.registration_role === "string"
+    ? user.user_metadata.registration_role
+    : null;
+  if (isAppPersona(metadataPersona)) return metadataPersona;
+
+  return null;
+};
+
 const getUserCompanyIds = async (client: ReturnType<typeof createClient>, userId: string) => {
   const { data, error } = await client.from("company_members").select("company_id").eq("user_id", userId);
   if (error) throw error;
@@ -104,6 +133,38 @@ const assertValidEventTypeForTransition = (currentStatus: string, nextStatus: st
   const allowed = ALLOWED_EVENT_TYPES_BY_TRANSITION[transitionKey] ?? [];
   if (!allowed.includes(eventType)) {
     throw new Error(`Invalid event type for transition: ${transitionKey} (${eventType})`);
+  }
+};
+
+const assertEventActorAllowed = ({
+  roles,
+  persona,
+  eventType,
+}: {
+  roles: Set<string>;
+  persona: AppPersona | null;
+  eventType: string;
+}) => {
+  if (roles.has("admin")) return;
+  if (!roles.has("manager")) {
+    throw new Error("Forbidden");
+  }
+
+  // Backward compatibility: legacy accounts may not have user_personas hydrated yet.
+  if (!persona) return;
+
+  if (eventType === "legal_review_approved" || eventType === "legal_final_sign_off" || eventType === "legal_review_saved") {
+    if (persona !== "in_house_lawyer") {
+      throw new Error("Forbidden");
+    }
+    return;
+  }
+
+  if (eventType === "review_approved" || eventType === "final_sign_off" || eventType === "submitted_for_review" || eventType === "review_started") {
+    if (persona !== "external_ca" && persona !== "in_house_ca" && persona !== "ca_firm") {
+      throw new Error("Forbidden");
+    }
+    return;
   }
 };
 
@@ -481,6 +542,7 @@ const saveDraftSnapshot = async (
   client: ReturnType<typeof createClient>,
   userId: string,
   roles: Set<string>,
+  persona: AppPersona | null,
   draftRunId: string,
   body: {
     content: string;
@@ -497,6 +559,7 @@ const saveDraftSnapshot = async (
   const nextStatus = body.nextStatus || currentStatus;
   assertValidWorkflowTransition(currentStatus, nextStatus);
   assertValidEventTypeForTransition(currentStatus, nextStatus, body.eventType);
+  assertEventActorAllowed({ roles, persona, eventType: body.eventType });
 
   const { data: latestVersion } = await client
     .from("draft_versions")
@@ -681,6 +744,7 @@ serve(async (req: Request) => {
     const path = url.pathname.replace(/^\/+/, "");
     const { client, user, token } = await getUserClient(req);
     const roles = await getUserRoles(client, user.id);
+    const persona = await getUserPersona(client, user.id, user);
 
     if (req.method === "GET" && path.endsWith("company/dashboard")) {
       requireRole(roles, ["user", "manager", "admin"]);
@@ -754,6 +818,7 @@ serve(async (req: Request) => {
       const currentStatus = String(payload.run.status);
       assertValidWorkflowTransition(currentStatus, nextStatus);
       assertValidEventTypeForTransition(currentStatus, nextStatus, eventType);
+      assertEventActorAllowed({ roles, persona, eventType });
 
       const { data: latestVersion } = await client
         .from("draft_versions")
@@ -856,7 +921,7 @@ serve(async (req: Request) => {
       }
       return json(req, 200, {
         ok: true,
-        data: await saveDraftSnapshot(client, user.id, roles, draftRunId, {
+        data: await saveDraftSnapshot(client, user.id, roles, persona, draftRunId, {
           content,
           nextStatus: body.nextStatus ? String(body.nextStatus) : undefined,
           eventType,
