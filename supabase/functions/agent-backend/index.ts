@@ -63,18 +63,6 @@ const getAdminClient = () => {
   return createClient(url, service);
 };
 
-const getUserRoles = async (client: ReturnType<typeof createClient>, userId: string) => {
-  const { data, error } = await client.from("user_roles").select("role").eq("user_id", userId);
-  if (error) throw error;
-  return new Set((data ?? []).map((row) => String(row.role)));
-};
-
-const requireRole = (roles: Set<string>, allowed: string[]) => {
-  if (!allowed.some((role) => roles.has(role))) {
-    throw new Error("Forbidden");
-  }
-};
-
 const sendEmailViaResend = async ({
   apiKey,
   from,
@@ -109,15 +97,109 @@ const sendEmailViaResend = async ({
   }
 };
 
+const parseBearerToken = (req: Request) => {
+  const authHeader = req.headers.get("Authorization") || req.headers.get("authorization") || "";
+  if (!authHeader.toLowerCase().startsWith("bearer ")) return "";
+  return authHeader.replace(/^bearer\s+/i, "").trim();
+};
+
+const isDispatchTokenAuthorized = (req: Request) => {
+  const configuredToken = Deno.env.get("DISPATCH_CRON_TOKEN") || "";
+  if (!configuredToken) return false;
+  const headerToken = (req.headers.get("x-dispatch-token") || "").trim();
+  const bearerToken = parseBearerToken(req);
+  return headerToken === configuredToken || bearerToken === configuredToken;
+};
+
 serve(async (req: Request) => {
   if (req.method === "OPTIONS") return new Response(null, { headers: getCorsHeaders(req) });
 
   try {
     const url = new URL(req.url);
     const path = url.pathname.replace(/^\/+/, "");
-    const { client, user } = await getUserClient(req);
     const admin = getAdminClient();
-    const roles = await getUserRoles(client, user.id);
+
+    if (req.method === "POST" && path.endsWith("notifications/dispatch")) {
+      const machineAuthorized = isDispatchTokenAuthorized(req);
+
+      if (!machineAuthorized) {
+        const { client, user } = await getUserClient(req);
+        const { data: roleRows, error: roleError } = await client.from("user_roles").select("role").eq("user_id", user.id);
+        if (roleError) return json(req, 400, { error: roleError.message });
+        const roles = new Set((roleRows ?? []).map((row) => String(row.role)));
+        if (!roles.has("admin")) return json(req, 403, { error: "Forbidden" });
+      }
+
+      const resendApiKey = Deno.env.get("RESEND_API_KEY") || "";
+      const emailFrom = Deno.env.get("EMAIL_FROM") || "";
+      if (!resendApiKey || !emailFrom) {
+        return json(req, 400, { error: "Missing RESEND_API_KEY or EMAIL_FROM" });
+      }
+
+      const body = await req.json().catch(() => ({}));
+      const limitRaw = Number(body?.limit ?? 20);
+      const limit = Number.isFinite(limitRaw) ? Math.max(1, Math.min(100, limitRaw)) : 20;
+
+      const { data: queuedRows, error: loadError } = await admin
+        .from("agent_notifications_outbox")
+        .select("id, payload, attempts, status")
+        .eq("channel", "email")
+        .in("status", ["queued", "failed"])
+        .lt("attempts", 5)
+        .order("created_at", { ascending: true })
+        .limit(limit);
+      if (loadError) return json(req, 400, { error: loadError.message });
+
+      const rows = queuedRows ?? [];
+      if (!rows.length) {
+        return json(req, 200, { ok: true, processed: 0, sent: 0, failed: 0 });
+      }
+
+      let sent = 0;
+      let failed = 0;
+
+      for (const row of rows) {
+        const { data: claimedRow } = await admin
+          .from("agent_notifications_outbox")
+          .update({ status: "processing", attempts: (Number(row.attempts ?? 0) + 1) })
+          .eq("id", row.id)
+          .in("status", ["queued", "failed"])
+          .select("id, payload, attempts")
+          .maybeSingle();
+
+        if (!claimedRow) continue;
+
+        try {
+          const payload = claimedRow.payload && typeof claimedRow.payload === "object"
+            ? claimedRow.payload as Record<string, unknown>
+            : {};
+          const to = typeof payload.to === "string" ? payload.to.trim() : "";
+          const subject = typeof payload.subject === "string" ? payload.subject.trim() : "Regulon Notification";
+          const bodyText = typeof payload.body_text === "string" ? payload.body_text : "You have a new workflow update.";
+          if (!to) throw new Error("missing_to_email");
+
+          await sendEmailViaResend({ apiKey: resendApiKey, from: emailFrom, to, subject, bodyText });
+
+          const { error: sentUpdateError } = await admin
+            .from("agent_notifications_outbox")
+            .update({ status: "sent", last_error: null })
+            .eq("id", row.id);
+          if (sentUpdateError) throw sentUpdateError;
+          sent += 1;
+        } catch (sendError) {
+          failed += 1;
+          const errorMessage = sendError instanceof Error ? sendError.message : "email_dispatch_failed";
+          await admin
+            .from("agent_notifications_outbox")
+            .update({ status: "failed", last_error: errorMessage.slice(0, 500) })
+            .eq("id", row.id);
+        }
+      }
+
+      return json(req, 200, { ok: true, processed: rows.length, sent, failed });
+    }
+
+    const { client, user } = await getUserClient(req);
 
     if (req.method === "POST" && path.endsWith("run")) {
       const body = await req.json();
@@ -289,78 +371,6 @@ serve(async (req: Request) => {
       if (actionUpdateError) return json(req, 400, { error: actionUpdateError.message });
 
       return json(req, 200, { ok: true });
-    }
-
-    if (req.method === "POST" && path.endsWith("notifications/dispatch")) {
-      requireRole(roles, ["admin"]);
-
-      const resendApiKey = Deno.env.get("RESEND_API_KEY") || "";
-      const emailFrom = Deno.env.get("EMAIL_FROM") || "";
-      if (!resendApiKey || !emailFrom) {
-        return json(req, 400, { error: "Missing RESEND_API_KEY or EMAIL_FROM" });
-      }
-
-      const body = await req.json().catch(() => ({}));
-      const limitRaw = Number(body?.limit ?? 20);
-      const limit = Number.isFinite(limitRaw) ? Math.max(1, Math.min(100, limitRaw)) : 20;
-
-      const { data: queuedRows, error: loadError } = await admin
-        .from("agent_notifications_outbox")
-        .select("id, payload, attempts, status")
-        .eq("channel", "email")
-        .in("status", ["queued", "failed"])
-        .lt("attempts", 5)
-        .order("created_at", { ascending: true })
-        .limit(limit);
-      if (loadError) return json(req, 400, { error: loadError.message });
-
-      const rows = queuedRows ?? [];
-      if (!rows.length) {
-        return json(req, 200, { ok: true, processed: 0, sent: 0, failed: 0 });
-      }
-
-      let sent = 0;
-      let failed = 0;
-
-      for (const row of rows) {
-        const { data: claimedRow } = await admin
-          .from("agent_notifications_outbox")
-          .update({ status: "processing", attempts: (Number(row.attempts ?? 0) + 1) })
-          .eq("id", row.id)
-          .in("status", ["queued", "failed"])
-          .select("id, payload, attempts")
-          .maybeSingle();
-
-        if (!claimedRow) continue;
-
-        try {
-          const payload = claimedRow.payload && typeof claimedRow.payload === "object"
-            ? claimedRow.payload as Record<string, unknown>
-            : {};
-          const to = typeof payload.to === "string" ? payload.to.trim() : "";
-          const subject = typeof payload.subject === "string" ? payload.subject.trim() : "Regulon Notification";
-          const bodyText = typeof payload.body_text === "string" ? payload.body_text : "You have a new workflow update.";
-          if (!to) throw new Error("missing_to_email");
-
-          await sendEmailViaResend({ apiKey: resendApiKey, from: emailFrom, to, subject, bodyText });
-
-          const { error: sentUpdateError } = await admin
-            .from("agent_notifications_outbox")
-            .update({ status: "sent", last_error: null })
-            .eq("id", row.id);
-          if (sentUpdateError) throw sentUpdateError;
-          sent += 1;
-        } catch (sendError) {
-          failed += 1;
-          const errorMessage = sendError instanceof Error ? sendError.message : "email_dispatch_failed";
-          await admin
-            .from("agent_notifications_outbox")
-            .update({ status: "failed", last_error: errorMessage.slice(0, 500) })
-            .eq("id", row.id);
-        }
-      }
-
-      return json(req, 200, { ok: true, processed: rows.length, sent, failed });
     }
 
     return json(req, 404, { error: "Route not found" });
