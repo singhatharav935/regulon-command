@@ -274,6 +274,15 @@ const getMonthStartDate = () => {
   return monthStart.toISOString().slice(0, 10);
 };
 
+const parseMonthStart = (value: string | null) => {
+  if (!value) return getMonthStartDate();
+  const trimmed = value.trim();
+  if (!/^\d{4}-\d{2}$/.test(trimmed)) {
+    throw new Error("month must be in YYYY-MM format");
+  }
+  return `${trimmed}-01`;
+};
+
 const enforceCompanyMonthlyQuota = async (
   client: ReturnType<typeof createClient>,
   companyId: string | null,
@@ -1400,6 +1409,124 @@ serve(async (req: Request) => {
         model_breakdown: modelBreakdown,
         top_users: topUsers,
       });
+    }
+
+    if (req.method === "GET" && path.endsWith("drafting/ai-ops/company-usage")) {
+      requireRole(roles, ["admin"]);
+      const companyId = (url.searchParams.get("company_id") || "").trim();
+      if (!companyId) return json(req, 400, { error: "company_id is required" });
+
+      const monthStart = parseMonthStart(url.searchParams.get("month"));
+      const [{ data: company, error: companyError }, { data: quota, error: quotaError }, { data: usage, error: usageError }] = await Promise.all([
+        client.from("companies").select("id, name").eq("id", companyId).maybeSingle(),
+        client.from("ai_company_usage_quotas").select("monthly_request_limit, hard_block, updated_at").eq("company_id", companyId).maybeSingle(),
+        client.from("ai_company_monthly_usage").select("request_count, updated_at").eq("company_id", companyId).eq("month_start", monthStart).maybeSingle(),
+      ]);
+      if (companyError) return json(req, 400, { error: companyError.message });
+      if (quotaError) return json(req, 400, { error: quotaError.message });
+      if (usageError) return json(req, 400, { error: usageError.message });
+      if (!company) return json(req, 404, { error: "company not found" });
+
+      const defaultMonthlyLimit = Math.max(100, Number(Deno.env.get("AI_DEFAULT_COMPANY_MONTHLY_LIMIT") ?? "2000"));
+      const limit = Number(quota?.monthly_request_limit ?? defaultMonthlyLimit);
+      const consumed = Number(usage?.request_count ?? 0);
+
+      return json(req, 200, {
+        ok: true,
+        company: { id: company.id, name: company.name },
+        month_start: monthStart,
+        quota: {
+          monthly_request_limit: limit,
+          hard_block: Boolean(quota?.hard_block),
+          updated_at: quota?.updated_at ?? null,
+        },
+        usage: {
+          request_count: consumed,
+          remaining: Math.max(0, limit - consumed),
+          utilization_rate: limit > 0 ? Number((consumed / limit).toFixed(4)) : 0,
+          updated_at: usage?.updated_at ?? null,
+        },
+      });
+    }
+
+    if (req.method === "POST" && path.endsWith("drafting/ai-ops/company-quota")) {
+      requireRole(roles, ["admin"]);
+      const body = await req.json();
+      const companyId = String(body.company_id || "").trim();
+      if (!companyId) return json(req, 400, { error: "company_id is required" });
+
+      const monthlyLimitRaw = Number(body.monthly_request_limit ?? Number.NaN);
+      const monthlyRequestLimit = Number.isFinite(monthlyLimitRaw)
+        ? Math.max(100, Math.min(500000, Math.floor(monthlyLimitRaw)))
+        : null;
+      if (monthlyRequestLimit === null) {
+        return json(req, 400, { error: "monthly_request_limit is required" });
+      }
+      const hardBlock = body.hard_block === true;
+
+      const { error: upsertError } = await client
+        .from("ai_company_usage_quotas")
+        .upsert({
+          company_id: companyId,
+          monthly_request_limit: monthlyRequestLimit,
+          hard_block: hardBlock,
+        }, { onConflict: "company_id" });
+      if (upsertError) return json(req, 400, { error: upsertError.message });
+
+      return json(req, 200, {
+        ok: true,
+        data: {
+          company_id: companyId,
+          monthly_request_limit: monthlyRequestLimit,
+          hard_block: hardBlock,
+        },
+      });
+    }
+
+    if (req.method === "GET" && path.endsWith("drafting/ai-ops/company-usage-summary")) {
+      requireRole(roles, ["admin"]);
+      const monthStart = parseMonthStart(url.searchParams.get("month"));
+      const limitRaw = Number(url.searchParams.get("limit") ?? 100);
+      const limit = Number.isFinite(limitRaw) ? Math.max(10, Math.min(1000, limitRaw)) : 100;
+
+      const { data: usageRows, error: usageError } = await client
+        .from("ai_company_monthly_usage")
+        .select("company_id, request_count, updated_at")
+        .eq("month_start", monthStart)
+        .order("request_count", { ascending: false })
+        .limit(limit);
+      if (usageError) return json(req, 400, { error: usageError.message });
+
+      const rows = usageRows ?? [];
+      if (!rows.length) return json(req, 200, { ok: true, month_start: monthStart, companies: [] });
+
+      const companyIds = Array.from(new Set(rows.map((row) => row.company_id)));
+      const [{ data: companyRows, error: companyError }, { data: quotaRows, error: quotaError }] = await Promise.all([
+        client.from("companies").select("id, name").in("id", companyIds),
+        client.from("ai_company_usage_quotas").select("company_id, monthly_request_limit, hard_block").in("company_id", companyIds),
+      ]);
+      if (companyError) return json(req, 400, { error: companyError.message });
+      if (quotaError) return json(req, 400, { error: quotaError.message });
+
+      const companyMap = new Map((companyRows ?? []).map((row) => [row.id, row.name]));
+      const quotaMap = new Map((quotaRows ?? []).map((row) => [row.company_id, row]));
+      const defaultMonthlyLimit = Math.max(100, Number(Deno.env.get("AI_DEFAULT_COMPANY_MONTHLY_LIMIT") ?? "2000"));
+
+      const companies = rows.map((row) => {
+        const quota = quotaMap.get(row.company_id);
+        const limitValue = Number(quota?.monthly_request_limit ?? defaultMonthlyLimit);
+        return {
+          company_id: row.company_id,
+          company_name: companyMap.get(row.company_id) ?? "Unknown Company",
+          request_count: row.request_count,
+          monthly_request_limit: limitValue,
+          hard_block: Boolean(quota?.hard_block),
+          utilization_rate: limitValue > 0 ? Number((row.request_count / limitValue).toFixed(4)) : 0,
+          updated_at: row.updated_at,
+        };
+      });
+
+      return json(req, 200, { ok: true, month_start: monthStart, companies });
     }
 
     if (req.method === "POST" && path.endsWith("drafting/ai-ops/recover-stale")) {
