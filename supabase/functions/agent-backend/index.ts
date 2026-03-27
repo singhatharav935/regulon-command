@@ -111,6 +111,17 @@ const isDispatchTokenAuthorized = (req: Request) => {
   return headerToken === configuredToken || bearerToken === configuredToken;
 };
 
+const assertDispatchAuthorized = async (req: Request) => {
+  const machineAuthorized = isDispatchTokenAuthorized(req);
+  if (machineAuthorized) return;
+
+  const { client, user } = await getUserClient(req);
+  const { data: roleRows, error: roleError } = await client.from("user_roles").select("role").eq("user_id", user.id);
+  if (roleError) throw new Error(roleError.message);
+  const roles = new Set((roleRows ?? []).map((row) => String(row.role)));
+  if (!roles.has("admin")) throw new Error("Forbidden");
+};
+
 const getRetryBackoffMs = (attempts: number) => {
   // 1, 2, 4, 8, 16 minutes capped at 16 minutes.
   const minutes = Math.min(16, Math.max(1, 2 ** Math.max(0, attempts - 1)));
@@ -133,16 +144,84 @@ serve(async (req: Request) => {
     const path = url.pathname.replace(/^\/+/, "");
     const admin = getAdminClient();
 
-    if (req.method === "POST" && path.endsWith("notifications/dispatch")) {
-      const machineAuthorized = isDispatchTokenAuthorized(req);
+    if (req.method === "GET" && path.endsWith("notifications/stats")) {
+      await assertDispatchAuthorized(req);
 
-      if (!machineAuthorized) {
-        const { client, user } = await getUserClient(req);
-        const { data: roleRows, error: roleError } = await client.from("user_roles").select("role").eq("user_id", user.id);
-        if (roleError) return json(req, 400, { error: roleError.message });
-        const roles = new Set((roleRows ?? []).map((row) => String(row.role)));
-        if (!roles.has("admin")) return json(req, 403, { error: "Forbidden" });
+      const [queued, processing, sent, failed] = await Promise.all([
+        admin.from("agent_notifications_outbox").select("id", { count: "exact", head: true }).eq("channel", "email").eq("status", "queued"),
+        admin.from("agent_notifications_outbox").select("id", { count: "exact", head: true }).eq("channel", "email").eq("status", "processing"),
+        admin.from("agent_notifications_outbox").select("id", { count: "exact", head: true }).eq("channel", "email").eq("status", "sent"),
+        admin.from("agent_notifications_outbox").select("id", { count: "exact", head: true }).eq("channel", "email").eq("status", "failed"),
+      ]);
+
+      const countErrors = [queued.error, processing.error, sent.error, failed.error].filter(Boolean);
+      if (countErrors.length > 0) {
+        return json(req, 400, { error: countErrors[0]?.message || "Failed to load notification counts" });
       }
+
+      const { data: recentFailures, error: recentFailuresError } = await admin
+        .from("agent_notifications_outbox")
+        .select("id, attempts, last_error, updated_at, payload")
+        .eq("channel", "email")
+        .eq("status", "failed")
+        .order("updated_at", { ascending: false })
+        .limit(10);
+      if (recentFailuresError) return json(req, 400, { error: recentFailuresError.message });
+
+      const failureSamples = (recentFailures ?? []).map((row) => ({
+        id: row.id,
+        attempts: row.attempts,
+        last_error: row.last_error,
+        updated_at: row.updated_at,
+        to: typeof (row.payload as Record<string, unknown>)?.to === "string"
+          ? ((row.payload as Record<string, unknown>).to as string)
+          : null,
+      }));
+
+      return json(req, 200, {
+        ok: true,
+        counts: {
+          queued: queued.count ?? 0,
+          processing: processing.count ?? 0,
+          sent: sent.count ?? 0,
+          failed: failed.count ?? 0,
+        },
+        recent_failures: failureSamples,
+      });
+    }
+
+    if (req.method === "POST" && path.endsWith("notifications/requeue-failed")) {
+      await assertDispatchAuthorized(req);
+
+      const body = await req.json().catch(() => ({}));
+      const limitRaw = Number(body?.limit ?? 50);
+      const limit = Number.isFinite(limitRaw) ? Math.max(1, Math.min(500, limitRaw)) : 50;
+
+      const { data: failedRows, error: failedRowsError } = await admin
+        .from("agent_notifications_outbox")
+        .select("id")
+        .eq("channel", "email")
+        .eq("status", "failed")
+        .order("updated_at", { ascending: true })
+        .limit(limit);
+      if (failedRowsError) return json(req, 400, { error: failedRowsError.message });
+
+      const ids = (failedRows ?? []).map((row) => row.id);
+      if (!ids.length) {
+        return json(req, 200, { ok: true, requeued: 0 });
+      }
+
+      const { error: requeueError } = await admin
+        .from("agent_notifications_outbox")
+        .update({ status: "queued", last_error: null, attempts: 0 })
+        .in("id", ids);
+      if (requeueError) return json(req, 400, { error: requeueError.message });
+
+      return json(req, 200, { ok: true, requeued: ids.length });
+    }
+
+    if (req.method === "POST" && path.endsWith("notifications/dispatch")) {
+      await assertDispatchAuthorized(req);
 
       const resendApiKey = Deno.env.get("RESEND_API_KEY") || "";
       const emailFrom = Deno.env.get("EMAIL_FROM") || "";
