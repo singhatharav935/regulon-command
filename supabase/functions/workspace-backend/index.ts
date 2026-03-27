@@ -3457,11 +3457,13 @@ serve(async (req: Request) => {
     }
 
     if (req.method === "GET" && path.includes("draft-review/")) {
+      requireRole(roles, ["manager", "admin"]);
       const draftRunId = path.split("draft-review/")[1];
       return json(req, 200, { ok: true, data: await loadDraftReview(client, user.id, roles, draftRunId) });
     }
 
     if (req.method === "POST" && path.includes("draft-review/") && path.endsWith("/save")) {
+      requireRole(roles, ["manager", "admin"]);
       const draftRunId = path.split("draft-review/")[1].replace("/save", "");
       const payload = await loadDraftReview(client, user.id, roles, draftRunId);
       const body = await req.json();
@@ -3491,6 +3493,14 @@ serve(async (req: Request) => {
         legalLaneEnabled,
         legalReviewRequired: workflowPolicy.legalReviewRequired,
         finalSignoffMode: workflowPolicy.finalSignoffMode,
+      });
+      assertWorkflowBlockingConditions({
+        eventType,
+        existingEvents: payload.events,
+        legalReviewRequired: workflowPolicy.legalReviewRequired,
+        finalSignoffMode: workflowPolicy.finalSignoffMode,
+        legalLaneEnabled,
+        persona,
       });
 
       const latestVersionNumber = await getLatestDraftVersionNumber(client, draftRunId);
