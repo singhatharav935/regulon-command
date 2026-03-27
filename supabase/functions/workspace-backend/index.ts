@@ -883,6 +883,7 @@ const resolveErrorCode = (message: string) => {
   if (message === "Unauthorized") return "AUTH_UNAUTHORIZED";
   if (message.startsWith("Forbidden")) return "ACCESS_FORBIDDEN";
   if (message === "Draft not found" || message === "Draft export not found") return "RESOURCE_NOT_FOUND";
+  if (message === "Unsupported workflow action") return "VALIDATION_INVALID_FIELD";
   if (message.startsWith("Policy denied:")) return "WORKFLOW_ACTOR_FORBIDDEN";
   if (message === "AI request already in progress") return "AI_REQUEST_IN_PROGRESS";
   if (message.startsWith("AI rate limit exceeded:")) return "AI_RATE_LIMITED";
@@ -2150,6 +2151,49 @@ const advanceDraftWorkflowState = async (
 
   await queueWorkflowNotifications(client, draftRunId, body.eventType, nextStatus, userId);
   return await loadDraftArtifacts(client, userId, roles, draftRunId);
+};
+
+const executeDraftWorkflowAction = async (
+  client: ReturnType<typeof createClient>,
+  userId: string,
+  roles: Set<string>,
+  persona: AppPersona | null,
+  draftRunId: string,
+  body: {
+    action: string;
+    note?: string | null;
+  },
+) => {
+  const action = body.action.trim().toLowerCase();
+  const actionMap: Record<string, { nextStatus: string; eventType: string }> = {
+    submit_for_review: { nextStatus: "under_review", eventType: "submitted_for_review" },
+    start_review: { nextStatus: "under_review", eventType: "review_started" },
+    approve_review: { nextStatus: "approved", eventType: "review_approved" },
+    approve_legal_review: { nextStatus: "approved", eventType: "legal_review_approved" },
+    final_signoff: { nextStatus: "signed_off", eventType: "final_sign_off" },
+    legal_final_signoff: { nextStatus: "signed_off", eventType: "legal_final_sign_off" },
+  };
+
+  const mapped = actionMap[action];
+  if (!mapped) {
+    throw new Error("Unsupported workflow action");
+  }
+
+  return await advanceDraftWorkflowState(
+    client,
+    userId,
+    roles,
+    persona,
+    draftRunId,
+    {
+      nextStatus: mapped.nextStatus,
+      eventType: mapped.eventType,
+      payload: {
+        action,
+        note: body.note ?? null,
+      },
+    },
+  );
 };
 
 const loadDraftPolicyStatus = async (
@@ -3552,6 +3596,30 @@ serve(async (req: Request) => {
           snapshotId: snapshot.id,
           snapshotCreatedAt: snapshot.created_at,
         },
+      });
+    }
+
+    if (req.method === "POST" && path.includes("drafts/") && path.endsWith("/workflow-action")) {
+      requireRole(roles, ["manager", "admin"]);
+      const draftRunId = path.split("drafts/")[1].replace("/workflow-action", "");
+      const body = await req.json().catch(() => ({}));
+      const action = String(body.action || "").trim();
+      if (!action) {
+        return json(req, 400, { error: "action is required" });
+      }
+      return json(req, 200, {
+        ok: true,
+        data: await executeDraftWorkflowAction(
+          client,
+          user.id,
+          roles,
+          persona,
+          draftRunId,
+          {
+            action,
+            note: typeof body.note === "string" ? body.note.trim() : null,
+          },
+        ),
       });
     }
 
