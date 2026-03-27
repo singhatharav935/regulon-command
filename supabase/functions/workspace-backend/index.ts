@@ -740,6 +740,59 @@ const prepareAiIdempotencyLock = async (
   return { requestKey, cachedResponse: null };
 };
 
+const inferAiOperationLane = ({
+  persona,
+  legalLaneEnabled,
+}: {
+  persona: AppPersona | null;
+  legalLaneEnabled: boolean;
+}) => {
+  if ((persona === "external_ca" || persona === "ca_firm") && !legalLaneEnabled) {
+    return "external_legal_outside_regulon";
+  }
+  return "internal_regulon_lane";
+};
+
+const writeAiOperationAudit = async (
+  client: ReturnType<typeof createClient>,
+  params: {
+    userId: string;
+    companyId: string | null;
+    draftRunId: string | null;
+    operation: string;
+    lane: string | null;
+    outcome: "success" | "failed" | "in_progress";
+    responseStatus?: number | null;
+    aiModelUsed?: string | null;
+    aiFallbackUsed?: boolean | null;
+    aiAttemptCount?: number | null;
+    modelRouterVersion?: string | null;
+    durationMs?: number | null;
+    errorMessage?: string | null;
+    payloadMeta?: Record<string, unknown>;
+  },
+) => {
+  const { error } = await client
+    .from("ai_operation_audit")
+    .insert({
+      user_id: params.userId,
+      company_id: params.companyId,
+      draft_run_id: params.draftRunId,
+      operation: params.operation,
+      lane: params.lane,
+      outcome: params.outcome,
+      response_status: params.responseStatus ?? null,
+      ai_model_used: params.aiModelUsed ?? null,
+      ai_fallback_used: params.aiFallbackUsed ?? null,
+      ai_attempt_count: params.aiAttemptCount ?? null,
+      model_router_version: params.modelRouterVersion ?? null,
+      duration_ms: params.durationMs ?? null,
+      error_message: params.errorMessage ?? null,
+      payload_meta: params.payloadMeta ?? null,
+    });
+  if (error) throw error;
+};
+
 const finalizeAiIdempotencyLock = async (
   client: ReturnType<typeof createClient>,
   userId: string,
@@ -1585,10 +1638,28 @@ const proxyAiDraft = async (
   payload: Record<string, unknown>,
 ) => {
   const { companyId } = await validateAiDraftScope(client, userId, roles, persona, payload);
+  const entitlements = await loadActorEntitlements(client, userId);
+  const lane = inferAiOperationLane({ persona, legalLaneEnabled: resolveLegalLaneEnabled(persona, entitlements) });
   const operation = normalizeAiOperation(payload);
+  const draftRunId = typeof payload.draftRunId === "string" ? payload.draftRunId : null;
+  const startedAt = Date.now();
   const { requestKey, cachedResponse } = await prepareAiIdempotencyLock(client, userId, operation, payload, companyId);
 
   if (cachedResponse) {
+    await writeAiOperationAudit(client, {
+      userId,
+      companyId,
+      draftRunId,
+      operation,
+      lane,
+      outcome: "success",
+      responseStatus: 200,
+      durationMs: Date.now() - startedAt,
+      payloadMeta: {
+        request_key: requestKey,
+        source: "idempotency_cache",
+      },
+    });
     return {
       ok: true,
       status: 200,
@@ -1618,15 +1689,34 @@ const proxyAiDraft = async (
 
   if (contentType.includes("application/json")) {
     const body = await response.json().catch(() => ({}));
+    const isSuccess = response.ok;
     await finalizeAiIdempotencyLock(client, userId, requestKey, {
-      status: response.ok ? "completed" : "failed",
-      responsePayload: response.ok ? body : null,
-      errorMessage: response.ok ? null : (typeof body?.error === "string" ? body.error : `ai-draft failed (${response.status})`),
+      status: isSuccess ? "completed" : "failed",
+      responsePayload: isSuccess ? body : null,
+      errorMessage: isSuccess ? null : (typeof body?.error === "string" ? body.error : `ai-draft failed (${response.status})`),
       responseStatus: response.status,
       aiModelUsed,
       aiFallbackUsed: aiFallbackUsedHeader === "true",
       aiAttemptCount: Number.isFinite(aiAttemptCount as number) ? aiAttemptCount : null,
       modelRouterVersion,
+    });
+    await writeAiOperationAudit(client, {
+      userId,
+      companyId,
+      draftRunId,
+      operation,
+      lane,
+      outcome: isSuccess ? "success" : "failed",
+      responseStatus: response.status,
+      aiModelUsed,
+      aiFallbackUsed: aiFallbackUsedHeader === "true",
+      aiAttemptCount: Number.isFinite(aiAttemptCount as number) ? aiAttemptCount : null,
+      modelRouterVersion,
+      durationMs: Date.now() - startedAt,
+      errorMessage: isSuccess ? null : (typeof body?.error === "string" ? body.error : null),
+      payloadMeta: {
+        request_key: requestKey,
+      },
     });
     return {
       ok: response.ok,
@@ -1646,6 +1736,24 @@ const proxyAiDraft = async (
     aiAttemptCount: Number.isFinite(aiAttemptCount as number) ? aiAttemptCount : null,
     modelRouterVersion,
   });
+  await writeAiOperationAudit(client, {
+    userId,
+    companyId,
+    draftRunId,
+    operation,
+    lane,
+    outcome: response.ok ? "success" : "failed",
+    responseStatus: response.status,
+    aiModelUsed,
+    aiFallbackUsed: aiFallbackUsedHeader === "true",
+    aiAttemptCount: Number.isFinite(aiAttemptCount as number) ? aiAttemptCount : null,
+    modelRouterVersion,
+    durationMs: Date.now() - startedAt,
+    errorMessage: text || `ai-draft failed (${response.status})`,
+    payloadMeta: {
+      request_key: requestKey,
+    },
+  });
   return {
     ok: response.ok,
     status: response.status,
@@ -1664,7 +1772,11 @@ const proxyAiDraftStream = async (
   payload: Record<string, unknown>,
 ) => {
   const { companyId } = await validateAiDraftScope(client, userId, roles, persona, payload);
+  const entitlements = await loadActorEntitlements(client, userId);
+  const lane = inferAiOperationLane({ persona, legalLaneEnabled: resolveLegalLaneEnabled(persona, entitlements) });
   const operation = normalizeAiOperation(payload);
+  const draftRunId = typeof payload.draftRunId === "string" ? payload.draftRunId : null;
+  const startedAt = Date.now();
   const { requestKey } = await prepareAiIdempotencyLock(client, userId, operation, payload, companyId);
   const { url, anon } = getEnv();
   let response: Response;
@@ -1682,6 +1794,17 @@ const proxyAiDraftStream = async (
   } catch (error) {
     const errorMessage = error instanceof Error ? error.message : "ai-draft stream request failed";
     await finalizeAiIdempotencyLock(client, userId, requestKey, { status: "failed", errorMessage });
+    await writeAiOperationAudit(client, {
+      userId,
+      companyId,
+      draftRunId,
+      operation,
+      lane,
+      outcome: "failed",
+      durationMs: Date.now() - startedAt,
+      errorMessage,
+      payloadMeta: { request_key: requestKey, source: "stream_fetch_error" },
+    });
     throw error;
   }
 
@@ -1705,6 +1828,22 @@ const proxyAiDraftStream = async (
     aiFallbackUsed: aiFallbackUsedHeader === "true",
     aiAttemptCount: Number.isFinite(aiAttemptCount as number) ? aiAttemptCount : null,
     modelRouterVersion,
+  });
+  await writeAiOperationAudit(client, {
+    userId,
+    companyId,
+    draftRunId,
+    operation,
+    lane,
+    outcome: response.ok ? "success" : "failed",
+    responseStatus: response.status,
+    aiModelUsed,
+    aiFallbackUsed: aiFallbackUsedHeader === "true",
+    aiAttemptCount: Number.isFinite(aiAttemptCount as number) ? aiAttemptCount : null,
+    modelRouterVersion,
+    durationMs: Date.now() - startedAt,
+    errorMessage: response.ok ? null : `ai-draft stream failed (${response.status})`,
+    payloadMeta: { request_key: requestKey, source: "stream" },
   });
 
   if (response.body) {
@@ -2072,6 +2211,90 @@ serve(async (req: Request) => {
         },
         model_breakdown: modelBreakdown,
         top_users: topUsers,
+      });
+    }
+
+    if (req.method === "GET" && path.endsWith("drafting/ai-ops/audit")) {
+      requireRole(roles, ["admin"]);
+      const limitRaw = Number(url.searchParams.get("limit") ?? 200);
+      const limit = Number.isFinite(limitRaw) ? Math.max(20, Math.min(1000, limitRaw)) : 200;
+      const outcome = (url.searchParams.get("outcome") || "").trim();
+      const operation = (url.searchParams.get("operation") || "").trim();
+      const userId = (url.searchParams.get("user_id") || "").trim();
+      const companyId = (url.searchParams.get("company_id") || "").trim();
+
+      let query = client
+        .from("ai_operation_audit")
+        .select("id, user_id, company_id, draft_run_id, operation, lane, outcome, response_status, ai_model_used, ai_fallback_used, ai_attempt_count, duration_ms, error_message, created_at")
+        .order("created_at", { ascending: false })
+        .limit(limit);
+
+      if (outcome) query = query.eq("outcome", outcome);
+      if (operation) query = query.eq("operation", operation);
+      if (userId) query = query.eq("user_id", userId);
+      if (companyId) query = query.eq("company_id", companyId);
+
+      const { data, error } = await query;
+      if (error) return json(req, 400, { error: error.message });
+
+      return json(req, 200, { ok: true, data: data ?? [] });
+    }
+
+    if (req.method === "GET" && path.endsWith("drafting/ai-ops/audit-summary")) {
+      requireRole(roles, ["admin"]);
+      const sinceHoursRaw = Number(url.searchParams.get("since_hours") ?? 24);
+      const sinceHours = Number.isFinite(sinceHoursRaw) ? Math.max(1, Math.min(168, sinceHoursRaw)) : 24;
+      const sinceIso = new Date(Date.now() - sinceHours * 60 * 60 * 1000).toISOString();
+
+      const { data, error } = await client
+        .from("ai_operation_audit")
+        .select("operation, lane, outcome, duration_ms, ai_model_used, ai_fallback_used, created_at")
+        .gte("created_at", sinceIso)
+        .order("created_at", { ascending: false })
+        .limit(5000);
+      if (error) return json(req, 400, { error: error.message });
+
+      const rows = data ?? [];
+      const counts = {
+        total: rows.length,
+        success: rows.filter((row) => row.outcome === "success").length,
+        failed: rows.filter((row) => row.outcome === "failed").length,
+      };
+      const byOperation: Record<string, number> = {};
+      const byLane: Record<string, number> = {};
+      const byModel: Record<string, number> = {};
+      let fallbackCount = 0;
+      const durations: number[] = [];
+
+      for (const row of rows) {
+        byOperation[row.operation] = (byOperation[row.operation] ?? 0) + 1;
+        const lane = row.lane || "unknown";
+        byLane[lane] = (byLane[lane] ?? 0) + 1;
+        const model = row.ai_model_used || "unknown";
+        byModel[model] = (byModel[model] ?? 0) + 1;
+        if (row.ai_fallback_used === true) fallbackCount += 1;
+        if (typeof row.duration_ms === "number" && Number.isFinite(row.duration_ms) && row.duration_ms >= 0) {
+          durations.push(row.duration_ms);
+        }
+      }
+
+      durations.sort((a, b) => a - b);
+      const p95Idx = durations.length > 0 ? Math.floor(durations.length * 0.95) : -1;
+      const p95DurationMs = p95Idx >= 0 ? durations[Math.min(durations.length - 1, p95Idx)] : null;
+      const avgDurationMs = durations.length > 0
+        ? Math.round(durations.reduce((sum, val) => sum + val, 0) / durations.length)
+        : null;
+
+      return json(req, 200, {
+        ok: true,
+        since_hours: sinceHours,
+        counts,
+        avg_duration_ms: avgDurationMs,
+        p95_duration_ms: p95DurationMs,
+        fallback_usage_rate: rows.length > 0 ? Number((fallbackCount / rows.length).toFixed(4)) : 0,
+        by_operation: byOperation,
+        by_lane: byLane,
+        by_model: byModel,
       });
     }
 
