@@ -100,7 +100,7 @@ const getUserCompanyIds = async (client: ReturnType<typeof createClient>, userId
 
 const requireRole = (roles: Set<string>, allowed: string[]) => {
   if (!allowed.some((role) => roles.has(role))) {
-    throw new Error("Forbidden");
+    throw new Error("Forbidden: missing_required_role");
   }
 };
 
@@ -147,7 +147,7 @@ const assertEventActorAllowed = ({
 }) => {
   if (roles.has("admin")) return;
   if (!roles.has("manager")) {
-    throw new Error("Forbidden");
+    throw new Error("Policy denied: manager_role_required_for_review_actions");
   }
 
   // Backward compatibility: legacy accounts may not have user_personas hydrated yet.
@@ -155,17 +155,27 @@ const assertEventActorAllowed = ({
 
   if (eventType === "legal_review_approved" || eventType === "legal_final_sign_off" || eventType === "legal_review_saved") {
     if (persona !== "in_house_lawyer") {
-      throw new Error("Forbidden");
+      throw new Error("Policy denied: legal_review_events_require_in_house_lawyer");
     }
     return;
   }
 
   if (eventType === "review_approved" || eventType === "final_sign_off" || eventType === "submitted_for_review" || eventType === "review_started") {
     if (persona !== "external_ca" && persona !== "in_house_ca" && persona !== "ca_firm") {
-      throw new Error("Forbidden");
+      throw new Error("Policy denied: ca_review_events_require_ca_persona");
     }
     return;
   }
+};
+
+const resolveErrorCode = (message: string) => {
+  if (message === "Unauthorized") return "AUTH_UNAUTHORIZED";
+  if (message.startsWith("Forbidden")) return "ACCESS_FORBIDDEN";
+  if (message.startsWith("Policy denied:")) return "WORKFLOW_ACTOR_FORBIDDEN";
+  if (message.startsWith("Invalid workflow transition:")) return "WORKFLOW_TRANSITION_INVALID";
+  if (message.startsWith("Invalid event type for transition:")) return "WORKFLOW_EVENT_INVALID";
+  if (message.includes(" is required") || message.includes(" are required")) return "VALIDATION_REQUIRED_FIELD";
+  return "INTERNAL_ERROR";
 };
 
 const createCompanyWorkspace = async (client: ReturnType<typeof createClient>, name: string, industry: string | null) => {
@@ -958,15 +968,17 @@ serve(async (req: Request) => {
     return json(req, 404, { error: "Route not found" });
   } catch (error) {
     const message = error instanceof Error ? error.message : "Internal error";
+    const errorCode = resolveErrorCode(message);
     const status =
-      message === "Unauthorized"
+      errorCode === "AUTH_UNAUTHORIZED"
         ? 401
-        : message === "Forbidden"
+        : errorCode === "ACCESS_FORBIDDEN" || errorCode === "WORKFLOW_ACTOR_FORBIDDEN"
           ? 403
-          : message.startsWith("Invalid workflow transition:")
-            || message.startsWith("Invalid event type for transition:")
+          : errorCode === "WORKFLOW_TRANSITION_INVALID"
+            || errorCode === "WORKFLOW_EVENT_INVALID"
+            || errorCode === "VALIDATION_REQUIRED_FIELD"
             ? 400
             : 500;
-    return json(req, status, { error: message });
+    return json(req, status, { error: message, error_code: errorCode });
   }
 });

@@ -4,6 +4,7 @@ type WorkspaceBackendEnvelope<T> = {
   ok?: boolean;
   data?: T;
   error?: string;
+  error_code?: string;
 };
 
 const getWorkspaceBackendBaseUrl = () => {
@@ -47,7 +48,9 @@ export const workspaceBackendRequest = async <T>(
 
   const payload = (await response.json().catch(() => ({}))) as WorkspaceBackendEnvelope<T>;
   if (!response.ok) {
-    throw new Error(payload?.error || `Workspace backend request failed (${response.status}).`);
+    const message = payload?.error || `Workspace backend request failed (${response.status}).`;
+    const code = payload?.error_code;
+    throw new Error(code ? `${message} [${code}]` : message);
   }
 
   return payload.data as T;
