@@ -1449,6 +1449,190 @@ const listDraftExports = async (
   return withUrls;
 };
 
+const parseJsonArrayStrings = (value: unknown): string[] => {
+  if (!Array.isArray(value)) return [];
+  return value.filter((item) => typeof item === "string") as string[];
+};
+
+const evaluateDraftFilingReadiness = async (
+  client: ReturnType<typeof createClient>,
+  userId: string,
+  roles: Set<string>,
+  persona: AppPersona | null,
+  draftRunId: string,
+) => {
+  const review = await loadDraftReview(client, userId, roles, draftRunId);
+  const documentType = typeof review.run.document_type === "string" ? review.run.document_type : null;
+  const [workflowPolicy, entitlements] = await Promise.all([
+    loadAuthorityWorkflowPolicy(client, documentType),
+    loadActorEntitlements(client, userId),
+  ]);
+  const legalLaneEnabled = resolveLegalLaneEnabled(persona, entitlements);
+  const eventSet = new Set(review.events.map((event) => String(event.event_type)));
+  const content = typeof review.run.draft_content === "string" ? review.run.draft_content : "";
+
+  const checkpoints = {
+    submittedForReview: eventSet.has("submitted_for_review") || eventSet.has("review_started"),
+    reviewApproved: eventSet.has("review_approved"),
+    legalReviewApproved: eventSet.has("legal_review_approved"),
+    externalLegalExported: eventSet.has("exported_for_external_legal"),
+    externalLegalSignedOff: eventSet.has("external_legal_signed_off"),
+    finalSignedOff: eventSet.has("final_sign_off") || eventSet.has("legal_final_sign_off") || eventSet.has("external_legal_signed_off"),
+  };
+
+  const blockers: string[] = [];
+  const warnings: string[] = [];
+
+  if (!content.trim()) {
+    blockers.push("Draft content is empty.");
+  }
+
+  if (/\[to be filled by ca\/lawyer\]/i.test(content) || /\[to be filled\]/i.test(content)) {
+    blockers.push("Draft contains unresolved placeholders.");
+  }
+
+  if (!checkpoints.submittedForReview) {
+    blockers.push("Draft review was not formally submitted.");
+  }
+
+  if (!checkpoints.reviewApproved && workflowPolicy.finalSignoffMode === "dual") {
+    blockers.push("CA review approval is required for dual sign-off mode.");
+  }
+
+  if (workflowPolicy.legalReviewRequired && !checkpoints.legalReviewApproved) {
+    blockers.push("Legal review approval is required by authority policy.");
+  }
+
+  if (review.run.status !== "signed_off" || !checkpoints.finalSignedOff) {
+    blockers.push("Final sign-off is pending.");
+  }
+
+  if ((persona === "external_ca" || persona === "ca_firm") && !legalLaneEnabled) {
+    if (!checkpoints.externalLegalExported) {
+      blockers.push("Draft must be exported for external legal sign-off.");
+    }
+    if (!checkpoints.externalLegalSignedOff) {
+      blockers.push("External legal sign-off event is pending.");
+    }
+  }
+
+  if (content.length < 1200) {
+    warnings.push("Draft length is short for filing-grade quality.");
+  }
+
+  if (!/(section|rule|regulation|act|clause)\s+[a-z0-9()./-]+/i.test(content)) {
+    warnings.push("No explicit legal provision anchors detected.");
+  }
+
+  if (!/(annexure|evidence|document|ledger|invoice|proof)/i.test(content)) {
+    warnings.push("Evidence mapping language appears weak.");
+  }
+
+  if (!/(prayer|relief|request|hearing)/i.test(content)) {
+    warnings.push("Prayer/hearing request language not detected.");
+  }
+
+  const scoreBase = 100 - (blockers.length * 18) - (warnings.length * 6);
+  const score = Math.max(0, Math.min(100, scoreBase));
+  const ready = blockers.length === 0 && score >= 85;
+
+  return {
+    draftRunId,
+    score,
+    ready,
+    status: review.run.status,
+    documentType: review.run.document_type,
+    draftMode: review.run.draft_mode,
+    policy: {
+      legalReviewRequired: workflowPolicy.legalReviewRequired,
+      finalSignoffMode: workflowPolicy.finalSignoffMode,
+      legalLaneEnabled,
+      regulonLegalLaneEntitled: entitlements.regulonLegalLaneEnabled,
+    },
+    checkpoints,
+    blockers,
+    warnings,
+    signals: {
+      contentLength: content.length,
+      placeholderCount:
+        (content.match(/\[to be filled by ca\/lawyer\]/gi)?.length ?? 0) +
+        (content.match(/\[to be filled\]/gi)?.length ?? 0),
+      eventCount: review.events.length,
+      versionCount: review.versions.length,
+    },
+    generatedAt: new Date().toISOString(),
+  };
+};
+
+const persistDraftFilingReadiness = async (
+  client: ReturnType<typeof createClient>,
+  userId: string,
+  draftRunId: string,
+  assessment: {
+    score: number;
+    ready: boolean;
+    blockers: string[];
+    warnings: string[];
+    signals: Record<string, unknown>;
+  },
+) => {
+  const { data, error } = await client
+    .from("draft_filing_checks")
+    .insert({
+      draft_run_id: draftRunId,
+      user_id: userId,
+      score: assessment.score,
+      ready: assessment.ready,
+      blockers: assessment.blockers,
+      warnings: assessment.warnings,
+      signals: assessment.signals,
+    })
+    .select("id, draft_run_id, user_id, score, ready, blockers, warnings, signals, created_at")
+    .single();
+  if (error || !data) throw error ?? new Error("Failed to persist filing readiness");
+
+  const { error: auditError } = await client
+    .from("draft_audit_events")
+    .insert({
+      draft_run_id: draftRunId,
+      user_id: userId,
+      event_type: "filing_readiness_assessed",
+      payload: {
+        review_surface: "workspace-backend",
+        score: assessment.score,
+        ready: assessment.ready,
+        blocker_count: assessment.blockers.length,
+        warning_count: assessment.warnings.length,
+      },
+    });
+  if (auditError) throw auditError;
+
+  return data;
+};
+
+const listDraftFilingReadinessHistory = async (
+  client: ReturnType<typeof createClient>,
+  userId: string,
+  roles: Set<string>,
+  draftRunId: string,
+  options?: { limit?: number },
+) => {
+  await loadDraftReview(client, userId, roles, draftRunId);
+  const limit = Math.max(1, Math.min(50, Number(options?.limit ?? 20)));
+  const { data, error } = await client
+    .from("draft_filing_checks")
+    .select("id, draft_run_id, user_id, score, ready, blockers, warnings, signals, created_at")
+    .eq("draft_run_id", draftRunId)
+    .order("created_at", { ascending: false })
+    .limit(limit);
+  if (error) throw error;
+  return (data ?? []).map((row) => ({
+    ...row,
+    blockers: parseJsonArrayStrings(row.blockers),
+    warnings: parseJsonArrayStrings(row.warnings),
+  }));
+};
+
 const rollbackDraftToVersion = async (
   client: ReturnType<typeof createClient>,
   userId: string,
@@ -3020,6 +3204,26 @@ serve(async (req: Request) => {
       });
     }
 
+    if (req.method === "GET" && path.includes("drafts/") && path.endsWith("/filing-readiness/history")) {
+      requireRole(roles, ["manager", "admin"]);
+      const draftRunId = path.split("drafts/")[1].replace("/filing-readiness/history", "");
+      const limitRaw = Number(url.searchParams.get("limit") ?? 20);
+      const limit = Number.isFinite(limitRaw) ? limitRaw : 20;
+      return json(req, 200, {
+        ok: true,
+        data: await listDraftFilingReadinessHistory(client, user.id, roles, draftRunId, { limit }),
+      });
+    }
+
+    if (req.method === "GET" && path.includes("drafts/") && path.endsWith("/filing-readiness")) {
+      requireRole(roles, ["manager", "admin"]);
+      const draftRunId = path.split("drafts/")[1].replace("/filing-readiness", "");
+      return json(req, 200, {
+        ok: true,
+        data: await evaluateDraftFilingReadiness(client, user.id, roles, persona, draftRunId),
+      });
+    }
+
     if (req.method === "GET" && path.includes("draft-review/")) {
       const draftRunId = path.split("draft-review/")[1];
       return json(req, 200, { ok: true, data: await loadDraftReview(client, user.id, roles, draftRunId) });
@@ -3180,6 +3384,27 @@ serve(async (req: Request) => {
           targetVersionNumber: targetVersionRaw,
           note: typeof body.note === "string" ? body.note.trim() : null,
         }),
+      });
+    }
+
+    if (req.method === "POST" && path.includes("drafts/") && path.endsWith("/filing-readiness")) {
+      requireRole(roles, ["manager", "admin"]);
+      const draftRunId = path.split("drafts/")[1].replace("/filing-readiness", "");
+      const assessment = await evaluateDraftFilingReadiness(client, user.id, roles, persona, draftRunId);
+      const snapshot = await persistDraftFilingReadiness(client, user.id, draftRunId, {
+        score: assessment.score,
+        ready: assessment.ready,
+        blockers: assessment.blockers,
+        warnings: assessment.warnings,
+        signals: assessment.signals,
+      });
+      return json(req, 200, {
+        ok: true,
+        data: {
+          ...assessment,
+          snapshotId: snapshot.id,
+          snapshotCreatedAt: snapshot.created_at,
+        },
       });
     }
 
