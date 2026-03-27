@@ -2,6 +2,7 @@ import { serve } from "https://deno.land/std@0.168.0/http/server.ts";
 import { createClient } from "https://esm.sh/@supabase/supabase-js@2";
 import { PDFDocument, StandardFonts, rgb } from "https://esm.sh/pdf-lib@1.17.1";
 import { Document, Packer, Paragraph, HeadingLevel, TextRun } from "https://esm.sh/docx@9.5.1";
+import { buildOpsRunbooks, buildRegressionChecklist, computePrelaunchGate } from "./ops-contract.ts";
 
 const getCorsHeaders = (req: Request) => {
   const origin = req.headers.get("origin") ?? "";
@@ -2817,6 +2818,49 @@ const runWorkflowSlaMonitor = async (
   };
 };
 
+const collectPrelaunchSignals = async (
+  client: ReturnType<typeof createClient>,
+) => {
+  const envPresent = {
+    SUPABASE_URL: Boolean(Deno.env.get("SUPABASE_URL")),
+    SUPABASE_ANON_KEY: Boolean(Deno.env.get("SUPABASE_ANON_KEY")),
+    SUPABASE_SERVICE_ROLE_KEY: Boolean(Deno.env.get("SUPABASE_SERVICE_ROLE_KEY")),
+    ALLOWED_ORIGINS: Boolean((Deno.env.get("ALLOWED_ORIGINS") ?? "").trim()),
+    OPENAI_API_KEY: Boolean(Deno.env.get("OPENAI_API_KEY")),
+    OPENAI_MODEL: Boolean(Deno.env.get("OPENAI_MODEL")),
+  };
+
+  const [integrity, sla] = await Promise.all([
+    runWorkflowIntegrityCheck(client, { limit: 300 }),
+    runWorkflowSlaMonitor(client, { limit: 500 }),
+  ]);
+
+  const sinceIso = new Date(Date.now() - 24 * 60 * 60 * 1000).toISOString();
+  const { data: aiRows, error: aiRowsError } = await client
+    .from("ai_request_idempotency")
+    .select("status, created_at, updated_at")
+    .gte("created_at", sinceIso)
+    .order("created_at", { ascending: false })
+    .limit(2500);
+  if (aiRowsError) throw aiRowsError;
+
+  const lockWindowSeconds = Math.max(15, Number(Deno.env.get("AI_LOCK_WINDOW_SECONDS") ?? "120"));
+  const rows = aiRows ?? [];
+  const staleProcessingCount = rows.filter((row) => row.status === "processing" && isLockFresh(row.updated_at, lockWindowSeconds) === false).length;
+  const failedCount = rows.filter((row) => row.status === "failed").length;
+
+  return {
+    envPresent,
+    workflowIntegrity: integrity.summary,
+    workflowSla: sla.summary,
+    aiOps: {
+      sampledRows: rows.length,
+      failedCount,
+      staleProcessingCount,
+    },
+  };
+};
+
 const getRouteAccessMatrix = () => ({
   dashboards: [
     { route: "GET /company/dashboard", roles: ["user", "manager", "admin"] },
@@ -3296,6 +3340,35 @@ serve(async (req: Request) => {
       return json(req, 200, {
         ok: true,
         data: getRouteAccessMatrix(),
+      });
+    }
+
+    if (req.method === "GET" && path.endsWith("ops/runbooks")) {
+      requireRole(roles, ["admin"]);
+      return json(req, 200, {
+        ok: true,
+        data: buildOpsRunbooks(),
+      });
+    }
+
+    if (req.method === "GET" && path.endsWith("ops/regression-checklist")) {
+      requireRole(roles, ["admin"]);
+      return json(req, 200, {
+        ok: true,
+        data: buildRegressionChecklist(),
+      });
+    }
+
+    if (req.method === "GET" && path.endsWith("ops/prelaunch-gate")) {
+      requireRole(roles, ["admin"]);
+      const signals = await collectPrelaunchSignals(client);
+      return json(req, 200, {
+        ok: true,
+        data: {
+          ...computePrelaunchGate(signals),
+          signals,
+          generated_at: new Date().toISOString(),
+        },
       });
     }
 
