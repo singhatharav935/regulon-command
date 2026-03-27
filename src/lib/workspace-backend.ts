@@ -52,3 +52,15 @@ export const workspaceBackendRequest = async <T>(
 
   return payload.data as T;
 };
+
+export const workspaceBackendStreamRequest = async (
+  path: string,
+  payload: Record<string, unknown>,
+) => {
+  const headers = await getWorkspaceBackendHeaders();
+  return fetch(`${getWorkspaceBackendBaseUrl()}${path}`, {
+    method: "POST",
+    headers,
+    body: JSON.stringify(payload),
+  });
+};

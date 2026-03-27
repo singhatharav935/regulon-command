@@ -35,7 +35,7 @@ import { Tooltip, TooltipContent, TooltipProvider, TooltipTrigger } from "@/comp
 import { toast } from "sonner";
 import { supabase } from "@/integrations/supabase/client";
 import { useLocation, useNavigate } from "react-router-dom";
-import { workspaceBackendRequest } from "@/lib/workspace-backend";
+import { workspaceBackendRequest, workspaceBackendStreamRequest } from "@/lib/workspace-backend";
 
 const documentTypes = [
   { id: "mca-notice", label: "MCA Notice Response", authority: "MCA" },
@@ -1769,7 +1769,6 @@ const AIDraftingEngine = ({ demoMode = false, includeLawyerReview = true }: AIDr
   const hasDraftEndpoint =
     import.meta.env.DEV ||
     (typeof import.meta.env.VITE_SUPABASE_URL === "string" && import.meta.env.VITE_SUPABASE_URL.startsWith("http"));
-  const secureFunctionAuth = import.meta.env.VITE_ENABLE_SECURE_FUNCTION_AUTH === "true";
   const supabaseUrl = (import.meta.env.VITE_SUPABASE_URL as string) || "";
   const supabasePublishableKey = (import.meta.env.VITE_SUPABASE_PUBLISHABLE_KEY as string) || "";
   const noticeLength = noticeDetails.trim().length;
@@ -5584,14 +5583,6 @@ Return only revised final draft text.`);
         );
       }
 
-      let authToken = supabasePublishableKey;
-      if (secureFunctionAuth) {
-        const {
-          data: { session },
-        } = await supabase.auth.getSession();
-        authToken = session?.access_token ?? authToken;
-      }
-
       const requestPayload = {
         documentType: selectedDocType,
         companyName: client?.name || "Company",
@@ -5694,30 +5685,7 @@ Return only revised final draft text.`);
         return;
       }
 
-      const tryRequest = async (withAuthHeaders: boolean) =>
-        fetch(DRAFT_URL, {
-          method: "POST",
-          headers: withAuthHeaders
-            ? {
-                "Content-Type": "application/json",
-                Authorization: `Bearer ${authToken}`,
-                apikey: supabasePublishableKey,
-              }
-            : {
-                "Content-Type": "application/json",
-              },
-          body: JSON.stringify(requestPayload),
-        });
-
-      let response: Response;
-      try {
-        response = await tryRequest(true);
-      } catch (networkError) {
-        if (secureFunctionAuth) {
-          throw networkError;
-        }
-        response = await tryRequest(false);
-      }
+      const response = await workspaceBackendStreamRequest("/drafting/ai-stream", requestPayload as Record<string, unknown>);
 
       if (response.status === 429) {
         throw new Error("Rate limit exceeded. Please try again in a moment.");
