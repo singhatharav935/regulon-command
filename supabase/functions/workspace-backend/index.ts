@@ -1119,6 +1119,13 @@ const resolveErrorCode = (message: string) => {
   if (message.startsWith("severity must be one of: medium, high, critical")) return "VALIDATION_INVALID_FIELD";
   if (message.startsWith("status must be one of:")) return "VALIDATION_INVALID_FIELD";
   if (message.startsWith("quality percentages must be between 0 and 100")) return "VALIDATION_INVALID_FIELD";
+  if (message.startsWith("sourceType must be one of:")) return "VALIDATION_INVALID_FIELD";
+  if (message.startsWith("suiteName is required")) return "VALIDATION_REQUIRED_FIELD";
+  if (message.startsWith("flowName is required")) return "VALIDATION_REQUIRED_FIELD";
+  if (message.startsWith("runDurationMs must be a non-negative number")) return "VALIDATION_INVALID_FIELD";
+  if (message.startsWith("totalTests must be a non-negative number")) return "VALIDATION_INVALID_FIELD";
+  if (message.startsWith("passedTests must be a non-negative number")) return "VALIDATION_INVALID_FIELD";
+  if (message.startsWith("failedTests must be a non-negative number")) return "VALIDATION_INVALID_FIELD";
   if (message.includes("must be a valid UUID")) return "VALIDATION_INVALID_FIELD";
   if (message.startsWith("Invalid workflow transition:")) return "WORKFLOW_TRANSITION_INVALID";
   if (message.startsWith("Invalid event type for transition:")) return "WORKFLOW_EVENT_INVALID";
@@ -4095,6 +4102,9 @@ const collectDeployReadinessSignals = async (
     "performance_synthetic_checks",
     "performance_budget_policies",
     "performance_alert_events",
+    "qa_api_contract_runs",
+    "qa_e2e_smoke_runs",
+    "qa_failure_registry",
   ];
   const missingTables: string[] = [];
   const tableProbeErrors: Array<{ table: string; code: string | null; message: string }> = [];
@@ -5270,6 +5280,13 @@ const getRouteAccessMatrix = () => ({
     { route: "POST /ops/performance/budgets", roles: ["admin"] },
     { route: "GET /ops/performance/alerts", roles: ["admin"] },
     { route: "POST /ops/performance/alerts", roles: ["admin"] },
+    { route: "GET /ops/qa/readiness", roles: ["admin"] },
+    { route: "GET /ops/qa/api-contract-runs", roles: ["admin"] },
+    { route: "POST /ops/qa/api-contract-runs", roles: ["admin"] },
+    { route: "GET /ops/qa/e2e-smoke-runs", roles: ["admin"] },
+    { route: "POST /ops/qa/e2e-smoke-runs", roles: ["admin"] },
+    { route: "GET /ops/qa/failures", roles: ["admin"] },
+    { route: "POST /ops/qa/failures", roles: ["admin"] },
     { route: "POST /ops/billing/invoice/issue", roles: ["admin"] },
     { route: "POST /ops/billing/payment-attempt", roles: ["admin"] },
     { route: "POST /ops/assign/company-member", roles: ["admin"] },
@@ -8275,6 +8292,292 @@ const collectPerformanceReadinessSignals = async (
   };
 };
 
+const QA_RUN_ALLOWED_STATUS = new Set(["pass", "warn", "fail"]);
+const QA_FAILURE_ALLOWED_SEVERITIES = new Set(["medium", "high", "critical"]);
+const QA_FAILURE_ALLOWED_STATUSES = new Set(["open", "acknowledged", "resolved", "dismissed"]);
+const QA_FAILURE_ALLOWED_SOURCES = new Set(["api_contract", "e2e_smoke", "manual", "production_incident"]);
+
+const listQaApiContractRuns = async (
+  client: ReturnType<typeof createClient>,
+  options?: { environment?: string | null; status?: string | null; limit?: number; offset?: number },
+) => {
+  const limit = Math.max(1, Math.min(300, Number(options?.limit ?? 120)));
+  const offset = Math.max(0, Number(options?.offset ?? 0));
+  let query = client
+    .from("qa_api_contract_runs")
+    .select("id, suite_name, environment, status, total_tests, passed_tests, failed_tests, run_duration_ms, details, executed_by, executed_at, created_at, updated_at")
+    .order("executed_at", { ascending: false })
+    .range(offset, offset + limit - 1);
+  const environment = toTrimmedString(options?.environment ?? null, 30);
+  if (environment) query = query.eq("environment", environment);
+  const status = toTrimmedString(options?.status ?? null, 20);
+  if (status) query = query.eq("status", status);
+  const { data, error } = await query;
+  if (error) throw error;
+  return data ?? [];
+};
+
+const createQaApiContractRunByAdmin = async (
+  client: ReturnType<typeof createClient>,
+  adminUserId: string,
+  params: {
+    suiteName: string;
+    environment?: string | null;
+    status: string;
+    totalTests: number;
+    passedTests: number;
+    failedTests: number;
+    runDurationMs?: number | null;
+    details?: Record<string, unknown>;
+    executedAt?: string | null;
+  },
+) => {
+  const suiteName = toTrimmedString(params.suiteName, 160);
+  if (!suiteName) throw new Error("suiteName is required");
+  const environment = toTrimmedString(params.environment ?? null, 20) ?? "production";
+  const status = toTrimmedString(params.status, 20);
+  if (!status || !QA_RUN_ALLOWED_STATUS.has(status)) throw new Error("status must be one of: pass, warn, fail");
+
+  const parseCount = (value: number, key: string) => {
+    const number = Number(value);
+    if (!Number.isFinite(number) || number < 0) throw new Error(`${key} must be a non-negative number`);
+    return Math.trunc(number);
+  };
+  const totalTests = parseCount(params.totalTests, "totalTests");
+  const passedTests = parseCount(params.passedTests, "passedTests");
+  const failedTests = parseCount(params.failedTests, "failedTests");
+  const runDurationMs = typeof params.runDurationMs === "undefined" || params.runDurationMs === null ? null : parseCount(params.runDurationMs, "runDurationMs");
+  const executedAtRaw = toTrimmedString(params.executedAt ?? null, 80);
+  const executedAt = executedAtRaw ? new Date(executedAtRaw).toISOString() : new Date().toISOString();
+
+  const { data, error } = await client
+    .from("qa_api_contract_runs")
+    .insert({
+      suite_name: suiteName,
+      environment,
+      status,
+      total_tests: totalTests,
+      passed_tests: passedTests,
+      failed_tests: failedTests,
+      run_duration_ms: runDurationMs,
+      details: params.details ?? {},
+      executed_by: adminUserId,
+      executed_at: executedAt,
+    })
+    .select("id, suite_name, environment, status, total_tests, passed_tests, failed_tests, run_duration_ms, details, executed_by, executed_at, created_at, updated_at")
+    .single();
+  if (error || !data) throw error ?? new Error("Failed to create QA API contract run");
+
+  await createOpsActivityLog(client, {
+    actorUserId: adminUserId,
+    activityType: "qa_api_contract_run_created",
+    entityType: "qa_api_contract_runs",
+    entityId: data.id,
+    details: { suite_name: data.suite_name, status: data.status, environment: data.environment },
+  });
+  return data;
+};
+
+const listQaE2eSmokeRuns = async (
+  client: ReturnType<typeof createClient>,
+  options?: { roleScope?: string | null; status?: string | null; limit?: number; offset?: number },
+) => {
+  const limit = Math.max(1, Math.min(300, Number(options?.limit ?? 120)));
+  const offset = Math.max(0, Number(options?.offset ?? 0));
+  let query = client
+    .from("qa_e2e_smoke_runs")
+    .select("id, flow_name, role_scope, status, evidence, error_summary, executed_by, executed_at, created_at, updated_at")
+    .order("executed_at", { ascending: false })
+    .range(offset, offset + limit - 1);
+  const roleScope = toTrimmedString(options?.roleScope ?? null, 80);
+  if (roleScope) query = query.eq("role_scope", roleScope);
+  const status = toTrimmedString(options?.status ?? null, 20);
+  if (status) query = query.eq("status", status);
+  const { data, error } = await query;
+  if (error) throw error;
+  return data ?? [];
+};
+
+const createQaE2eSmokeRunByAdmin = async (
+  client: ReturnType<typeof createClient>,
+  adminUserId: string,
+  params: {
+    flowName: string;
+    roleScope?: string | null;
+    status: string;
+    evidence?: Record<string, unknown>;
+    errorSummary?: string | null;
+    executedAt?: string | null;
+  },
+) => {
+  const flowName = toTrimmedString(params.flowName, 160);
+  if (!flowName) throw new Error("flowName is required");
+  const status = toTrimmedString(params.status, 20);
+  if (!status || !QA_RUN_ALLOWED_STATUS.has(status)) throw new Error("status must be one of: pass, warn, fail");
+  const roleScope = toTrimmedString(params.roleScope ?? null, 80) ?? "all";
+  const executedAtRaw = toTrimmedString(params.executedAt ?? null, 80);
+  const executedAt = executedAtRaw ? new Date(executedAtRaw).toISOString() : new Date().toISOString();
+
+  const { data, error } = await client
+    .from("qa_e2e_smoke_runs")
+    .insert({
+      flow_name: flowName,
+      role_scope: roleScope,
+      status,
+      evidence: params.evidence ?? {},
+      error_summary: toTrimmedString(params.errorSummary ?? null, 6000),
+      executed_by: adminUserId,
+      executed_at: executedAt,
+    })
+    .select("id, flow_name, role_scope, status, evidence, error_summary, executed_by, executed_at, created_at, updated_at")
+    .single();
+  if (error || !data) throw error ?? new Error("Failed to create QA E2E smoke run");
+
+  await createOpsActivityLog(client, {
+    actorUserId: adminUserId,
+    activityType: "qa_e2e_smoke_run_created",
+    entityType: "qa_e2e_smoke_runs",
+    entityId: data.id,
+    details: { flow_name: data.flow_name, status: data.status, role_scope: data.role_scope },
+  });
+  return data;
+};
+
+const listQaFailures = async (
+  client: ReturnType<typeof createClient>,
+  options?: { status?: string | null; severity?: string | null; limit?: number; offset?: number },
+) => {
+  const limit = Math.max(1, Math.min(300, Number(options?.limit ?? 120)));
+  const offset = Math.max(0, Number(options?.offset ?? 0));
+  let query = client
+    .from("qa_failure_registry")
+    .select("id, source_type, source_run_id, severity, status, title, detail, owner_user_id, acknowledged_by, acknowledged_at, resolved_by, resolved_at, metadata, created_at, updated_at")
+    .order("created_at", { ascending: false })
+    .range(offset, offset + limit - 1);
+  const status = toTrimmedString(options?.status ?? null, 20);
+  if (status) query = query.eq("status", status);
+  const severity = toTrimmedString(options?.severity ?? null, 20);
+  if (severity) query = query.eq("severity", severity);
+  const { data, error } = await query;
+  if (error) throw error;
+  return data ?? [];
+};
+
+const upsertQaFailureByAdmin = async (
+  client: ReturnType<typeof createClient>,
+  adminUserId: string,
+  params: {
+    id?: string | null;
+    sourceType: string;
+    sourceRunId?: string | null;
+    severity: string;
+    status?: string | null;
+    title: string;
+    detail?: string | null;
+    ownerUserId?: string | null;
+    metadata?: Record<string, unknown>;
+  },
+) => {
+  if (params.id) assertUuid(params.id, "id");
+  if (params.sourceRunId) assertUuid(params.sourceRunId, "sourceRunId");
+  if (params.ownerUserId) assertUuid(params.ownerUserId, "ownerUserId");
+
+  const sourceType = toTrimmedString(params.sourceType, 40);
+  if (!sourceType || !QA_FAILURE_ALLOWED_SOURCES.has(sourceType)) {
+    throw new Error("sourceType must be one of: api_contract, e2e_smoke, manual, production_incident");
+  }
+  const severity = toTrimmedString(params.severity, 20);
+  if (!severity || !QA_FAILURE_ALLOWED_SEVERITIES.has(severity)) {
+    throw new Error("severity must be one of: medium, high, critical");
+  }
+  const status = toTrimmedString(params.status ?? null, 20) ?? "open";
+  if (!QA_FAILURE_ALLOWED_STATUSES.has(status)) {
+    throw new Error("status must be one of: open, acknowledged, resolved, dismissed");
+  }
+  const title = toTrimmedString(params.title, 240);
+  if (!title) throw new Error("title is required");
+  const nowIso = new Date().toISOString();
+  const acknowledged = status === "acknowledged";
+  const resolved = status === "resolved" || status === "dismissed";
+
+  const { data, error } = await client
+    .from("qa_failure_registry")
+    .upsert({
+      id: params.id ?? undefined,
+      source_type: sourceType,
+      source_run_id: params.sourceRunId ?? null,
+      severity,
+      status,
+      title,
+      detail: toTrimmedString(params.detail ?? null, 6000),
+      owner_user_id: params.ownerUserId ?? null,
+      acknowledged_by: acknowledged ? adminUserId : null,
+      acknowledged_at: acknowledged ? nowIso : null,
+      resolved_by: resolved ? adminUserId : null,
+      resolved_at: resolved ? nowIso : null,
+      metadata: params.metadata ?? {},
+      updated_at: nowIso,
+    })
+    .select("id, source_type, source_run_id, severity, status, title, detail, owner_user_id, acknowledged_by, acknowledged_at, resolved_by, resolved_at, metadata, created_at, updated_at")
+    .single();
+  if (error || !data) throw error ?? new Error("Failed to upsert QA failure");
+
+  await createOpsActivityLog(client, {
+    actorUserId: adminUserId,
+    activityType: "qa_failure_upserted",
+    entityType: "qa_failure_registry",
+    entityId: data.id,
+    details: { source_type: data.source_type, severity: data.severity, status: data.status },
+  });
+  return data;
+};
+
+const collectQaReadinessSignals = async (
+  client: ReturnType<typeof createClient>,
+) => {
+  const apiCutoff = new Date(Date.now() - 3 * 24 * 60 * 60 * 1000).toISOString();
+  const e2eCutoff = new Date(Date.now() - 3 * 24 * 60 * 60 * 1000).toISOString();
+
+  const [apiRecentResult, e2eRecentResult, failuresResult] = await Promise.all([
+    client.from("qa_api_contract_runs").select("id, status").gte("executed_at", apiCutoff),
+    client.from("qa_e2e_smoke_runs").select("id, status").gte("executed_at", e2eCutoff),
+    client.from("qa_failure_registry").select("id, severity, status").in("status", ["open", "acknowledged"]),
+  ]);
+  if (apiRecentResult.error) throw apiRecentResult.error;
+  if (e2eRecentResult.error) throw e2eRecentResult.error;
+  if (failuresResult.error) throw failuresResult.error;
+
+  const apiRecent = apiRecentResult.data ?? [];
+  const e2eRecent = e2eRecentResult.data ?? [];
+  const failures = failuresResult.data ?? [];
+
+  const apiFail = apiRecent.filter((row) => row.status === "fail").length;
+  const e2eFail = e2eRecent.filter((row) => row.status === "fail").length;
+  const failureCritical = failures.filter((row) => row.severity === "critical").length;
+  const failureHigh = failures.filter((row) => row.severity === "high").length;
+  const failureMedium = failures.filter((row) => row.severity === "medium").length;
+
+  return {
+    summary: {
+      critical: failureCritical + apiFail + e2eFail,
+      high: failureHigh + (apiRecent.length === 0 ? 1 : 0) + (e2eRecent.length === 0 ? 1 : 0),
+      medium: failureMedium,
+    },
+    metrics: {
+      api_contract_runs_last_72h: apiRecent.length,
+      api_contract_runs_failed_last_72h: apiFail,
+      e2e_smoke_runs_last_72h: e2eRecent.length,
+      e2e_smoke_runs_failed_last_72h: e2eFail,
+      qa_failures_open_critical: failureCritical,
+      qa_failures_open_high: failureHigh,
+      qa_failures_open_medium: failureMedium,
+    },
+    overall: {
+      pass: failureCritical === 0 && apiFail === 0 && e2eFail === 0 && apiRecent.length > 0 && e2eRecent.length > 0,
+    },
+  };
+};
+
 const OPS_TICKET_ALLOWED_STATUSES = new Set(["open", "in_progress", "waiting_customer", "resolved", "closed"]);
 const OPS_TICKET_ALLOWED_PRIORITIES = new Set(["low", "medium", "high", "critical"]);
 const OPS_TICKET_ALLOWED_CATEGORIES = new Set(["general", "billing", "kyc", "technical", "workflow", "dispute", "security"]);
@@ -10134,6 +10437,122 @@ serve(async (req: Request) => {
           detail: typeof body.detail === "string" ? body.detail : null,
           triggeredValue: Number.isFinite(Number(body.triggeredValue)) ? Number(body.triggeredValue) : null,
           budgetPolicyId: typeof body.budgetPolicyId === "string" ? body.budgetPolicyId : null,
+          metadata: safeMetadataObject(body.metadata),
+        }),
+      });
+    }
+
+    if (req.method === "GET" && path.endsWith("ops/qa/readiness")) {
+      requireRole(roles, ["admin"]);
+      return json(req, 200, {
+        ok: true,
+        data: await collectQaReadinessSignals(client),
+      });
+    }
+
+    if (req.method === "GET" && path.endsWith("ops/qa/api-contract-runs")) {
+      requireRole(roles, ["admin"]);
+      const limitRaw = Number(url.searchParams.get("limit") ?? 120);
+      const offsetRaw = Number(url.searchParams.get("offset") ?? 0);
+      return json(req, 200, {
+        ok: true,
+        data: await listQaApiContractRuns(client, {
+          environment: url.searchParams.get("environment"),
+          status: url.searchParams.get("status"),
+          limit: Number.isFinite(limitRaw) ? limitRaw : 120,
+          offset: Number.isFinite(offsetRaw) ? offsetRaw : 0,
+        }),
+      });
+    }
+
+    if (req.method === "POST" && path.endsWith("ops/qa/api-contract-runs")) {
+      requireRole(roles, ["admin"]);
+      const body = await req.json().catch(() => ({}));
+      if (!body || typeof body !== "object") {
+        return json(req, 400, { error: "request body is required" });
+      }
+      return json(req, 200, {
+        ok: true,
+        data: await createQaApiContractRunByAdmin(client, user.id, {
+          suiteName: typeof body.suiteName === "string" ? body.suiteName : "",
+          environment: typeof body.environment === "string" ? body.environment : null,
+          status: typeof body.status === "string" ? body.status.trim().toLowerCase() : "",
+          totalTests: Number(body.totalTests ?? 0),
+          passedTests: Number(body.passedTests ?? 0),
+          failedTests: Number(body.failedTests ?? 0),
+          runDurationMs: Number.isFinite(Number(body.runDurationMs)) ? Number(body.runDurationMs) : null,
+          details: safeMetadataObject(body.details),
+          executedAt: typeof body.executedAt === "string" ? body.executedAt : null,
+        }),
+      });
+    }
+
+    if (req.method === "GET" && path.endsWith("ops/qa/e2e-smoke-runs")) {
+      requireRole(roles, ["admin"]);
+      const limitRaw = Number(url.searchParams.get("limit") ?? 120);
+      const offsetRaw = Number(url.searchParams.get("offset") ?? 0);
+      return json(req, 200, {
+        ok: true,
+        data: await listQaE2eSmokeRuns(client, {
+          roleScope: url.searchParams.get("role_scope"),
+          status: url.searchParams.get("status"),
+          limit: Number.isFinite(limitRaw) ? limitRaw : 120,
+          offset: Number.isFinite(offsetRaw) ? offsetRaw : 0,
+        }),
+      });
+    }
+
+    if (req.method === "POST" && path.endsWith("ops/qa/e2e-smoke-runs")) {
+      requireRole(roles, ["admin"]);
+      const body = await req.json().catch(() => ({}));
+      if (!body || typeof body !== "object") {
+        return json(req, 400, { error: "request body is required" });
+      }
+      return json(req, 200, {
+        ok: true,
+        data: await createQaE2eSmokeRunByAdmin(client, user.id, {
+          flowName: typeof body.flowName === "string" ? body.flowName : "",
+          roleScope: typeof body.roleScope === "string" ? body.roleScope : null,
+          status: typeof body.status === "string" ? body.status.trim().toLowerCase() : "",
+          evidence: safeMetadataObject(body.evidence),
+          errorSummary: typeof body.errorSummary === "string" ? body.errorSummary : null,
+          executedAt: typeof body.executedAt === "string" ? body.executedAt : null,
+        }),
+      });
+    }
+
+    if (req.method === "GET" && path.endsWith("ops/qa/failures")) {
+      requireRole(roles, ["admin"]);
+      const limitRaw = Number(url.searchParams.get("limit") ?? 120);
+      const offsetRaw = Number(url.searchParams.get("offset") ?? 0);
+      return json(req, 200, {
+        ok: true,
+        data: await listQaFailures(client, {
+          status: url.searchParams.get("status"),
+          severity: url.searchParams.get("severity"),
+          limit: Number.isFinite(limitRaw) ? limitRaw : 120,
+          offset: Number.isFinite(offsetRaw) ? offsetRaw : 0,
+        }),
+      });
+    }
+
+    if (req.method === "POST" && path.endsWith("ops/qa/failures")) {
+      requireRole(roles, ["admin"]);
+      const body = await req.json().catch(() => ({}));
+      if (!body || typeof body !== "object") {
+        return json(req, 400, { error: "request body is required" });
+      }
+      return json(req, 200, {
+        ok: true,
+        data: await upsertQaFailureByAdmin(client, user.id, {
+          id: typeof body.id === "string" ? body.id : null,
+          sourceType: typeof body.sourceType === "string" ? body.sourceType.trim().toLowerCase() : "",
+          sourceRunId: typeof body.sourceRunId === "string" ? body.sourceRunId : null,
+          severity: typeof body.severity === "string" ? body.severity.trim().toLowerCase() : "",
+          status: typeof body.status === "string" ? body.status.trim().toLowerCase() : null,
+          title: typeof body.title === "string" ? body.title : "",
+          detail: typeof body.detail === "string" ? body.detail : null,
+          ownerUserId: typeof body.ownerUserId === "string" ? body.ownerUserId : null,
           metadata: safeMetadataObject(body.metadata),
         }),
       });
