@@ -16,6 +16,7 @@ describe("ops-contract", () => {
       workflowSla: { critical: 0, high: 0, medium: 0 },
       aiOps: { sampledRows: 10, failedCount: 1, staleProcessingCount: 0 },
       tenantIsolation: { critical: 0, high: 0, medium: 0 },
+      auditTrail: { critical: 0, high: 0, medium: 0 },
     });
 
     expect(result.status).toBe("fail");
@@ -36,6 +37,7 @@ describe("ops-contract", () => {
       workflowSla: { critical: 0, high: 0, medium: 0 },
       aiOps: { sampledRows: 20, failedCount: 1, staleProcessingCount: 0 },
       tenantIsolation: { critical: 0, high: 0, medium: 0 },
+      auditTrail: { critical: 0, high: 0, medium: 0 },
     });
 
     expect(result.status).toBe("warn");
@@ -56,6 +58,7 @@ describe("ops-contract", () => {
       workflowSla: { critical: 0, high: 0, medium: 0 },
       aiOps: { sampledRows: 100, failedCount: 3, staleProcessingCount: 0 },
       tenantIsolation: { critical: 0, high: 0, medium: 0 },
+      auditTrail: { critical: 0, high: 0, medium: 0 },
     });
 
     expect(result.status).toBe("pass");
@@ -68,6 +71,7 @@ describe("ops-contract", () => {
     expect(runbooks.items.length).toBeGreaterThan(0);
     expect(checklist.flows.length).toBeGreaterThan(0);
     expect(checklist.requiredEndpoints).toContain("/ops/prelaunch-gate");
+    expect(checklist.requiredEndpoints).toContain("/ops/draft-audit-integrity-check");
   });
 
   it("fails gate when required schema is missing", () => {
@@ -84,6 +88,7 @@ describe("ops-contract", () => {
       workflowSla: { critical: 0, high: 0, medium: 0 },
       aiOps: { sampledRows: 50, failedCount: 2, staleProcessingCount: 0 },
       tenantIsolation: { critical: 0, high: 0, medium: 0 },
+      auditTrail: { critical: 0, high: 0, medium: 0 },
     });
 
     expect(result.status).toBe("fail");
@@ -103,8 +108,29 @@ describe("ops-contract", () => {
       workflowSla: { critical: 0, high: 0, medium: 0 },
       aiOps: { sampledRows: 80, failedCount: 1, staleProcessingCount: 0 },
       tenantIsolation: { critical: 0, high: 2, medium: 1 },
+      auditTrail: { critical: 0, high: 0, medium: 0 },
     });
 
     expect(result.status).toBe("warn");
+  });
+
+  it("fails gate when audit trail has critical findings", () => {
+    const result = computePrelaunchGate({
+      envPresent: {
+        SUPABASE_URL: true,
+        SUPABASE_ANON_KEY: true,
+      },
+      schemaReadiness: {
+        missingTables: [],
+        probeErrors: 0,
+      },
+      workflowIntegrity: { critical: 0, high: 0, medium: 0 },
+      workflowSla: { critical: 0, high: 0, medium: 0 },
+      aiOps: { sampledRows: 50, failedCount: 1, staleProcessingCount: 0 },
+      tenantIsolation: { critical: 0, high: 0, medium: 0 },
+      auditTrail: { critical: 2, high: 0, medium: 0 },
+    });
+
+    expect(result.status).toBe("fail");
   });
 });

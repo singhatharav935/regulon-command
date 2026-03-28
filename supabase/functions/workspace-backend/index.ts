@@ -3522,6 +3522,199 @@ const runTenantIsolationCheck = async (
   };
 };
 
+const runDraftAuditTrailIntegrityCheck = async (
+  client: ReturnType<typeof createClient>,
+  options?: { limit?: number; companyId?: string | null },
+) => {
+  const limit = Math.max(50, Math.min(5000, Number(options?.limit ?? 800)));
+  const companyId = typeof options?.companyId === "string" && options.companyId.trim() ? options.companyId.trim() : null;
+
+  let runsQuery = client
+    .from("draft_runs")
+    .select("id, company_id, status, created_at")
+    .order("created_at", { ascending: false })
+    .limit(limit);
+  if (companyId) runsQuery = runsQuery.eq("company_id", companyId);
+
+  const { data: runs, error: runsError } = await runsQuery;
+  if (runsError) throw runsError;
+
+  const runRows = runs ?? [];
+  const runIds = runRows.map((row) => row.id);
+  if (runIds.length === 0) {
+    return {
+      scanned: 0,
+      findings: [],
+      summary: { critical: 0, high: 0, medium: 0 },
+      overall: { pass: true },
+    };
+  }
+
+  const [versionsResult, eventsResult] = await Promise.all([
+    client
+      .from("draft_versions")
+      .select("draft_run_id, version_number, created_at")
+      .in("draft_run_id", runIds)
+      .order("version_number", { ascending: true }),
+    client
+      .from("draft_audit_events")
+      .select("draft_run_id, event_type, created_at")
+      .in("draft_run_id", runIds)
+      .order("created_at", { ascending: true }),
+  ]);
+  if (versionsResult.error) throw versionsResult.error;
+  if (eventsResult.error) throw eventsResult.error;
+
+  const versionsByRun = new Map<string, Array<{ version_number: number; created_at: string }>>();
+  for (const row of versionsResult.data ?? []) {
+    const list = versionsByRun.get(row.draft_run_id) ?? [];
+    list.push({
+      version_number: Number(row.version_number),
+      created_at: String(row.created_at),
+    });
+    versionsByRun.set(row.draft_run_id, list);
+  }
+
+  const eventsByRun = new Map<string, Array<{ event_type: string; created_at: string }>>();
+  for (const row of eventsResult.data ?? []) {
+    const list = eventsByRun.get(row.draft_run_id) ?? [];
+    list.push({
+      event_type: String(row.event_type),
+      created_at: String(row.created_at),
+    });
+    eventsByRun.set(row.draft_run_id, list);
+  }
+
+  const findings: Array<{
+    severity: "critical" | "high" | "medium";
+    code: string;
+    draft_run_id: string;
+    detail: string;
+  }> = [];
+
+  for (const run of runRows) {
+    const runVersions = versionsByRun.get(run.id) ?? [];
+    const runEvents = eventsByRun.get(run.id) ?? [];
+
+    if (runVersions.length === 0) {
+      findings.push({
+        severity: "critical",
+        code: "MISSING_VERSIONS",
+        draft_run_id: run.id,
+        detail: "Draft run has no version history rows.",
+      });
+    } else {
+      const uniqueVersions = new Set(runVersions.map((v) => v.version_number));
+      if (uniqueVersions.size !== runVersions.length) {
+        findings.push({
+          severity: "critical",
+          code: "DUPLICATE_VERSION_NUMBER",
+          draft_run_id: run.id,
+          detail: "Duplicate version numbers detected for draft run.",
+        });
+      }
+      if (runVersions[0].version_number !== 1) {
+        findings.push({
+          severity: "critical",
+          code: "VERSION_SEQUENCE_START_INVALID",
+          draft_run_id: run.id,
+          detail: `Version sequence starts at ${runVersions[0].version_number} instead of 1.`,
+        });
+      }
+      let expected = 1;
+      for (const version of runVersions) {
+        if (version.version_number !== expected) {
+          findings.push({
+            severity: "critical",
+            code: "VERSION_SEQUENCE_GAP",
+            draft_run_id: run.id,
+            detail: `Expected version ${expected} but found ${version.version_number}.`,
+          });
+          break;
+        }
+        expected += 1;
+      }
+    }
+
+    if (runEvents.length === 0) {
+      findings.push({
+        severity: "critical",
+        code: "MISSING_AUDIT_EVENTS",
+        draft_run_id: run.id,
+        detail: "Draft run has no audit trail events.",
+      });
+      continue;
+    }
+
+    const eventSet = new Set(runEvents.map((event) => event.event_type));
+    if (!eventSet.has("draft_generated")) {
+      findings.push({
+        severity: "high",
+        code: "MISSING_DRAFT_GENERATED_EVENT",
+        draft_run_id: run.id,
+        detail: "Audit trail does not include draft_generated event.",
+      });
+    }
+
+    if (run.status === "under_review" && !eventSet.has("submitted_for_review")) {
+      findings.push({
+        severity: "high",
+        code: "UNDER_REVIEW_WITHOUT_SUBMISSION_EVENT",
+        draft_run_id: run.id,
+        detail: "Draft status is under_review but no submitted_for_review event exists.",
+      });
+    }
+
+    if (
+      run.status === "approved" &&
+      !(eventSet.has("review_approved") || eventSet.has("legal_review_approved") || eventSet.has("external_legal_signed_off"))
+    ) {
+      findings.push({
+        severity: "high",
+        code: "APPROVED_WITHOUT_APPROVAL_EVENT",
+        draft_run_id: run.id,
+        detail: "Draft status is approved but no approval event exists.",
+      });
+    }
+
+    if (
+      run.status === "signed_off" &&
+      !(eventSet.has("final_sign_off") || eventSet.has("legal_final_sign_off") || eventSet.has("external_legal_signed_off"))
+    ) {
+      findings.push({
+        severity: "high",
+        code: "SIGNED_OFF_WITHOUT_SIGNOFF_EVENT",
+        draft_run_id: run.id,
+        detail: "Draft status is signed_off but no sign-off event exists.",
+      });
+    }
+
+    const runCreatedAtMs = Date.parse(String(run.created_at));
+    const earliestEventMs = Date.parse(runEvents[0].created_at);
+    if (!Number.isNaN(runCreatedAtMs) && !Number.isNaN(earliestEventMs) && earliestEventMs < runCreatedAtMs - 60_000) {
+      findings.push({
+        severity: "medium",
+        code: "EVENT_BEFORE_RUN_CREATED",
+        draft_run_id: run.id,
+        detail: "Earliest audit event timestamp is earlier than draft run creation timestamp.",
+      });
+    }
+  }
+
+  return {
+    scanned: runRows.length,
+    findings: findings.slice(0, 300),
+    summary: {
+      critical: findings.filter((item) => item.severity === "critical").length,
+      high: findings.filter((item) => item.severity === "high").length,
+      medium: findings.filter((item) => item.severity === "medium").length,
+    },
+    overall: {
+      pass: findings.length === 0,
+    },
+  };
+};
+
 const collectPrelaunchSignals = async (
   client: ReturnType<typeof createClient>,
 ) => {
@@ -3534,9 +3727,11 @@ const collectPrelaunchSignals = async (
     OPENAI_MODEL: Boolean(Deno.env.get("OPENAI_MODEL")),
   };
 
-  const [integrity, sla] = await Promise.all([
+  const [integrity, sla, tenantIsolation, auditTrail] = await Promise.all([
     runWorkflowIntegrityCheck(client, { limit: 300 }),
     runWorkflowSlaMonitor(client, { limit: 500 }),
+    runTenantIsolationCheck(client, { limitPerTable: 3000 }),
+    runDraftAuditTrailIntegrityCheck(client, { limit: 1200 }),
   ]);
   const deployReadiness = await collectDeployReadinessSignals(client);
 
@@ -3567,7 +3762,8 @@ const collectPrelaunchSignals = async (
       failedCount,
       staleProcessingCount,
     },
-    tenantIsolation: (await runTenantIsolationCheck(client, { limitPerTable: 3000 })).summary,
+    tenantIsolation: tenantIsolation.summary,
+    auditTrail: auditTrail.summary,
   };
 };
 
@@ -4702,6 +4898,7 @@ const getRouteAccessMatrix = () => ({
     { route: "GET /ops/security/readiness", roles: ["admin"] },
     { route: "GET /ops/security/session-check", roles: ["user", "manager", "admin"] },
     { route: "GET /ops/workflow-integrity-check", roles: ["admin"] },
+    { route: "GET /ops/draft-audit-integrity-check", roles: ["admin"] },
     { route: "GET /ops/workflow-sla-monitor", roles: ["admin"] },
     { route: "GET /ops/tenant-isolation-check", roles: ["admin"] },
     { route: "GET /ops/deploy-readiness", roles: ["admin"] },
@@ -5520,6 +5717,20 @@ serve(async (req: Request) => {
       return json(req, 200, {
         ok: true,
         data: await runWorkflowIntegrityCheck(client, {
+          limit,
+          companyId,
+        }),
+      });
+    }
+
+    if (req.method === "GET" && path.endsWith("ops/draft-audit-integrity-check")) {
+      requireRole(roles, ["admin"]);
+      const limitRaw = Number(url.searchParams.get("limit") ?? 800);
+      const limit = Number.isFinite(limitRaw) ? limitRaw : 800;
+      const companyId = url.searchParams.get("company_id");
+      return json(req, 200, {
+        ok: true,
+        data: await runDraftAuditTrailIntegrityCheck(client, {
           limit,
           companyId,
         }),

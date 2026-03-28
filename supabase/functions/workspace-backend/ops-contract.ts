@@ -26,6 +26,11 @@ export type PrelaunchSignals = {
     high: number;
     medium: number;
   };
+  auditTrail: {
+    critical: number;
+    high: number;
+    medium: number;
+  };
 };
 
 export const computePrelaunchGate = (signals: PrelaunchSignals) => {
@@ -69,6 +74,12 @@ export const computePrelaunchGate = (signals: PrelaunchSignals) => {
       title: "Tenant Isolation",
       status: signals.tenantIsolation.critical > 0 ? "fail" : signals.tenantIsolation.high > 0 ? "warn" : "pass",
       detail: "Cross-tenant reference integrity and membership isolation checks are healthy.",
+    },
+    {
+      id: "audit_trail",
+      title: "Draft Version & Audit Trail Integrity",
+      status: signals.auditTrail.critical > 0 ? "fail" : signals.auditTrail.high > 0 ? "warn" : "pass",
+      detail: "Every draft has coherent versions and mandatory lifecycle audit events.",
     },
   ] as const;
 
@@ -139,6 +150,7 @@ export const buildRegressionChecklist = () => ({
     "/drafts/:id/exports",
     "/draft-exports/:id/download-link",
     "/ops/workflow-integrity-check",
+    "/ops/draft-audit-integrity-check",
     "/ops/workflow-sla-monitor",
     "/ops/prelaunch-gate",
   ],
