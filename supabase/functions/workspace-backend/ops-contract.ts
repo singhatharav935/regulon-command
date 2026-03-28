@@ -51,6 +51,11 @@ export type PrelaunchSignals = {
     high: number;
     medium: number;
   };
+  infraDevops: {
+    critical: number;
+    high: number;
+    medium: number;
+  };
 };
 
 export const computePrelaunchGate = (signals: PrelaunchSignals) => {
@@ -124,6 +129,12 @@ export const computePrelaunchGate = (signals: PrelaunchSignals) => {
       title: "Operations Readiness",
       status: signals.operationsReadiness.critical > 0 ? "fail" : signals.operationsReadiness.high > 0 ? "warn" : "pass",
       detail: "Support ticketing, assignment workflows, and ops activity logs are operational.",
+    },
+    {
+      id: "infra_devops",
+      title: "Infra & DevOps Readiness",
+      status: signals.infraDevops.critical > 0 ? "fail" : signals.infraDevops.high > 0 ? "warn" : "pass",
+      detail: "Runbooks, release governance, backup drills, monitoring, and SLO control are operational.",
     },
   ] as const;
 
@@ -200,6 +211,7 @@ export const buildRegressionChecklist = () => ({
     "/ops/compliance/legal-documents",
     "/ops/commercial/readiness",
     "/ops/operations/readiness",
+    "/ops/infra/readiness",
     "/ops/workflow-sla-monitor",
     "/ops/prelaunch-gate",
   ],

@@ -1094,6 +1094,8 @@ const resolveErrorCode = (message: string) => {
   if (message.startsWith("Public rate limit exceeded:")) return "AI_RATE_LIMITED";
   if (message.startsWith("Unsupported documentType:")) return "VALIDATION_INVALID_FIELD";
   if (message.includes("must be one of:")) return "VALIDATION_INVALID_FIELD";
+  if (message.includes("must be between 0 and 100")) return "VALIDATION_INVALID_FIELD";
+  if (message.includes("must be a positive number")) return "VALIDATION_INVALID_FIELD";
   if (message.startsWith("dueAt must be a valid ISO date")) return "VALIDATION_INVALID_FIELD";
   if (message.includes("must be snake_case")) return "VALIDATION_INVALID_FIELD";
   if (message.startsWith("Published legal document not found")) return "VALIDATION_INVALID_FIELD";
@@ -3968,7 +3970,7 @@ const collectPrelaunchSignals = async (
     OPENAI_MODEL: Boolean(Deno.env.get("OPENAI_MODEL")),
   };
 
-  const [integrity, sla, tenantIsolation, auditTrail, exportIntegrity, complianceLegal, commercialReadiness, operationsReadiness] = await Promise.all([
+  const [integrity, sla, tenantIsolation, auditTrail, exportIntegrity, complianceLegal, commercialReadiness, operationsReadiness, infraDevops] = await Promise.all([
     runWorkflowIntegrityCheck(client, { limit: 300 }),
     runWorkflowSlaMonitor(client, { limit: 500 }),
     runTenantIsolationCheck(client, { limitPerTable: 3000 }),
@@ -3977,6 +3979,7 @@ const collectPrelaunchSignals = async (
     collectComplianceLegalReadinessSignals(client),
     collectCommercialReadinessSignals(client),
     collectOperationsReadinessSignals(client),
+    collectInfraDevopsReadinessSignals(client),
   ]);
   const deployReadiness = await collectDeployReadinessSignals(client);
 
@@ -4013,6 +4016,7 @@ const collectPrelaunchSignals = async (
     complianceLegal: complianceLegal.summary,
     commercialReadiness: commercialReadiness.summary,
     operationsReadiness: operationsReadiness.summary,
+    infraDevops: infraDevops.summary,
   };
 };
 
@@ -4066,6 +4070,12 @@ const collectDeployReadinessSignals = async (
     "ops_support_ticket_messages",
     "ops_client_assignment_requests",
     "ops_activity_logs",
+    "infra_runbooks",
+    "infra_release_registry",
+    "infra_backup_restore_drills",
+    "infra_monitoring_integrations",
+    "infra_slo_policies",
+    "infra_slo_breaches",
   ];
   const missingTables: string[] = [];
   const tableProbeErrors: Array<{ table: string; code: string | null; message: string }> = [];
@@ -5210,6 +5220,19 @@ const getRouteAccessMatrix = () => ({
     { route: "POST /ops/compliance/data-requests/:id/status", roles: ["admin"] },
     { route: "GET /ops/commercial/readiness", roles: ["admin"] },
     { route: "GET /ops/operations/readiness", roles: ["admin"] },
+    { route: "GET /ops/infra/readiness", roles: ["admin"] },
+    { route: "GET /ops/infra/runbooks", roles: ["admin"] },
+    { route: "POST /ops/infra/runbooks", roles: ["admin"] },
+    { route: "GET /ops/infra/releases", roles: ["admin"] },
+    { route: "POST /ops/infra/releases", roles: ["admin"] },
+    { route: "GET /ops/infra/backup-drills", roles: ["admin"] },
+    { route: "POST /ops/infra/backup-drills", roles: ["admin"] },
+    { route: "GET /ops/infra/monitoring-integrations", roles: ["admin"] },
+    { route: "POST /ops/infra/monitoring-integrations", roles: ["admin"] },
+    { route: "GET /ops/infra/slo-policies", roles: ["admin"] },
+    { route: "POST /ops/infra/slo-policies", roles: ["admin"] },
+    { route: "GET /ops/infra/slo-breaches", roles: ["admin"] },
+    { route: "POST /ops/infra/slo-breaches", roles: ["admin"] },
     { route: "POST /ops/billing/invoice/issue", roles: ["admin"] },
     { route: "POST /ops/billing/payment-attempt", roles: ["admin"] },
     { route: "POST /ops/assign/company-member", roles: ["admin"] },
@@ -6830,6 +6853,565 @@ const collectCommercialReadinessSignals = async (
   };
 };
 
+const INFRA_RUNBOOK_ALLOWED_STATUSES = new Set(["draft", "active", "archived"]);
+const INFRA_RELEASE_ALLOWED_ENVIRONMENTS = new Set(["development", "staging", "production"]);
+const INFRA_RELEASE_ALLOWED_STATUSES = new Set(["planned", "deployed", "rolled_back", "failed"]);
+const INFRA_BACKUP_DRILL_ALLOWED_ENVIRONMENTS = new Set(["staging", "production"]);
+const INFRA_BACKUP_DRILL_ALLOWED_STATUSES = new Set(["planned", "running", "succeeded", "failed"]);
+const INFRA_MONITORING_ALLOWED_TYPES = new Set(["uptime", "error_tracking", "logging", "alerting"]);
+const INFRA_MONITORING_ALLOWED_STATUSES = new Set(["active", "degraded", "disabled", "failed"]);
+const INFRA_SLO_BREACH_ALLOWED_SEVERITIES = new Set(["warning", "critical"]);
+const INFRA_SLO_BREACH_ALLOWED_STATUSES = new Set(["open", "acknowledged", "resolved"]);
+
+const listInfraRunbooks = async (
+  client: ReturnType<typeof createClient>,
+  options?: { status?: string | null; serviceScope?: string | null; limit?: number; offset?: number },
+) => {
+  const limit = Math.max(1, Math.min(200, Number(options?.limit ?? 80)));
+  const offset = Math.max(0, Number(options?.offset ?? 0));
+  let query = client
+    .from("infra_runbooks")
+    .select("id, runbook_key, title, service_scope, status, owner_user_id, metadata, updated_at, created_at")
+    .order("updated_at", { ascending: false })
+    .range(offset, offset + limit - 1);
+  const status = toTrimmedString(options?.status ?? null, 30);
+  if (status) query = query.eq("status", status);
+  const serviceScope = toTrimmedString(options?.serviceScope ?? null, 120);
+  if (serviceScope) query = query.eq("service_scope", serviceScope);
+  const { data, error } = await query;
+  if (error) throw error;
+  return data ?? [];
+};
+
+const upsertInfraRunbookByAdmin = async (
+  client: ReturnType<typeof createClient>,
+  adminUserId: string,
+  params: {
+    runbookKey: string;
+    title: string;
+    serviceScope?: string | null;
+    contentMarkdown: string;
+    status?: string | null;
+    metadata?: Record<string, unknown>;
+  },
+) => {
+  const runbookKey = toTrimmedString(params.runbookKey, 120);
+  if (!runbookKey) throw new Error("runbookKey is required");
+  if (!/^[a-z0-9_]+$/.test(runbookKey)) {
+    throw new Error("runbookKey must be snake_case");
+  }
+  const title = toTrimmedString(params.title, 220);
+  if (!title) throw new Error("title is required");
+  const contentMarkdown = toTrimmedString(params.contentMarkdown, 120000);
+  if (!contentMarkdown) throw new Error("contentMarkdown is required");
+  const serviceScope = toTrimmedString(params.serviceScope ?? null, 120) ?? "workspace-backend";
+  const status = toTrimmedString(params.status ?? null, 30) ?? "active";
+  if (!INFRA_RUNBOOK_ALLOWED_STATUSES.has(status)) {
+    throw new Error("status must be one of: draft, active, archived");
+  }
+
+  const { data, error } = await client
+    .from("infra_runbooks")
+    .upsert({
+      runbook_key: runbookKey,
+      title,
+      service_scope: serviceScope,
+      content_markdown: contentMarkdown,
+      status,
+      owner_user_id: adminUserId,
+      metadata: params.metadata ?? {},
+      updated_at: new Date().toISOString(),
+    }, { onConflict: "runbook_key" })
+    .select("id, runbook_key, title, service_scope, status, owner_user_id, metadata, updated_at, created_at")
+    .single();
+  if (error || !data) throw error ?? new Error("Failed to upsert infra runbook");
+
+  await createOpsActivityLog(client, {
+    actorUserId: adminUserId,
+    activityType: "infra_runbook_upserted",
+    entityType: "infra_runbooks",
+    entityId: data.id,
+    details: { runbook_key: data.runbook_key, status: data.status, service_scope: data.service_scope },
+  });
+  return data;
+};
+
+const listInfraReleaseRegistry = async (
+  client: ReturnType<typeof createClient>,
+  options?: { environment?: string | null; status?: string | null; limit?: number; offset?: number },
+) => {
+  const limit = Math.max(1, Math.min(200, Number(options?.limit ?? 80)));
+  const offset = Math.max(0, Number(options?.offset ?? 0));
+  let query = client
+    .from("infra_release_registry")
+    .select("id, release_version, environment, status, commit_sha, deployed_by, deployed_at, rollback_reference, rollback_reason, metadata, updated_at, created_at")
+    .order("deployed_at", { ascending: false })
+    .range(offset, offset + limit - 1);
+  const environment = toTrimmedString(options?.environment ?? null, 30);
+  if (environment) query = query.eq("environment", environment);
+  const status = toTrimmedString(options?.status ?? null, 30);
+  if (status) query = query.eq("status", status);
+  const { data, error } = await query;
+  if (error) throw error;
+  return data ?? [];
+};
+
+const upsertInfraReleaseByAdmin = async (
+  client: ReturnType<typeof createClient>,
+  adminUserId: string,
+  params: {
+    releaseVersion: string;
+    environment?: string | null;
+    status?: string | null;
+    commitSha?: string | null;
+    deployedAt?: string | null;
+    rollbackReference?: string | null;
+    rollbackReason?: string | null;
+    metadata?: Record<string, unknown>;
+  },
+) => {
+  const releaseVersion = toTrimmedString(params.releaseVersion, 120);
+  if (!releaseVersion) throw new Error("releaseVersion is required");
+  const environment = toTrimmedString(params.environment ?? null, 30) ?? "production";
+  if (!INFRA_RELEASE_ALLOWED_ENVIRONMENTS.has(environment)) {
+    throw new Error("environment must be one of: development, staging, production");
+  }
+  const status = toTrimmedString(params.status ?? null, 30) ?? "deployed";
+  if (!INFRA_RELEASE_ALLOWED_STATUSES.has(status)) {
+    throw new Error("status must be one of: planned, deployed, rolled_back, failed");
+  }
+  const deployedAtRaw = toTrimmedString(params.deployedAt ?? null, 80);
+  const deployedAt = deployedAtRaw ? new Date(deployedAtRaw).toISOString() : new Date().toISOString();
+  const commitSha = toTrimmedString(params.commitSha ?? null, 120);
+  const rollbackReference = toTrimmedString(params.rollbackReference ?? null, 220);
+  const rollbackReason = toTrimmedString(params.rollbackReason ?? null, 3000);
+
+  const { data, error } = await client
+    .from("infra_release_registry")
+    .upsert({
+      release_version: releaseVersion,
+      environment,
+      status,
+      commit_sha: commitSha,
+      deployed_by: adminUserId,
+      deployed_at: deployedAt,
+      rollback_reference: rollbackReference,
+      rollback_reason: rollbackReason,
+      metadata: params.metadata ?? {},
+      updated_at: new Date().toISOString(),
+    }, { onConflict: "release_version,environment" })
+    .select("id, release_version, environment, status, commit_sha, deployed_by, deployed_at, rollback_reference, rollback_reason, metadata, updated_at, created_at")
+    .single();
+  if (error || !data) throw error ?? new Error("Failed to upsert release registry row");
+
+  await createOpsActivityLog(client, {
+    actorUserId: adminUserId,
+    activityType: "infra_release_upserted",
+    entityType: "infra_release_registry",
+    entityId: data.id,
+    details: { release_version: data.release_version, environment: data.environment, status: data.status },
+  });
+  return data;
+};
+
+const listInfraBackupRestoreDrills = async (
+  client: ReturnType<typeof createClient>,
+  options?: { environment?: string | null; status?: string | null; limit?: number; offset?: number },
+) => {
+  const limit = Math.max(1, Math.min(200, Number(options?.limit ?? 80)));
+  const offset = Math.max(0, Number(options?.offset ?? 0));
+  let query = client
+    .from("infra_backup_restore_drills")
+    .select("id, environment, status, executed_by, started_at, completed_at, rto_minutes, rpo_minutes, backup_snapshot_ref, notes, metadata, updated_at, created_at")
+    .order("started_at", { ascending: false })
+    .range(offset, offset + limit - 1);
+  const environment = toTrimmedString(options?.environment ?? null, 30);
+  if (environment) query = query.eq("environment", environment);
+  const status = toTrimmedString(options?.status ?? null, 30);
+  if (status) query = query.eq("status", status);
+  const { data, error } = await query;
+  if (error) throw error;
+  return data ?? [];
+};
+
+const createInfraBackupRestoreDrillByAdmin = async (
+  client: ReturnType<typeof createClient>,
+  adminUserId: string,
+  params: {
+    environment?: string | null;
+    status: string;
+    startedAt?: string | null;
+    completedAt?: string | null;
+    rtoMinutes?: number | null;
+    rpoMinutes?: number | null;
+    backupSnapshotRef?: string | null;
+    notes?: string | null;
+    metadata?: Record<string, unknown>;
+  },
+) => {
+  const environment = toTrimmedString(params.environment ?? null, 30) ?? "production";
+  if (!INFRA_BACKUP_DRILL_ALLOWED_ENVIRONMENTS.has(environment)) {
+    throw new Error("environment must be one of: staging, production");
+  }
+  const status = toTrimmedString(params.status, 30);
+  if (!status || !INFRA_BACKUP_DRILL_ALLOWED_STATUSES.has(status)) {
+    throw new Error("status must be one of: planned, running, succeeded, failed");
+  }
+  const startedAtRaw = toTrimmedString(params.startedAt ?? null, 80);
+  const startedAt = startedAtRaw ? new Date(startedAtRaw).toISOString() : new Date().toISOString();
+  const completedAtRaw = toTrimmedString(params.completedAt ?? null, 80);
+  const completedAt = completedAtRaw ? new Date(completedAtRaw).toISOString() : null;
+  const rtoMinutes = params.rtoMinutes === null || typeof params.rtoMinutes === "undefined" ? null : Number(params.rtoMinutes);
+  const rpoMinutes = params.rpoMinutes === null || typeof params.rpoMinutes === "undefined" ? null : Number(params.rpoMinutes);
+  if (rtoMinutes !== null && (!Number.isFinite(rtoMinutes) || rtoMinutes < 0)) {
+    throw new Error("rtoMinutes must be a non-negative number");
+  }
+  if (rpoMinutes !== null && (!Number.isFinite(rpoMinutes) || rpoMinutes < 0)) {
+    throw new Error("rpoMinutes must be a non-negative number");
+  }
+
+  const { data, error } = await client
+    .from("infra_backup_restore_drills")
+    .insert({
+      environment,
+      status,
+      executed_by: adminUserId,
+      started_at: startedAt,
+      completed_at: completedAt,
+      rto_minutes: rtoMinutes,
+      rpo_minutes: rpoMinutes,
+      backup_snapshot_ref: toTrimmedString(params.backupSnapshotRef ?? null, 220),
+      notes: toTrimmedString(params.notes ?? null, 3000),
+      metadata: params.metadata ?? {},
+    })
+    .select("id, environment, status, executed_by, started_at, completed_at, rto_minutes, rpo_minutes, backup_snapshot_ref, notes, metadata, updated_at, created_at")
+    .single();
+  if (error || !data) throw error ?? new Error("Failed to create backup/restore drill");
+
+  await createOpsActivityLog(client, {
+    actorUserId: adminUserId,
+    activityType: "infra_backup_drill_created",
+    entityType: "infra_backup_restore_drills",
+    entityId: data.id,
+    details: { environment: data.environment, status: data.status },
+  });
+  return data;
+};
+
+const listInfraMonitoringIntegrations = async (
+  client: ReturnType<typeof createClient>,
+  options?: { status?: string | null; integrationType?: string | null; limit?: number; offset?: number },
+) => {
+  const limit = Math.max(1, Math.min(200, Number(options?.limit ?? 80)));
+  const offset = Math.max(0, Number(options?.offset ?? 0));
+  let query = client
+    .from("infra_monitoring_integrations")
+    .select("id, provider, integration_type, status, config_masked, last_check_at, last_error, owner_user_id, metadata, updated_at, created_at")
+    .order("updated_at", { ascending: false })
+    .range(offset, offset + limit - 1);
+  const status = toTrimmedString(options?.status ?? null, 30);
+  if (status) query = query.eq("status", status);
+  const integrationType = toTrimmedString(options?.integrationType ?? null, 60);
+  if (integrationType) query = query.eq("integration_type", integrationType);
+  const { data, error } = await query;
+  if (error) throw error;
+  return data ?? [];
+};
+
+const upsertInfraMonitoringIntegrationByAdmin = async (
+  client: ReturnType<typeof createClient>,
+  adminUserId: string,
+  params: {
+    provider: string;
+    integrationType: string;
+    status?: string | null;
+    configMasked?: Record<string, unknown>;
+    lastCheckAt?: string | null;
+    lastError?: string | null;
+    metadata?: Record<string, unknown>;
+  },
+) => {
+  const provider = toTrimmedString(params.provider, 120);
+  if (!provider) throw new Error("provider is required");
+  const integrationType = toTrimmedString(params.integrationType, 60);
+  if (!integrationType || !INFRA_MONITORING_ALLOWED_TYPES.has(integrationType)) {
+    throw new Error("integrationType must be one of: uptime, error_tracking, logging, alerting");
+  }
+  const status = toTrimmedString(params.status ?? null, 30) ?? "active";
+  if (!INFRA_MONITORING_ALLOWED_STATUSES.has(status)) {
+    throw new Error("status must be one of: active, degraded, disabled, failed");
+  }
+  const lastCheckAtRaw = toTrimmedString(params.lastCheckAt ?? null, 80);
+  const lastCheckAt = lastCheckAtRaw ? new Date(lastCheckAtRaw).toISOString() : null;
+
+  const { data, error } = await client
+    .from("infra_monitoring_integrations")
+    .upsert({
+      provider,
+      integration_type: integrationType,
+      status,
+      config_masked: params.configMasked ?? {},
+      last_check_at: lastCheckAt,
+      last_error: toTrimmedString(params.lastError ?? null, 2000),
+      owner_user_id: adminUserId,
+      metadata: params.metadata ?? {},
+      updated_at: new Date().toISOString(),
+    }, { onConflict: "provider,integration_type" })
+    .select("id, provider, integration_type, status, config_masked, last_check_at, last_error, owner_user_id, metadata, updated_at, created_at")
+    .single();
+  if (error || !data) throw error ?? new Error("Failed to upsert monitoring integration");
+
+  await createOpsActivityLog(client, {
+    actorUserId: adminUserId,
+    activityType: "infra_monitoring_integration_upserted",
+    entityType: "infra_monitoring_integrations",
+    entityId: data.id,
+    details: { provider: data.provider, integration_type: data.integration_type, status: data.status },
+  });
+  return data;
+};
+
+const listInfraSloPolicies = async (
+  client: ReturnType<typeof createClient>,
+  options?: { active?: boolean | null; serviceName?: string | null; limit?: number; offset?: number },
+) => {
+  const limit = Math.max(1, Math.min(200, Number(options?.limit ?? 80)));
+  const offset = Math.max(0, Number(options?.offset ?? 0));
+  let query = client
+    .from("infra_slo_policies")
+    .select("id, service_name, sli_name, window_days, target_percent, warning_threshold_percent, critical_threshold_percent, active, metadata, updated_at, created_at")
+    .order("updated_at", { ascending: false })
+    .range(offset, offset + limit - 1);
+  if (typeof options?.active === "boolean") query = query.eq("active", options.active);
+  const serviceName = toTrimmedString(options?.serviceName ?? null, 120);
+  if (serviceName) query = query.eq("service_name", serviceName);
+  const { data, error } = await query;
+  if (error) throw error;
+  return data ?? [];
+};
+
+const upsertInfraSloPolicyByAdmin = async (
+  client: ReturnType<typeof createClient>,
+  adminUserId: string,
+  params: {
+    serviceName: string;
+    sliName: string;
+    windowDays?: number | null;
+    targetPercent: number;
+    warningThresholdPercent: number;
+    criticalThresholdPercent: number;
+    active?: boolean;
+    metadata?: Record<string, unknown>;
+  },
+) => {
+  const serviceName = toTrimmedString(params.serviceName, 120);
+  if (!serviceName) throw new Error("serviceName is required");
+  const sliName = toTrimmedString(params.sliName, 120);
+  if (!sliName) throw new Error("sliName is required");
+  const windowDays = Number(params.windowDays ?? 30);
+  if (!Number.isFinite(windowDays) || windowDays <= 0) throw new Error("windowDays must be a positive number");
+  const targetPercent = Number(params.targetPercent);
+  const warningThresholdPercent = Number(params.warningThresholdPercent);
+  const criticalThresholdPercent = Number(params.criticalThresholdPercent);
+  const thresholds = [targetPercent, warningThresholdPercent, criticalThresholdPercent];
+  if (thresholds.some((value) => !Number.isFinite(value) || value < 0 || value > 100)) {
+    throw new Error("target/threshold percentages must be between 0 and 100");
+  }
+
+  const { data, error } = await client
+    .from("infra_slo_policies")
+    .upsert({
+      service_name: serviceName,
+      sli_name: sliName,
+      window_days: Math.round(windowDays),
+      target_percent: targetPercent,
+      warning_threshold_percent: warningThresholdPercent,
+      critical_threshold_percent: criticalThresholdPercent,
+      active: params.active !== false,
+      metadata: params.metadata ?? {},
+      updated_at: new Date().toISOString(),
+    }, { onConflict: "service_name,sli_name,window_days" })
+    .select("id, service_name, sli_name, window_days, target_percent, warning_threshold_percent, critical_threshold_percent, active, metadata, updated_at, created_at")
+    .single();
+  if (error || !data) throw error ?? new Error("Failed to upsert SLO policy");
+
+  await createOpsActivityLog(client, {
+    actorUserId: adminUserId,
+    activityType: "infra_slo_policy_upserted",
+    entityType: "infra_slo_policies",
+    entityId: data.id,
+    details: { service_name: data.service_name, sli_name: data.sli_name, active: data.active },
+  });
+  return data;
+};
+
+const listInfraSloBreaches = async (
+  client: ReturnType<typeof createClient>,
+  options?: { status?: string | null; severity?: string | null; limit?: number; offset?: number },
+) => {
+  const limit = Math.max(1, Math.min(200, Number(options?.limit ?? 80)));
+  const offset = Math.max(0, Number(options?.offset ?? 0));
+  let query = client
+    .from("infra_slo_breaches")
+    .select("id, policy_id, severity, status, observed_percent, breach_started_at, breach_resolved_at, acknowledged_by, notes, metadata, updated_at, created_at")
+    .order("breach_started_at", { ascending: false })
+    .range(offset, offset + limit - 1);
+  const status = toTrimmedString(options?.status ?? null, 30);
+  if (status) query = query.eq("status", status);
+  const severity = toTrimmedString(options?.severity ?? null, 30);
+  if (severity) query = query.eq("severity", severity);
+  const { data, error } = await query;
+  if (error) throw error;
+  return data ?? [];
+};
+
+const upsertInfraSloBreachByAdmin = async (
+  client: ReturnType<typeof createClient>,
+  adminUserId: string,
+  params: {
+    id?: string | null;
+    policyId: string;
+    severity: string;
+    status?: string | null;
+    observedPercent: number;
+    breachStartedAt?: string | null;
+    breachResolvedAt?: string | null;
+    notes?: string | null;
+    metadata?: Record<string, unknown>;
+  },
+) => {
+  assertUuid(params.policyId, "policyId");
+  if (params.id) assertUuid(params.id, "id");
+  const severity = toTrimmedString(params.severity, 30);
+  if (!severity || !INFRA_SLO_BREACH_ALLOWED_SEVERITIES.has(severity)) {
+    throw new Error("severity must be one of: warning, critical");
+  }
+  const status = toTrimmedString(params.status ?? null, 30) ?? "open";
+  if (!INFRA_SLO_BREACH_ALLOWED_STATUSES.has(status)) {
+    throw new Error("status must be one of: open, acknowledged, resolved");
+  }
+  const observedPercent = Number(params.observedPercent);
+  if (!Number.isFinite(observedPercent) || observedPercent < 0 || observedPercent > 100) {
+    throw new Error("observedPercent must be between 0 and 100");
+  }
+  const startedAtRaw = toTrimmedString(params.breachStartedAt ?? null, 80);
+  const resolvedAtRaw = toTrimmedString(params.breachResolvedAt ?? null, 80);
+  const startedAt = startedAtRaw ? new Date(startedAtRaw).toISOString() : new Date().toISOString();
+  const resolvedAt = resolvedAtRaw ? new Date(resolvedAtRaw).toISOString() : (status === "resolved" ? new Date().toISOString() : null);
+  const acknowledgedBy = status === "acknowledged" ? adminUserId : null;
+
+  const patch = {
+    id: params.id ?? undefined,
+    policy_id: params.policyId,
+    severity,
+    status,
+    observed_percent: observedPercent,
+    breach_started_at: startedAt,
+    breach_resolved_at: resolvedAt,
+    acknowledged_by: acknowledgedBy,
+    notes: toTrimmedString(params.notes ?? null, 3000),
+    metadata: params.metadata ?? {},
+    updated_at: new Date().toISOString(),
+  };
+
+  const { data, error } = await client
+    .from("infra_slo_breaches")
+    .upsert(patch)
+    .select("id, policy_id, severity, status, observed_percent, breach_started_at, breach_resolved_at, acknowledged_by, notes, metadata, updated_at, created_at")
+    .single();
+  if (error || !data) throw error ?? new Error("Failed to upsert SLO breach");
+
+  await createOpsActivityLog(client, {
+    actorUserId: adminUserId,
+    activityType: "infra_slo_breach_upserted",
+    entityType: "infra_slo_breaches",
+    entityId: data.id,
+    details: { policy_id: data.policy_id, severity: data.severity, status: data.status },
+  });
+  return data;
+};
+
+const collectInfraDevopsReadinessSignals = async (
+  client: ReturnType<typeof createClient>,
+) => {
+  const releaseFreshCutoff = new Date(Date.now() - 45 * 24 * 60 * 60 * 1000).toISOString();
+  const drillFreshCutoff = new Date(Date.now() - 90 * 24 * 60 * 60 * 1000).toISOString();
+  const [runbooksResult, activeRunbooksResult, productionReleasesResult, recentProductionReleaseResult, monitoringResult, activeSloPoliciesResult, openBreachesResult, recentSucceededDrillsResult] = await Promise.all([
+    client.from("infra_runbooks").select("id", { count: "exact", head: true }),
+    client.from("infra_runbooks").select("id", { count: "exact", head: true }).eq("status", "active"),
+    client.from("infra_release_registry").select("id", { count: "exact", head: true }).eq("environment", "production").eq("status", "deployed"),
+    client.from("infra_release_registry").select("id", { count: "exact", head: true }).eq("environment", "production").eq("status", "deployed").gte("deployed_at", releaseFreshCutoff),
+    client.from("infra_monitoring_integrations").select("id, integration_type, status"),
+    client.from("infra_slo_policies").select("id", { count: "exact", head: true }).eq("active", true),
+    client.from("infra_slo_breaches").select("id, severity, status").in("status", ["open", "acknowledged"]),
+    client.from("infra_backup_restore_drills").select("id", { count: "exact", head: true }).eq("status", "succeeded").gte("started_at", drillFreshCutoff),
+  ]);
+  if (runbooksResult.error) throw runbooksResult.error;
+  if (activeRunbooksResult.error) throw activeRunbooksResult.error;
+  if (productionReleasesResult.error) throw productionReleasesResult.error;
+  if (recentProductionReleaseResult.error) throw recentProductionReleaseResult.error;
+  if (monitoringResult.error) throw monitoringResult.error;
+  if (activeSloPoliciesResult.error) throw activeSloPoliciesResult.error;
+  if (openBreachesResult.error) throw openBreachesResult.error;
+  if (recentSucceededDrillsResult.error) throw recentSucceededDrillsResult.error;
+
+  const monitoringRows = monitoringResult.data ?? [];
+  const requiredMonitoringTypes = ["uptime", "error_tracking", "logging", "alerting"];
+  const missingMonitoringTypes = requiredMonitoringTypes.filter((type) =>
+    !monitoringRows.some((row) => row.integration_type === type && row.status !== "disabled")
+  );
+  const degradedOrFailedMonitoring = monitoringRows.filter((row) => row.status === "degraded" || row.status === "failed").length;
+
+  const openBreaches = openBreachesResult.data ?? [];
+  const openCriticalBreaches = openBreaches.filter((row) => row.severity === "critical").length;
+  const openWarningBreaches = openBreaches.filter((row) => row.severity === "warning").length;
+
+  const runbooksActive = Number(activeRunbooksResult.count ?? 0);
+  const productionReleases = Number(productionReleasesResult.count ?? 0);
+  const recentProductionReleases = Number(recentProductionReleaseResult.count ?? 0);
+  const recentSucceededDrills = Number(recentSucceededDrillsResult.count ?? 0);
+  const activeSloPolicies = Number(activeSloPoliciesResult.count ?? 0);
+
+  return {
+    summary: {
+      critical:
+        (runbooksActive === 0 ? 1 : 0) +
+        (productionReleases === 0 ? 1 : 0) +
+        openCriticalBreaches,
+      high:
+        missingMonitoringTypes.length +
+        degradedOrFailedMonitoring +
+        (recentSucceededDrills === 0 ? 1 : 0) +
+        (recentProductionReleases === 0 ? 1 : 0),
+      medium:
+        openWarningBreaches +
+        (activeSloPolicies === 0 ? 1 : 0),
+    },
+    metrics: {
+      runbooks_total: Number(runbooksResult.count ?? 0),
+      runbooks_active: runbooksActive,
+      production_releases_total: productionReleases,
+      production_releases_recent_45d: recentProductionReleases,
+      backup_restore_drills_succeeded_90d: recentSucceededDrills,
+      monitoring_integrations_total: monitoringRows.length,
+      monitoring_integrations_missing_types: missingMonitoringTypes,
+      monitoring_integrations_degraded_or_failed: degradedOrFailedMonitoring,
+      slo_policies_active: activeSloPolicies,
+      slo_breaches_open_critical: openCriticalBreaches,
+      slo_breaches_open_warning: openWarningBreaches,
+    },
+    overall: {
+      pass:
+        runbooksActive > 0 &&
+        productionReleases > 0 &&
+        recentSucceededDrills > 0 &&
+        missingMonitoringTypes.length === 0 &&
+        degradedOrFailedMonitoring === 0 &&
+        openCriticalBreaches === 0,
+    },
+  };
+};
+
 const OPS_TICKET_ALLOWED_STATUSES = new Set(["open", "in_progress", "waiting_customer", "resolved", "closed"]);
 const OPS_TICKET_ALLOWED_PRIORITIES = new Set(["low", "medium", "high", "critical"]);
 const OPS_TICKET_ALLOWED_CATEGORIES = new Set(["general", "billing", "kyc", "technical", "workflow", "dispute", "security"]);
@@ -8154,6 +8736,231 @@ serve(async (req: Request) => {
       return json(req, 200, {
         ok: true,
         data: await collectOperationsReadinessSignals(client),
+      });
+    }
+
+    if (req.method === "GET" && path.endsWith("ops/infra/readiness")) {
+      requireRole(roles, ["admin"]);
+      return json(req, 200, {
+        ok: true,
+        data: await collectInfraDevopsReadinessSignals(client),
+      });
+    }
+
+    if (req.method === "GET" && path.endsWith("ops/infra/runbooks")) {
+      requireRole(roles, ["admin"]);
+      const limitRaw = Number(url.searchParams.get("limit") ?? 80);
+      const offsetRaw = Number(url.searchParams.get("offset") ?? 0);
+      return json(req, 200, {
+        ok: true,
+        data: await listInfraRunbooks(client, {
+          status: url.searchParams.get("status"),
+          serviceScope: url.searchParams.get("service_scope"),
+          limit: Number.isFinite(limitRaw) ? limitRaw : 80,
+          offset: Number.isFinite(offsetRaw) ? offsetRaw : 0,
+        }),
+      });
+    }
+
+    if (req.method === "POST" && path.endsWith("ops/infra/runbooks")) {
+      requireRole(roles, ["admin"]);
+      const body = await req.json().catch(() => ({}));
+      if (!body || typeof body !== "object") {
+        return json(req, 400, { error: "request body is required" });
+      }
+      return json(req, 200, {
+        ok: true,
+        data: await upsertInfraRunbookByAdmin(client, user.id, {
+          runbookKey: typeof body.runbookKey === "string" ? body.runbookKey : "",
+          title: typeof body.title === "string" ? body.title : "",
+          serviceScope: typeof body.serviceScope === "string" ? body.serviceScope : null,
+          contentMarkdown: typeof body.contentMarkdown === "string" ? body.contentMarkdown : "",
+          status: typeof body.status === "string" ? body.status.trim().toLowerCase() : null,
+          metadata: safeMetadataObject(body.metadata),
+        }),
+      });
+    }
+
+    if (req.method === "GET" && path.endsWith("ops/infra/releases")) {
+      requireRole(roles, ["admin"]);
+      const limitRaw = Number(url.searchParams.get("limit") ?? 80);
+      const offsetRaw = Number(url.searchParams.get("offset") ?? 0);
+      return json(req, 200, {
+        ok: true,
+        data: await listInfraReleaseRegistry(client, {
+          environment: url.searchParams.get("environment"),
+          status: url.searchParams.get("status"),
+          limit: Number.isFinite(limitRaw) ? limitRaw : 80,
+          offset: Number.isFinite(offsetRaw) ? offsetRaw : 0,
+        }),
+      });
+    }
+
+    if (req.method === "POST" && path.endsWith("ops/infra/releases")) {
+      requireRole(roles, ["admin"]);
+      const body = await req.json().catch(() => ({}));
+      if (!body || typeof body !== "object") {
+        return json(req, 400, { error: "request body is required" });
+      }
+      return json(req, 200, {
+        ok: true,
+        data: await upsertInfraReleaseByAdmin(client, user.id, {
+          releaseVersion: typeof body.releaseVersion === "string" ? body.releaseVersion : "",
+          environment: typeof body.environment === "string" ? body.environment.trim().toLowerCase() : null,
+          status: typeof body.status === "string" ? body.status.trim().toLowerCase() : null,
+          commitSha: typeof body.commitSha === "string" ? body.commitSha : null,
+          deployedAt: typeof body.deployedAt === "string" ? body.deployedAt : null,
+          rollbackReference: typeof body.rollbackReference === "string" ? body.rollbackReference : null,
+          rollbackReason: typeof body.rollbackReason === "string" ? body.rollbackReason : null,
+          metadata: safeMetadataObject(body.metadata),
+        }),
+      });
+    }
+
+    if (req.method === "GET" && path.endsWith("ops/infra/backup-drills")) {
+      requireRole(roles, ["admin"]);
+      const limitRaw = Number(url.searchParams.get("limit") ?? 80);
+      const offsetRaw = Number(url.searchParams.get("offset") ?? 0);
+      return json(req, 200, {
+        ok: true,
+        data: await listInfraBackupRestoreDrills(client, {
+          environment: url.searchParams.get("environment"),
+          status: url.searchParams.get("status"),
+          limit: Number.isFinite(limitRaw) ? limitRaw : 80,
+          offset: Number.isFinite(offsetRaw) ? offsetRaw : 0,
+        }),
+      });
+    }
+
+    if (req.method === "POST" && path.endsWith("ops/infra/backup-drills")) {
+      requireRole(roles, ["admin"]);
+      const body = await req.json().catch(() => ({}));
+      if (!body || typeof body !== "object") {
+        return json(req, 400, { error: "request body is required" });
+      }
+      return json(req, 200, {
+        ok: true,
+        data: await createInfraBackupRestoreDrillByAdmin(client, user.id, {
+          environment: typeof body.environment === "string" ? body.environment.trim().toLowerCase() : null,
+          status: typeof body.status === "string" ? body.status.trim().toLowerCase() : "",
+          startedAt: typeof body.startedAt === "string" ? body.startedAt : null,
+          completedAt: typeof body.completedAt === "string" ? body.completedAt : null,
+          rtoMinutes: Number.isFinite(Number(body.rtoMinutes)) ? Number(body.rtoMinutes) : null,
+          rpoMinutes: Number.isFinite(Number(body.rpoMinutes)) ? Number(body.rpoMinutes) : null,
+          backupSnapshotRef: typeof body.backupSnapshotRef === "string" ? body.backupSnapshotRef : null,
+          notes: typeof body.notes === "string" ? body.notes : null,
+          metadata: safeMetadataObject(body.metadata),
+        }),
+      });
+    }
+
+    if (req.method === "GET" && path.endsWith("ops/infra/monitoring-integrations")) {
+      requireRole(roles, ["admin"]);
+      const limitRaw = Number(url.searchParams.get("limit") ?? 80);
+      const offsetRaw = Number(url.searchParams.get("offset") ?? 0);
+      return json(req, 200, {
+        ok: true,
+        data: await listInfraMonitoringIntegrations(client, {
+          status: url.searchParams.get("status"),
+          integrationType: url.searchParams.get("integration_type"),
+          limit: Number.isFinite(limitRaw) ? limitRaw : 80,
+          offset: Number.isFinite(offsetRaw) ? offsetRaw : 0,
+        }),
+      });
+    }
+
+    if (req.method === "POST" && path.endsWith("ops/infra/monitoring-integrations")) {
+      requireRole(roles, ["admin"]);
+      const body = await req.json().catch(() => ({}));
+      if (!body || typeof body !== "object") {
+        return json(req, 400, { error: "request body is required" });
+      }
+      return json(req, 200, {
+        ok: true,
+        data: await upsertInfraMonitoringIntegrationByAdmin(client, user.id, {
+          provider: typeof body.provider === "string" ? body.provider : "",
+          integrationType: typeof body.integrationType === "string" ? body.integrationType.trim().toLowerCase() : "",
+          status: typeof body.status === "string" ? body.status.trim().toLowerCase() : null,
+          configMasked: safeMetadataObject(body.configMasked),
+          lastCheckAt: typeof body.lastCheckAt === "string" ? body.lastCheckAt : null,
+          lastError: typeof body.lastError === "string" ? body.lastError : null,
+          metadata: safeMetadataObject(body.metadata),
+        }),
+      });
+    }
+
+    if (req.method === "GET" && path.endsWith("ops/infra/slo-policies")) {
+      requireRole(roles, ["admin"]);
+      const limitRaw = Number(url.searchParams.get("limit") ?? 80);
+      const offsetRaw = Number(url.searchParams.get("offset") ?? 0);
+      const activeRaw = url.searchParams.get("active");
+      const active = activeRaw === null ? null : activeRaw === "true";
+      return json(req, 200, {
+        ok: true,
+        data: await listInfraSloPolicies(client, {
+          active,
+          serviceName: url.searchParams.get("service_name"),
+          limit: Number.isFinite(limitRaw) ? limitRaw : 80,
+          offset: Number.isFinite(offsetRaw) ? offsetRaw : 0,
+        }),
+      });
+    }
+
+    if (req.method === "POST" && path.endsWith("ops/infra/slo-policies")) {
+      requireRole(roles, ["admin"]);
+      const body = await req.json().catch(() => ({}));
+      if (!body || typeof body !== "object") {
+        return json(req, 400, { error: "request body is required" });
+      }
+      return json(req, 200, {
+        ok: true,
+        data: await upsertInfraSloPolicyByAdmin(client, user.id, {
+          serviceName: typeof body.serviceName === "string" ? body.serviceName : "",
+          sliName: typeof body.sliName === "string" ? body.sliName : "",
+          windowDays: Number.isFinite(Number(body.windowDays)) ? Number(body.windowDays) : null,
+          targetPercent: Number(body.targetPercent ?? 0),
+          warningThresholdPercent: Number(body.warningThresholdPercent ?? 0),
+          criticalThresholdPercent: Number(body.criticalThresholdPercent ?? 0),
+          active: body.active !== false,
+          metadata: safeMetadataObject(body.metadata),
+        }),
+      });
+    }
+
+    if (req.method === "GET" && path.endsWith("ops/infra/slo-breaches")) {
+      requireRole(roles, ["admin"]);
+      const limitRaw = Number(url.searchParams.get("limit") ?? 80);
+      const offsetRaw = Number(url.searchParams.get("offset") ?? 0);
+      return json(req, 200, {
+        ok: true,
+        data: await listInfraSloBreaches(client, {
+          status: url.searchParams.get("status"),
+          severity: url.searchParams.get("severity"),
+          limit: Number.isFinite(limitRaw) ? limitRaw : 80,
+          offset: Number.isFinite(offsetRaw) ? offsetRaw : 0,
+        }),
+      });
+    }
+
+    if (req.method === "POST" && path.endsWith("ops/infra/slo-breaches")) {
+      requireRole(roles, ["admin"]);
+      const body = await req.json().catch(() => ({}));
+      if (!body || typeof body !== "object") {
+        return json(req, 400, { error: "request body is required" });
+      }
+      return json(req, 200, {
+        ok: true,
+        data: await upsertInfraSloBreachByAdmin(client, user.id, {
+          id: typeof body.id === "string" ? body.id : null,
+          policyId: typeof body.policyId === "string" ? body.policyId : "",
+          severity: typeof body.severity === "string" ? body.severity.trim().toLowerCase() : "",
+          status: typeof body.status === "string" ? body.status.trim().toLowerCase() : null,
+          observedPercent: Number(body.observedPercent ?? 0),
+          breachStartedAt: typeof body.breachStartedAt === "string" ? body.breachStartedAt : null,
+          breachResolvedAt: typeof body.breachResolvedAt === "string" ? body.breachResolvedAt : null,
+          notes: typeof body.notes === "string" ? body.notes : null,
+          metadata: safeMetadataObject(body.metadata),
+        }),
       });
     }
 
