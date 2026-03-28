@@ -14,6 +14,7 @@ interface LawImpact {
 
 interface UpcomingLawImpactSectionProps {
   impacts?: LawImpact[];
+  useDemoFallback?: boolean;
 }
 
 const demoLawImpacts: LawImpact[] = [
@@ -46,8 +47,8 @@ const demoLawImpacts: LawImpact[] = [
   },
 ];
 
-const UpcomingLawImpactSection = ({ impacts }: UpcomingLawImpactSectionProps) => {
-  const effectiveImpacts = impacts && impacts.length > 0 ? impacts : demoLawImpacts;
+const UpcomingLawImpactSection = ({ impacts, useDemoFallback = true }: UpcomingLawImpactSectionProps) => {
+  const effectiveImpacts = impacts && impacts.length > 0 ? impacts : useDemoFallback ? demoLawImpacts : [];
   const getRiskBadgeClass = (level: LawImpact["riskLevel"]) => {
     switch (level) {
       case "high": return "bg-red-500/20 text-red-400 border-red-500/30";
@@ -101,6 +102,11 @@ const UpcomingLawImpactSection = ({ impacts }: UpcomingLawImpactSectionProps) =>
 
       {/* Law Impact Items */}
       <div className="space-y-4">
+        {effectiveImpacts.length === 0 ? (
+          <div className="p-4 rounded-xl bg-card/30 border border-border/30">
+            <p className="text-sm text-muted-foreground">No upcoming law impacts found in live backend data.</p>
+          </div>
+        ) : null}
         {effectiveImpacts.map((law, index) => (
           <motion.div
             key={law.id}

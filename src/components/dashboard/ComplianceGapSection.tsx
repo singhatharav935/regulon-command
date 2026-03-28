@@ -13,6 +13,7 @@ interface GapItem {
 
 interface ComplianceGapSectionProps {
   gaps?: GapItem[];
+  useDemoFallback?: boolean;
 }
 
 const demoGaps: GapItem[] = [
@@ -23,8 +24,8 @@ const demoGaps: GapItem[] = [
   { id: "5", type: "pending", title: "RBI Foreign Liabilities Return", regulator: "RBI", impact: "+2%", timeToClose: "3-4 days" },
 ];
 
-const ComplianceGapSection = ({ gaps }: ComplianceGapSectionProps) => {
-  const effectiveGaps = gaps && gaps.length > 0 ? gaps : demoGaps;
+const ComplianceGapSection = ({ gaps, useDemoFallback = true }: ComplianceGapSectionProps) => {
+  const effectiveGaps = gaps && gaps.length > 0 ? gaps : useDemoFallback ? demoGaps : [];
   const getTypeIcon = (type: GapItem["type"]) => {
     switch (type) {
       case "missing": return <FileX className="w-4 h-4 text-red-400" />;
@@ -98,6 +99,11 @@ const ComplianceGapSection = ({ gaps }: ComplianceGapSectionProps) => {
 
       {/* Gap Items */}
       <div className="space-y-3">
+        {effectiveGaps.length === 0 ? (
+          <div className="p-4 rounded-xl bg-card/30 border border-border/30">
+            <p className="text-sm text-muted-foreground">No active compliance gaps from live backend data.</p>
+          </div>
+        ) : null}
         {effectiveGaps.map((gap, index) => (
           <motion.div
             key={gap.id}

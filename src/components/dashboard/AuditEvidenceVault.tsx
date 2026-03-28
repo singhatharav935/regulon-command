@@ -14,6 +14,7 @@ interface AuditRecord {
 
 interface AuditEvidenceVaultProps {
   records?: AuditRecord[];
+  useDemoFallback?: boolean;
 }
 
 const demoAuditRecords: AuditRecord[] = [
@@ -25,8 +26,8 @@ const demoAuditRecords: AuditRecord[] = [
   { id: "6", category: "evidence", title: "RBI Compliance Declarations", regulator: "RBI", date: "Dec 2025", status: "ready" },
 ];
 
-const AuditEvidenceVault = ({ records }: AuditEvidenceVaultProps) => {
-  const effectiveRecords = records && records.length > 0 ? records : demoAuditRecords;
+const AuditEvidenceVault = ({ records, useDemoFallback = true }: AuditEvidenceVaultProps) => {
+  const effectiveRecords = records && records.length > 0 ? records : useDemoFallback ? demoAuditRecords : [];
   const getCategoryIcon = (category: AuditRecord["category"]) => {
     switch (category) {
       case "filing": return <FileText className="w-4 h-4 text-primary" />;
@@ -106,6 +107,11 @@ const AuditEvidenceVault = ({ records }: AuditEvidenceVaultProps) => {
 
       {/* Records Grid */}
       <div className="grid grid-cols-1 md:grid-cols-3 gap-6">
+        {effectiveRecords.length === 0 ? (
+          <div className="md:col-span-3 p-4 rounded-xl bg-card/30 border border-border/30">
+            <p className="text-sm text-muted-foreground">No audit evidence records available from live backend data.</p>
+          </div>
+        ) : null}
         {/* Filings & Certificates */}
         <div className="space-y-3">
           <h3 className="text-sm font-medium text-muted-foreground uppercase tracking-wide flex items-center gap-2">

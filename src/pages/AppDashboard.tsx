@@ -374,9 +374,9 @@ const AppDashboard = () => {
               deadlines={mappedData.deadlines}
             />
 
-            <ComplianceGapSection gaps={mappedData.complianceGaps} />
-            <UpcomingLawImpactSection impacts={mappedData.upcomingLawImpacts} />
-            <AuditEvidenceVault records={mappedData.auditRecords} />
+            <ComplianceGapSection gaps={mappedData.complianceGaps} useDemoFallback={false} />
+            <UpcomingLawImpactSection impacts={mappedData.upcomingLawImpacts} useDemoFallback={false} />
+            <AuditEvidenceVault records={mappedData.auditRecords} useDemoFallback={false} />
 
             <QuickActions />
 
