@@ -49,7 +49,7 @@ const dashboardTypes = [
 const DashboardTypeNav = ({ activeType, routePrefix = "" }: DashboardTypeNavProps) => {
   const withPrefix = (href: string, id: string) => {
     if (id === "university") {
-      return routePrefix ? "/app/university" : "/university-demo";
+      return "/app/university";
     }
     if (id === "ca-firm") {
       return routePrefix ? "/app/ca-firm-dashboard" : "/ca-firm-dashboard";
