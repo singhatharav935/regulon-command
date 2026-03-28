@@ -1192,19 +1192,88 @@ const createCompanyWorkspace = async (
   return { created: true, companyId: typeof companyId === "string" ? companyId : null, seeded, seedError };
 };
 
+const bootstrapCaFirmWorkspaceData = async (
+  client: ReturnType<typeof createClient>,
+  params: { caFirmId: string; ownerUserId: string },
+) => {
+  const { caFirmId, ownerUserId } = params;
+
+  const [{ count: memberCount, error: memberCountError }, { count: directoryCount, error: directoryCountError }] = await Promise.all([
+    client.from("ca_firm_members").select("id", { count: "exact", head: true }).eq("ca_firm_id", caFirmId),
+    client.from("ca_firm_ca_directory").select("id", { count: "exact", head: true }).eq("ca_firm_id", caFirmId),
+  ]);
+  if (memberCountError) throw memberCountError;
+  if (directoryCountError) throw directoryCountError;
+
+  if (Number(directoryCount ?? 0) === 0) {
+    const [profileResult, verificationResult] = await Promise.all([
+      client.from("profiles").select("full_name, email").eq("user_id", ownerUserId).maybeSingle(),
+      client.from("user_verifications").select("license_number").eq("user_id", ownerUserId).maybeSingle(),
+    ]);
+    if (profileResult.error) throw profileResult.error;
+    if (verificationResult.error) throw verificationResult.error;
+
+    const nameFromProfile = typeof profileResult.data?.full_name === "string" && profileResult.data.full_name.trim()
+      ? profileResult.data.full_name.trim()
+      : null;
+    const emailFromProfile = typeof profileResult.data?.email === "string" && profileResult.data.email.trim()
+      ? profileResult.data.email.trim()
+      : null;
+    const licenseNumber = typeof verificationResult.data?.license_number === "string" && verificationResult.data.license_number.trim()
+      ? verificationResult.data.license_number.trim()
+      : null;
+
+    const caName = nameFromProfile ?? (emailFromProfile ? emailFromProfile.split("@")[0] : "Firm Owner");
+    const { error: directoryInsertError } = await client.from("ca_firm_ca_directory").insert({
+      ca_firm_id: caFirmId,
+      ca_user_id: ownerUserId,
+      ca_name: caName,
+      license_number: licenseNumber,
+      specialty: "Regulatory Advisory",
+      status: "active",
+    });
+    if (directoryInsertError) throw directoryInsertError;
+  }
+
+  return {
+    ca_firm_id: caFirmId,
+    seeded: {
+      owner_directory: Number(directoryCount ?? 0) === 0,
+      member_count: Number(memberCount ?? 0),
+      directory_count: Number(directoryCount ?? 0),
+    },
+  };
+};
+
 const createCaFirmWorkspace = async (
   client: ReturnType<typeof createClient>,
+  userId: string,
   name: string,
   registrationNumber: string,
   jurisdiction: string | null,
 ) => {
-  const { error } = await client.rpc("create_ca_firm_with_owner", {
+  const { data: caFirmId, error } = await client.rpc("create_ca_firm_with_owner", {
     _name: name,
     _registration_number: registrationNumber,
     _jurisdiction: jurisdiction,
   });
   if (error) throw error;
-  return { created: true };
+  let seeded = null;
+  let seedError: string | null = null;
+
+  if (typeof caFirmId === "string" && caFirmId) {
+    try {
+      const seedClient = getServiceClient() ?? client;
+      seeded = await bootstrapCaFirmWorkspaceData(seedClient, {
+        caFirmId,
+        ownerUserId: userId,
+      });
+    } catch (error) {
+      seedError = extractErrorMessage(error);
+    }
+  }
+
+  return { created: true, caFirmId: typeof caFirmId === "string" ? caFirmId : null, seeded, seedError };
 };
 
 const loadCaWorkspaceProfile = async (client: ReturnType<typeof createClient>, userId: string) => {
@@ -3227,6 +3296,7 @@ const getRouteAccessMatrix = () => ({
     { route: "GET /ca/dashboard", roles: ["manager", "admin"] },
     { route: "GET /legal/dashboard", roles: ["manager", "admin"] },
     { route: "GET /ca-firm/dashboard", roles: ["manager", "admin"] },
+    { route: "POST /ca-firm/bootstrap-data", roles: ["manager", "admin"] },
     { route: "GET /admin/dashboard", roles: ["admin"] },
   ],
   drafts: [
@@ -4801,7 +4871,27 @@ serve(async (req: Request) => {
       }
       return json(req, 200, {
         ok: true,
-        data: await createCaFirmWorkspace(client, name, registrationNumber, jurisdiction),
+        data: await createCaFirmWorkspace(client, user.id, name, registrationNumber, jurisdiction),
+      });
+    }
+
+    if (req.method === "POST" && path.endsWith("ca-firm/bootstrap-data")) {
+      requireRole(roles, ["manager", "admin"]);
+      const { data: membership, error: membershipError } = await client
+        .from("ca_firm_members")
+        .select("ca_firm_id")
+        .eq("user_id", user.id)
+        .limit(1)
+        .maybeSingle();
+      if (membershipError) throw membershipError;
+      const caFirmId = membership?.ca_firm_id ?? null;
+      if (!caFirmId) {
+        return json(req, 400, { error: "No CA firm membership found for bootstrap" });
+      }
+      const seedClient = getServiceClient() ?? client;
+      return json(req, 200, {
+        ok: true,
+        data: await bootstrapCaFirmWorkspaceData(seedClient, { caFirmId, ownerUserId: user.id }),
       });
     }
 
