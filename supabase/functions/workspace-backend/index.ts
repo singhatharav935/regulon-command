@@ -3,6 +3,7 @@ import { createClient } from "https://esm.sh/@supabase/supabase-js@2";
 import { PDFDocument, StandardFonts, rgb } from "https://esm.sh/pdf-lib@1.17.1";
 import { Document, Packer, Paragraph, HeadingLevel, TextRun } from "https://esm.sh/docx@9.5.1";
 import { buildOpsRunbooks, buildRegressionChecklist, computePrelaunchGate } from "./ops-contract.ts";
+import { evaluateDeployReadiness } from "./deploy-readiness-contract.ts";
 import { normalizeLandingLead } from "./landing-contract.ts";
 
 const getCorsHeaders = (req: Request) => {
@@ -2927,6 +2928,67 @@ const collectPrelaunchSignals = async (
   };
 };
 
+const collectDeployReadinessSignals = async (
+  client: ReturnType<typeof createClient>,
+) => {
+  const requiredEnv = {
+    SUPABASE_URL: Boolean(Deno.env.get("SUPABASE_URL")),
+    SUPABASE_ANON_KEY: Boolean(Deno.env.get("SUPABASE_ANON_KEY")),
+    SUPABASE_SERVICE_ROLE_KEY: Boolean(Deno.env.get("SUPABASE_SERVICE_ROLE_KEY")),
+    OPENAI_API_KEY: Boolean(Deno.env.get("OPENAI_API_KEY")),
+    OPENAI_MODEL: Boolean(Deno.env.get("OPENAI_MODEL")),
+    ALLOWED_ORIGINS: Boolean((Deno.env.get("ALLOWED_ORIGINS") ?? "").trim()),
+    ENFORCE_AUTH: Boolean((Deno.env.get("ENFORCE_AUTH") ?? "").trim()),
+  };
+  const enforceAuthEnabled = (Deno.env.get("ENFORCE_AUTH") ?? "").trim().toLowerCase() === "true";
+  const allowedOrigins = (Deno.env.get("ALLOWED_ORIGINS") ?? "")
+    .split(",")
+    .map((item) => item.trim())
+    .filter(Boolean);
+
+  const probeClient = getServiceClient() ?? client;
+  const requiredTables = [
+    "profiles",
+    "user_roles",
+    "draft_runs",
+    "draft_versions",
+    "draft_audit_events",
+    "draft_exports",
+    "draft_filing_checks",
+    "ai_request_idempotency",
+    "ai_operation_audit",
+    "landing_public_content",
+    "landing_leads",
+    "landing_public_rate_limits",
+  ];
+  const missingTables: string[] = [];
+  for (const table of requiredTables) {
+    const { error } = await probeClient.from(table).select("*", { count: "exact", head: true });
+    if (error && (error as { code?: string }).code === "42P01") {
+      missingTables.push(table);
+    }
+  }
+
+  const signals = {
+    env: {
+      requiredPresent: requiredEnv,
+      enforceAuthEnabled,
+      allowedOrigins,
+    },
+    db: {
+      requiredTablesMissing: missingTables,
+    },
+    functionConfig: {
+      landingPublicEnabled: true,
+    },
+  };
+
+  return {
+    signals,
+    evaluation: evaluateDeployReadiness(signals),
+  };
+};
+
 const getRouteAccessMatrix = () => ({
   dashboards: [
     { route: "GET /company/dashboard", roles: ["user", "manager", "admin"] },
@@ -2948,6 +3010,7 @@ const getRouteAccessMatrix = () => ({
     { route: "GET /ops/config-check", roles: ["admin"] },
     { route: "GET /ops/workflow-integrity-check", roles: ["admin"] },
     { route: "GET /ops/workflow-sla-monitor", roles: ["admin"] },
+    { route: "GET /ops/deploy-readiness", roles: ["admin"] },
     { route: "GET /ops/route-access-matrix", roles: ["admin"] },
     { route: "GET /ops/landing/leads", roles: ["admin"] },
     { route: "GET /ops/landing/metrics", roles: ["admin"] },
@@ -3521,6 +3584,19 @@ serve(async (req: Request) => {
         env_present: envKeys,
         db_probe_ok: !probeError,
         db_probe_rows: (tablesProbe ?? []).length,
+      });
+    }
+
+    if (req.method === "GET" && path.endsWith("ops/deploy-readiness")) {
+      requireRole(roles, ["admin"]);
+      const result = await collectDeployReadinessSignals(client);
+      return json(req, 200, {
+        ok: true,
+        data: {
+          ...result.evaluation,
+          signals: result.signals,
+          checked_at: new Date().toISOString(),
+        },
       });
     }
 
