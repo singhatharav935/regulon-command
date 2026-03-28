@@ -5,6 +5,7 @@ import { Document, Packer, Paragraph, HeadingLevel, TextRun } from "https://esm.
 import { buildOpsRunbooks, buildRegressionChecklist, computePrelaunchGate } from "./ops-contract.ts";
 import { evaluateDeployReadiness } from "./deploy-readiness-contract.ts";
 import { normalizeLandingLead } from "./landing-contract.ts";
+import { validateAiOperationContractPayload } from "./ai-contract.ts";
 
 const getCorsHeaders = (req: Request) => {
   const origin = req.headers.get("origin") ?? "";
@@ -6653,6 +6654,7 @@ serve(async (req: Request) => {
       if (!body || typeof body !== "object") {
         return json(req, 400, { error: "request body is required" });
       }
+      validateAiOperationContractPayload(body as Record<string, unknown>);
       const result = await proxyAiDraft(client, user.id, roles, persona, token, body as Record<string, unknown>);
       if (!result.ok) {
         return json(req, result.status, { error: result.error || "ai-draft request failed" });
@@ -6666,6 +6668,7 @@ serve(async (req: Request) => {
       if (!body || typeof body !== "object") {
         return json(req, 400, { error: "request body is required" });
       }
+      validateAiOperationContractPayload(body as Record<string, unknown>);
       return await proxyAiDraftStream(req, client, user.id, roles, persona, token, body as Record<string, unknown>);
     }
 
