@@ -11,6 +11,10 @@ interface GapItem {
   timeToClose: string;
 }
 
+interface ComplianceGapSectionProps {
+  gaps?: GapItem[];
+}
+
 const demoGaps: GapItem[] = [
   { id: "1", type: "missing", title: "DIR-3 KYC for Directors", regulator: "MCA", impact: "+5%", timeToClose: "2-3 days" },
   { id: "2", type: "expired", title: "GST Registration Certificate Renewal", regulator: "GST", impact: "+3%", timeToClose: "5-7 days" },
@@ -19,7 +23,8 @@ const demoGaps: GapItem[] = [
   { id: "5", type: "pending", title: "RBI Foreign Liabilities Return", regulator: "RBI", impact: "+2%", timeToClose: "3-4 days" },
 ];
 
-const ComplianceGapSection = () => {
+const ComplianceGapSection = ({ gaps }: ComplianceGapSectionProps) => {
+  const effectiveGaps = gaps && gaps.length > 0 ? gaps : demoGaps;
   const getTypeIcon = (type: GapItem["type"]) => {
     switch (type) {
       case "missing": return <FileX className="w-4 h-4 text-red-400" />;
@@ -93,7 +98,7 @@ const ComplianceGapSection = () => {
 
       {/* Gap Items */}
       <div className="space-y-3">
-        {demoGaps.map((gap, index) => (
+        {effectiveGaps.map((gap, index) => (
           <motion.div
             key={gap.id}
             initial={{ opacity: 0, x: -20 }}

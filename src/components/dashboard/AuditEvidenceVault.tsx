@@ -12,6 +12,10 @@ interface AuditRecord {
   status: "ready" | "pending";
 }
 
+interface AuditEvidenceVaultProps {
+  records?: AuditRecord[];
+}
+
 const demoAuditRecords: AuditRecord[] = [
   { id: "1", category: "filing", title: "Certificate of Incorporation", regulator: "MCA", date: "Jan 2024", status: "ready" },
   { id: "2", category: "filing", title: "GST Registration Certificate", regulator: "GST", date: "Jan 2024", status: "ready" },
@@ -21,7 +25,8 @@ const demoAuditRecords: AuditRecord[] = [
   { id: "6", category: "evidence", title: "RBI Compliance Declarations", regulator: "RBI", date: "Dec 2025", status: "ready" },
 ];
 
-const AuditEvidenceVault = () => {
+const AuditEvidenceVault = ({ records }: AuditEvidenceVaultProps) => {
+  const effectiveRecords = records && records.length > 0 ? records : demoAuditRecords;
   const getCategoryIcon = (category: AuditRecord["category"]) => {
     switch (category) {
       case "filing": return <FileText className="w-4 h-4 text-primary" />;
@@ -46,9 +51,9 @@ const AuditEvidenceVault = () => {
     }
   };
 
-  const filings = demoAuditRecords.filter(r => r.category === "filing");
-  const timelines = demoAuditRecords.filter(r => r.category === "timeline");
-  const evidence = demoAuditRecords.filter(r => r.category === "evidence");
+  const filings = effectiveRecords.filter((r) => r.category === "filing");
+  const timelines = effectiveRecords.filter((r) => r.category === "timeline");
+  const evidence = effectiveRecords.filter((r) => r.category === "evidence");
 
   return (
     <motion.div

@@ -69,6 +69,15 @@ const AppDashboard = () => {
     if (!data) return null;
 
     const now = new Date();
+    const lawPreparationByRegulator: Record<string, string[]> = {
+      MCA: ["Validate statutory registers", "Prepare board resolution backup", "Cross-check filing evidence"],
+      GST: ["Reconcile invoices and GSTR data", "Prepare ITC support pack", "Review portal filing acknowledgements"],
+      "Income Tax": ["Prepare computation note", "Review supporting ledgers", "Compile response annexures"],
+      RBI: ["Map FEMA transaction trail", "Collect AD bank records", "Validate reporting timelines"],
+      SEBI: ["Validate disclosure matrix", "Compile exchange filings", "Prepare governance notes"],
+      Contract: ["Review clause obligations", "Map exception register", "Prepare amendment recommendations"],
+      Customs: ["Validate BOE documentation", "Prepare valuation support", "Compile duty computation trail"],
+    };
 
     return {
       company: {
@@ -120,6 +129,73 @@ const AppDashboard = () => {
         eventType: event.event_type,
         createdAt: format(parseISO(event.created_at), "MMM dd, yyyy HH:mm"),
       })),
+      complianceGaps: data.tasks
+        .filter((task) => task.status !== "completed")
+        .slice(0, 8)
+        .map((task) => {
+          const taskDueDate = task.due_date ? parseISO(task.due_date) : null;
+          const days = taskDueDate ? differenceInCalendarDays(taskDueDate, now) : null;
+          const type = days !== null && days < 0
+            ? "expired"
+            : task.status === "pending"
+              ? "missing"
+              : "pending";
+          const impact = task.priority === "critical"
+            ? "+6%"
+            : task.priority === "high"
+              ? "+4%"
+              : "+2%";
+          return {
+            id: task.id,
+            type,
+            title: task.title,
+            regulator: task.regulator,
+            impact,
+            timeToClose: days === null ? "TBD" : days <= 0 ? "Immediate" : `${days} day${days === 1 ? "" : "s"}`,
+          };
+        }),
+      upcomingLawImpacts: data.exposures
+        .slice(0, 6)
+        .map((exposure) => {
+          const riskLevel = exposure.status === "critical" || exposure.status === "non_compliant"
+            ? "high"
+            : exposure.status === "potential" || exposure.status === "watchlist"
+              ? "medium"
+              : "low";
+          const scoreImpact = riskLevel === "high" ? "-10%" : riskLevel === "medium" ? "-5%" : "-2%";
+          const preparationSteps = lawPreparationByRegulator[exposure.regulator] ?? [
+            "Review latest compliance obligation",
+            "Prepare filing-ready evidence",
+            "Assign responsible owner and due date",
+          ];
+          return {
+            id: exposure.regulator,
+            title: `${exposure.regulator} Compliance Update`,
+            effectiveDate: "Immediate",
+            scoreImpact,
+            riskLevel,
+            riskDescription: exposure.notes ?? `Active ${exposure.regulator} exposure requires monitoring and action.`,
+            preparationSteps,
+          };
+        }),
+      auditRecords: [
+        ...data.documents.slice(0, 12).map((document) => ({
+          id: `doc-${document.id}`,
+          category: (document.status === "submitted" ? "filing" : "evidence") as "filing" | "evidence",
+          title: document.name,
+          regulator: document.regulator ?? "General",
+          date: format(parseISO(document.created_at), "MMM yyyy"),
+          status: document.status === "submitted" ? "ready" : "pending",
+        })),
+        ...data.deadlines.slice(0, 6).map((deadline) => ({
+          id: `deadline-${deadline.id}`,
+          category: "timeline" as const,
+          title: deadline.title,
+          regulator: deadline.regulator,
+          date: format(parseISO(deadline.due_date), "MMM dd, yyyy"),
+          status: "ready" as const,
+        })),
+      ].slice(0, 18),
     };
   }, [data]);
 
@@ -298,9 +374,9 @@ const AppDashboard = () => {
               deadlines={mappedData.deadlines}
             />
 
-            <ComplianceGapSection />
-            <UpcomingLawImpactSection />
-            <AuditEvidenceVault />
+            <ComplianceGapSection gaps={mappedData.complianceGaps} />
+            <UpcomingLawImpactSection impacts={mappedData.upcomingLawImpacts} />
+            <AuditEvidenceVault records={mappedData.auditRecords} />
 
             <QuickActions />
 

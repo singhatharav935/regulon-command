@@ -12,6 +12,10 @@ interface LawImpact {
   preparationSteps: string[];
 }
 
+interface UpcomingLawImpactSectionProps {
+  impacts?: LawImpact[];
+}
+
 const demoLawImpacts: LawImpact[] = [
   {
     id: "1",
@@ -42,7 +46,8 @@ const demoLawImpacts: LawImpact[] = [
   },
 ];
 
-const UpcomingLawImpactSection = () => {
+const UpcomingLawImpactSection = ({ impacts }: UpcomingLawImpactSectionProps) => {
+  const effectiveImpacts = impacts && impacts.length > 0 ? impacts : demoLawImpacts;
   const getRiskBadgeClass = (level: LawImpact["riskLevel"]) => {
     switch (level) {
       case "high": return "bg-red-500/20 text-red-400 border-red-500/30";
@@ -96,7 +101,7 @@ const UpcomingLawImpactSection = () => {
 
       {/* Law Impact Items */}
       <div className="space-y-4">
-        {demoLawImpacts.map((law, index) => (
+        {effectiveImpacts.map((law, index) => (
           <motion.div
             key={law.id}
             initial={{ opacity: 0, x: -20 }}
