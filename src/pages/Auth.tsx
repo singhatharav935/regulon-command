@@ -204,13 +204,6 @@ const Auth = () => {
     setErrors(newErrors);
     if (Object.keys(newErrors).length > 0) return false;
 
-    if (mode === "signup") {
-      if (roleNeedsRegistrationNumber(selectedPersona) && registrationNumber.trim().length < 3) {
-        toast({ title: "Registration number is required", variant: "destructive" });
-        return false;
-      }
-    }
-
     return true;
   };
 
@@ -385,8 +378,8 @@ const Auth = () => {
 
                 {roleNeedsRegistrationNumber(selectedPersona) && (
                   <div className="space-y-2">
-                    <Label>Registration Number</Label>
-                    <Input value={registrationNumber} onChange={(e) => setRegistrationNumber(e.target.value)} placeholder="Company/Firm/Admin registration" />
+                    <Label>Registration Number (Optional)</Label>
+                    <Input value={registrationNumber} onChange={(e) => setRegistrationNumber(e.target.value)} placeholder="Company/Firm/Admin registration (optional)" />
                   </div>
                 )}
 
