@@ -33,7 +33,7 @@ const dashboardTypes = [
   {
     id: "university",
     label: "University Dashboard",
-    href: "/university",
+    href: "/app/university",
     icon: GraduationCap,
     description: "Campus operations & compliance command"
   },
@@ -47,9 +47,14 @@ const dashboardTypes = [
 ];
 
 const DashboardTypeNav = ({ activeType, routePrefix = "" }: DashboardTypeNavProps) => {
+  const forceAppRouteByDashboardId: Partial<Record<DashboardTypeNavProps["activeType"], string>> = {
+    university: "/app/university",
+  };
+
   const withPrefix = (href: string, id: string) => {
-    if (id === "university") {
-      return "/app/university";
+    const forcedAppRoute = forceAppRouteByDashboardId[id as DashboardTypeNavProps["activeType"]];
+    if (forcedAppRoute) {
+      return forcedAppRoute;
     }
     if (id === "ca-firm") {
       return routePrefix ? "/app/ca-firm-dashboard" : "/ca-firm-dashboard";
