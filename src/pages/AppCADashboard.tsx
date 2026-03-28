@@ -43,6 +43,15 @@ const AppCADashboard = () => {
     },
   });
 
+  const { data: onboarding } = useQuery({
+    queryKey: ["onboarding-status-ca", user?.id],
+    enabled: Boolean(user?.id),
+    queryFn: async () => workspaceBackendRequest<{
+      blockers: Array<{ code: string; message: string; severity: string }>;
+      next_steps: string[];
+    }>("/onboarding/status"),
+  });
+
   const mapped = useMemo(() => {
     if (!data) return null;
 
@@ -158,8 +167,15 @@ const AppCADashboard = () => {
                 <CardHeader>
                   <CardTitle>No companies assigned</CardTitle>
                 </CardHeader>
-                <CardContent className="text-sm text-muted-foreground">
-                  Ask platform admin/company owner to assign you in <code>company_members</code> to start live CA operations.
+                <CardContent className="text-sm text-muted-foreground space-y-3">
+                  <p>Ask platform admin/company owner to assign you in <code>company_members</code> to start live CA operations.</p>
+                  {onboarding?.blockers?.length ? (
+                    <div className="rounded-lg border border-amber-500/30 bg-amber-500/10 p-3 text-xs text-amber-200">
+                      {onboarding.blockers.slice(0, 4).map((blocker) => (
+                        <p key={blocker.code}>• {blocker.message}</p>
+                      ))}
+                    </div>
+                  ) : null}
                 </CardContent>
               </Card>
             ) : (

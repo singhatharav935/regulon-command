@@ -28,6 +28,7 @@ const AppDashboard = () => {
   const [companyName, setCompanyName] = useState("");
   const [industry, setIndustry] = useState("");
   const [creatingCompany, setCreatingCompany] = useState(false);
+  const [repairingOnboarding, setRepairingOnboarding] = useState(false);
 
   const { data, isLoading, isError, error } = useQuery({
     queryKey: ["app-dashboard", user?.id],
@@ -45,6 +46,22 @@ const AppDashboard = () => {
         draftRuns: Array<{ id: string; document_type: string; draft_mode: string; status: string; created_at: string }>;
         draftAuditEvents: Array<{ id: string; draft_run_id: string; event_type: string; created_at: string }>;
       }>("/company/dashboard");
+    },
+  });
+
+  const { data: onboarding } = useQuery({
+    queryKey: ["onboarding-status", user?.id],
+    enabled: Boolean(user?.id),
+    queryFn: async () => {
+      if (!user?.id) {
+        throw new Error("User is not authenticated");
+      }
+      return workspaceBackendRequest<{
+        ready_for_dashboard: boolean;
+        target_dashboard: string;
+        next_steps: string[];
+        blockers: Array<{ code: string; message: string; severity: string }>;
+      }>("/onboarding/status");
     },
   });
 
@@ -131,6 +148,31 @@ const AppDashboard = () => {
   }
 
   if (!data?.company || !mappedData) {
+    const handleRepairOnboarding = async () => {
+      setRepairingOnboarding(true);
+      try {
+        await workspaceBackendRequest<{
+          repaired: { role: string; persona: string };
+        }>("/onboarding/repair-self", {
+          method: "POST",
+          body: JSON.stringify({}),
+        });
+        toast({
+          title: "Onboarding state repaired",
+          description: "Role/persona/verification rows are synced. You can continue setup.",
+        });
+        window.location.reload();
+      } catch (error) {
+        toast({
+          title: "Onboarding repair failed",
+          description: error instanceof Error ? error.message : "Unexpected error",
+          variant: "destructive",
+        });
+      } finally {
+        setRepairingOnboarding(false);
+      }
+    };
+
     const handleCreateCompany = async () => {
       if (!companyName.trim()) {
         toast({
@@ -178,6 +220,21 @@ const AppDashboard = () => {
               <p className="text-muted-foreground mb-6">
                 Create your company workspace to start using live compliance data immediately.
               </p>
+              {onboarding?.blockers?.length ? (
+                <div className="max-w-2xl mx-auto mb-5 rounded-lg border border-amber-400/30 bg-amber-500/10 p-4 text-left">
+                  <p className="text-sm font-medium text-amber-300 mb-2">Onboarding blockers</p>
+                  <ul className="text-xs text-amber-100/90 space-y-1">
+                    {onboarding.blockers.map((blocker) => (
+                      <li key={blocker.code}>• {blocker.message}</li>
+                    ))}
+                  </ul>
+                  <div className="mt-3 flex justify-end">
+                    <Button variant="outline" size="sm" onClick={handleRepairOnboarding} disabled={repairingOnboarding}>
+                      {repairingOnboarding ? "Repairing..." : "Repair My Onboarding State"}
+                    </Button>
+                  </div>
+                </div>
+              ) : null}
               <div className="max-w-md mx-auto space-y-3 text-left">
                 <Input
                   placeholder="Company name"

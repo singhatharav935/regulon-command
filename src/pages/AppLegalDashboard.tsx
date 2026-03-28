@@ -28,6 +28,15 @@ const AppLegalDashboard = () => {
     },
   });
 
+  const { data: onboarding } = useQuery({
+    queryKey: ["onboarding-status-legal", user?.id],
+    enabled: Boolean(user?.id),
+    queryFn: async () => workspaceBackendRequest<{
+      blockers: Array<{ code: string; message: string; severity: string }>;
+      next_steps: string[];
+    }>("/onboarding/status"),
+  });
+
   if (isLoading) {
     return (
       <div className="min-h-screen bg-background flex items-center justify-center">
@@ -95,8 +104,15 @@ const AppLegalDashboard = () => {
 
           {data && data.companyIds.length === 0 ? (
             <Card className="glass-card border-border/40 mb-8">
-              <CardContent className="p-6 text-sm text-muted-foreground">
-                No company assignment found for this legal workspace yet. Assign the lawyer to a company in `company_members` to activate live review queues.
+              <CardContent className="p-6 text-sm text-muted-foreground space-y-3">
+                <p>No company assignment found for this legal workspace yet. Assign the lawyer to a company in `company_members` to activate live review queues.</p>
+                {onboarding?.blockers?.length ? (
+                  <div className="rounded-lg border border-amber-500/30 bg-amber-500/10 p-3 text-xs text-amber-200">
+                    {onboarding.blockers.slice(0, 4).map((blocker) => (
+                      <p key={blocker.code}>• {blocker.message}</p>
+                    ))}
+                  </div>
+                ) : null}
               </CardContent>
             </Card>
           ) : null}

@@ -3750,6 +3750,244 @@ const inferReadinessActions = (readiness: {
   return actions;
 };
 
+const ensureSelfOnboardingState = async (
+  serviceClient: ReturnType<typeof createClient>,
+  params: {
+    userId: string;
+    email: string | null;
+    fullName: string | null;
+    persona: AppPersona;
+    verificationDraft: {
+      entity_name: string | null;
+      registration_number: string | null;
+      license_number: string | null;
+      jurisdiction: string | null;
+    };
+  },
+) => {
+  const mappedRole = mapPersonaToRole(params.persona);
+  const workspaceType =
+    params.persona === "in_house_ca"
+      ? "regulon_ca"
+      : params.persona === "external_ca"
+        ? "external_ca"
+        : null;
+
+  const { error: profileError } = await serviceClient
+    .from("profiles")
+    .upsert(
+      {
+        user_id: params.userId,
+        email: params.email,
+        full_name: params.fullName,
+      },
+      { onConflict: "user_id" },
+    );
+  if (profileError) throw profileError;
+
+  const { error: personaError } = await serviceClient
+    .from("user_personas")
+    .upsert(
+      {
+        user_id: params.userId,
+        persona: params.persona,
+      },
+      { onConflict: "user_id" },
+    );
+  if (personaError) throw personaError;
+
+  const { error: roleError } = await serviceClient
+    .from("user_roles")
+    .upsert(
+      {
+        user_id: params.userId,
+        role: mappedRole,
+      },
+      { onConflict: "user_id,role" },
+    );
+  if (roleError) throw roleError;
+
+  const { error: verificationError } = await serviceClient
+    .from("user_verifications")
+    .upsert(
+      {
+        user_id: params.userId,
+        persona: params.persona,
+        entity_name: params.verificationDraft.entity_name,
+        registration_number: params.verificationDraft.registration_number,
+        license_number: params.verificationDraft.license_number,
+        jurisdiction: params.verificationDraft.jurisdiction,
+        status: "pending",
+        is_verified: false,
+      },
+      { onConflict: "user_id" },
+    );
+  if (verificationError) throw verificationError;
+
+  if (workspaceType) {
+    const { error: workspaceError } = await serviceClient
+      .from("ca_workspace_profiles")
+      .upsert(
+        {
+          user_id: params.userId,
+          workspace_type: workspaceType,
+        },
+        { onConflict: "user_id" },
+      );
+    if (workspaceError) throw workspaceError;
+  }
+
+  return {
+    role: mappedRole,
+    persona: params.persona,
+    workspace_type: workspaceType,
+  };
+};
+
+const loadSelfOnboardingStatus = async (
+  client: ReturnType<typeof createClient>,
+  user: { id: string; email?: string | null; email_confirmed_at?: string | null; user_metadata?: Record<string, unknown> },
+  effectivePersona: AppPersona | null,
+  effectiveRoles: Set<string>,
+) => {
+  const userId = user.id;
+  const [profileResult, personaResult, roleRowsResult, verificationResult, companyMembersResult, caFirmMembersResult] = await Promise.all([
+    client.from("profiles").select("user_id, full_name, email").eq("user_id", userId).maybeSingle(),
+    client.from("user_personas").select("persona").eq("user_id", userId).maybeSingle(),
+    client.from("user_roles").select("role").eq("user_id", userId),
+    client.from("user_verifications").select("status, is_verified").eq("user_id", userId).maybeSingle(),
+    client.from("company_members").select("company_id").eq("user_id", userId),
+    client.from("ca_firm_members").select("ca_firm_id").eq("user_id", userId),
+  ]);
+  if (profileResult.error) throw profileResult.error;
+  if (personaResult.error) throw personaResult.error;
+  if (roleRowsResult.error) throw roleRowsResult.error;
+  if (verificationResult.error) throw verificationResult.error;
+  if (companyMembersResult.error) throw companyMembersResult.error;
+  if (caFirmMembersResult.error) throw caFirmMembersResult.error;
+
+  const rowPersona = normalizePersona(personaResult.data?.persona ?? null);
+  const persona = rowPersona ?? effectivePersona ?? "company_owner";
+  const roleRows = Array.from(new Set((roleRowsResult.data ?? []).map((row) => String(row.role))));
+  const roles = Array.from(new Set([...roleRows, ...Array.from(effectiveRoles)]));
+
+  const profilePresent = Boolean(profileResult.data);
+  const personaPresent = Boolean(rowPersona);
+  const rolePresent = roleRows.length > 0;
+  const verification = verificationResult.data
+    ? {
+      status: typeof verificationResult.data.status === "string" ? verificationResult.data.status : "pending",
+      is_verified: verificationResult.data.is_verified === true,
+    }
+    : null;
+  const verificationPresent = Boolean(verificationResult.data);
+  const companyAssignments = (companyMembersResult.data ?? []).length;
+  const caFirmAssignments = (caFirmMembersResult.data ?? []).length;
+
+  const requiresCompanyAssignment =
+    persona === "company_owner" ||
+    persona === "external_ca" ||
+    persona === "in_house_ca" ||
+    persona === "in_house_lawyer";
+  const requiresCaFirmAssignment = persona === "ca_firm";
+  const requiresVerification = true;
+
+  const blockers: Array<{ code: string; message: string; severity: "critical" | "high" | "medium" }> = [];
+  if (!user.email_confirmed_at) {
+    blockers.push({
+      code: "EMAIL_NOT_VERIFIED",
+      message: "Email is not verified yet. Verify email before workspace access.",
+      severity: "critical",
+    });
+  }
+  if (!profilePresent) {
+    blockers.push({
+      code: "PROFILE_MISSING",
+      message: "Profile row is missing.",
+      severity: "high",
+    });
+  }
+  if (!personaPresent) {
+    blockers.push({
+      code: "PERSONA_MISSING",
+      message: "Persona mapping is missing.",
+      severity: "high",
+    });
+  }
+  if (!rolePresent) {
+    blockers.push({
+      code: "ROLE_MISSING",
+      message: "Role mapping is missing.",
+      severity: "high",
+    });
+  }
+  if (requiresVerification && !verificationPresent) {
+    blockers.push({
+      code: "VERIFICATION_RECORD_MISSING",
+      message: "Verification record is missing.",
+      severity: "high",
+    });
+  }
+  if (requiresVerification && verificationPresent && verification?.is_verified !== true) {
+    blockers.push({
+      code: "VERIFICATION_PENDING",
+      message: "Verification is pending approval.",
+      severity: "medium",
+    });
+  }
+  if (requiresCompanyAssignment && companyAssignments === 0) {
+    blockers.push({
+      code: "COMPANY_ASSIGNMENT_MISSING",
+      message: "No company assigned for this persona.",
+      severity: "high",
+    });
+  }
+  if (requiresCaFirmAssignment && caFirmAssignments === 0) {
+    blockers.push({
+      code: "CA_FIRM_ASSIGNMENT_MISSING",
+      message: "No CA firm membership assigned.",
+      severity: "high",
+    });
+  }
+
+  return {
+    user_id: userId,
+    email: user.email ?? null,
+    persona,
+    roles,
+    checks: {
+      email_verified: Boolean(user.email_confirmed_at),
+      profile_row_present: profilePresent,
+      persona_row_present: personaPresent,
+      role_row_present: rolePresent,
+      verification_row_present: verificationPresent,
+      verification_approved: verification?.is_verified === true,
+      company_assignment_present: companyAssignments > 0,
+      ca_firm_assignment_present: caFirmAssignments > 0,
+    },
+    verification: verification ?? { status: "missing", is_verified: false },
+    memberships: {
+      company: companyAssignments,
+      ca_firm: caFirmAssignments,
+    },
+    target_dashboard: resolveTargetDashboardPath(persona, roles),
+    ready_for_dashboard: blockers.length === 0,
+    blockers,
+    next_steps: inferReadinessActions({
+      persona,
+      roles,
+      memberships: { company: companyAssignments, ca_firm: caFirmAssignments },
+      blockers: blockers.map((item) => {
+        if (item.code === "PERSONA_MISSING") return "Missing persona";
+        if (item.code === "ROLE_MISSING") return "Missing app role";
+        if (item.code === "COMPANY_ASSIGNMENT_MISSING") return "No company assignment";
+        if (item.code === "CA_FIRM_ASSIGNMENT_MISSING") return "No CA firm membership";
+        return item.message;
+      }),
+    }),
+  };
+};
+
 const buildSelfDashboardProbe = async (
   client: ReturnType<typeof createClient>,
   userId: string,
@@ -4236,6 +4474,8 @@ const bootstrapCompanyAuthorityWorkflowsByAdmin = async (
 
 const getRouteAccessMatrix = () => ({
   dashboards: [
+    { route: "GET /onboarding/status", roles: ["authenticated"] },
+    { route: "POST /onboarding/repair-self", roles: ["authenticated"] },
     { route: "GET /dashboard/readiness/self", roles: ["authenticated"] },
     { route: "GET /ops/dashboard-readiness/smoke", roles: ["admin"] },
     { route: "GET /company/dashboard", roles: ["user", "manager", "admin"] },
@@ -4769,6 +5009,55 @@ serve(async (req: Request) => {
     const { client, user, token } = await getUserClient(req);
     const persona = await getUserPersona(client, user.id, user);
     const roles = applyPersonaRoleFallback(await getUserRoles(client, user.id), persona);
+
+    if (req.method === "GET" && path.endsWith("onboarding/status")) {
+      return json(req, 200, {
+        ok: true,
+        data: await loadSelfOnboardingStatus(client, user, persona, roles),
+      });
+    }
+
+    if (req.method === "POST" && path.endsWith("onboarding/repair-self")) {
+      const serviceClient = getServiceClient();
+      if (!serviceClient) return json(req, 500, { error: "Missing Supabase service role configuration" });
+
+      const metadataPersona = normalizePersona(user.user_metadata?.registration_role ?? null);
+      const resolvedPersona = persona ?? metadataPersona ?? "company_owner";
+      const verificationDraft = {
+        entity_name: typeof user.user_metadata?.verification_entity_name === "string" && user.user_metadata.verification_entity_name.trim()
+          ? user.user_metadata.verification_entity_name.trim()
+          : null,
+        registration_number: typeof user.user_metadata?.verification_registration_number === "string" && user.user_metadata.verification_registration_number.trim()
+          ? user.user_metadata.verification_registration_number.trim()
+          : null,
+        license_number: typeof user.user_metadata?.verification_license_number === "string" && user.user_metadata.verification_license_number.trim()
+          ? user.user_metadata.verification_license_number.trim()
+          : null,
+        jurisdiction: typeof user.user_metadata?.verification_jurisdiction === "string" && user.user_metadata.verification_jurisdiction.trim()
+          ? user.user_metadata.verification_jurisdiction.trim()
+          : null,
+      };
+
+      const repaired = await ensureSelfOnboardingState(serviceClient, {
+        userId: user.id,
+        email: typeof user.email === "string" ? user.email : null,
+        fullName: typeof user.user_metadata?.full_name === "string" && user.user_metadata.full_name.trim()
+          ? user.user_metadata.full_name.trim()
+          : null,
+        persona: resolvedPersona,
+        verificationDraft,
+      });
+
+      const refreshedPersona = await getUserPersona(client, user.id, user);
+      const refreshedRoles = applyPersonaRoleFallback(await getUserRoles(client, user.id), refreshedPersona);
+      return json(req, 200, {
+        ok: true,
+        data: {
+          repaired,
+          status: await loadSelfOnboardingStatus(client, user, refreshedPersona, refreshedRoles),
+        },
+      });
+    }
 
     if (req.method === "GET" && path.endsWith("dashboard/readiness/self")) {
       const readiness = await loadSingleUserDashboardReadiness(client, user.id);
