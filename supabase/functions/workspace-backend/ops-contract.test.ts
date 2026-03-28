@@ -94,6 +94,7 @@ describe("ops-contract", () => {
     expect(checklist.requiredEndpoints).toContain("/ops/operations/readiness");
     expect(checklist.requiredEndpoints).toContain("/ops/infra/readiness");
     expect(checklist.requiredEndpoints).toContain("/ops/postlaunch/readiness");
+    expect(checklist.requiredEndpoints).toContain("/ops/performance/readiness");
   });
 
   it("fails gate when required schema is missing", () => {

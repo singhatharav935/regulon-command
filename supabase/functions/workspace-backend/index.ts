@@ -1109,6 +1109,14 @@ const resolveErrorCode = (message: string) => {
   if (message.startsWith("priority must be one of:")) return "VALIDATION_INVALID_FIELD";
   if (message.startsWith("assignmentType must be one of:")) return "VALIDATION_INVALID_FIELD";
   if (message.startsWith("alertType must be one of:")) return "VALIDATION_INVALID_FIELD";
+  if (message.startsWith("checkType must be one of:")) return "VALIDATION_INVALID_FIELD";
+  if (message.startsWith("comparator must be one of:")) return "VALIDATION_INVALID_FIELD";
+  if (message.startsWith("budgetKey must be snake_case")) return "VALIDATION_INVALID_FIELD";
+  if (message.startsWith("statusCode must be a valid HTTP status code")) return "VALIDATION_INVALID_FIELD";
+  if (message.startsWith("thresholdWarn and thresholdFail must be numbers")) return "VALIDATION_INVALID_FIELD";
+  if (message.startsWith("errorRatePercent must be between 0 and 100")) return "VALIDATION_INVALID_FIELD";
+  if (message.startsWith("triggeredValue must be a number")) return "VALIDATION_INVALID_FIELD";
+  if (message.startsWith("severity must be one of: medium, high, critical")) return "VALIDATION_INVALID_FIELD";
   if (message.startsWith("status must be one of:")) return "VALIDATION_INVALID_FIELD";
   if (message.startsWith("quality percentages must be between 0 and 100")) return "VALIDATION_INVALID_FIELD";
   if (message.includes("must be a valid UUID")) return "VALIDATION_INVALID_FIELD";
@@ -4083,6 +4091,10 @@ const collectDeployReadinessSignals = async (
     "postlaunch_risk_alerts",
     "postlaunch_model_quality_reviews",
     "postlaunch_hotfix_releases",
+    "performance_client_metrics",
+    "performance_synthetic_checks",
+    "performance_budget_policies",
+    "performance_alert_events",
   ];
   const missingTables: string[] = [];
   const tableProbeErrors: Array<{ table: string; code: string | null; message: string }> = [];
@@ -5249,6 +5261,15 @@ const getRouteAccessMatrix = () => ({
     { route: "POST /ops/postlaunch/model-quality-reviews", roles: ["admin"] },
     { route: "GET /ops/postlaunch/hotfix-releases", roles: ["admin"] },
     { route: "POST /ops/postlaunch/hotfix-releases", roles: ["admin"] },
+    { route: "GET /ops/performance/readiness", roles: ["admin"] },
+    { route: "GET /ops/performance/client-metrics", roles: ["admin"] },
+    { route: "POST /ops/performance/client-metrics", roles: ["admin"] },
+    { route: "GET /ops/performance/synthetic-checks", roles: ["admin"] },
+    { route: "POST /ops/performance/synthetic-checks", roles: ["admin"] },
+    { route: "GET /ops/performance/budgets", roles: ["admin"] },
+    { route: "POST /ops/performance/budgets", roles: ["admin"] },
+    { route: "GET /ops/performance/alerts", roles: ["admin"] },
+    { route: "POST /ops/performance/alerts", roles: ["admin"] },
     { route: "POST /ops/billing/invoice/issue", roles: ["admin"] },
     { route: "POST /ops/billing/payment-attempt", roles: ["admin"] },
     { route: "POST /ops/assign/company-member", roles: ["admin"] },
@@ -7556,7 +7577,7 @@ const upsertPostlaunchRiskAlertByAdmin = async (
     throw new Error("severity must be one of: low, medium, high, critical");
   }
   const status = toTrimmedString(params.status ?? null, 20) ?? "open";
-  if (!POSTLAUNCH_ALERT_STATUSES.has(status)) {
+  if (!PERFORMANCE_ALERT_STATUSES.has(status)) {
     throw new Error("status must be one of: open, acknowledged, resolved, dismissed");
   }
   const title = toTrimmedString(params.title, 240);
@@ -7795,6 +7816,461 @@ const collectPostlaunchReadinessSignals = async (
     },
     overall: {
       pass: criticalOpenAlerts === 0 && failedHotfix === 0 && recentSnapshots > 0,
+    },
+  };
+};
+
+const PERFORMANCE_SYNTHETIC_CHECK_TYPES = new Set(["landing", "auth", "company_dashboard", "ca_dashboard", "legal_dashboard", "api_health"]);
+const PERFORMANCE_CHECK_STATUSES = new Set(["pass", "warn", "fail"]);
+const PERFORMANCE_BUDGET_COMPARATORS = new Set(["lte", "gte"]);
+const PERFORMANCE_ALERT_SEVERITIES = new Set(["medium", "high", "critical"]);
+const PERFORMANCE_ALERT_STATUSES = new Set(["open", "acknowledged", "resolved", "dismissed"]);
+
+const listPerformanceClientMetrics = async (
+  client: ReturnType<typeof createClient>,
+  options?: { route?: string | null; limit?: number; offset?: number; fromDate?: string | null; toDate?: string | null },
+) => {
+  const limit = Math.max(1, Math.min(365, Number(options?.limit ?? 120)));
+  const offset = Math.max(0, Number(options?.offset ?? 0));
+  let query = client
+    .from("performance_client_metrics")
+    .select("id, metric_date, route, role_scope, source, p95_ttfb_ms, p95_lcp_ms, p95_cls, error_rate_percent, bundle_kb_main, js_chunk_count, metadata, created_by, created_at, updated_at")
+    .order("metric_date", { ascending: false })
+    .range(offset, offset + limit - 1);
+  const route = toTrimmedString(options?.route ?? null, 220);
+  if (route) query = query.eq("route", route);
+  const fromDate = toTrimmedString(options?.fromDate ?? null, 20);
+  if (fromDate) query = query.gte("metric_date", fromDate);
+  const toDate = toTrimmedString(options?.toDate ?? null, 20);
+  if (toDate) query = query.lte("metric_date", toDate);
+  const { data, error } = await query;
+  if (error) throw error;
+  return data ?? [];
+};
+
+const upsertPerformanceClientMetricByAdmin = async (
+  client: ReturnType<typeof createClient>,
+  adminUserId: string,
+  params: {
+    metricDate: string;
+    route: string;
+    roleScope?: string | null;
+    source?: string | null;
+    p95TtfbMs?: number | null;
+    p95LcpMs?: number | null;
+    p95Cls?: number | null;
+    errorRatePercent?: number | null;
+    bundleKbMain?: number | null;
+    jsChunkCount?: number | null;
+    metadata?: Record<string, unknown>;
+  },
+) => {
+  const metricDate = toTrimmedString(params.metricDate, 20);
+  if (!metricDate) throw new Error("metricDate is required");
+  const route = toTrimmedString(params.route, 220);
+  if (!route) throw new Error("route is required");
+  const roleScope = toTrimmedString(params.roleScope ?? null, 80) ?? "all";
+  const source = toTrimmedString(params.source ?? null, 80) ?? "manual";
+
+  const parseOptionalNonNegativeNumber = (value: number | null | undefined, key: string) => {
+    if (typeof value === "undefined" || value === null) return null;
+    const number = Number(value);
+    if (!Number.isFinite(number) || number < 0) throw new Error(`${key} must be a non-negative number`);
+    return number;
+  };
+
+  const p95TtfbMs = parseOptionalNonNegativeNumber(params.p95TtfbMs, "p95TtfbMs");
+  const p95LcpMs = parseOptionalNonNegativeNumber(params.p95LcpMs, "p95LcpMs");
+  const p95Cls = parseOptionalNonNegativeNumber(params.p95Cls, "p95Cls");
+  const errorRatePercent = parseOptionalNonNegativeNumber(params.errorRatePercent, "errorRatePercent");
+  if (errorRatePercent !== null && errorRatePercent > 100) {
+    throw new Error("errorRatePercent must be between 0 and 100");
+  }
+  const bundleKbMain = parseOptionalNonNegativeNumber(params.bundleKbMain, "bundleKbMain");
+  const jsChunkCount = parseOptionalNonNegativeNumber(params.jsChunkCount, "jsChunkCount");
+
+  const { data, error } = await client
+    .from("performance_client_metrics")
+    .upsert({
+      metric_date: metricDate,
+      route,
+      role_scope: roleScope,
+      source,
+      p95_ttfb_ms: p95TtfbMs === null ? null : Math.trunc(p95TtfbMs),
+      p95_lcp_ms: p95LcpMs === null ? null : Math.trunc(p95LcpMs),
+      p95_cls: p95Cls,
+      error_rate_percent: errorRatePercent,
+      bundle_kb_main: bundleKbMain === null ? null : Math.trunc(bundleKbMain),
+      js_chunk_count: jsChunkCount === null ? null : Math.trunc(jsChunkCount),
+      metadata: params.metadata ?? {},
+      created_by: adminUserId,
+      updated_at: new Date().toISOString(),
+    }, { onConflict: "metric_date,route,role_scope,source" })
+    .select("id, metric_date, route, role_scope, source, p95_ttfb_ms, p95_lcp_ms, p95_cls, error_rate_percent, bundle_kb_main, js_chunk_count, metadata, created_by, created_at, updated_at")
+    .single();
+  if (error || !data) throw error ?? new Error("Failed to upsert performance metric");
+
+  await createOpsActivityLog(client, {
+    actorUserId: adminUserId,
+    activityType: "performance_client_metric_upserted",
+    entityType: "performance_client_metrics",
+    entityId: data.id,
+    details: { metric_date: data.metric_date, route: data.route, source: data.source },
+  });
+  return data;
+};
+
+const listPerformanceSyntheticChecks = async (
+  client: ReturnType<typeof createClient>,
+  options?: { checkType?: string | null; status?: string | null; limit?: number; offset?: number },
+) => {
+  const limit = Math.max(1, Math.min(500, Number(options?.limit ?? 120)));
+  const offset = Math.max(0, Number(options?.offset ?? 0));
+  let query = client
+    .from("performance_synthetic_checks")
+    .select("id, check_type, target, status, latency_ms, status_code, checked_at, details, metadata, created_by, created_at, updated_at")
+    .order("checked_at", { ascending: false })
+    .range(offset, offset + limit - 1);
+  const checkType = toTrimmedString(options?.checkType ?? null, 80);
+  if (checkType) query = query.eq("check_type", checkType);
+  const status = toTrimmedString(options?.status ?? null, 30);
+  if (status) query = query.eq("status", status);
+  const { data, error } = await query;
+  if (error) throw error;
+  return data ?? [];
+};
+
+const createPerformanceSyntheticCheckByAdmin = async (
+  client: ReturnType<typeof createClient>,
+  adminUserId: string,
+  params: {
+    checkType: string;
+    target: string;
+    status: string;
+    latencyMs?: number | null;
+    statusCode?: number | null;
+    checkedAt?: string | null;
+    details?: string | null;
+    metadata?: Record<string, unknown>;
+  },
+) => {
+  const checkType = toTrimmedString(params.checkType, 80);
+  if (!checkType || !PERFORMANCE_SYNTHETIC_CHECK_TYPES.has(checkType)) {
+    throw new Error("checkType must be one of: landing, auth, company_dashboard, ca_dashboard, legal_dashboard, api_health");
+  }
+  const target = toTrimmedString(params.target, 220);
+  if (!target) throw new Error("target is required");
+  const status = toTrimmedString(params.status, 30);
+  if (!status || !PERFORMANCE_CHECK_STATUSES.has(status)) {
+    throw new Error("status must be one of: pass, warn, fail");
+  }
+  const latencyMs = typeof params.latencyMs === "undefined" || params.latencyMs === null ? null : Number(params.latencyMs);
+  if (latencyMs !== null && (!Number.isFinite(latencyMs) || latencyMs < 0)) {
+    throw new Error("latencyMs must be a non-negative number");
+  }
+  const statusCode = typeof params.statusCode === "undefined" || params.statusCode === null ? null : Number(params.statusCode);
+  if (statusCode !== null && (!Number.isFinite(statusCode) || statusCode < 100)) {
+    throw new Error("statusCode must be a valid HTTP status code");
+  }
+  const checkedAtRaw = toTrimmedString(params.checkedAt ?? null, 80);
+  const checkedAt = checkedAtRaw ? new Date(checkedAtRaw).toISOString() : new Date().toISOString();
+
+  const { data, error } = await client
+    .from("performance_synthetic_checks")
+    .insert({
+      check_type: checkType,
+      target,
+      status,
+      latency_ms: latencyMs === null ? null : Math.trunc(latencyMs),
+      status_code: statusCode === null ? null : Math.trunc(statusCode),
+      checked_at: checkedAt,
+      details: toTrimmedString(params.details ?? null, 6000),
+      metadata: params.metadata ?? {},
+      created_by: adminUserId,
+    })
+    .select("id, check_type, target, status, latency_ms, status_code, checked_at, details, metadata, created_by, created_at, updated_at")
+    .single();
+  if (error || !data) throw error ?? new Error("Failed to create synthetic check");
+
+  await createOpsActivityLog(client, {
+    actorUserId: adminUserId,
+    activityType: "performance_synthetic_check_created",
+    entityType: "performance_synthetic_checks",
+    entityId: data.id,
+    details: { check_type: data.check_type, status: data.status, target: data.target },
+  });
+  return data;
+};
+
+const listPerformanceBudgetPolicies = async (
+  client: ReturnType<typeof createClient>,
+  options?: { active?: boolean | null; metricName?: string | null; limit?: number; offset?: number },
+) => {
+  const limit = Math.max(1, Math.min(200, Number(options?.limit ?? 80)));
+  const offset = Math.max(0, Number(options?.offset ?? 0));
+  let query = client
+    .from("performance_budget_policies")
+    .select("id, budget_key, metric_name, threshold_warn, threshold_fail, comparator, active, metadata, created_at, updated_at")
+    .order("created_at", { ascending: false })
+    .range(offset, offset + limit - 1);
+  if (typeof options?.active === "boolean") query = query.eq("active", options.active);
+  const metricName = toTrimmedString(options?.metricName ?? null, 80);
+  if (metricName) query = query.eq("metric_name", metricName);
+  const { data, error } = await query;
+  if (error) throw error;
+  return data ?? [];
+};
+
+const upsertPerformanceBudgetPolicyByAdmin = async (
+  client: ReturnType<typeof createClient>,
+  adminUserId: string,
+  params: {
+    budgetKey: string;
+    metricName: string;
+    thresholdWarn: number;
+    thresholdFail: number;
+    comparator?: string | null;
+    active?: boolean;
+    metadata?: Record<string, unknown>;
+  },
+) => {
+  const budgetKey = toTrimmedString(params.budgetKey, 120);
+  if (!budgetKey) throw new Error("budgetKey is required");
+  if (!/^[a-z0-9_]+$/.test(budgetKey)) throw new Error("budgetKey must be snake_case");
+  const metricName = toTrimmedString(params.metricName, 80);
+  if (!metricName) throw new Error("metricName is required");
+  const thresholdWarn = Number(params.thresholdWarn);
+  const thresholdFail = Number(params.thresholdFail);
+  if (!Number.isFinite(thresholdWarn) || !Number.isFinite(thresholdFail)) {
+    throw new Error("thresholdWarn and thresholdFail must be numbers");
+  }
+  const comparator = toTrimmedString(params.comparator ?? null, 20) ?? "lte";
+  if (!PERFORMANCE_BUDGET_COMPARATORS.has(comparator)) {
+    throw new Error("comparator must be one of: lte, gte");
+  }
+
+  const { data, error } = await client
+    .from("performance_budget_policies")
+    .upsert({
+      budget_key: budgetKey,
+      metric_name: metricName,
+      threshold_warn: thresholdWarn,
+      threshold_fail: thresholdFail,
+      comparator,
+      active: params.active !== false,
+      metadata: params.metadata ?? {},
+      updated_at: new Date().toISOString(),
+    }, { onConflict: "budget_key" })
+    .select("id, budget_key, metric_name, threshold_warn, threshold_fail, comparator, active, metadata, created_at, updated_at")
+    .single();
+  if (error || !data) throw error ?? new Error("Failed to upsert performance budget policy");
+
+  await createOpsActivityLog(client, {
+    actorUserId: adminUserId,
+    activityType: "performance_budget_policy_upserted",
+    entityType: "performance_budget_policies",
+    entityId: data.id,
+    details: { budget_key: data.budget_key, metric_name: data.metric_name, active: data.active },
+  });
+  return data;
+};
+
+const listPerformanceAlertEvents = async (
+  client: ReturnType<typeof createClient>,
+  options?: { status?: string | null; severity?: string | null; limit?: number; offset?: number },
+) => {
+  const limit = Math.max(1, Math.min(300, Number(options?.limit ?? 120)));
+  const offset = Math.max(0, Number(options?.offset ?? 0));
+  let query = client
+    .from("performance_alert_events")
+    .select("id, metric_name, severity, status, title, detail, triggered_value, budget_policy_id, acknowledged_by, acknowledged_at, resolved_by, resolved_at, metadata, created_at, updated_at")
+    .order("created_at", { ascending: false })
+    .range(offset, offset + limit - 1);
+  const status = toTrimmedString(options?.status ?? null, 30);
+  if (status) query = query.eq("status", status);
+  const severity = toTrimmedString(options?.severity ?? null, 30);
+  if (severity) query = query.eq("severity", severity);
+  const { data, error } = await query;
+  if (error) throw error;
+  return data ?? [];
+};
+
+const upsertPerformanceAlertEventByAdmin = async (
+  client: ReturnType<typeof createClient>,
+  adminUserId: string,
+  params: {
+    id?: string | null;
+    metricName: string;
+    severity: string;
+    status?: string | null;
+    title: string;
+    detail?: string | null;
+    triggeredValue?: number | null;
+    budgetPolicyId?: string | null;
+    metadata?: Record<string, unknown>;
+  },
+) => {
+  if (params.id) assertUuid(params.id, "id");
+  if (params.budgetPolicyId) assertUuid(params.budgetPolicyId, "budgetPolicyId");
+  const metricName = toTrimmedString(params.metricName, 80);
+  if (!metricName) throw new Error("metricName is required");
+  const severity = toTrimmedString(params.severity, 20);
+  if (!severity || !PERFORMANCE_ALERT_SEVERITIES.has(severity)) {
+    throw new Error("severity must be one of: medium, high, critical");
+  }
+  const status = toTrimmedString(params.status ?? null, 20) ?? "open";
+  if (!POSTLAUNCH_ALERT_STATUSES.has(status)) {
+    throw new Error("status must be one of: open, acknowledged, resolved, dismissed");
+  }
+  const title = toTrimmedString(params.title, 240);
+  if (!title) throw new Error("title is required");
+  const triggeredValue = typeof params.triggeredValue === "undefined" || params.triggeredValue === null ? null : Number(params.triggeredValue);
+  if (triggeredValue !== null && !Number.isFinite(triggeredValue)) throw new Error("triggeredValue must be a number");
+  const nowIso = new Date().toISOString();
+  const acknowledged = status === "acknowledged";
+  const resolved = status === "resolved" || status === "dismissed";
+
+  const { data, error } = await client
+    .from("performance_alert_events")
+    .upsert({
+      id: params.id ?? undefined,
+      metric_name: metricName,
+      severity,
+      status,
+      title,
+      detail: toTrimmedString(params.detail ?? null, 6000),
+      triggered_value: triggeredValue,
+      budget_policy_id: params.budgetPolicyId ?? null,
+      acknowledged_by: acknowledged ? adminUserId : null,
+      acknowledged_at: acknowledged ? nowIso : null,
+      resolved_by: resolved ? adminUserId : null,
+      resolved_at: resolved ? nowIso : null,
+      metadata: params.metadata ?? {},
+      updated_at: nowIso,
+    })
+    .select("id, metric_name, severity, status, title, detail, triggered_value, budget_policy_id, acknowledged_by, acknowledged_at, resolved_by, resolved_at, metadata, created_at, updated_at")
+    .single();
+  if (error || !data) throw error ?? new Error("Failed to upsert performance alert");
+
+  await createOpsActivityLog(client, {
+    actorUserId: adminUserId,
+    activityType: "performance_alert_event_upserted",
+    entityType: "performance_alert_events",
+    entityId: data.id,
+    details: { metric_name: data.metric_name, severity: data.severity, status: data.status },
+  });
+  return data;
+};
+
+const collectPerformanceReadinessSignals = async (
+  client: ReturnType<typeof createClient>,
+) => {
+  const now = Date.now();
+  const metricsCutoff = new Date(now - 7 * 24 * 60 * 60 * 1000).toISOString().slice(0, 10);
+  const syntheticCutoff = new Date(now - 24 * 60 * 60 * 1000).toISOString();
+  const monitorCheckCutoff = new Date(now - 24 * 60 * 60 * 1000).toISOString();
+
+  const [clientMetricsResult, syntheticResult, budgetsResult, alertsResult, monitorResult] = await Promise.all([
+    client.from("performance_client_metrics").select("id, metric_date, p95_ttfb_ms, p95_lcp_ms, p95_cls, error_rate_percent, bundle_kb_main").gte("metric_date", metricsCutoff),
+    client.from("performance_synthetic_checks").select("id, check_type, status, checked_at").gte("checked_at", syntheticCutoff),
+    client.from("performance_budget_policies").select("id, budget_key, metric_name, threshold_warn, threshold_fail, comparator, active").eq("active", true),
+    client.from("performance_alert_events").select("id, severity, status").in("status", ["open", "acknowledged"]),
+    client.from("infra_monitoring_integrations").select("id, integration_type, status, last_check_at"),
+  ]);
+  if (clientMetricsResult.error) throw clientMetricsResult.error;
+  if (syntheticResult.error) throw syntheticResult.error;
+  if (budgetsResult.error) throw budgetsResult.error;
+  if (alertsResult.error) throw alertsResult.error;
+  if (monitorResult.error) throw monitorResult.error;
+
+  const metricsRows = clientMetricsResult.data ?? [];
+  const syntheticRows = syntheticResult.data ?? [];
+  const budgetRows = budgetsResult.data ?? [];
+  const alertRows = alertsResult.data ?? [];
+  const monitorRows = monitorResult.data ?? [];
+
+  const requiredChecks = ["landing", "auth", "company_dashboard", "api_health"];
+  const missingChecks = requiredChecks.filter((checkType) => !syntheticRows.some((row) => row.check_type === checkType));
+  const syntheticFailCount = syntheticRows.filter((row) => row.status === "fail").length;
+  const syntheticWarnCount = syntheticRows.filter((row) => row.status === "warn").length;
+
+  const alertCriticalOpen = alertRows.filter((row) => row.severity === "critical").length;
+  const alertHighOpen = alertRows.filter((row) => row.severity === "high").length;
+  const alertMediumOpen = alertRows.filter((row) => row.severity === "medium").length;
+
+  const monitoringIssues = monitorRows.filter((row) => row.status === "failed" || row.status === "degraded").length;
+  const staleMonitoringChecks = monitorRows.filter((row) => {
+    if (typeof row.last_check_at !== "string" || !row.last_check_at) return true;
+    const checkAt = Date.parse(row.last_check_at);
+    if (Number.isNaN(checkAt)) return true;
+    return checkAt < Date.parse(monitorCheckCutoff);
+  }).length;
+
+  const latestMetricByRoute = new Map<string, Record<string, unknown>>();
+  for (const row of metricsRows) {
+    const key = `${row.route}`;
+    const existing = latestMetricByRoute.get(key);
+    const currentDate = Date.parse(String(row.metric_date));
+    const existingDate = existing ? Date.parse(String(existing.metric_date)) : Number.NEGATIVE_INFINITY;
+    if (!existing || currentDate >= existingDate) {
+      latestMetricByRoute.set(key, row as unknown as Record<string, unknown>);
+    }
+  }
+
+  const metricValueByName = (metric: Record<string, unknown>, metricName: string): number | null => {
+    const value = metric[metricName];
+    if (typeof value === "number" && Number.isFinite(value)) return value;
+    return null;
+  };
+
+  let budgetWarnCount = 0;
+  let budgetFailCount = 0;
+  for (const budget of budgetRows) {
+    const metricName = String(budget.metric_name ?? "");
+    const comparator = String(budget.comparator ?? "lte");
+    const warn = Number(budget.threshold_warn ?? 0);
+    const fail = Number(budget.threshold_fail ?? 0);
+    const routeValues = Array.from(latestMetricByRoute.values())
+      .map((metric) => metricValueByName(metric, metricName))
+      .filter((value): value is number => value !== null);
+    if (routeValues.length === 0) continue;
+
+    const worst = comparator === "gte" ? Math.min(...routeValues) : Math.max(...routeValues);
+    const isFail = comparator === "gte" ? worst < fail : worst > fail;
+    const isWarn = comparator === "gte" ? worst < warn : worst > warn;
+    if (isFail) budgetFailCount += 1;
+    else if (isWarn) budgetWarnCount += 1;
+  }
+
+  return {
+    summary: {
+      critical: syntheticFailCount + alertCriticalOpen + budgetFailCount,
+      high: missingChecks.length + syntheticWarnCount + alertHighOpen + monitoringIssues + staleMonitoringChecks + (metricsRows.length === 0 ? 1 : 0),
+      medium: alertMediumOpen + budgetWarnCount,
+    },
+    metrics: {
+      client_metrics_last_7d: metricsRows.length,
+      synthetic_checks_last_24h: syntheticRows.length,
+      synthetic_checks_missing_core: missingChecks,
+      synthetic_checks_fail: syntheticFailCount,
+      synthetic_checks_warn: syntheticWarnCount,
+      budgets_active: budgetRows.length,
+      budgets_warn_breaches: budgetWarnCount,
+      budgets_fail_breaches: budgetFailCount,
+      alerts_open_critical: alertCriticalOpen,
+      alerts_open_high: alertHighOpen,
+      alerts_open_medium: alertMediumOpen,
+      monitoring_integrations_problematic: monitoringIssues,
+      monitoring_integrations_stale_check: staleMonitoringChecks,
+    },
+    overall: {
+      pass:
+        syntheticFailCount === 0 &&
+        alertCriticalOpen === 0 &&
+        budgetFailCount === 0 &&
+        missingChecks.length === 0 &&
+        monitoringIssues === 0 &&
+        staleMonitoringChecks === 0,
     },
   };
 };
@@ -9500,6 +9976,164 @@ serve(async (req: Request) => {
           rollbackExecuted: body.rollbackExecuted === true,
           rollbackNotes: typeof body.rollbackNotes === "string" ? body.rollbackNotes : null,
           deployedAt: typeof body.deployedAt === "string" ? body.deployedAt : null,
+          metadata: safeMetadataObject(body.metadata),
+        }),
+      });
+    }
+
+    if (req.method === "GET" && path.endsWith("ops/performance/readiness")) {
+      requireRole(roles, ["admin"]);
+      return json(req, 200, {
+        ok: true,
+        data: await collectPerformanceReadinessSignals(client),
+      });
+    }
+
+    if (req.method === "GET" && path.endsWith("ops/performance/client-metrics")) {
+      requireRole(roles, ["admin"]);
+      const limitRaw = Number(url.searchParams.get("limit") ?? 120);
+      const offsetRaw = Number(url.searchParams.get("offset") ?? 0);
+      return json(req, 200, {
+        ok: true,
+        data: await listPerformanceClientMetrics(client, {
+          route: url.searchParams.get("route"),
+          fromDate: url.searchParams.get("from_date"),
+          toDate: url.searchParams.get("to_date"),
+          limit: Number.isFinite(limitRaw) ? limitRaw : 120,
+          offset: Number.isFinite(offsetRaw) ? offsetRaw : 0,
+        }),
+      });
+    }
+
+    if (req.method === "POST" && path.endsWith("ops/performance/client-metrics")) {
+      requireRole(roles, ["admin"]);
+      const body = await req.json().catch(() => ({}));
+      if (!body || typeof body !== "object") {
+        return json(req, 400, { error: "request body is required" });
+      }
+      return json(req, 200, {
+        ok: true,
+        data: await upsertPerformanceClientMetricByAdmin(client, user.id, {
+          metricDate: typeof body.metricDate === "string" ? body.metricDate : "",
+          route: typeof body.route === "string" ? body.route : "",
+          roleScope: typeof body.roleScope === "string" ? body.roleScope : null,
+          source: typeof body.source === "string" ? body.source : null,
+          p95TtfbMs: Number.isFinite(Number(body.p95TtfbMs)) ? Number(body.p95TtfbMs) : null,
+          p95LcpMs: Number.isFinite(Number(body.p95LcpMs)) ? Number(body.p95LcpMs) : null,
+          p95Cls: Number.isFinite(Number(body.p95Cls)) ? Number(body.p95Cls) : null,
+          errorRatePercent: Number.isFinite(Number(body.errorRatePercent)) ? Number(body.errorRatePercent) : null,
+          bundleKbMain: Number.isFinite(Number(body.bundleKbMain)) ? Number(body.bundleKbMain) : null,
+          jsChunkCount: Number.isFinite(Number(body.jsChunkCount)) ? Number(body.jsChunkCount) : null,
+          metadata: safeMetadataObject(body.metadata),
+        }),
+      });
+    }
+
+    if (req.method === "GET" && path.endsWith("ops/performance/synthetic-checks")) {
+      requireRole(roles, ["admin"]);
+      const limitRaw = Number(url.searchParams.get("limit") ?? 120);
+      const offsetRaw = Number(url.searchParams.get("offset") ?? 0);
+      return json(req, 200, {
+        ok: true,
+        data: await listPerformanceSyntheticChecks(client, {
+          checkType: url.searchParams.get("check_type"),
+          status: url.searchParams.get("status"),
+          limit: Number.isFinite(limitRaw) ? limitRaw : 120,
+          offset: Number.isFinite(offsetRaw) ? offsetRaw : 0,
+        }),
+      });
+    }
+
+    if (req.method === "POST" && path.endsWith("ops/performance/synthetic-checks")) {
+      requireRole(roles, ["admin"]);
+      const body = await req.json().catch(() => ({}));
+      if (!body || typeof body !== "object") {
+        return json(req, 400, { error: "request body is required" });
+      }
+      return json(req, 200, {
+        ok: true,
+        data: await createPerformanceSyntheticCheckByAdmin(client, user.id, {
+          checkType: typeof body.checkType === "string" ? body.checkType.trim().toLowerCase() : "",
+          target: typeof body.target === "string" ? body.target : "",
+          status: typeof body.status === "string" ? body.status.trim().toLowerCase() : "",
+          latencyMs: Number.isFinite(Number(body.latencyMs)) ? Number(body.latencyMs) : null,
+          statusCode: Number.isFinite(Number(body.statusCode)) ? Number(body.statusCode) : null,
+          checkedAt: typeof body.checkedAt === "string" ? body.checkedAt : null,
+          details: typeof body.details === "string" ? body.details : null,
+          metadata: safeMetadataObject(body.metadata),
+        }),
+      });
+    }
+
+    if (req.method === "GET" && path.endsWith("ops/performance/budgets")) {
+      requireRole(roles, ["admin"]);
+      const limitRaw = Number(url.searchParams.get("limit") ?? 80);
+      const offsetRaw = Number(url.searchParams.get("offset") ?? 0);
+      const activeRaw = url.searchParams.get("active");
+      const active = activeRaw === null ? null : activeRaw === "true";
+      return json(req, 200, {
+        ok: true,
+        data: await listPerformanceBudgetPolicies(client, {
+          active,
+          metricName: url.searchParams.get("metric_name"),
+          limit: Number.isFinite(limitRaw) ? limitRaw : 80,
+          offset: Number.isFinite(offsetRaw) ? offsetRaw : 0,
+        }),
+      });
+    }
+
+    if (req.method === "POST" && path.endsWith("ops/performance/budgets")) {
+      requireRole(roles, ["admin"]);
+      const body = await req.json().catch(() => ({}));
+      if (!body || typeof body !== "object") {
+        return json(req, 400, { error: "request body is required" });
+      }
+      return json(req, 200, {
+        ok: true,
+        data: await upsertPerformanceBudgetPolicyByAdmin(client, user.id, {
+          budgetKey: typeof body.budgetKey === "string" ? body.budgetKey : "",
+          metricName: typeof body.metricName === "string" ? body.metricName : "",
+          thresholdWarn: Number(body.thresholdWarn ?? 0),
+          thresholdFail: Number(body.thresholdFail ?? 0),
+          comparator: typeof body.comparator === "string" ? body.comparator.trim().toLowerCase() : null,
+          active: body.active !== false,
+          metadata: safeMetadataObject(body.metadata),
+        }),
+      });
+    }
+
+    if (req.method === "GET" && path.endsWith("ops/performance/alerts")) {
+      requireRole(roles, ["admin"]);
+      const limitRaw = Number(url.searchParams.get("limit") ?? 120);
+      const offsetRaw = Number(url.searchParams.get("offset") ?? 0);
+      return json(req, 200, {
+        ok: true,
+        data: await listPerformanceAlertEvents(client, {
+          status: url.searchParams.get("status"),
+          severity: url.searchParams.get("severity"),
+          limit: Number.isFinite(limitRaw) ? limitRaw : 120,
+          offset: Number.isFinite(offsetRaw) ? offsetRaw : 0,
+        }),
+      });
+    }
+
+    if (req.method === "POST" && path.endsWith("ops/performance/alerts")) {
+      requireRole(roles, ["admin"]);
+      const body = await req.json().catch(() => ({}));
+      if (!body || typeof body !== "object") {
+        return json(req, 400, { error: "request body is required" });
+      }
+      return json(req, 200, {
+        ok: true,
+        data: await upsertPerformanceAlertEventByAdmin(client, user.id, {
+          id: typeof body.id === "string" ? body.id : null,
+          metricName: typeof body.metricName === "string" ? body.metricName : "",
+          severity: typeof body.severity === "string" ? body.severity.trim().toLowerCase() : "",
+          status: typeof body.status === "string" ? body.status.trim().toLowerCase() : null,
+          title: typeof body.title === "string" ? body.title : "",
+          detail: typeof body.detail === "string" ? body.detail : null,
+          triggeredValue: Number.isFinite(Number(body.triggeredValue)) ? Number(body.triggeredValue) : null,
+          budgetPolicyId: typeof body.budgetPolicyId === "string" ? body.budgetPolicyId : null,
           metadata: safeMetadataObject(body.metadata),
         }),
       });
