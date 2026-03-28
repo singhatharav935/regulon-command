@@ -212,6 +212,7 @@ export const buildRegressionChecklist = () => ({
     "/ops/commercial/readiness",
     "/ops/operations/readiness",
     "/ops/infra/readiness",
+    "/ops/postlaunch/readiness",
     "/ops/workflow-sla-monitor",
     "/ops/prelaunch-gate",
   ],

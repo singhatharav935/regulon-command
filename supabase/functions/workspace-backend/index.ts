@@ -1108,6 +1108,9 @@ const resolveErrorCode = (message: string) => {
   if (message.startsWith("category must be one of:")) return "VALIDATION_INVALID_FIELD";
   if (message.startsWith("priority must be one of:")) return "VALIDATION_INVALID_FIELD";
   if (message.startsWith("assignmentType must be one of:")) return "VALIDATION_INVALID_FIELD";
+  if (message.startsWith("alertType must be one of:")) return "VALIDATION_INVALID_FIELD";
+  if (message.startsWith("status must be one of:")) return "VALIDATION_INVALID_FIELD";
+  if (message.startsWith("quality percentages must be between 0 and 100")) return "VALIDATION_INVALID_FIELD";
   if (message.includes("must be a valid UUID")) return "VALIDATION_INVALID_FIELD";
   if (message.startsWith("Invalid workflow transition:")) return "WORKFLOW_TRANSITION_INVALID";
   if (message.startsWith("Invalid event type for transition:")) return "WORKFLOW_EVENT_INVALID";
@@ -4076,6 +4079,10 @@ const collectDeployReadinessSignals = async (
     "infra_monitoring_integrations",
     "infra_slo_policies",
     "infra_slo_breaches",
+    "postlaunch_kpi_snapshots",
+    "postlaunch_risk_alerts",
+    "postlaunch_model_quality_reviews",
+    "postlaunch_hotfix_releases",
   ];
   const missingTables: string[] = [];
   const tableProbeErrors: Array<{ table: string; code: string | null; message: string }> = [];
@@ -5233,6 +5240,15 @@ const getRouteAccessMatrix = () => ({
     { route: "POST /ops/infra/slo-policies", roles: ["admin"] },
     { route: "GET /ops/infra/slo-breaches", roles: ["admin"] },
     { route: "POST /ops/infra/slo-breaches", roles: ["admin"] },
+    { route: "GET /ops/postlaunch/readiness", roles: ["admin"] },
+    { route: "GET /ops/postlaunch/kpi-snapshots", roles: ["admin"] },
+    { route: "POST /ops/postlaunch/kpi-snapshots", roles: ["admin"] },
+    { route: "GET /ops/postlaunch/risk-alerts", roles: ["admin"] },
+    { route: "POST /ops/postlaunch/risk-alerts", roles: ["admin"] },
+    { route: "GET /ops/postlaunch/model-quality-reviews", roles: ["admin"] },
+    { route: "POST /ops/postlaunch/model-quality-reviews", roles: ["admin"] },
+    { route: "GET /ops/postlaunch/hotfix-releases", roles: ["admin"] },
+    { route: "POST /ops/postlaunch/hotfix-releases", roles: ["admin"] },
     { route: "POST /ops/billing/invoice/issue", roles: ["admin"] },
     { route: "POST /ops/billing/payment-attempt", roles: ["admin"] },
     { route: "POST /ops/assign/company-member", roles: ["admin"] },
@@ -7412,6 +7428,377 @@ const collectInfraDevopsReadinessSignals = async (
   };
 };
 
+const POSTLAUNCH_RISK_ALERT_TYPES = new Set(["churn_risk", "workflow_failure_spike", "sla_breach_spike", "payment_risk", "compliance_risk"]);
+const POSTLAUNCH_ALERT_SEVERITIES = new Set(["low", "medium", "high", "critical"]);
+const POSTLAUNCH_ALERT_STATUSES = new Set(["open", "acknowledged", "resolved", "dismissed"]);
+const POSTLAUNCH_HOTFIX_STATUSES = new Set(["planned", "deployed", "rolled_back", "failed"]);
+
+const listPostlaunchKpiSnapshots = async (
+  client: ReturnType<typeof createClient>,
+  options?: { limit?: number; offset?: number; fromDate?: string | null; toDate?: string | null },
+) => {
+  const limit = Math.max(1, Math.min(365, Number(options?.limit ?? 90)));
+  const offset = Math.max(0, Number(options?.offset ?? 0));
+  let query = client
+    .from("postlaunch_kpi_snapshots")
+    .select("id, snapshot_date, activation_count, draft_success_count, draft_failure_count, active_companies_count, active_ca_users_count, churn_risk_companies_count, metadata, created_by, created_at, updated_at")
+    .order("snapshot_date", { ascending: false })
+    .range(offset, offset + limit - 1);
+  const fromDate = toTrimmedString(options?.fromDate ?? null, 20);
+  if (fromDate) query = query.gte("snapshot_date", fromDate);
+  const toDate = toTrimmedString(options?.toDate ?? null, 20);
+  if (toDate) query = query.lte("snapshot_date", toDate);
+  const { data, error } = await query;
+  if (error) throw error;
+  return data ?? [];
+};
+
+const upsertPostlaunchKpiSnapshotByAdmin = async (
+  client: ReturnType<typeof createClient>,
+  adminUserId: string,
+  params: {
+    snapshotDate: string;
+    activationCount: number;
+    draftSuccessCount: number;
+    draftFailureCount: number;
+    activeCompaniesCount: number;
+    activeCaUsersCount: number;
+    churnRiskCompaniesCount: number;
+    metadata?: Record<string, unknown>;
+  },
+) => {
+  const snapshotDate = toTrimmedString(params.snapshotDate, 20);
+  if (!snapshotDate) throw new Error("snapshotDate is required");
+  const parseCount = (value: number, key: string) => {
+    const number = Number(value);
+    if (!Number.isFinite(number) || number < 0) throw new Error(`${key} must be a non-negative number`);
+    return Math.trunc(number);
+  };
+  const activationCount = parseCount(params.activationCount, "activationCount");
+  const draftSuccessCount = parseCount(params.draftSuccessCount, "draftSuccessCount");
+  const draftFailureCount = parseCount(params.draftFailureCount, "draftFailureCount");
+  const activeCompaniesCount = parseCount(params.activeCompaniesCount, "activeCompaniesCount");
+  const activeCaUsersCount = parseCount(params.activeCaUsersCount, "activeCaUsersCount");
+  const churnRiskCompaniesCount = parseCount(params.churnRiskCompaniesCount, "churnRiskCompaniesCount");
+
+  const { data, error } = await client
+    .from("postlaunch_kpi_snapshots")
+    .upsert({
+      snapshot_date: snapshotDate,
+      activation_count: activationCount,
+      draft_success_count: draftSuccessCount,
+      draft_failure_count: draftFailureCount,
+      active_companies_count: activeCompaniesCount,
+      active_ca_users_count: activeCaUsersCount,
+      churn_risk_companies_count: churnRiskCompaniesCount,
+      metadata: params.metadata ?? {},
+      created_by: adminUserId,
+      updated_at: new Date().toISOString(),
+    }, { onConflict: "snapshot_date" })
+    .select("id, snapshot_date, activation_count, draft_success_count, draft_failure_count, active_companies_count, active_ca_users_count, churn_risk_companies_count, metadata, created_by, created_at, updated_at")
+    .single();
+  if (error || !data) throw error ?? new Error("Failed to upsert KPI snapshot");
+
+  await createOpsActivityLog(client, {
+    actorUserId: adminUserId,
+    activityType: "postlaunch_kpi_snapshot_upserted",
+    entityType: "postlaunch_kpi_snapshots",
+    entityId: data.id,
+    details: { snapshot_date: data.snapshot_date },
+  });
+  return data;
+};
+
+const listPostlaunchRiskAlerts = async (
+  client: ReturnType<typeof createClient>,
+  options?: { status?: string | null; severity?: string | null; limit?: number; offset?: number },
+) => {
+  const limit = Math.max(1, Math.min(250, Number(options?.limit ?? 100)));
+  const offset = Math.max(0, Number(options?.offset ?? 0));
+  let query = client
+    .from("postlaunch_risk_alerts")
+    .select("id, company_id, alert_type, severity, status, title, detail, owner_user_id, acknowledged_by, acknowledged_at, resolved_by, resolved_at, metadata, created_at, updated_at")
+    .order("created_at", { ascending: false })
+    .range(offset, offset + limit - 1);
+  const status = toTrimmedString(options?.status ?? null, 30);
+  if (status) query = query.eq("status", status);
+  const severity = toTrimmedString(options?.severity ?? null, 30);
+  if (severity) query = query.eq("severity", severity);
+  const { data, error } = await query;
+  if (error) throw error;
+  return data ?? [];
+};
+
+const upsertPostlaunchRiskAlertByAdmin = async (
+  client: ReturnType<typeof createClient>,
+  adminUserId: string,
+  params: {
+    id?: string | null;
+    companyId?: string | null;
+    alertType: string;
+    severity: string;
+    status?: string | null;
+    title: string;
+    detail?: string | null;
+    ownerUserId?: string | null;
+    metadata?: Record<string, unknown>;
+  },
+) => {
+  if (params.id) assertUuid(params.id, "id");
+  if (params.companyId) assertUuid(params.companyId, "companyId");
+  if (params.ownerUserId) assertUuid(params.ownerUserId, "ownerUserId");
+  const alertType = toTrimmedString(params.alertType, 60);
+  if (!alertType || !POSTLAUNCH_RISK_ALERT_TYPES.has(alertType)) {
+    throw new Error("alertType must be one of: churn_risk, workflow_failure_spike, sla_breach_spike, payment_risk, compliance_risk");
+  }
+  const severity = toTrimmedString(params.severity, 20);
+  if (!severity || !POSTLAUNCH_ALERT_SEVERITIES.has(severity)) {
+    throw new Error("severity must be one of: low, medium, high, critical");
+  }
+  const status = toTrimmedString(params.status ?? null, 20) ?? "open";
+  if (!POSTLAUNCH_ALERT_STATUSES.has(status)) {
+    throw new Error("status must be one of: open, acknowledged, resolved, dismissed");
+  }
+  const title = toTrimmedString(params.title, 240);
+  if (!title) throw new Error("title is required");
+  const nowIso = new Date().toISOString();
+  const acknowledged = status === "acknowledged";
+  const resolved = status === "resolved" || status === "dismissed";
+
+  const { data, error } = await client
+    .from("postlaunch_risk_alerts")
+    .upsert({
+      id: params.id ?? undefined,
+      company_id: params.companyId ?? null,
+      alert_type: alertType,
+      severity,
+      status,
+      title,
+      detail: toTrimmedString(params.detail ?? null, 6000),
+      owner_user_id: params.ownerUserId ?? null,
+      acknowledged_by: acknowledged ? adminUserId : null,
+      acknowledged_at: acknowledged ? nowIso : null,
+      resolved_by: resolved ? adminUserId : null,
+      resolved_at: resolved ? nowIso : null,
+      metadata: params.metadata ?? {},
+      updated_at: nowIso,
+    })
+    .select("id, company_id, alert_type, severity, status, title, detail, owner_user_id, acknowledged_by, acknowledged_at, resolved_by, resolved_at, metadata, created_at, updated_at")
+    .single();
+  if (error || !data) throw error ?? new Error("Failed to upsert risk alert");
+
+  await createOpsActivityLog(client, {
+    actorUserId: adminUserId,
+    companyId: data.company_id ?? null,
+    activityType: "postlaunch_risk_alert_upserted",
+    entityType: "postlaunch_risk_alerts",
+    entityId: data.id,
+    details: { alert_type: data.alert_type, severity: data.severity, status: data.status },
+  });
+  return data;
+};
+
+const listPostlaunchModelQualityReviews = async (
+  client: ReturnType<typeof createClient>,
+  options?: { limit?: number; offset?: number },
+) => {
+  const limit = Math.max(1, Math.min(120, Number(options?.limit ?? 40)));
+  const offset = Math.max(0, Number(options?.offset ?? 0));
+  const { data, error } = await client
+    .from("postlaunch_model_quality_reviews")
+    .select("id, review_window_start, review_window_end, sample_size, hallucination_rate_percent, citation_coverage_percent, legal_risk_incidents, quality_score, reviewer_user_id, summary, actions, metadata, created_at, updated_at")
+    .order("review_window_end", { ascending: false })
+    .range(offset, offset + limit - 1);
+  if (error) throw error;
+  return data ?? [];
+};
+
+const createPostlaunchModelQualityReviewByAdmin = async (
+  client: ReturnType<typeof createClient>,
+  adminUserId: string,
+  params: {
+    reviewWindowStart: string;
+    reviewWindowEnd: string;
+    sampleSize: number;
+    hallucinationRatePercent: number;
+    citationCoveragePercent: number;
+    legalRiskIncidents: number;
+    qualityScore: number;
+    summary?: string | null;
+    actions?: unknown;
+    metadata?: Record<string, unknown>;
+  },
+) => {
+  const reviewWindowStart = toTrimmedString(params.reviewWindowStart, 20);
+  const reviewWindowEnd = toTrimmedString(params.reviewWindowEnd, 20);
+  if (!reviewWindowStart || !reviewWindowEnd) throw new Error("reviewWindowStart and reviewWindowEnd are required");
+  const sampleSize = Number(params.sampleSize);
+  const legalRiskIncidents = Number(params.legalRiskIncidents ?? 0);
+  const hallucinationRatePercent = Number(params.hallucinationRatePercent);
+  const citationCoveragePercent = Number(params.citationCoveragePercent);
+  const qualityScore = Number(params.qualityScore);
+  if (!Number.isFinite(sampleSize) || sampleSize <= 0) throw new Error("sampleSize must be a positive number");
+  if (!Number.isFinite(legalRiskIncidents) || legalRiskIncidents < 0) throw new Error("legalRiskIncidents must be a non-negative number");
+  const bounded = [hallucinationRatePercent, citationCoveragePercent, qualityScore];
+  if (bounded.some((value) => !Number.isFinite(value) || value < 0 || value > 100)) {
+    throw new Error("quality percentages must be between 0 and 100");
+  }
+  const actions = Array.isArray(params.actions) ? params.actions : [];
+
+  const { data, error } = await client
+    .from("postlaunch_model_quality_reviews")
+    .insert({
+      review_window_start: reviewWindowStart,
+      review_window_end: reviewWindowEnd,
+      sample_size: Math.trunc(sampleSize),
+      hallucination_rate_percent: hallucinationRatePercent,
+      citation_coverage_percent: citationCoveragePercent,
+      legal_risk_incidents: Math.trunc(legalRiskIncidents),
+      quality_score: qualityScore,
+      reviewer_user_id: adminUserId,
+      summary: toTrimmedString(params.summary ?? null, 8000),
+      actions,
+      metadata: params.metadata ?? {},
+    })
+    .select("id, review_window_start, review_window_end, sample_size, hallucination_rate_percent, citation_coverage_percent, legal_risk_incidents, quality_score, reviewer_user_id, summary, actions, metadata, created_at, updated_at")
+    .single();
+  if (error || !data) throw error ?? new Error("Failed to create model quality review");
+
+  await createOpsActivityLog(client, {
+    actorUserId: adminUserId,
+    activityType: "postlaunch_model_quality_review_created",
+    entityType: "postlaunch_model_quality_reviews",
+    entityId: data.id,
+    details: { review_window_start: data.review_window_start, review_window_end: data.review_window_end, quality_score: data.quality_score },
+  });
+  return data;
+};
+
+const listPostlaunchHotfixReleases = async (
+  client: ReturnType<typeof createClient>,
+  options?: { status?: string | null; limit?: number; offset?: number },
+) => {
+  const limit = Math.max(1, Math.min(200, Number(options?.limit ?? 80)));
+  const offset = Math.max(0, Number(options?.offset ?? 0));
+  let query = client
+    .from("postlaunch_hotfix_releases")
+    .select("id, release_tag, commit_sha, scope, trigger_reason, status, rollback_available, rollback_executed, rollback_notes, deployed_by, deployed_at, metadata, created_at, updated_at")
+    .order("deployed_at", { ascending: false })
+    .range(offset, offset + limit - 1);
+  const status = toTrimmedString(options?.status ?? null, 30);
+  if (status) query = query.eq("status", status);
+  const { data, error } = await query;
+  if (error) throw error;
+  return data ?? [];
+};
+
+const upsertPostlaunchHotfixReleaseByAdmin = async (
+  client: ReturnType<typeof createClient>,
+  adminUserId: string,
+  params: {
+    releaseTag: string;
+    commitSha?: string | null;
+    scope?: string | null;
+    triggerReason: string;
+    status: string;
+    rollbackAvailable?: boolean;
+    rollbackExecuted?: boolean;
+    rollbackNotes?: string | null;
+    deployedAt?: string | null;
+    metadata?: Record<string, unknown>;
+  },
+) => {
+  const releaseTag = toTrimmedString(params.releaseTag, 120);
+  if (!releaseTag) throw new Error("releaseTag is required");
+  const triggerReason = toTrimmedString(params.triggerReason, 400);
+  if (!triggerReason) throw new Error("triggerReason is required");
+  const status = toTrimmedString(params.status, 30);
+  if (!status || !POSTLAUNCH_HOTFIX_STATUSES.has(status)) {
+    throw new Error("status must be one of: planned, deployed, rolled_back, failed");
+  }
+  const deployedAtRaw = toTrimmedString(params.deployedAt ?? null, 80);
+  const deployedAt = deployedAtRaw ? new Date(deployedAtRaw).toISOString() : new Date().toISOString();
+
+  const { data, error } = await client
+    .from("postlaunch_hotfix_releases")
+    .upsert({
+      release_tag: releaseTag,
+      commit_sha: toTrimmedString(params.commitSha ?? null, 120),
+      scope: toTrimmedString(params.scope ?? null, 160) ?? "workspace-backend",
+      trigger_reason: triggerReason,
+      status,
+      rollback_available: params.rollbackAvailable !== false,
+      rollback_executed: params.rollbackExecuted === true,
+      rollback_notes: toTrimmedString(params.rollbackNotes ?? null, 3000),
+      deployed_by: adminUserId,
+      deployed_at: deployedAt,
+      metadata: params.metadata ?? {},
+      updated_at: new Date().toISOString(),
+    }, { onConflict: "release_tag" })
+    .select("id, release_tag, commit_sha, scope, trigger_reason, status, rollback_available, rollback_executed, rollback_notes, deployed_by, deployed_at, metadata, created_at, updated_at")
+    .single();
+  if (error || !data) throw error ?? new Error("Failed to upsert hotfix release");
+
+  await createOpsActivityLog(client, {
+    actorUserId: adminUserId,
+    activityType: "postlaunch_hotfix_release_upserted",
+    entityType: "postlaunch_hotfix_releases",
+    entityId: data.id,
+    details: { release_tag: data.release_tag, status: data.status, rollback_executed: data.rollback_executed },
+  });
+  return data;
+};
+
+const collectPostlaunchReadinessSignals = async (
+  client: ReturnType<typeof createClient>,
+) => {
+  const snapshotCutoff = new Date(Date.now() - 7 * 24 * 60 * 60 * 1000).toISOString().slice(0, 10);
+  const qualityCutoff = new Date(Date.now() - 14 * 24 * 60 * 60 * 1000).toISOString().slice(0, 10);
+  const hotfixCutoff = new Date(Date.now() - 30 * 24 * 60 * 60 * 1000).toISOString();
+
+  const [recentSnapshotsResult, openAlertsResult, recentQualityResult, recentHotfixResult] = await Promise.all([
+    client.from("postlaunch_kpi_snapshots").select("id", { count: "exact", head: true }).gte("snapshot_date", snapshotCutoff),
+    client.from("postlaunch_risk_alerts").select("id, severity, status").in("status", ["open", "acknowledged"]),
+    client.from("postlaunch_model_quality_reviews").select("id", { count: "exact", head: true }).gte("review_window_end", qualityCutoff),
+    client.from("postlaunch_hotfix_releases").select("id, status, rollback_executed").gte("deployed_at", hotfixCutoff),
+  ]);
+  if (recentSnapshotsResult.error) throw recentSnapshotsResult.error;
+  if (openAlertsResult.error) throw openAlertsResult.error;
+  if (recentQualityResult.error) throw recentQualityResult.error;
+  if (recentHotfixResult.error) throw recentHotfixResult.error;
+
+  const openAlerts = openAlertsResult.data ?? [];
+  const criticalOpenAlerts = openAlerts.filter((row) => row.severity === "critical").length;
+  const highOpenAlerts = openAlerts.filter((row) => row.severity === "high").length;
+  const mediumOpenAlerts = openAlerts.filter((row) => row.severity === "medium").length;
+  const recentHotfix = recentHotfixResult.data ?? [];
+  const failedHotfix = recentHotfix.filter((row) => row.status === "failed").length;
+  const rollbackExecutedCount = recentHotfix.filter((row) => row.rollback_executed === true).length;
+  const recentSnapshots = Number(recentSnapshotsResult.count ?? 0);
+  const recentQuality = Number(recentQualityResult.count ?? 0);
+
+  return {
+    summary: {
+      critical: criticalOpenAlerts,
+      high: highOpenAlerts + failedHotfix + (recentSnapshots === 0 ? 1 : 0),
+      medium: mediumOpenAlerts + (recentQuality === 0 ? 1 : 0),
+    },
+    metrics: {
+      kpi_snapshots_last_7d: recentSnapshots,
+      open_alerts_critical: criticalOpenAlerts,
+      open_alerts_high: highOpenAlerts,
+      open_alerts_medium: mediumOpenAlerts,
+      model_quality_reviews_last_14d: recentQuality,
+      hotfix_releases_last_30d: recentHotfix.length,
+      hotfix_failed_last_30d: failedHotfix,
+      hotfix_rollbacks_last_30d: rollbackExecutedCount,
+    },
+    overall: {
+      pass: criticalOpenAlerts === 0 && failedHotfix === 0 && recentSnapshots > 0,
+    },
+  };
+};
+
 const OPS_TICKET_ALLOWED_STATUSES = new Set(["open", "in_progress", "waiting_customer", "resolved", "closed"]);
 const OPS_TICKET_ALLOWED_PRIORITIES = new Set(["low", "medium", "high", "critical"]);
 const OPS_TICKET_ALLOWED_CATEGORIES = new Set(["general", "billing", "kyc", "technical", "workflow", "dispute", "security"]);
@@ -8959,6 +9346,160 @@ serve(async (req: Request) => {
           breachStartedAt: typeof body.breachStartedAt === "string" ? body.breachStartedAt : null,
           breachResolvedAt: typeof body.breachResolvedAt === "string" ? body.breachResolvedAt : null,
           notes: typeof body.notes === "string" ? body.notes : null,
+          metadata: safeMetadataObject(body.metadata),
+        }),
+      });
+    }
+
+    if (req.method === "GET" && path.endsWith("ops/postlaunch/readiness")) {
+      requireRole(roles, ["admin"]);
+      return json(req, 200, {
+        ok: true,
+        data: await collectPostlaunchReadinessSignals(client),
+      });
+    }
+
+    if (req.method === "GET" && path.endsWith("ops/postlaunch/kpi-snapshots")) {
+      requireRole(roles, ["admin"]);
+      const limitRaw = Number(url.searchParams.get("limit") ?? 90);
+      const offsetRaw = Number(url.searchParams.get("offset") ?? 0);
+      return json(req, 200, {
+        ok: true,
+        data: await listPostlaunchKpiSnapshots(client, {
+          limit: Number.isFinite(limitRaw) ? limitRaw : 90,
+          offset: Number.isFinite(offsetRaw) ? offsetRaw : 0,
+          fromDate: url.searchParams.get("from_date"),
+          toDate: url.searchParams.get("to_date"),
+        }),
+      });
+    }
+
+    if (req.method === "POST" && path.endsWith("ops/postlaunch/kpi-snapshots")) {
+      requireRole(roles, ["admin"]);
+      const body = await req.json().catch(() => ({}));
+      if (!body || typeof body !== "object") {
+        return json(req, 400, { error: "request body is required" });
+      }
+      return json(req, 200, {
+        ok: true,
+        data: await upsertPostlaunchKpiSnapshotByAdmin(client, user.id, {
+          snapshotDate: typeof body.snapshotDate === "string" ? body.snapshotDate : "",
+          activationCount: Number(body.activationCount ?? 0),
+          draftSuccessCount: Number(body.draftSuccessCount ?? 0),
+          draftFailureCount: Number(body.draftFailureCount ?? 0),
+          activeCompaniesCount: Number(body.activeCompaniesCount ?? 0),
+          activeCaUsersCount: Number(body.activeCaUsersCount ?? 0),
+          churnRiskCompaniesCount: Number(body.churnRiskCompaniesCount ?? 0),
+          metadata: safeMetadataObject(body.metadata),
+        }),
+      });
+    }
+
+    if (req.method === "GET" && path.endsWith("ops/postlaunch/risk-alerts")) {
+      requireRole(roles, ["admin"]);
+      const limitRaw = Number(url.searchParams.get("limit") ?? 100);
+      const offsetRaw = Number(url.searchParams.get("offset") ?? 0);
+      return json(req, 200, {
+        ok: true,
+        data: await listPostlaunchRiskAlerts(client, {
+          status: url.searchParams.get("status"),
+          severity: url.searchParams.get("severity"),
+          limit: Number.isFinite(limitRaw) ? limitRaw : 100,
+          offset: Number.isFinite(offsetRaw) ? offsetRaw : 0,
+        }),
+      });
+    }
+
+    if (req.method === "POST" && path.endsWith("ops/postlaunch/risk-alerts")) {
+      requireRole(roles, ["admin"]);
+      const body = await req.json().catch(() => ({}));
+      if (!body || typeof body !== "object") {
+        return json(req, 400, { error: "request body is required" });
+      }
+      return json(req, 200, {
+        ok: true,
+        data: await upsertPostlaunchRiskAlertByAdmin(client, user.id, {
+          id: typeof body.id === "string" ? body.id : null,
+          companyId: typeof body.companyId === "string" ? body.companyId : null,
+          alertType: typeof body.alertType === "string" ? body.alertType.trim().toLowerCase() : "",
+          severity: typeof body.severity === "string" ? body.severity.trim().toLowerCase() : "",
+          status: typeof body.status === "string" ? body.status.trim().toLowerCase() : null,
+          title: typeof body.title === "string" ? body.title : "",
+          detail: typeof body.detail === "string" ? body.detail : null,
+          ownerUserId: typeof body.ownerUserId === "string" ? body.ownerUserId : null,
+          metadata: safeMetadataObject(body.metadata),
+        }),
+      });
+    }
+
+    if (req.method === "GET" && path.endsWith("ops/postlaunch/model-quality-reviews")) {
+      requireRole(roles, ["admin"]);
+      const limitRaw = Number(url.searchParams.get("limit") ?? 40);
+      const offsetRaw = Number(url.searchParams.get("offset") ?? 0);
+      return json(req, 200, {
+        ok: true,
+        data: await listPostlaunchModelQualityReviews(client, {
+          limit: Number.isFinite(limitRaw) ? limitRaw : 40,
+          offset: Number.isFinite(offsetRaw) ? offsetRaw : 0,
+        }),
+      });
+    }
+
+    if (req.method === "POST" && path.endsWith("ops/postlaunch/model-quality-reviews")) {
+      requireRole(roles, ["admin"]);
+      const body = await req.json().catch(() => ({}));
+      if (!body || typeof body !== "object") {
+        return json(req, 400, { error: "request body is required" });
+      }
+      return json(req, 200, {
+        ok: true,
+        data: await createPostlaunchModelQualityReviewByAdmin(client, user.id, {
+          reviewWindowStart: typeof body.reviewWindowStart === "string" ? body.reviewWindowStart : "",
+          reviewWindowEnd: typeof body.reviewWindowEnd === "string" ? body.reviewWindowEnd : "",
+          sampleSize: Number(body.sampleSize ?? 0),
+          hallucinationRatePercent: Number(body.hallucinationRatePercent ?? 0),
+          citationCoveragePercent: Number(body.citationCoveragePercent ?? 0),
+          legalRiskIncidents: Number(body.legalRiskIncidents ?? 0),
+          qualityScore: Number(body.qualityScore ?? 0),
+          summary: typeof body.summary === "string" ? body.summary : null,
+          actions: Array.isArray(body.actions) ? body.actions : [],
+          metadata: safeMetadataObject(body.metadata),
+        }),
+      });
+    }
+
+    if (req.method === "GET" && path.endsWith("ops/postlaunch/hotfix-releases")) {
+      requireRole(roles, ["admin"]);
+      const limitRaw = Number(url.searchParams.get("limit") ?? 80);
+      const offsetRaw = Number(url.searchParams.get("offset") ?? 0);
+      return json(req, 200, {
+        ok: true,
+        data: await listPostlaunchHotfixReleases(client, {
+          status: url.searchParams.get("status"),
+          limit: Number.isFinite(limitRaw) ? limitRaw : 80,
+          offset: Number.isFinite(offsetRaw) ? offsetRaw : 0,
+        }),
+      });
+    }
+
+    if (req.method === "POST" && path.endsWith("ops/postlaunch/hotfix-releases")) {
+      requireRole(roles, ["admin"]);
+      const body = await req.json().catch(() => ({}));
+      if (!body || typeof body !== "object") {
+        return json(req, 400, { error: "request body is required" });
+      }
+      return json(req, 200, {
+        ok: true,
+        data: await upsertPostlaunchHotfixReleaseByAdmin(client, user.id, {
+          releaseTag: typeof body.releaseTag === "string" ? body.releaseTag : "",
+          commitSha: typeof body.commitSha === "string" ? body.commitSha : null,
+          scope: typeof body.scope === "string" ? body.scope : null,
+          triggerReason: typeof body.triggerReason === "string" ? body.triggerReason : "",
+          status: typeof body.status === "string" ? body.status.trim().toLowerCase() : "",
+          rollbackAvailable: body.rollbackAvailable !== false,
+          rollbackExecuted: body.rollbackExecuted === true,
+          rollbackNotes: typeof body.rollbackNotes === "string" ? body.rollbackNotes : null,
+          deployedAt: typeof body.deployedAt === "string" ? body.deployedAt : null,
           metadata: safeMetadataObject(body.metadata),
         }),
       });
