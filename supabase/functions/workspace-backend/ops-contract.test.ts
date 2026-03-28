@@ -19,6 +19,7 @@ describe("ops-contract", () => {
       auditTrail: { critical: 0, high: 0, medium: 0 },
       exportIntegrity: { critical: 0, high: 0, medium: 0 },
       complianceLegal: { critical: 0, high: 0, medium: 0 },
+      commercialReadiness: { critical: 0, high: 0, medium: 0 },
     });
 
     expect(result.status).toBe("fail");
@@ -42,6 +43,7 @@ describe("ops-contract", () => {
       auditTrail: { critical: 0, high: 0, medium: 0 },
       exportIntegrity: { critical: 0, high: 0, medium: 0 },
       complianceLegal: { critical: 0, high: 0, medium: 0 },
+      commercialReadiness: { critical: 0, high: 0, medium: 0 },
     });
 
     expect(result.status).toBe("warn");
@@ -65,6 +67,7 @@ describe("ops-contract", () => {
       auditTrail: { critical: 0, high: 0, medium: 0 },
       exportIntegrity: { critical: 0, high: 0, medium: 0 },
       complianceLegal: { critical: 0, high: 0, medium: 0 },
+      commercialReadiness: { critical: 0, high: 0, medium: 0 },
     });
 
     expect(result.status).toBe("pass");
@@ -81,6 +84,7 @@ describe("ops-contract", () => {
     expect(checklist.requiredEndpoints).toContain("/ops/draft-export-integrity-check");
     expect(checklist.requiredEndpoints).toContain("/ops/compliance/readiness");
     expect(checklist.requiredEndpoints).toContain("/ops/compliance/legal-documents");
+    expect(checklist.requiredEndpoints).toContain("/ops/commercial/readiness");
   });
 
   it("fails gate when required schema is missing", () => {
@@ -100,6 +104,7 @@ describe("ops-contract", () => {
       auditTrail: { critical: 0, high: 0, medium: 0 },
       exportIntegrity: { critical: 0, high: 0, medium: 0 },
       complianceLegal: { critical: 0, high: 0, medium: 0 },
+      commercialReadiness: { critical: 0, high: 0, medium: 0 },
     });
 
     expect(result.status).toBe("fail");
@@ -122,6 +127,7 @@ describe("ops-contract", () => {
       auditTrail: { critical: 0, high: 0, medium: 0 },
       exportIntegrity: { critical: 0, high: 0, medium: 0 },
       complianceLegal: { critical: 0, high: 0, medium: 0 },
+      commercialReadiness: { critical: 0, high: 0, medium: 0 },
     });
 
     expect(result.status).toBe("warn");
@@ -144,6 +150,7 @@ describe("ops-contract", () => {
       auditTrail: { critical: 2, high: 0, medium: 0 },
       exportIntegrity: { critical: 0, high: 0, medium: 0 },
       complianceLegal: { critical: 0, high: 0, medium: 0 },
+      commercialReadiness: { critical: 0, high: 0, medium: 0 },
     });
 
     expect(result.status).toBe("fail");
@@ -166,6 +173,7 @@ describe("ops-contract", () => {
       auditTrail: { critical: 0, high: 0, medium: 0 },
       exportIntegrity: { critical: 0, high: 3, medium: 0 },
       complianceLegal: { critical: 0, high: 0, medium: 0 },
+      commercialReadiness: { critical: 0, high: 0, medium: 0 },
     });
 
     expect(result.status).toBe("warn");
@@ -188,8 +196,32 @@ describe("ops-contract", () => {
       auditTrail: { critical: 0, high: 0, medium: 0 },
       exportIntegrity: { critical: 0, high: 0, medium: 0 },
       complianceLegal: { critical: 1, high: 0, medium: 0 },
+      commercialReadiness: { critical: 0, high: 0, medium: 0 },
     });
 
     expect(result.status).toBe("fail");
+  });
+
+  it("warns gate when commercial readiness has high findings", () => {
+    const result = computePrelaunchGate({
+      envPresent: {
+        SUPABASE_URL: true,
+        SUPABASE_ANON_KEY: true,
+      },
+      schemaReadiness: {
+        missingTables: [],
+        probeErrors: 0,
+      },
+      workflowIntegrity: { critical: 0, high: 0, medium: 0 },
+      workflowSla: { critical: 0, high: 0, medium: 0 },
+      aiOps: { sampledRows: 120, failedCount: 2, staleProcessingCount: 0 },
+      tenantIsolation: { critical: 0, high: 0, medium: 0 },
+      auditTrail: { critical: 0, high: 0, medium: 0 },
+      exportIntegrity: { critical: 0, high: 0, medium: 0 },
+      complianceLegal: { critical: 0, high: 0, medium: 0 },
+      commercialReadiness: { critical: 0, high: 2, medium: 0 },
+    });
+
+    expect(result.status).toBe("warn");
   });
 });

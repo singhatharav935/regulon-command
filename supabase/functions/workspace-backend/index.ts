@@ -241,6 +241,12 @@ const getUserCompanyIds = async (client: ReturnType<typeof createClient>, userId
   return Array.from(new Set((data ?? []).map((row) => row.company_id)));
 };
 
+const getUserCaFirmIds = async (client: ReturnType<typeof createClient>, userId: string) => {
+  const { data, error } = await client.from("ca_firm_members").select("ca_firm_id").eq("user_id", userId);
+  if (error) throw error;
+  return Array.from(new Set((data ?? []).map((row) => row.ca_firm_id)));
+};
+
 const requireRole = (roles: Set<string>, allowed: string[]) => {
   if (!allowed.some((role) => roles.has(role))) {
     throw new Error("Forbidden: missing_required_role");
@@ -1091,6 +1097,10 @@ const resolveErrorCode = (message: string) => {
   if (message.startsWith("dueAt must be a valid ISO date")) return "VALIDATION_INVALID_FIELD";
   if (message.includes("must be snake_case")) return "VALIDATION_INVALID_FIELD";
   if (message.startsWith("Published legal document not found")) return "VALIDATION_INVALID_FIELD";
+  if (message.includes("cannot be set together")) return "VALIDATION_INVALID_FIELD";
+  if (message.includes("must be a non-negative number")) return "VALIDATION_INVALID_FIELD";
+  if (message.startsWith("Active billing plan not found")) return "VALIDATION_INVALID_FIELD";
+  if (message.startsWith("billing subscription not found")) return "RESOURCE_NOT_FOUND";
   if (message.includes("must be a valid UUID")) return "VALIDATION_INVALID_FIELD";
   if (message.startsWith("Invalid workflow transition:")) return "WORKFLOW_TRANSITION_INVALID";
   if (message.startsWith("Invalid event type for transition:")) return "WORKFLOW_EVENT_INVALID";
@@ -3953,13 +3963,14 @@ const collectPrelaunchSignals = async (
     OPENAI_MODEL: Boolean(Deno.env.get("OPENAI_MODEL")),
   };
 
-  const [integrity, sla, tenantIsolation, auditTrail, exportIntegrity, complianceLegal] = await Promise.all([
+  const [integrity, sla, tenantIsolation, auditTrail, exportIntegrity, complianceLegal, commercialReadiness] = await Promise.all([
     runWorkflowIntegrityCheck(client, { limit: 300 }),
     runWorkflowSlaMonitor(client, { limit: 500 }),
     runTenantIsolationCheck(client, { limitPerTable: 3000 }),
     runDraftAuditTrailIntegrityCheck(client, { limit: 1200 }),
     runDraftExportIntegrityCheck(client, { limit: 1200 }),
     collectComplianceLegalReadinessSignals(client),
+    collectCommercialReadinessSignals(client),
   ]);
   const deployReadiness = await collectDeployReadinessSignals(client);
 
@@ -3994,6 +4005,7 @@ const collectPrelaunchSignals = async (
     auditTrail: auditTrail.summary,
     exportIntegrity: exportIntegrity.summary,
     complianceLegal: complianceLegal.summary,
+    commercialReadiness: commercialReadiness.summary,
   };
 };
 
@@ -4036,6 +4048,13 @@ const collectDeployReadinessSignals = async (
     "compliance_audit_events",
     "legal_documents",
     "legal_document_acceptances",
+    "billing_plans",
+    "billing_subscriptions",
+    "billing_invoice_records",
+    "billing_payment_attempts",
+    "billing_usage_meters",
+    "billing_usage_events",
+    "billing_usage_monthly_rollups",
   ];
   const missingTables: string[] = [];
   const tableProbeErrors: Array<{ table: string; code: string | null; message: string }> = [];
@@ -5127,6 +5146,14 @@ const getRouteAccessMatrix = () => ({
     { route: "POST /compliance/data-requests", roles: ["authenticated"] },
     { route: "GET /compliance/legal-documents/acceptance-status", roles: ["authenticated"] },
     { route: "POST /compliance/legal-documents/accept", roles: ["authenticated"] },
+    { route: "GET /billing/plans", roles: ["authenticated"] },
+    { route: "GET /billing/subscription", roles: ["authenticated"] },
+    { route: "POST /billing/subscription/activate", roles: ["manager", "admin"] },
+    { route: "POST /billing/subscription/change-plan", roles: ["manager", "admin"] },
+    { route: "POST /billing/subscription/cancel", roles: ["manager", "admin"] },
+    { route: "GET /billing/invoices", roles: ["authenticated"] },
+    { route: "POST /billing/usage/events", roles: ["manager", "admin"] },
+    { route: "GET /billing/usage/summary", roles: ["authenticated"] },
   ],
   drafts: [
     { route: "POST /drafts", roles: ["manager", "admin"] },
@@ -5162,6 +5189,9 @@ const getRouteAccessMatrix = () => ({
     { route: "GET /ops/compliance/legal-documents", roles: ["admin"] },
     { route: "POST /ops/compliance/legal-documents/publish", roles: ["admin"] },
     { route: "POST /ops/compliance/data-requests/:id/status", roles: ["admin"] },
+    { route: "GET /ops/commercial/readiness", roles: ["admin"] },
+    { route: "POST /ops/billing/invoice/issue", roles: ["admin"] },
+    { route: "POST /ops/billing/payment-attempt", roles: ["admin"] },
     { route: "POST /ops/assign/company-member", roles: ["admin"] },
     { route: "POST /ops/assign/ca-firm-member", roles: ["admin"] },
     { route: "POST /ops/bootstrap/company-workflow", roles: ["admin"] },
@@ -6248,6 +6278,538 @@ const collectComplianceLegalReadinessSignals = async (
   };
 };
 
+const resolveBillingScopeForUser = async (
+  client: ReturnType<typeof createClient>,
+  userId: string,
+  roles: Set<string>,
+  options?: { companyId?: string | null; caFirmId?: string | null },
+) => {
+  const companyIdRaw = toTrimmedString(options?.companyId ?? null, 80);
+  const caFirmIdRaw = toTrimmedString(options?.caFirmId ?? null, 80);
+  const companyId = companyIdRaw && companyIdRaw !== "none" ? companyIdRaw : null;
+  const caFirmId = caFirmIdRaw && caFirmIdRaw !== "none" ? caFirmIdRaw : null;
+  if (companyId && caFirmId) throw new Error("companyId and caFirmId cannot be set together");
+  if (companyId) assertUuid(companyId, "companyId");
+  if (caFirmId) assertUuid(caFirmId, "caFirmId");
+
+  if (roles.has("admin")) {
+    if (companyId || caFirmId) return { companyId, caFirmId };
+    return { companyId: null, caFirmId: null };
+  }
+
+  const [companyIds, caFirmIds] = await Promise.all([
+    getUserCompanyIds(client, userId),
+    getUserCaFirmIds(client, userId),
+  ]);
+
+  if (companyId) {
+    if (!companyIds.includes(companyId)) throw new Error("Forbidden");
+    return { companyId, caFirmId: null };
+  }
+  if (caFirmId) {
+    if (!caFirmIds.includes(caFirmId)) throw new Error("Forbidden");
+    return { companyId: null, caFirmId };
+  }
+  if (companyIds.length > 0) return { companyId: companyIds[0], caFirmId: null };
+  if (caFirmIds.length > 0) return { companyId: null, caFirmId: caFirmIds[0] };
+  return { companyId: null, caFirmId: null };
+};
+
+const listBillingPlans = async (client: ReturnType<typeof createClient>) => {
+  const { data, error } = await client
+    .from("billing_plans")
+    .select("id, plan_code, plan_name, plan_tier, billing_cycle, currency, base_price_minor, gst_rate_bps, ai_monthly_request_limit, seats_included, overage_per_request_minor, active, metadata, updated_at")
+    .eq("active", true)
+    .order("base_price_minor", { ascending: true });
+  if (error) throw error;
+  return data ?? [];
+};
+
+const loadBillingSubscription = async (
+  client: ReturnType<typeof createClient>,
+  scope: { companyId: string | null; caFirmId: string | null },
+) => {
+  if (!scope.companyId && !scope.caFirmId) return null;
+  let query = client
+    .from("billing_subscriptions")
+    .select("id, company_id, ca_firm_id, owner_user_id, plan_id, status, current_period_start, current_period_end, trial_ends_at, cancel_at_period_end, cancelled_at, auto_renew, payment_retry_count, payment_last_failed_at, payment_failure_code, payment_failure_message, metadata, updated_at, billing_plans(plan_code, plan_name, plan_tier, billing_cycle, currency, base_price_minor, gst_rate_bps, ai_monthly_request_limit, seats_included, overage_per_request_minor)")
+    .order("created_at", { ascending: false })
+    .limit(1);
+  if (scope.companyId) query = query.eq("company_id", scope.companyId);
+  if (scope.caFirmId) query = query.eq("ca_firm_id", scope.caFirmId);
+  const { data, error } = await query.maybeSingle();
+  if (error) throw error;
+  return data ?? null;
+};
+
+const upsertBillingSubscription = async (
+  client: ReturnType<typeof createClient>,
+  params: {
+    scope: { companyId: string | null; caFirmId: string | null };
+    ownerUserId: string;
+    planCode: string;
+    action: "activate" | "change_plan" | "cancel";
+    cancelAtPeriodEnd?: boolean;
+  },
+) => {
+  const planCode = toTrimmedString(params.planCode, 100);
+  if (!planCode && params.action !== "cancel") throw new Error("planCode is required");
+
+  const current = await loadBillingSubscription(client, params.scope);
+  if (params.action === "cancel") {
+    if (!current) throw new Error("billing subscription not found");
+    const cancelAtPeriodEnd = params.cancelAtPeriodEnd !== false;
+    const patch = cancelAtPeriodEnd
+      ? { cancel_at_period_end: true, auto_renew: false, status: "active" }
+      : { status: "cancelled", cancelled_at: new Date().toISOString(), auto_renew: false, cancel_at_period_end: false };
+    const { data, error } = await client
+      .from("billing_subscriptions")
+      .update(patch)
+      .eq("id", current.id)
+      .select("id, status, cancel_at_period_end, cancelled_at, current_period_end, updated_at")
+      .single();
+    if (error || !data) throw error ?? new Error("Failed to cancel subscription");
+    return data;
+  }
+
+  const { data: plan, error: planError } = await client
+    .from("billing_plans")
+    .select("id, plan_code")
+    .eq("plan_code", planCode)
+    .eq("active", true)
+    .maybeSingle();
+  if (planError) throw planError;
+  if (!plan) throw new Error("Active billing plan not found");
+
+  const periodStart = new Date().toISOString();
+  const periodEnd = new Date(Date.now() + 30 * 24 * 60 * 60 * 1000).toISOString();
+  const trialEndsAt = new Date(Date.now() + 14 * 24 * 60 * 60 * 1000).toISOString();
+
+  if (!current) {
+    const { data, error } = await client
+      .from("billing_subscriptions")
+      .insert({
+        company_id: params.scope.companyId,
+        ca_firm_id: params.scope.caFirmId,
+        owner_user_id: params.ownerUserId,
+        plan_id: plan.id,
+        status: "trialing",
+        current_period_start: periodStart,
+        current_period_end: periodEnd,
+        trial_ends_at: trialEndsAt,
+        auto_renew: true,
+      })
+      .select("id, company_id, ca_firm_id, plan_id, status, current_period_start, current_period_end, trial_ends_at, updated_at")
+      .single();
+    if (error || !data) throw error ?? new Error("Failed to create billing subscription");
+    return data;
+  }
+
+  const { data, error } = await client
+    .from("billing_subscriptions")
+    .update({
+      plan_id: plan.id,
+      status: current.status === "cancelled" || current.status === "expired" ? "active" : current.status,
+      cancel_at_period_end: false,
+      auto_renew: true,
+      cancelled_at: null,
+    })
+    .eq("id", current.id)
+    .select("id, company_id, ca_firm_id, plan_id, status, current_period_start, current_period_end, trial_ends_at, updated_at")
+    .single();
+  if (error || !data) throw error ?? new Error("Failed to update billing subscription");
+  return data;
+};
+
+const listBillingInvoices = async (
+  client: ReturnType<typeof createClient>,
+  scope: { companyId: string | null; caFirmId: string | null },
+  options?: { limit?: number; offset?: number; status?: string | null },
+) => {
+  if (!scope.companyId && !scope.caFirmId) return [];
+  const limit = Math.max(1, Math.min(200, Number(options?.limit ?? 60)));
+  const offset = Math.max(0, Number(options?.offset ?? 0));
+  let query = client
+    .from("billing_invoice_records")
+    .select("id, invoice_number, invoice_type, status, currency, subtotal_minor, tax_minor, total_minor, amount_paid_minor, issued_at, due_at, paid_at, gstin_supplier, gstin_customer, place_of_supply, hsn_sac_code, metadata, created_at")
+    .order("created_at", { ascending: false })
+    .range(offset, offset + limit - 1);
+  if (scope.companyId) query = query.eq("company_id", scope.companyId);
+  if (scope.caFirmId) query = query.eq("ca_firm_id", scope.caFirmId);
+  const status = toTrimmedString(options?.status ?? null, 40);
+  if (status) query = query.eq("status", status);
+  const { data, error } = await query;
+  if (error) throw error;
+  return data ?? [];
+};
+
+const recordBillingUsageEvent = async (
+  client: ReturnType<typeof createClient>,
+  params: {
+    scope: { companyId: string | null; caFirmId: string | null };
+    userId: string;
+    meterKey: string;
+    quantity: number;
+    source: string;
+    idempotencyKey: string;
+    metadata?: Record<string, unknown>;
+  },
+) => {
+  const meterKey = toTrimmedString(params.meterKey, 80);
+  if (!meterKey) throw new Error("meterKey is required");
+  const idempotencyKey = toTrimmedString(params.idempotencyKey, 120);
+  if (!idempotencyKey) throw new Error("idempotencyKey is required");
+  const source = toTrimmedString(params.source, 80) ?? "api";
+  const quantity = Number(params.quantity);
+  if (!Number.isFinite(quantity) || quantity < 0) throw new Error("quantity must be a non-negative number");
+
+  const { data: meter, error: meterError } = await client
+    .from("billing_usage_meters")
+    .select("id, meter_key, billable")
+    .eq("meter_key", meterKey)
+    .eq("active", true)
+    .maybeSingle();
+  if (meterError) throw meterError;
+  if (!meter) throw new Error("Active usage meter not found");
+
+  const subscription = await loadBillingSubscription(client, params.scope);
+  const subscriptionId = subscription?.id ?? null;
+  const nowIso = new Date().toISOString();
+  const monthStart = new Date();
+  monthStart.setUTCDate(1);
+  monthStart.setUTCHours(0, 0, 0, 0);
+  const monthStartDate = monthStart.toISOString().slice(0, 10);
+
+  const { data: event, error: eventError } = await client
+    .from("billing_usage_events")
+    .insert({
+      meter_id: meter.id,
+      subscription_id: subscriptionId,
+      company_id: params.scope.companyId,
+      ca_firm_id: params.scope.caFirmId,
+      user_id: params.userId,
+      quantity,
+      source,
+      idempotency_key: idempotencyKey,
+      metadata: params.metadata ?? {},
+      event_at: nowIso,
+    })
+    .select("id, meter_id, subscription_id, company_id, ca_firm_id, user_id, quantity, event_at, source, idempotency_key")
+    .single();
+  if (eventError || !event) throw eventError ?? new Error("Failed to record usage event");
+
+  const { data: rollup, error: rollupLoadError } = await client
+    .from("billing_usage_monthly_rollups")
+    .select("id, total_quantity, billable_quantity")
+    .eq("meter_id", meter.id)
+    .eq("month_start", monthStartDate)
+    .eq("subscription_id", subscriptionId)
+    .eq("company_id", params.scope.companyId)
+    .eq("ca_firm_id", params.scope.caFirmId)
+    .eq("user_id", params.userId)
+    .maybeSingle();
+  if (rollupLoadError) throw rollupLoadError;
+
+  const nextTotal = Number(rollup?.total_quantity ?? 0) + quantity;
+  const nextBillable = Number(rollup?.billable_quantity ?? 0) + (meter.billable ? quantity : 0);
+
+  const { error: rollupUpsertError } = await client
+    .from("billing_usage_monthly_rollups")
+    .upsert({
+      id: rollup?.id,
+      meter_id: meter.id,
+      month_start: monthStartDate,
+      subscription_id: subscriptionId,
+      company_id: params.scope.companyId,
+      ca_firm_id: params.scope.caFirmId,
+      user_id: params.userId,
+      total_quantity: nextTotal,
+      billable_quantity: nextBillable,
+      last_event_at: nowIso,
+      updated_at: nowIso,
+    }, { onConflict: "meter_id,month_start,subscription_id,company_id,ca_firm_id,user_id" });
+  if (rollupUpsertError) throw rollupUpsertError;
+
+  return event;
+};
+
+const loadBillingUsageSummary = async (
+  client: ReturnType<typeof createClient>,
+  scope: { companyId: string | null; caFirmId: string | null },
+  options?: { monthStart?: string | null },
+) => {
+  const monthStart = toTrimmedString(options?.monthStart ?? null, 20)
+    ?? new Date(Date.UTC(new Date().getUTCFullYear(), new Date().getUTCMonth(), 1)).toISOString().slice(0, 10);
+  let query = client
+    .from("billing_usage_monthly_rollups")
+    .select("meter_id, month_start, subscription_id, company_id, ca_firm_id, user_id, total_quantity, billable_quantity, last_event_at");
+  if (scope.companyId) query = query.eq("company_id", scope.companyId);
+  if (scope.caFirmId) query = query.eq("ca_firm_id", scope.caFirmId);
+  query = query.eq("month_start", monthStart);
+  const { data: rows, error } = await query;
+  if (error) throw error;
+  const meterIds = Array.from(new Set((rows ?? []).map((row) => row.meter_id).filter(Boolean)));
+  const { data: meters, error: meterError } = meterIds.length > 0
+    ? await client.from("billing_usage_meters").select("id, meter_key, meter_name, unit").in("id", meterIds)
+    : { data: [], error: null };
+  if (meterError) throw meterError;
+  const meterById = new Map((meters ?? []).map((row) => [row.id, row]));
+  return (rows ?? []).map((row) => ({
+    ...row,
+    meter: meterById.get(row.meter_id) ?? null,
+  }));
+};
+
+const issueBillingInvoiceByAdmin = async (
+  client: ReturnType<typeof createClient>,
+  params: {
+    subscriptionId: string;
+    invoiceNumber: string;
+    subtotalMinor: number;
+    taxMinor: number;
+    dueAt?: string | null;
+    gstinCustomer?: string | null;
+    placeOfSupply?: string | null;
+    hsnSacCode?: string | null;
+    lineItems?: unknown;
+    metadata?: Record<string, unknown>;
+  },
+) => {
+  assertUuid(params.subscriptionId, "subscriptionId");
+  const { data: subscription, error: subError } = await client
+    .from("billing_subscriptions")
+    .select("id, company_id, ca_firm_id, status")
+    .eq("id", params.subscriptionId)
+    .maybeSingle();
+  if (subError) throw subError;
+  if (!subscription) throw new Error("billing subscription not found");
+
+  const invoiceNumber = toTrimmedString(params.invoiceNumber, 80);
+  if (!invoiceNumber) throw new Error("invoiceNumber is required");
+  const subtotalMinor = Number(params.subtotalMinor);
+  const taxMinor = Number(params.taxMinor);
+  if (!Number.isFinite(subtotalMinor) || subtotalMinor < 0) throw new Error("subtotalMinor must be a non-negative number");
+  if (!Number.isFinite(taxMinor) || taxMinor < 0) throw new Error("taxMinor must be a non-negative number");
+  const totalMinor = subtotalMinor + taxMinor;
+
+  const dueAtRaw = toTrimmedString(params.dueAt ?? null, 80);
+  const dueAt = dueAtRaw ? new Date(dueAtRaw).toISOString() : new Date(Date.now() + 7 * 24 * 60 * 60 * 1000).toISOString();
+  const lineItems = Array.isArray(params.lineItems) ? params.lineItems : [];
+
+  const { data, error } = await client
+    .from("billing_invoice_records")
+    .insert({
+      subscription_id: subscription.id,
+      company_id: subscription.company_id,
+      ca_firm_id: subscription.ca_firm_id,
+      invoice_number: invoiceNumber,
+      invoice_type: "tax_invoice",
+      status: "issued",
+      subtotal_minor: subtotalMinor,
+      tax_minor: taxMinor,
+      total_minor: totalMinor,
+      amount_paid_minor: 0,
+      due_at: dueAt,
+      gstin_supplier: "27ABCDE1234F1Z5",
+      gstin_customer: toTrimmedString(params.gstinCustomer, 20),
+      place_of_supply: toTrimmedString(params.placeOfSupply, 80),
+      hsn_sac_code: toTrimmedString(params.hsnSacCode, 20),
+      line_items: lineItems,
+      metadata: params.metadata ?? {},
+    })
+    .select("id, subscription_id, invoice_number, status, subtotal_minor, tax_minor, total_minor, due_at, created_at")
+    .single();
+  if (error || !data) throw error ?? new Error("Failed to issue invoice");
+  return data;
+};
+
+const recordBillingPaymentAttemptByAdmin = async (
+  client: ReturnType<typeof createClient>,
+  params: {
+    subscriptionId: string;
+    invoiceId?: string | null;
+    status: "succeeded" | "failed" | "scheduled_retry" | "cancelled";
+    amountMinor: number;
+    provider?: string | null;
+    failureCode?: string | null;
+    failureMessage?: string | null;
+    retryScheduledAt?: string | null;
+    metadata?: Record<string, unknown>;
+  },
+) => {
+  assertUuid(params.subscriptionId, "subscriptionId");
+  if (params.invoiceId) assertUuid(params.invoiceId, "invoiceId");
+  const amountMinor = Number(params.amountMinor);
+  if (!Number.isFinite(amountMinor) || amountMinor < 0) throw new Error("amountMinor must be a non-negative number");
+
+  const { data: latestAttempt, error: latestError } = await client
+    .from("billing_payment_attempts")
+    .select("attempt_number")
+    .eq("subscription_id", params.subscriptionId)
+    .order("attempted_at", { ascending: false })
+    .limit(1)
+    .maybeSingle();
+  if (latestError) throw latestError;
+  const attemptNumber = Number(latestAttempt?.attempt_number ?? 0) + 1;
+
+  const retryScheduledAt = toTrimmedString(params.retryScheduledAt ?? null, 80);
+  const retryIso = retryScheduledAt ? new Date(retryScheduledAt).toISOString() : null;
+  const provider = toTrimmedString(params.provider ?? null, 80) ?? "manual";
+  const failureCode = toTrimmedString(params.failureCode ?? null, 80);
+  const failureMessage = toTrimmedString(params.failureMessage ?? null, 2000);
+  const nowIso = new Date().toISOString();
+
+  const { data, error } = await client
+    .from("billing_payment_attempts")
+    .insert({
+      subscription_id: params.subscriptionId,
+      invoice_id: params.invoiceId ?? null,
+      attempt_number: attemptNumber,
+      status: params.status,
+      amount_minor: amountMinor,
+      provider,
+      failure_code: failureCode,
+      failure_message: failureMessage,
+      retry_scheduled_at: retryIso,
+      attempted_at: nowIso,
+      resolved_at: params.status === "succeeded" || params.status === "cancelled" ? nowIso : null,
+      metadata: params.metadata ?? {},
+    })
+    .select("id, subscription_id, invoice_id, attempt_number, status, amount_minor, provider, failure_code, failure_message, retry_scheduled_at, attempted_at")
+    .single();
+  if (error || !data) throw error ?? new Error("Failed to record payment attempt");
+
+  if (params.status === "succeeded") {
+    const { error: subUpdateError } = await client
+      .from("billing_subscriptions")
+      .update({
+        status: "active",
+        payment_retry_count: 0,
+        payment_last_failed_at: null,
+        payment_failure_code: null,
+        payment_failure_message: null,
+      })
+      .eq("id", params.subscriptionId);
+    if (subUpdateError) throw subUpdateError;
+
+    if (params.invoiceId) {
+      const { error: invoiceUpdateError } = await client
+        .from("billing_invoice_records")
+        .update({
+          status: "paid",
+          amount_paid_minor: amountMinor,
+          paid_at: nowIso,
+        })
+        .eq("id", params.invoiceId);
+      if (invoiceUpdateError) throw invoiceUpdateError;
+    }
+  } else if (params.status === "failed" || params.status === "scheduled_retry") {
+    const { data: sub, error: subLoadError } = await client
+      .from("billing_subscriptions")
+      .select("payment_retry_count")
+      .eq("id", params.subscriptionId)
+      .maybeSingle();
+    if (subLoadError) throw subLoadError;
+    const nextRetry = Number(sub?.payment_retry_count ?? 0) + 1;
+    const { error: subUpdateError } = await client
+      .from("billing_subscriptions")
+      .update({
+        status: "past_due",
+        payment_retry_count: nextRetry,
+        payment_last_failed_at: nowIso,
+        payment_failure_code: failureCode,
+        payment_failure_message: failureMessage,
+      })
+      .eq("id", params.subscriptionId);
+    if (subUpdateError) throw subUpdateError;
+
+    if (params.invoiceId) {
+      const { error: invoiceUpdateError } = await client
+        .from("billing_invoice_records")
+        .update({ status: "overdue" })
+        .eq("id", params.invoiceId);
+      if (invoiceUpdateError) throw invoiceUpdateError;
+    }
+  }
+
+  return data;
+};
+
+const collectCommercialReadinessSignals = async (
+  client: ReturnType<typeof createClient>,
+) => {
+  const [plansResult, subscriptionsResult, activeSubscriptionsResult, invoicesResult, overdueInvoicesResult, failedPaymentsResult, metersResult, usageEventsResult] = await Promise.all([
+    client.from("billing_plans").select("id, metadata").eq("active", true),
+    client.from("billing_subscriptions").select("id, status, company_id, ca_firm_id, current_period_end, payment_retry_count"),
+    client.from("billing_subscriptions").select("id", { count: "exact", head: true }).in("status", ["trialing", "active", "past_due", "paused"]),
+    client.from("billing_invoice_records").select("id", { count: "exact", head: true }),
+    client.from("billing_invoice_records").select("id", { count: "exact", head: true }).eq("status", "overdue"),
+    client.from("billing_payment_attempts").select("id", { count: "exact", head: true }).eq("status", "failed"),
+    client.from("billing_usage_meters").select("id", { count: "exact", head: true }).eq("active", true),
+    client.from("billing_usage_events").select("id", { count: "exact", head: true }).gte("event_at", new Date(Date.now() - 30 * 24 * 60 * 60 * 1000).toISOString()),
+  ]);
+  if (plansResult.error) throw plansResult.error;
+  if (subscriptionsResult.error) throw subscriptionsResult.error;
+  if (activeSubscriptionsResult.error) throw activeSubscriptionsResult.error;
+  if (invoicesResult.error) throw invoicesResult.error;
+  if (overdueInvoicesResult.error) throw overdueInvoicesResult.error;
+  if (failedPaymentsResult.error) throw failedPaymentsResult.error;
+  if (metersResult.error) throw metersResult.error;
+  if (usageEventsResult.error) throw usageEventsResult.error;
+
+  const plans = plansResult.data ?? [];
+  const subscriptions = subscriptionsResult.data ?? [];
+  const activeSubscriptions = Number(activeSubscriptionsResult.count ?? 0);
+  const overdueInvoices = Number(overdueInvoicesResult.count ?? 0);
+  const failedPayments = Number(failedPaymentsResult.count ?? 0);
+  const usageEvents30d = Number(usageEventsResult.count ?? 0);
+
+  const missingRequiredPlanTiers = ["core", "nexus", "sovereign"].filter((tier) =>
+    !plans.some((row) => {
+      const metadata = (row.metadata ?? {}) as Record<string, unknown>;
+      const tierFromMetadata = typeof metadata.plan_tier === "string" ? metadata.plan_tier : null;
+      return tierFromMetadata === tier;
+    }) && !plans.some((row) => {
+      const metadata = (row.metadata ?? {}) as Record<string, unknown>;
+      const code = typeof metadata.plan_code === "string" ? metadata.plan_code.toLowerCase() : "";
+      return code.includes(tier);
+    }) && !plans.some((row) => {
+      const raw = JSON.stringify(row).toLowerCase();
+      return raw.includes(`"plan_tier":"${tier}"`) || raw.includes(`${tier}_monthly`) || raw.includes(`"${tier}"`);
+    })
+  );
+
+  const pastDueSubscriptions = subscriptions.filter((row) => row.status === "past_due").length;
+  const excessiveRetrySubscriptions = subscriptions.filter((row) => Number(row.payment_retry_count ?? 0) >= 3).length;
+  const tenantScopedCount = subscriptions.filter((row) => (row.company_id ? 1 : 0) + (row.ca_firm_id ? 1 : 0) === 1).length;
+
+  return {
+    summary: {
+      critical: missingRequiredPlanTiers.length + (tenantScopedCount !== subscriptions.length ? 1 : 0),
+      high: overdueInvoices + excessiveRetrySubscriptions + (Number(metersResult.count ?? 0) === 0 ? 1 : 0),
+      medium: pastDueSubscriptions + failedPayments,
+    },
+    metrics: {
+      plans_active: plans.length,
+      plans_missing_tiers: missingRequiredPlanTiers,
+      subscriptions_total: subscriptions.length,
+      subscriptions_active_like: activeSubscriptions,
+      invoices_total: Number(invoicesResult.count ?? 0),
+      invoices_overdue: overdueInvoices,
+      payment_attempts_failed: failedPayments,
+      subscriptions_with_retry_ge_3: excessiveRetrySubscriptions,
+      usage_meters_active: Number(metersResult.count ?? 0),
+      usage_events_30d: usageEvents30d,
+    },
+    overall: {
+      pass:
+        missingRequiredPlanTiers.length === 0 &&
+        tenantScopedCount === subscriptions.length &&
+        Number(metersResult.count ?? 0) > 0,
+    },
+  };
+};
+
 serve(async (req: Request) => {
   const corsHeaders = getCorsHeaders(req);
   if (corsHeaders["Access-Control-Allow-Origin"] === "null") {
@@ -6461,6 +7023,136 @@ serve(async (req: Request) => {
       return json(req, 200, {
         ok: true,
         data: await acceptLegalDocument(client, req, user.id, body as Record<string, unknown>),
+      });
+    }
+
+    if (req.method === "GET" && path.endsWith("billing/plans")) {
+      return json(req, 200, { ok: true, data: await listBillingPlans(client) });
+    }
+
+    if (req.method === "GET" && path.endsWith("billing/subscription")) {
+      const scope = await resolveBillingScopeForUser(client, user.id, roles, {
+        companyId: url.searchParams.get("company_id"),
+        caFirmId: url.searchParams.get("ca_firm_id"),
+      });
+      return json(req, 200, { ok: true, data: await loadBillingSubscription(client, scope) });
+    }
+
+    if (req.method === "POST" && path.endsWith("billing/subscription/activate")) {
+      requireRole(roles, ["manager", "admin"]);
+      const body = await req.json().catch(() => ({}));
+      if (!body || typeof body !== "object") {
+        return json(req, 400, { error: "request body is required" });
+      }
+      const scope = await resolveBillingScopeForUser(client, user.id, roles, {
+        companyId: typeof body.companyId === "string" ? body.companyId : null,
+        caFirmId: typeof body.caFirmId === "string" ? body.caFirmId : null,
+      });
+      return json(req, 200, {
+        ok: true,
+        data: await upsertBillingSubscription(client, {
+          scope,
+          ownerUserId: user.id,
+          planCode: typeof body.planCode === "string" ? body.planCode : "",
+          action: "activate",
+        }),
+      });
+    }
+
+    if (req.method === "POST" && path.endsWith("billing/subscription/change-plan")) {
+      requireRole(roles, ["manager", "admin"]);
+      const body = await req.json().catch(() => ({}));
+      if (!body || typeof body !== "object") {
+        return json(req, 400, { error: "request body is required" });
+      }
+      const scope = await resolveBillingScopeForUser(client, user.id, roles, {
+        companyId: typeof body.companyId === "string" ? body.companyId : null,
+        caFirmId: typeof body.caFirmId === "string" ? body.caFirmId : null,
+      });
+      return json(req, 200, {
+        ok: true,
+        data: await upsertBillingSubscription(client, {
+          scope,
+          ownerUserId: user.id,
+          planCode: typeof body.planCode === "string" ? body.planCode : "",
+          action: "change_plan",
+        }),
+      });
+    }
+
+    if (req.method === "POST" && path.endsWith("billing/subscription/cancel")) {
+      requireRole(roles, ["manager", "admin"]);
+      const body = await req.json().catch(() => ({}));
+      if (!body || typeof body !== "object") {
+        return json(req, 400, { error: "request body is required" });
+      }
+      const scope = await resolveBillingScopeForUser(client, user.id, roles, {
+        companyId: typeof body.companyId === "string" ? body.companyId : null,
+        caFirmId: typeof body.caFirmId === "string" ? body.caFirmId : null,
+      });
+      return json(req, 200, {
+        ok: true,
+        data: await upsertBillingSubscription(client, {
+          scope,
+          ownerUserId: user.id,
+          planCode: "",
+          action: "cancel",
+          cancelAtPeriodEnd: body.cancelAtPeriodEnd !== false,
+        }),
+      });
+    }
+
+    if (req.method === "GET" && path.endsWith("billing/invoices")) {
+      const scope = await resolveBillingScopeForUser(client, user.id, roles, {
+        companyId: url.searchParams.get("company_id"),
+        caFirmId: url.searchParams.get("ca_firm_id"),
+      });
+      const limitRaw = Number(url.searchParams.get("limit") ?? 60);
+      const offsetRaw = Number(url.searchParams.get("offset") ?? 0);
+      return json(req, 200, {
+        ok: true,
+        data: await listBillingInvoices(client, scope, {
+          limit: Number.isFinite(limitRaw) ? limitRaw : 60,
+          offset: Number.isFinite(offsetRaw) ? offsetRaw : 0,
+          status: url.searchParams.get("status"),
+        }),
+      });
+    }
+
+    if (req.method === "POST" && path.endsWith("billing/usage/events")) {
+      requireRole(roles, ["manager", "admin"]);
+      const body = await req.json().catch(() => ({}));
+      if (!body || typeof body !== "object") {
+        return json(req, 400, { error: "request body is required" });
+      }
+      const scope = await resolveBillingScopeForUser(client, user.id, roles, {
+        companyId: typeof body.companyId === "string" ? body.companyId : null,
+        caFirmId: typeof body.caFirmId === "string" ? body.caFirmId : null,
+      });
+      return json(req, 200, {
+        ok: true,
+        data: await recordBillingUsageEvent(client, {
+          scope,
+          userId: user.id,
+          meterKey: typeof body.meterKey === "string" ? body.meterKey : "",
+          quantity: Number(body.quantity ?? 0),
+          source: typeof body.source === "string" ? body.source : "api",
+          idempotencyKey: typeof body.idempotencyKey === "string" ? body.idempotencyKey : "",
+          metadata: safeMetadataObject(body.metadata),
+        }),
+      });
+    }
+
+    if (req.method === "GET" && path.endsWith("billing/usage/summary")) {
+      const scope = await resolveBillingScopeForUser(client, user.id, roles, {
+        companyId: url.searchParams.get("company_id"),
+        caFirmId: url.searchParams.get("ca_firm_id"),
+      });
+      return json(req, 200, {
+        ok: true,
+        data: await loadBillingUsageSummary(client, scope, {
+          monthStart: url.searchParams.get("month_start"),
+        }),
       });
     }
 
@@ -6889,6 +7581,63 @@ serve(async (req: Request) => {
       return json(req, 200, {
         ok: true,
         data: await updateComplianceDataRequestStatusByAdmin(client, user.id, requestId, body as Record<string, unknown>),
+      });
+    }
+
+    if (req.method === "GET" && path.endsWith("ops/commercial/readiness")) {
+      requireRole(roles, ["admin"]);
+      return json(req, 200, {
+        ok: true,
+        data: await collectCommercialReadinessSignals(client),
+      });
+    }
+
+    if (req.method === "POST" && path.endsWith("ops/billing/invoice/issue")) {
+      requireRole(roles, ["admin"]);
+      const body = await req.json().catch(() => ({}));
+      if (!body || typeof body !== "object") {
+        return json(req, 400, { error: "request body is required" });
+      }
+      return json(req, 200, {
+        ok: true,
+        data: await issueBillingInvoiceByAdmin(client, {
+          subscriptionId: typeof body.subscriptionId === "string" ? body.subscriptionId : "",
+          invoiceNumber: typeof body.invoiceNumber === "string" ? body.invoiceNumber : "",
+          subtotalMinor: Number(body.subtotalMinor ?? 0),
+          taxMinor: Number(body.taxMinor ?? 0),
+          dueAt: typeof body.dueAt === "string" ? body.dueAt : null,
+          gstinCustomer: typeof body.gstinCustomer === "string" ? body.gstinCustomer : null,
+          placeOfSupply: typeof body.placeOfSupply === "string" ? body.placeOfSupply : null,
+          hsnSacCode: typeof body.hsnSacCode === "string" ? body.hsnSacCode : null,
+          lineItems: Array.isArray(body.lineItems) ? body.lineItems : [],
+          metadata: safeMetadataObject(body.metadata),
+        }),
+      });
+    }
+
+    if (req.method === "POST" && path.endsWith("ops/billing/payment-attempt")) {
+      requireRole(roles, ["admin"]);
+      const body = await req.json().catch(() => ({}));
+      if (!body || typeof body !== "object") {
+        return json(req, 400, { error: "request body is required" });
+      }
+      const statusRaw = typeof body.status === "string" ? body.status.trim().toLowerCase() : "";
+      if (!["succeeded", "failed", "scheduled_retry", "cancelled"].includes(statusRaw)) {
+        return json(req, 400, { error: "status must be one of: succeeded, failed, scheduled_retry, cancelled" });
+      }
+      return json(req, 200, {
+        ok: true,
+        data: await recordBillingPaymentAttemptByAdmin(client, {
+          subscriptionId: typeof body.subscriptionId === "string" ? body.subscriptionId : "",
+          invoiceId: typeof body.invoiceId === "string" ? body.invoiceId : null,
+          status: statusRaw as "succeeded" | "failed" | "scheduled_retry" | "cancelled",
+          amountMinor: Number(body.amountMinor ?? 0),
+          provider: typeof body.provider === "string" ? body.provider : null,
+          failureCode: typeof body.failureCode === "string" ? body.failureCode : null,
+          failureMessage: typeof body.failureMessage === "string" ? body.failureMessage : null,
+          retryScheduledAt: typeof body.retryScheduledAt === "string" ? body.retryScheduledAt : null,
+          metadata: safeMetadataObject(body.metadata),
+        }),
       });
     }
 
