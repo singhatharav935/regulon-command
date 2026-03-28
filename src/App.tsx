@@ -3,27 +3,38 @@ import { Toaster as Sonner } from "@/components/ui/sonner";
 import { TooltipProvider } from "@/components/ui/tooltip";
 import { QueryClient, QueryClientProvider } from "@tanstack/react-query";
 import { BrowserRouter, Routes, Route } from "react-router-dom";
+import { Suspense, lazy } from "react";
 import Index from "./pages/Index";
 import Auth from "./pages/Auth";
-import Dashboard from "./pages/Dashboard";
-import CADashboard from "./pages/CADashboard";
-import AdminDashboard from "./pages/AdminDashboard";
 import NotFound from "./pages/NotFound";
-import AppDashboard from "./pages/AppDashboard";
-import AppCADashboard from "./pages/AppCADashboard";
-import AppAdminDashboard from "./pages/AppAdminDashboard";
-import UniversityDemoDashboard from "./pages/UniversityDemoDashboard";
-import AppUniversityDashboard from "./pages/AppUniversityDashboard";
-import AppLegalDashboard from "./pages/AppLegalDashboard";
-import AppVerification from "./pages/AppVerification";
-import CAFirmDashboard from "./pages/CAFirmDashboard";
-import AppCAFirmDashboard from "./pages/AppCAFirmDashboard";
 import { AuthProvider } from "./hooks/use-auth";
 import ProtectedRoute from "./components/auth/ProtectedRoute";
 import RoleLandingRoute from "./components/auth/RoleLandingRoute";
-import AgentWorkReview from "./pages/AgentWorkReview";
+
+const Dashboard = lazy(() => import("./pages/Dashboard"));
+const CADashboard = lazy(() => import("./pages/CADashboard"));
+const AdminDashboard = lazy(() => import("./pages/AdminDashboard"));
+const AppDashboard = lazy(() => import("./pages/AppDashboard"));
+const AppCADashboard = lazy(() => import("./pages/AppCADashboard"));
+const AppAdminDashboard = lazy(() => import("./pages/AppAdminDashboard"));
+const UniversityDemoDashboard = lazy(() => import("./pages/UniversityDemoDashboard"));
+const AppUniversityDashboard = lazy(() => import("./pages/AppUniversityDashboard"));
+const AppLegalDashboard = lazy(() => import("./pages/AppLegalDashboard"));
+const AppVerification = lazy(() => import("./pages/AppVerification"));
+const CAFirmDashboard = lazy(() => import("./pages/CAFirmDashboard"));
+const AppCAFirmDashboard = lazy(() => import("./pages/AppCAFirmDashboard"));
+const AgentWorkReview = lazy(() => import("./pages/AgentWorkReview"));
 
 const queryClient = new QueryClient();
+
+const RouteFallback = () => (
+  <div className="min-h-screen bg-background flex items-center justify-center">
+    <div className="text-center">
+      <div className="w-10 h-10 border-4 border-primary border-t-transparent rounded-full animate-spin mx-auto mb-3" />
+      <p className="text-muted-foreground">Loading workspace...</p>
+    </div>
+  </div>
+);
 
 const App = () => (
   <QueryClientProvider client={queryClient}>
@@ -32,7 +43,8 @@ const App = () => (
         <Toaster />
         <Sonner />
         <BrowserRouter>
-          <Routes>
+          <Suspense fallback={<RouteFallback />}>
+            <Routes>
             <Route path="/" element={<Index />} />
             <Route path="/platform" element={<Index />} />
             <Route path="/platform/how-it-works" element={<Index />} />
@@ -147,8 +159,9 @@ const App = () => (
             />
 
             {/* ADD ALL CUSTOM ROUTES ABOVE THE CATCH-ALL "*" ROUTE */}
-            <Route path="*" element={<NotFound />} />
-          </Routes>
+              <Route path="*" element={<NotFound />} />
+            </Routes>
+          </Suspense>
         </BrowserRouter>
       </TooltipProvider>
     </AuthProvider>
