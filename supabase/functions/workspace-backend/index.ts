@@ -12,6 +12,7 @@ const getCorsHeaders = (req: Request) => {
     .split(",")
     .map((item) => item.trim())
     .filter(Boolean);
+  const allowLocalOrigins = (Deno.env.get("ALLOW_LOCAL_ORIGINS") ?? "").trim().toLowerCase() === "true";
 
   const isLocalOrigin =
     origin.startsWith("http://localhost:") ||
@@ -21,7 +22,10 @@ const getCorsHeaders = (req: Request) => {
 
   const hasWildcard = allowlist.includes("*");
   const isAllowlisted = allowlist.includes(origin);
-  const allowOrigin = allowlist.length === 0 ? "*" : (isLocalOrigin || hasWildcard || isAllowlisted ? origin : "null");
+  const localOriginAllowed = allowlist.length === 0 || allowLocalOrigins;
+  const allowOrigin = allowlist.length === 0
+    ? "*"
+    : ((localOriginAllowed && isLocalOrigin) || hasWildcard || isAllowlisted ? origin : "null");
 
   return {
     "Access-Control-Allow-Origin": allowOrigin,

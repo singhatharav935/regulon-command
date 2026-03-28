@@ -4,6 +4,7 @@ import type { ReactElement } from "react";
 import { useAuth } from "@/hooks/use-auth";
 import type { Database } from "@/integrations/supabase/types";
 import type { AppPersona } from "@/hooks/use-auth";
+import { previewBypassEnabled } from "@/lib/runtime-flags";
 
 type AppRole = Database["public"]["Enums"]["app_role"];
 
@@ -15,7 +16,7 @@ interface ProtectedRouteProps {
 }
 
 const verificationRequiredPersonas: AppPersona[] = ["external_ca", "in_house_ca", "in_house_lawyer", "company_owner", "admin", "ca_firm"];
-const VERIFICATION_OPTIONAL_FOR_NOW = import.meta.env.DEV;
+const VERIFICATION_OPTIONAL_FOR_NOW = previewBypassEnabled;
 
 const inferPersonaFromMetadata = (registrationRole: unknown): AppPersona | null => {
   if (

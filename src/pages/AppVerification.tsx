@@ -10,6 +10,7 @@ import { Input } from "@/components/ui/input";
 import { Button } from "@/components/ui/button";
 import { Textarea } from "@/components/ui/textarea";
 import { useToast } from "@/hooks/use-toast";
+import { previewBypassEnabled } from "@/lib/runtime-flags";
 
 const AppVerification = () => {
   const { user, persona, verificationStatus, isVerified } = useAuth();
@@ -23,7 +24,7 @@ const AppVerification = () => {
   const [notes, setNotes] = useState("");
   const [documentFile, setDocumentFile] = useState<File | null>(null);
   const [submitting, setSubmitting] = useState(false);
-  const verificationOptional = import.meta.env.DEV;
+  const verificationOptional = previewBypassEnabled;
 
   const requirements = useMemo(() => {
     if (persona === "external_ca" || persona === "in_house_ca") {
@@ -146,7 +147,7 @@ const AppVerification = () => {
               <CardTitle>{requirements.title}</CardTitle>
               <p className="text-sm text-muted-foreground">
                 {verificationOptional
-                  ? "Verification details are optional in preview mode. You can submit now or continue to dashboard."
+                  ? "Verification details are optional in controlled preview mode. You can submit now or continue to dashboard."
                   : "Submit mandatory KYC/professional details before dashboard access."}
               </p>
             </CardHeader>
