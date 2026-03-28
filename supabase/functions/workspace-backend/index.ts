@@ -3832,6 +3832,83 @@ const repairUserDashboardReadinessByAdmin = async (
   };
 };
 
+const repairAllDashboardReadinessByAdmin = async (
+  serviceClient: ReturnType<typeof createClient>,
+  options?: { limit?: number; seedWorkflows?: boolean },
+) => {
+  const limit = Math.max(10, Math.min(300, Number(options?.limit ?? 120)));
+  const seedWorkflows = options?.seedWorkflows !== false;
+
+  const snapshot = await listDashboardReadinessUsers(serviceClient, { limit, offset: 0 });
+  const blocked = snapshot.users.filter((user) => user.dashboard_ready === false);
+  const repaired: Array<{ user_id: string; ok: boolean; actions?: string[]; error?: string }> = [];
+
+  for (const user of blocked) {
+    try {
+      const result = await repairUserDashboardReadinessByAdmin(serviceClient, {
+        userId: user.user_id,
+      });
+      repaired.push({
+        user_id: user.user_id,
+        ok: true,
+        actions: result.actions,
+      });
+    } catch (error) {
+      repaired.push({
+        user_id: user.user_id,
+        ok: false,
+        error: extractErrorMessage(error),
+      });
+    }
+  }
+
+  let workflowSeededCompanies = 0;
+  const workflowSeedErrors: Array<{ company_id: string; error: string }> = [];
+  if (seedWorkflows) {
+    const { data: companies, error: companiesError } = await serviceClient
+      .from("companies")
+      .select("id")
+      .order("created_at", { ascending: false })
+      .limit(limit);
+    if (companiesError) throw companiesError;
+
+    for (const company of companies ?? []) {
+      const { count: runCount, error: runCountError } = await serviceClient
+        .from("draft_runs")
+        .select("id", { count: "exact", head: true })
+        .eq("company_id", company.id);
+      if (runCountError) {
+        workflowSeedErrors.push({ company_id: company.id, error: runCountError.message });
+        continue;
+      }
+      if (Number(runCount ?? 0) > 0) continue;
+
+      try {
+        await bootstrapCompanyAuthorityWorkflowsByAdmin(serviceClient, { companyId: company.id });
+        workflowSeededCompanies += 1;
+      } catch (error) {
+        workflowSeedErrors.push({
+          company_id: company.id,
+          error: extractErrorMessage(error),
+        });
+      }
+    }
+  }
+
+  const after = await listDashboardReadinessUsers(serviceClient, { limit, offset: 0 });
+
+  return {
+    processed_limit: limit,
+    before: snapshot.summary,
+    after: after.summary,
+    repaired_users: repaired.filter((item) => item.ok).length,
+    failed_repairs: repaired.filter((item) => !item.ok).length,
+    repair_results: repaired,
+    workflow_seeded_companies: workflowSeededCompanies,
+    workflow_seed_errors: workflowSeedErrors,
+  };
+};
+
 const loadAuthorityBackendCoverage = async (
   client: ReturnType<typeof createClient>,
 ) => {
@@ -3990,6 +4067,7 @@ const getRouteAccessMatrix = () => ({
     { route: "GET /ops/deploy-readiness", roles: ["admin"] },
     { route: "GET /ops/dashboard-readiness/users", roles: ["admin"] },
     { route: "POST /ops/dashboard-readiness/repair-user", roles: ["admin"] },
+    { route: "POST /ops/dashboard-readiness/repair-all", roles: ["admin"] },
     { route: "GET /ops/authority-coverage", roles: ["admin"] },
     { route: "POST /ops/authority-bootstrap", roles: ["admin"] },
     { route: "POST /ops/bootstrap/company-authority-workflows", roles: ["admin"] },
@@ -4620,6 +4698,22 @@ serve(async (req: Request) => {
           desiredPersona,
           companyId,
           caFirmId,
+        }),
+      });
+    }
+
+    if (req.method === "POST" && path.endsWith("ops/dashboard-readiness/repair-all")) {
+      requireRole(roles, ["admin"]);
+      const serviceClient = getServiceClient();
+      if (!serviceClient) return json(req, 500, { error: "Missing Supabase service role configuration" });
+      const body = await req.json().catch(() => ({}));
+      const limitRaw = Number(body.limit ?? 120);
+      const seedWorkflows = body.seedWorkflows !== false;
+      return json(req, 200, {
+        ok: true,
+        data: await repairAllDashboardReadinessByAdmin(serviceClient, {
+          limit: Number.isFinite(limitRaw) ? limitRaw : 120,
+          seedWorkflows,
         }),
       });
     }
