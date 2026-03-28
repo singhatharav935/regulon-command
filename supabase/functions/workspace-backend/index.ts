@@ -213,6 +213,23 @@ const getUserPersona = async (client: ReturnType<typeof createClient>, userId: s
   return null;
 };
 
+const applyPersonaRoleFallback = (roles: Set<string>, persona: AppPersona | null) => {
+  const resolved = new Set(roles);
+  if (persona === "admin") {
+    resolved.add("admin");
+  } else if (
+    persona === "external_ca" ||
+    persona === "in_house_ca" ||
+    persona === "in_house_lawyer" ||
+    persona === "ca_firm"
+  ) {
+    resolved.add("manager");
+  } else if (persona === "company_owner") {
+    resolved.add("user");
+  }
+  return resolved;
+};
+
 const getUserCompanyIds = async (client: ReturnType<typeof createClient>, userId: string) => {
   const { data, error } = await client.from("company_members").select("company_id").eq("user_id", userId);
   if (error) throw error;
@@ -1162,7 +1179,8 @@ const createCompanyWorkspace = async (
 
   if (typeof companyId === "string" && companyId) {
     try {
-      seeded = await bootstrapCompanyWorkspaceData(client, {
+      const seedClient = getServiceClient() ?? client;
+      seeded = await bootstrapCompanyWorkspaceData(seedClient, {
         companyId,
         ownerUserId: userId,
       });
@@ -3723,8 +3741,8 @@ serve(async (req: Request) => {
     }
 
     const { client, user, token } = await getUserClient(req);
-    const roles = await getUserRoles(client, user.id);
     const persona = await getUserPersona(client, user.id, user);
+    const roles = applyPersonaRoleFallback(await getUserRoles(client, user.id), persona);
 
     if (req.method === "GET" && path.endsWith("company/dashboard")) {
       requireRole(roles, ["user", "manager", "admin"]);
@@ -4765,9 +4783,10 @@ serve(async (req: Request) => {
       if (!roles.has("admin") && !companyIds.includes(targetCompanyId)) {
         return json(req, 403, { error: "Forbidden" });
       }
+      const seedClient = getServiceClient() ?? client;
       return json(req, 200, {
         ok: true,
-        data: await bootstrapCompanyWorkspaceData(client, { companyId: targetCompanyId, ownerUserId: user.id }),
+        data: await bootstrapCompanyWorkspaceData(seedClient, { companyId: targetCompanyId, ownerUserId: user.id }),
       });
     }
 
