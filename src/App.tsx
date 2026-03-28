@@ -7,6 +7,7 @@ import { Suspense, lazy } from "react";
 import Index from "./pages/Index";
 import Auth from "./pages/Auth";
 import NotFound from "./pages/NotFound";
+import MarketingOptionPage from "./pages/MarketingOptionPage";
 import { AuthProvider } from "./hooks/use-auth";
 import ProtectedRoute from "./components/auth/ProtectedRoute";
 import RoleLandingRoute from "./components/auth/RoleLandingRoute";
@@ -48,24 +49,28 @@ const App = () => (
           <Suspense fallback={<RouteFallback />}>
             <Routes>
             <Route path="/" element={<Index />} />
-            <Route path="/platform" element={<Index />} />
-            <Route path="/platform/how-it-works" element={<Index />} />
-            <Route path="/platform/infrastructure" element={<Index />} />
-            <Route path="/platform/ai-human-review" element={<Index />} />
-            <Route path="/platform/regulators" element={<Index />} />
-            <Route path="/platform/ai-assistant" element={<Index />} />
-            <Route path="/platform/audit" element={<Index />} />
-            <Route path="/solutions/roc" element={<Index />} />
-            <Route path="/solutions/gst" element={<Index />} />
-            <Route path="/solutions/income-tax" element={<Index />} />
-            <Route path="/solutions/labour-law" element={<Index />} />
-            <Route path="/solutions/rbi" element={<Index />} />
-            <Route path="/solutions/sebi" element={<Index />} />
-            <Route path="/solutions/contracts" element={<Index />} />
-            <Route path="/customers" element={<Index />} />
-            <Route path="/security" element={<Index />} />
-            <Route path="/resources" element={<Index />} />
-            <Route path="/about" element={<Index />} />
+            <Route path="/platform" element={<MarketingOptionPage />} />
+            <Route path="/platform/how-it-works" element={<MarketingOptionPage />} />
+            <Route path="/platform/infrastructure" element={<MarketingOptionPage />} />
+            <Route path="/platform/ai-human-review" element={<MarketingOptionPage />} />
+            <Route path="/platform/regulators" element={<MarketingOptionPage />} />
+            <Route path="/platform/ai-assistant" element={<MarketingOptionPage />} />
+            <Route path="/platform/audit" element={<MarketingOptionPage />} />
+            <Route path="/solutions/roc" element={<MarketingOptionPage />} />
+            <Route path="/solutions/gst" element={<MarketingOptionPage />} />
+            <Route path="/solutions/income-tax" element={<MarketingOptionPage />} />
+            <Route path="/solutions/labour-law" element={<MarketingOptionPage />} />
+            <Route path="/solutions/rbi" element={<MarketingOptionPage />} />
+            <Route path="/solutions/sebi" element={<MarketingOptionPage />} />
+            <Route path="/solutions/contracts" element={<MarketingOptionPage />} />
+            <Route path="/customers" element={<MarketingOptionPage />} />
+            <Route path="/security" element={<MarketingOptionPage />} />
+            <Route path="/security/data-residency" element={<MarketingOptionPage />} />
+            <Route path="/security/encryption-standards" element={<MarketingOptionPage />} />
+            <Route path="/security/dpdp-2026" element={<MarketingOptionPage />} />
+            <Route path="/security/soc2-type-ii" element={<MarketingOptionPage />} />
+            <Route path="/resources" element={<MarketingOptionPage />} />
+            <Route path="/about" element={<MarketingOptionPage />} />
             <Route path="/privacy" element={<LegalPolicyPage docKey="privacy_policy" fallbackTitle="Privacy Policy" />} />
             <Route path="/terms" element={<LegalPolicyPage docKey="terms_of_service" fallbackTitle="Terms of Service" />} />
             <Route path="/refund-policy" element={<LegalPolicyPage docKey="refund_policy" fallbackTitle="Refund Policy" />} />
