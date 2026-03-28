@@ -201,3 +201,8 @@ export const workspacePublicRequest = async <T>(
 
   return payload.data as T;
 };
+
+export const workspaceBackendTesting = {
+  parseRetryAfterMs,
+  shouldRetryResponse,
+};

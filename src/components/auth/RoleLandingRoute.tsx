@@ -20,7 +20,7 @@ const inferPersonaFromMetadata = (registrationRole: unknown): AppPersona | null 
   return null;
 };
 
-const resolveLandingPath = ({
+export const resolveLandingPath = ({
   persona,
   roles,
   metadataPersona,
