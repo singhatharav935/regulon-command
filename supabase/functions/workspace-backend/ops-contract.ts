@@ -21,6 +21,11 @@ export type PrelaunchSignals = {
     failedCount: number;
     staleProcessingCount: number;
   };
+  tenantIsolation: {
+    critical: number;
+    high: number;
+    medium: number;
+  };
 };
 
 export const computePrelaunchGate = (signals: PrelaunchSignals) => {
@@ -58,6 +63,12 @@ export const computePrelaunchGate = (signals: PrelaunchSignals) => {
           ? "warn"
           : "pass",
       detail: "AI request failure ratio and stale processing locks are in control.",
+    },
+    {
+      id: "tenant_isolation",
+      title: "Tenant Isolation",
+      status: signals.tenantIsolation.critical > 0 ? "fail" : signals.tenantIsolation.high > 0 ? "warn" : "pass",
+      detail: "Cross-tenant reference integrity and membership isolation checks are healthy.",
     },
   ] as const;
 

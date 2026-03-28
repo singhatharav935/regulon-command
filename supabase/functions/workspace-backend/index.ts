@@ -3410,6 +3410,118 @@ const runWorkflowSlaMonitor = async (
   };
 };
 
+const runTenantIsolationCheck = async (
+  client: ReturnType<typeof createClient>,
+  options?: { limitPerTable?: number },
+) => {
+  const limitPerTable = Math.max(200, Math.min(10000, Number(options?.limitPerTable ?? 3000)));
+  const serviceClient = getServiceClient() ?? client;
+
+  const [companiesResult, profilesResult, caFirmsResult] = await Promise.all([
+    serviceClient.from("companies").select("id").limit(limitPerTable),
+    serviceClient.from("profiles").select("user_id").limit(limitPerTable),
+    serviceClient.from("ca_firms").select("id").limit(limitPerTable),
+  ]);
+  if (companiesResult.error) throw companiesResult.error;
+  if (profilesResult.error) throw profilesResult.error;
+  if (caFirmsResult.error) throw caFirmsResult.error;
+
+  const validCompanyIds = new Set((companiesResult.data ?? []).map((row) => row.id));
+  const validUserIds = new Set((profilesResult.data ?? []).map((row) => row.user_id));
+  const validFirmIds = new Set((caFirmsResult.data ?? []).map((row) => row.id));
+
+  const [tasksResult, docsResult, deadlinesResult, runsResult, exposuresResult, companyMembersResult, caFirmMembersResult, personaResult] = await Promise.all([
+    serviceClient.from("compliance_tasks").select("id, company_id").limit(limitPerTable),
+    serviceClient.from("documents").select("id, company_id").limit(limitPerTable),
+    serviceClient.from("deadlines").select("id, company_id").limit(limitPerTable),
+    serviceClient.from("draft_runs").select("id, company_id, user_id").limit(limitPerTable),
+    serviceClient.from("regulatory_exposure").select("id, company_id").limit(limitPerTable),
+    serviceClient.from("company_members").select("id, company_id, user_id").limit(limitPerTable),
+    serviceClient.from("ca_firm_members").select("id, ca_firm_id, user_id").limit(limitPerTable),
+    serviceClient.from("user_personas").select("user_id, persona").limit(limitPerTable),
+  ]);
+  if (tasksResult.error) throw tasksResult.error;
+  if (docsResult.error) throw docsResult.error;
+  if (deadlinesResult.error) throw deadlinesResult.error;
+  if (runsResult.error) throw runsResult.error;
+  if (exposuresResult.error) throw exposuresResult.error;
+  if (companyMembersResult.error) throw companyMembersResult.error;
+  if (caFirmMembersResult.error) throw caFirmMembersResult.error;
+  if (personaResult.error) throw personaResult.error;
+
+  const orphanTasks = (tasksResult.data ?? []).filter((row) => !validCompanyIds.has(row.company_id));
+  const orphanDocuments = (docsResult.data ?? []).filter((row) => !validCompanyIds.has(row.company_id));
+  const orphanDeadlines = (deadlinesResult.data ?? []).filter((row) => !validCompanyIds.has(row.company_id));
+  const orphanExposures = (exposuresResult.data ?? []).filter((row) => !validCompanyIds.has(row.company_id));
+  const orphanDraftRuns = (runsResult.data ?? []).filter((row) => row.company_id && !validCompanyIds.has(row.company_id));
+  const orphanCompanyMembers = (companyMembersResult.data ?? []).filter((row) => !validCompanyIds.has(row.company_id) || !validUserIds.has(row.user_id));
+  const orphanFirmMembers = (caFirmMembersResult.data ?? []).filter((row) => !validFirmIds.has(row.ca_firm_id) || !validUserIds.has(row.user_id));
+
+  const companyMembershipCountByUser = new Map<string, number>();
+  for (const row of companyMembersResult.data ?? []) {
+    companyMembershipCountByUser.set(row.user_id, (companyMembershipCountByUser.get(row.user_id) ?? 0) + 1);
+  }
+  const firmMembershipCountByUser = new Map<string, number>();
+  for (const row of caFirmMembersResult.data ?? []) {
+    firmMembershipCountByUser.set(row.user_id, (firmMembershipCountByUser.get(row.user_id) ?? 0) + 1);
+  }
+
+  const ownerWithoutCompany = (personaResult.data ?? []).filter(
+    (row) => row.persona === "company_owner" && (companyMembershipCountByUser.get(row.user_id) ?? 0) === 0,
+  );
+  const firmWithoutMembership = (personaResult.data ?? []).filter(
+    (row) => row.persona === "ca_firm" && (firmMembershipCountByUser.get(row.user_id) ?? 0) === 0,
+  );
+
+  const critical = orphanTasks.length
+    + orphanDocuments.length
+    + orphanDeadlines.length
+    + orphanExposures.length
+    + orphanDraftRuns.length
+    + orphanCompanyMembers.length
+    + orphanFirmMembers.length;
+  const high = ownerWithoutCompany.length + firmWithoutMembership.length;
+
+  return {
+    sampled: {
+      limit_per_table: limitPerTable,
+      companies: companiesResult.data?.length ?? 0,
+      profiles: profilesResult.data?.length ?? 0,
+      ca_firms: caFirmsResult.data?.length ?? 0,
+    },
+    findings: {
+      orphan_tasks: orphanTasks.length,
+      orphan_documents: orphanDocuments.length,
+      orphan_deadlines: orphanDeadlines.length,
+      orphan_exposures: orphanExposures.length,
+      orphan_draft_runs: orphanDraftRuns.length,
+      orphan_company_memberships: orphanCompanyMembers.length,
+      orphan_ca_firm_memberships: orphanFirmMembers.length,
+      owner_persona_without_company_membership: ownerWithoutCompany.length,
+      ca_firm_persona_without_firm_membership: firmWithoutMembership.length,
+    },
+    summary: {
+      critical,
+      high,
+      medium: 0,
+    },
+    sample_ids: {
+      orphan_tasks: orphanTasks.slice(0, 10).map((row) => row.id),
+      orphan_documents: orphanDocuments.slice(0, 10).map((row) => row.id),
+      orphan_deadlines: orphanDeadlines.slice(0, 10).map((row) => row.id),
+      orphan_exposures: orphanExposures.slice(0, 10).map((row) => row.id),
+      orphan_draft_runs: orphanDraftRuns.slice(0, 10).map((row) => row.id),
+      orphan_company_memberships: orphanCompanyMembers.slice(0, 10).map((row) => row.id),
+      orphan_ca_firm_memberships: orphanFirmMembers.slice(0, 10).map((row) => row.id),
+      owner_persona_without_company_membership: ownerWithoutCompany.slice(0, 10).map((row) => row.user_id),
+      ca_firm_persona_without_firm_membership: firmWithoutMembership.slice(0, 10).map((row) => row.user_id),
+    },
+    overall: {
+      pass: critical === 0 && high === 0,
+    },
+  };
+};
+
 const collectPrelaunchSignals = async (
   client: ReturnType<typeof createClient>,
 ) => {
@@ -3455,6 +3567,7 @@ const collectPrelaunchSignals = async (
       failedCount,
       staleProcessingCount,
     },
+    tenantIsolation: (await runTenantIsolationCheck(client, { limitPerTable: 3000 })).summary,
   };
 };
 
@@ -4590,6 +4703,7 @@ const getRouteAccessMatrix = () => ({
     { route: "GET /ops/security/session-check", roles: ["user", "manager", "admin"] },
     { route: "GET /ops/workflow-integrity-check", roles: ["admin"] },
     { route: "GET /ops/workflow-sla-monitor", roles: ["admin"] },
+    { route: "GET /ops/tenant-isolation-check", roles: ["admin"] },
     { route: "GET /ops/deploy-readiness", roles: ["admin"] },
     { route: "GET /ops/dashboard-readiness/users", roles: ["admin"] },
     { route: "POST /ops/dashboard-readiness/repair-user", roles: ["admin"] },
@@ -5428,6 +5542,17 @@ serve(async (req: Request) => {
           generatedWarnHours: Number.isFinite(generatedWarnHoursRaw) ? generatedWarnHoursRaw : 24,
           reviewWarnHours: Number.isFinite(reviewWarnHoursRaw) ? reviewWarnHoursRaw : 24,
           approvedWarnHours: Number.isFinite(approvedWarnHoursRaw) ? approvedWarnHoursRaw : 48,
+        }),
+      });
+    }
+
+    if (req.method === "GET" && path.endsWith("ops/tenant-isolation-check")) {
+      requireRole(roles, ["admin"]);
+      const limitPerTableRaw = Number(url.searchParams.get("limit_per_table") ?? 3000);
+      return json(req, 200, {
+        ok: true,
+        data: await runTenantIsolationCheck(client, {
+          limitPerTable: Number.isFinite(limitPerTableRaw) ? limitPerTableRaw : 3000,
         }),
       });
     }
