@@ -3567,6 +3567,213 @@ const listDashboardReadinessUsers = async (
   };
 };
 
+const normalizePersona = (value: unknown): AppPersona | null => {
+  if (
+    value === "external_ca" ||
+    value === "admin" ||
+    value === "company_owner" ||
+    value === "in_house_ca" ||
+    value === "in_house_lawyer" ||
+    value === "ca_firm"
+  ) {
+    return value;
+  }
+  return null;
+};
+
+const mapPersonaToRole = (persona: AppPersona) => {
+  if (persona === "admin") return "admin";
+  if (persona === "company_owner") return "user";
+  return "manager";
+};
+
+const loadSingleUserDashboardReadiness = async (
+  client: ReturnType<typeof createClient>,
+  userId: string,
+) => {
+  assertUuid(userId, "userId");
+  const [profileResult, rolesResult, personaResult, companyMembersResult, caFirmMembersResult, verificationResult] = await Promise.all([
+    client.from("profiles").select("user_id, full_name, email").eq("user_id", userId).maybeSingle(),
+    client.from("user_roles").select("role").eq("user_id", userId),
+    client.from("user_personas").select("persona").eq("user_id", userId).maybeSingle(),
+    client.from("company_members").select("company_id").eq("user_id", userId),
+    client.from("ca_firm_members").select("ca_firm_id").eq("user_id", userId),
+    client.from("user_verifications").select("status, is_verified").eq("user_id", userId).maybeSingle(),
+  ]);
+  if (profileResult.error) throw profileResult.error;
+  if (rolesResult.error) throw rolesResult.error;
+  if (personaResult.error) throw personaResult.error;
+  if (companyMembersResult.error) throw companyMembersResult.error;
+  if (caFirmMembersResult.error) throw caFirmMembersResult.error;
+  if (verificationResult.error) throw verificationResult.error;
+  if (!profileResult.data) throw new Error("Target user profile not found");
+
+  const persona = normalizePersona(personaResult.data?.persona ?? null);
+  const roles = (rolesResult.data ?? []).map((row) => String(row.role));
+  const companyMemberships = (companyMembersResult.data ?? []).length;
+  const caFirmMemberships = (caFirmMembersResult.data ?? []).length;
+  const verification = {
+    status: typeof verificationResult.data?.status === "string" ? verificationResult.data.status : null,
+    is_verified: Boolean(verificationResult.data?.is_verified),
+  };
+
+  const blockers: string[] = [];
+  if (!persona) blockers.push("Missing persona");
+  if (roles.length === 0) blockers.push("Missing app role");
+  if (persona === "company_owner" || persona === "external_ca" || persona === "in_house_ca" || persona === "in_house_lawyer") {
+    if (companyMemberships === 0) blockers.push("No company assignment");
+  }
+  if (persona === "ca_firm" && caFirmMemberships === 0) {
+    blockers.push("No CA firm membership");
+  }
+
+  return {
+    user_id: profileResult.data.user_id,
+    full_name: profileResult.data.full_name ?? null,
+    email: profileResult.data.email ?? null,
+    persona,
+    roles,
+    memberships: {
+      company: companyMemberships,
+      ca_firm: caFirmMemberships,
+    },
+    verification,
+    dashboard_ready: blockers.length === 0,
+    blockers,
+  };
+};
+
+const repairUserDashboardReadinessByAdmin = async (
+  serviceClient: ReturnType<typeof createClient>,
+  params: {
+    userId: string;
+    desiredPersona?: AppPersona | null;
+    companyId?: string | null;
+    caFirmId?: string | null;
+  },
+) => {
+  const userId = params.userId.trim();
+  assertUuid(userId, "userId");
+  const desiredPersona = params.desiredPersona ?? null;
+  if (desiredPersona && !normalizePersona(desiredPersona)) {
+    throw new Error("desiredPersona is invalid");
+  }
+
+  const profileReadiness = await loadSingleUserDashboardReadiness(serviceClient, userId);
+  const persona = desiredPersona ?? profileReadiness.persona ?? "company_owner";
+  const actions: string[] = [];
+
+  const { error: personaError } = await serviceClient
+    .from("user_personas")
+    .upsert({ user_id: userId, persona }, { onConflict: "user_id" });
+  if (personaError) throw personaError;
+  actions.push(`persona_set:${persona}`);
+
+  const appRole = mapPersonaToRole(persona);
+  const { error: roleError } = await serviceClient
+    .from("user_roles")
+    .upsert({ user_id: userId, role: appRole }, { onConflict: "user_id,role" });
+  if (roleError) throw roleError;
+  actions.push(`role_ensured:${appRole}`);
+
+  if (persona === "company_owner" || persona === "external_ca" || persona === "in_house_ca" || persona === "in_house_lawyer") {
+    const { data: memberships, error: membershipsError } = await serviceClient
+      .from("company_members")
+      .select("company_id")
+      .eq("user_id", userId)
+      .limit(1);
+    if (membershipsError) throw membershipsError;
+
+    if ((memberships ?? []).length === 0) {
+      const explicitCompanyId = typeof params.companyId === "string" && params.companyId.trim() ? params.companyId.trim() : null;
+      let companyId = explicitCompanyId;
+      if (companyId) assertUuid(companyId, "companyId");
+      if (!companyId) {
+        const { data: existingCompany, error: companyError } = await serviceClient
+          .from("companies")
+          .select("id")
+          .order("created_at", { ascending: false })
+          .limit(1)
+          .maybeSingle();
+        if (companyError) throw companyError;
+        companyId = existingCompany?.id ?? null;
+      }
+      if (!companyId) {
+        const workspaceName = profileReadiness.full_name ? `${profileReadiness.full_name} Workspace` : "Company Workspace";
+        const { data: newCompany, error: newCompanyError } = await serviceClient
+          .from("companies")
+          .insert({ name: workspaceName, industry: null, compliance_health: 85 })
+          .select("id")
+          .single();
+        if (newCompanyError || !newCompany) throw newCompanyError ?? new Error("Failed to create company for readiness repair");
+        companyId = newCompany.id;
+        actions.push("company_created");
+      }
+
+      const membershipRole: "user" | "manager" | "admin" = persona === "company_owner" ? "admin" : "manager";
+      await assignCompanyMembershipByAdmin(serviceClient, { companyId, userId, role: membershipRole });
+      actions.push(`company_assigned:${membershipRole}`);
+
+      await bootstrapCompanyWorkspaceData(serviceClient, { companyId, ownerUserId: userId });
+      actions.push("company_seeded");
+    }
+  }
+
+  if (persona === "ca_firm") {
+    const { data: firmMemberships, error: firmMembershipsError } = await serviceClient
+      .from("ca_firm_members")
+      .select("ca_firm_id")
+      .eq("user_id", userId)
+      .limit(1);
+    if (firmMembershipsError) throw firmMembershipsError;
+
+    if ((firmMemberships ?? []).length === 0) {
+      const explicitFirmId = typeof params.caFirmId === "string" && params.caFirmId.trim() ? params.caFirmId.trim() : null;
+      let caFirmId = explicitFirmId;
+      if (caFirmId) assertUuid(caFirmId, "caFirmId");
+      if (!caFirmId) {
+        const { data: existingFirm, error: existingFirmError } = await serviceClient
+          .from("ca_firms")
+          .select("id")
+          .order("created_at", { ascending: false })
+          .limit(1)
+          .maybeSingle();
+        if (existingFirmError) throw existingFirmError;
+        caFirmId = existingFirm?.id ?? null;
+      }
+      if (!caFirmId) {
+        const firmName = profileReadiness.full_name ? `${profileReadiness.full_name} & Co.` : "Regulon Partner Firm";
+        const registration = `AUTO-${Date.now().toString().slice(-8)}`;
+        const { data: newFirm, error: newFirmError } = await serviceClient
+          .from("ca_firms")
+          .insert({
+            name: firmName,
+            registration_number: registration,
+            jurisdiction: null,
+            created_by: userId,
+          })
+          .select("id")
+          .single();
+        if (newFirmError || !newFirm) throw newFirmError ?? new Error("Failed to create CA firm for readiness repair");
+        caFirmId = newFirm.id;
+        actions.push("ca_firm_created");
+      }
+
+      await assignCaFirmMembershipByAdmin(serviceClient, { caFirmId, userId, role: "owner" });
+      actions.push("ca_firm_assigned:owner");
+      await bootstrapCaFirmWorkspaceData(serviceClient, { caFirmId, ownerUserId: userId });
+      actions.push("ca_firm_seeded");
+    }
+  }
+
+  const readiness = await loadSingleUserDashboardReadiness(serviceClient, userId);
+  return {
+    repaired: true,
+    actions,
+    readiness,
+  };
+};
+
 const getRouteAccessMatrix = () => ({
   dashboards: [
     { route: "GET /company/dashboard", roles: ["user", "manager", "admin"] },
@@ -3592,6 +3799,7 @@ const getRouteAccessMatrix = () => ({
     { route: "GET /ops/workflow-sla-monitor", roles: ["admin"] },
     { route: "GET /ops/deploy-readiness", roles: ["admin"] },
     { route: "GET /ops/dashboard-readiness/users", roles: ["admin"] },
+    { route: "POST /ops/dashboard-readiness/repair-user", roles: ["admin"] },
     { route: "GET /ops/route-access-matrix", roles: ["admin"] },
     { route: "GET /ops/landing/leads", roles: ["admin"] },
     { route: "GET /ops/landing/metrics", roles: ["admin"] },
@@ -4198,6 +4406,27 @@ serve(async (req: Request) => {
         data: await listDashboardReadinessUsers(client, {
           limit: Number.isFinite(limitRaw) ? limitRaw : 100,
           offset: Number.isFinite(offsetRaw) ? offsetRaw : 0,
+        }),
+      });
+    }
+
+    if (req.method === "POST" && path.endsWith("ops/dashboard-readiness/repair-user")) {
+      requireRole(roles, ["admin"]);
+      const serviceClient = getServiceClient();
+      if (!serviceClient) return json(req, 500, { error: "Missing Supabase service role configuration" });
+      const body = await req.json().catch(() => ({}));
+      const userId = typeof body.userId === "string" ? body.userId.trim() : "";
+      if (!userId) return json(req, 400, { error: "userId is required" });
+      const desiredPersona = normalizePersona(body.desiredPersona ?? null);
+      const companyId = typeof body.companyId === "string" ? body.companyId.trim() : null;
+      const caFirmId = typeof body.caFirmId === "string" ? body.caFirmId.trim() : null;
+      return json(req, 200, {
+        ok: true,
+        data: await repairUserDashboardReadinessByAdmin(serviceClient, {
+          userId,
+          desiredPersona,
+          companyId,
+          caFirmId,
         }),
       });
     }
