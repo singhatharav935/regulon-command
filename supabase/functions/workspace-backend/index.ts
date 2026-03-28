@@ -529,6 +529,62 @@ const SUPPORTED_AI_DOCUMENT_TYPES = new Set([
   "custom-draft",
 ]);
 
+const AUTHORITY_BACKEND_COVERAGE: Array<{
+  documentType: string;
+  authority: string;
+  trainingCasesTable: string;
+  defaultPolicy: { legalReviewRequired: boolean; finalSignoffMode: "ca_only" | "lawyer_only" | "dual"; notes: string };
+}> = [
+  {
+    documentType: "mca-notice",
+    authority: "MCA",
+    trainingCasesTable: "mca_training_cases",
+    defaultPolicy: { legalReviewRequired: false, finalSignoffMode: "ca_only", notes: "Default CA-only signoff for MCA notice response." },
+  },
+  {
+    documentType: "gst-show-cause",
+    authority: "GST",
+    trainingCasesTable: "gst_training_cases",
+    defaultPolicy: { legalReviewRequired: false, finalSignoffMode: "ca_only", notes: "Default CA-only signoff for GST show-cause response." },
+  },
+  {
+    documentType: "income-tax-response",
+    authority: "Income Tax",
+    trainingCasesTable: "income_tax_training_cases",
+    defaultPolicy: { legalReviewRequired: false, finalSignoffMode: "ca_only", notes: "Default CA-only signoff for income-tax response." },
+  },
+  {
+    documentType: "rbi-filing",
+    authority: "RBI",
+    trainingCasesTable: "rbi_training_cases",
+    defaultPolicy: { legalReviewRequired: true, finalSignoffMode: "dual", notes: "Default dual signoff for RBI filing workflow." },
+  },
+  {
+    documentType: "sebi-compliance",
+    authority: "SEBI",
+    trainingCasesTable: "sebi_training_cases",
+    defaultPolicy: { legalReviewRequired: true, finalSignoffMode: "dual", notes: "Default dual signoff for SEBI compliance workflow." },
+  },
+  {
+    documentType: "customs-response",
+    authority: "Customs",
+    trainingCasesTable: "customs_training_cases",
+    defaultPolicy: { legalReviewRequired: false, finalSignoffMode: "ca_only", notes: "Default CA-only signoff for customs response." },
+  },
+  {
+    documentType: "contract-review",
+    authority: "Contract",
+    trainingCasesTable: "contract_training_cases",
+    defaultPolicy: { legalReviewRequired: true, finalSignoffMode: "dual", notes: "Default dual signoff for contract review workflow." },
+  },
+  {
+    documentType: "custom-draft",
+    authority: "Custom",
+    trainingCasesTable: "custom_training_cases",
+    defaultPolicy: { legalReviewRequired: false, finalSignoffMode: "ca_only", notes: "Default CA-only signoff for custom draft workflow." },
+  },
+];
+
 const parseDocumentType = (payload: Record<string, unknown>) => {
   const documentType = typeof payload.documentType === "string" ? payload.documentType.trim() : "";
   return documentType || null;
@@ -1019,6 +1075,7 @@ const resolveErrorCode = (message: string) => {
   if (message.startsWith("Draft state conflict:")) return "WORKFLOW_STATE_CONFLICT";
   if (message === "Unsupported workflow action") return "VALIDATION_INVALID_FIELD";
   if (message === "expectedVersionNumber must be a positive integer") return "VALIDATION_INVALID_FIELD";
+  if (message === "desiredPersona is invalid") return "VALIDATION_INVALID_FIELD";
   if (message.startsWith("Policy denied:")) return "WORKFLOW_ACTOR_FORBIDDEN";
   if (message === "AI request already in progress") return "AI_REQUEST_IN_PROGRESS";
   if (message.startsWith("AI rate limit exceeded:")) return "AI_RATE_LIMITED";
@@ -3410,6 +3467,7 @@ const collectDeployReadinessSignals = async (
     "draft_audit_events",
     "draft_exports",
     "draft_filing_checks",
+    "authority_workflow_policies",
     "ai_request_idempotency",
     "ai_operation_audit",
     "landing_public_content",
@@ -3774,6 +3832,138 @@ const repairUserDashboardReadinessByAdmin = async (
   };
 };
 
+const loadAuthorityBackendCoverage = async (
+  client: ReturnType<typeof createClient>,
+) => {
+  const docTypes = AUTHORITY_BACKEND_COVERAGE.map((item) => item.documentType);
+  const { data: policies, error: policiesError } = await client
+    .from("authority_workflow_policies")
+    .select("document_type, legal_review_required, final_signoff_mode, updated_at")
+    .in("document_type", docTypes);
+  if (policiesError) throw policiesError;
+
+  const policyByDocType = new Map<string, { legal_review_required: boolean; final_signoff_mode: string; updated_at: string | null }>();
+  for (const row of policies ?? []) {
+    policyByDocType.set(String(row.document_type), {
+      legal_review_required: row.legal_review_required === true,
+      final_signoff_mode: typeof row.final_signoff_mode === "string" ? row.final_signoff_mode : "ca_only",
+      updated_at: typeof row.updated_at === "string" ? row.updated_at : null,
+    });
+  }
+
+  const trainingTableStats: Array<{ table: string; count: number; exists: boolean; error: string | null }> = [];
+  for (const item of AUTHORITY_BACKEND_COVERAGE) {
+    const { count, error } = await client
+      .from(item.trainingCasesTable)
+      .select("id", { count: "exact", head: true });
+    if (error) {
+      trainingTableStats.push({
+        table: item.trainingCasesTable,
+        count: 0,
+        exists: false,
+        error: getErrorMessage(error) || "table probe failed",
+      });
+      continue;
+    }
+    trainingTableStats.push({
+      table: item.trainingCasesTable,
+      count: Number(count ?? 0),
+      exists: true,
+      error: null,
+    });
+  }
+  const trainingByTable = new Map(trainingTableStats.map((row) => [row.table, row]));
+
+  const coverage = AUTHORITY_BACKEND_COVERAGE.map((item) => {
+    const policy = policyByDocType.get(item.documentType) ?? null;
+    const training = trainingByTable.get(item.trainingCasesTable) ?? { table: item.trainingCasesTable, count: 0, exists: false, error: "missing" };
+    const policyPresent = Boolean(policy);
+    const trainingPresent = training.exists;
+    const ready = policyPresent && trainingPresent;
+    return {
+      authority: item.authority,
+      document_type: item.documentType,
+      workflow_policy: policy
+        ? {
+          legal_review_required: policy.legal_review_required,
+          final_signoff_mode: policy.final_signoff_mode,
+          updated_at: policy.updated_at,
+        }
+        : null,
+      training_cases_table: item.trainingCasesTable,
+      training_cases_count: training.count,
+      training_table_exists: training.exists,
+      training_probe_error: training.error,
+      ready,
+      blockers: [
+        ...(policyPresent ? [] : ["Missing workflow policy row"]),
+        ...(trainingPresent ? [] : [`Missing training table: ${item.trainingCasesTable}`]),
+      ],
+    };
+  });
+
+  return {
+    authorities: coverage,
+    summary: {
+      total: coverage.length,
+      ready: coverage.filter((item) => item.ready).length,
+      blocked: coverage.filter((item) => !item.ready).length,
+    },
+  };
+};
+
+const bootstrapAuthorityWorkflowPoliciesByAdmin = async (
+  serviceClient: ReturnType<typeof createClient>,
+) => {
+  const rows = AUTHORITY_BACKEND_COVERAGE.map((item) => ({
+    document_type: item.documentType,
+    legal_review_required: item.defaultPolicy.legalReviewRequired,
+    final_signoff_mode: item.defaultPolicy.finalSignoffMode,
+    notes: item.defaultPolicy.notes,
+  }));
+
+  const { data, error } = await serviceClient
+    .from("authority_workflow_policies")
+    .upsert(rows, { onConflict: "document_type" })
+    .select("document_type, legal_review_required, final_signoff_mode, updated_at");
+  if (error) throw error;
+  return {
+    upserted: rows.length,
+    policies: data ?? [],
+  };
+};
+
+const bootstrapCompanyAuthorityWorkflowsByAdmin = async (
+  serviceClient: ReturnType<typeof createClient>,
+  params: { companyId: string; actorUserId?: string | null },
+) => {
+  const companyId = params.companyId.trim();
+  assertUuid(companyId, "companyId");
+  const actorUserId = typeof params.actorUserId === "string" && params.actorUserId.trim() ? params.actorUserId.trim() : null;
+
+  const seededRuns = [];
+  for (const item of AUTHORITY_BACKEND_COVERAGE) {
+    const seeded = await seedCompanyWorkflowByAdmin(serviceClient, {
+      companyId,
+      actorUserId,
+      documentType: item.documentType,
+      draftMode: "defensive",
+    });
+    seededRuns.push({
+      authority: item.authority,
+      document_type: item.documentType,
+      draft_run_id: seeded.draft_run.id,
+    });
+  }
+
+  return {
+    seeded: true,
+    company_id: companyId,
+    total_runs: seededRuns.length,
+    runs: seededRuns,
+  };
+};
+
 const getRouteAccessMatrix = () => ({
   dashboards: [
     { route: "GET /company/dashboard", roles: ["user", "manager", "admin"] },
@@ -3800,6 +3990,9 @@ const getRouteAccessMatrix = () => ({
     { route: "GET /ops/deploy-readiness", roles: ["admin"] },
     { route: "GET /ops/dashboard-readiness/users", roles: ["admin"] },
     { route: "POST /ops/dashboard-readiness/repair-user", roles: ["admin"] },
+    { route: "GET /ops/authority-coverage", roles: ["admin"] },
+    { route: "POST /ops/authority-bootstrap", roles: ["admin"] },
+    { route: "POST /ops/bootstrap/company-authority-workflows", roles: ["admin"] },
     { route: "GET /ops/route-access-matrix", roles: ["admin"] },
     { route: "GET /ops/landing/leads", roles: ["admin"] },
     { route: "GET /ops/landing/metrics", roles: ["admin"] },
@@ -4428,6 +4621,38 @@ serve(async (req: Request) => {
           companyId,
           caFirmId,
         }),
+      });
+    }
+
+    if (req.method === "GET" && path.endsWith("ops/authority-coverage")) {
+      requireRole(roles, ["admin"]);
+      return json(req, 200, {
+        ok: true,
+        data: await loadAuthorityBackendCoverage(client),
+      });
+    }
+
+    if (req.method === "POST" && path.endsWith("ops/authority-bootstrap")) {
+      requireRole(roles, ["admin"]);
+      const serviceClient = getServiceClient();
+      if (!serviceClient) return json(req, 500, { error: "Missing Supabase service role configuration" });
+      return json(req, 200, {
+        ok: true,
+        data: await bootstrapAuthorityWorkflowPoliciesByAdmin(serviceClient),
+      });
+    }
+
+    if (req.method === "POST" && path.endsWith("ops/bootstrap/company-authority-workflows")) {
+      requireRole(roles, ["admin"]);
+      const serviceClient = getServiceClient();
+      if (!serviceClient) return json(req, 500, { error: "Missing Supabase service role configuration" });
+      const body = await req.json().catch(() => ({}));
+      const companyId = typeof body.companyId === "string" ? body.companyId.trim() : "";
+      if (!companyId) return json(req, 400, { error: "companyId is required" });
+      const actorUserId = typeof body.actorUserId === "string" ? body.actorUserId.trim() : null;
+      return json(req, 200, {
+        ok: true,
+        data: await bootstrapCompanyAuthorityWorkflowsByAdmin(serviceClient, { companyId, actorUserId }),
       });
     }
 
