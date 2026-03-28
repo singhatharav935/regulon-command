@@ -24,6 +24,8 @@ const AppVerification = lazy(() => import("./pages/AppVerification"));
 const CAFirmDashboard = lazy(() => import("./pages/CAFirmDashboard"));
 const AppCAFirmDashboard = lazy(() => import("./pages/AppCAFirmDashboard"));
 const AgentWorkReview = lazy(() => import("./pages/AgentWorkReview"));
+const LegalPolicyPage = lazy(() => import("./pages/LegalPolicyPage"));
+const ComplianceCenter = lazy(() => import("./pages/ComplianceCenter"));
 
 const queryClient = new QueryClient();
 
@@ -64,6 +66,12 @@ const App = () => (
             <Route path="/security" element={<Index />} />
             <Route path="/resources" element={<Index />} />
             <Route path="/about" element={<Index />} />
+            <Route path="/privacy" element={<LegalPolicyPage docKey="privacy_policy" fallbackTitle="Privacy Policy" />} />
+            <Route path="/terms" element={<LegalPolicyPage docKey="terms_of_service" fallbackTitle="Terms of Service" />} />
+            <Route path="/refund-policy" element={<LegalPolicyPage docKey="refund_policy" fallbackTitle="Refund Policy" />} />
+            <Route path="/dpa" element={<LegalPolicyPage docKey="dpa_terms" fallbackTitle="Data Processing Addendum" />} />
+            <Route path="/data-retention" element={<LegalPolicyPage docKey="data_retention_policy" fallbackTitle="Data Retention & Deletion Policy" />} />
+            <Route path="/compliance" element={<ComplianceCenter />} />
             <Route path="/auth" element={<Auth />} />
             <Route path="/dashboard" element={<Dashboard />} />
             <Route path="/ca-dashboard" element={<CADashboard />} />

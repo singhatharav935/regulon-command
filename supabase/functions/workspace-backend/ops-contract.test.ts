@@ -80,6 +80,7 @@ describe("ops-contract", () => {
     expect(checklist.requiredEndpoints).toContain("/ops/draft-audit-integrity-check");
     expect(checklist.requiredEndpoints).toContain("/ops/draft-export-integrity-check");
     expect(checklist.requiredEndpoints).toContain("/ops/compliance/readiness");
+    expect(checklist.requiredEndpoints).toContain("/ops/compliance/legal-documents");
   });
 
   it("fails gate when required schema is missing", () => {

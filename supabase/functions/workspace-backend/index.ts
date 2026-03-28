@@ -1089,6 +1089,8 @@ const resolveErrorCode = (message: string) => {
   if (message.startsWith("Unsupported documentType:")) return "VALIDATION_INVALID_FIELD";
   if (message.includes("must be one of:")) return "VALIDATION_INVALID_FIELD";
   if (message.startsWith("dueAt must be a valid ISO date")) return "VALIDATION_INVALID_FIELD";
+  if (message.includes("must be snake_case")) return "VALIDATION_INVALID_FIELD";
+  if (message.startsWith("Published legal document not found")) return "VALIDATION_INVALID_FIELD";
   if (message.includes("must be a valid UUID")) return "VALIDATION_INVALID_FIELD";
   if (message.startsWith("Invalid workflow transition:")) return "WORKFLOW_TRANSITION_INVALID";
   if (message.startsWith("Invalid event type for transition:")) return "WORKFLOW_EVENT_INVALID";
@@ -4032,6 +4034,8 @@ const collectDeployReadinessSignals = async (
     "legal_disclaimer_acceptances",
     "compliance_data_requests",
     "compliance_audit_events",
+    "legal_documents",
+    "legal_document_acceptances",
   ];
   const missingTables: string[] = [];
   const tableProbeErrors: Array<{ table: string; code: string | null; message: string }> = [];
@@ -5121,6 +5125,8 @@ const getRouteAccessMatrix = () => ({
     { route: "POST /compliance/legal-disclaimer/accept", roles: ["authenticated"] },
     { route: "GET /compliance/data-requests", roles: ["authenticated"] },
     { route: "POST /compliance/data-requests", roles: ["authenticated"] },
+    { route: "GET /compliance/legal-documents/acceptance-status", roles: ["authenticated"] },
+    { route: "POST /compliance/legal-documents/accept", roles: ["authenticated"] },
   ],
   drafts: [
     { route: "POST /drafts", roles: ["manager", "admin"] },
@@ -5153,6 +5159,8 @@ const getRouteAccessMatrix = () => ({
     { route: "POST /ops/landing/leads/:id/status", roles: ["admin"] },
     { route: "GET /ops/compliance/readiness", roles: ["admin"] },
     { route: "GET /ops/compliance/data-requests", roles: ["admin"] },
+    { route: "GET /ops/compliance/legal-documents", roles: ["admin"] },
+    { route: "POST /ops/compliance/legal-documents/publish", roles: ["admin"] },
     { route: "POST /ops/compliance/data-requests/:id/status", roles: ["admin"] },
     { route: "POST /ops/assign/company-member", roles: ["admin"] },
     { route: "POST /ops/assign/ca-firm-member", roles: ["admin"] },
@@ -5611,6 +5619,229 @@ const loadLandingMetrics = async (client: ReturnType<typeof createClient>) => {
   };
 };
 
+const LEGAL_DOC_REQUIRED_KEYS = [
+  "privacy_policy",
+  "terms_of_service",
+  "refund_policy",
+  "dpa_terms",
+  "data_retention_policy",
+] as const;
+
+const normalizeLegalDocKey = (value: unknown) => {
+  const normalized = String(value ?? "").trim().toLowerCase();
+  if (!normalized) throw new Error("docKey is required");
+  if (!/^[a-z0-9_]+$/.test(normalized)) throw new Error("docKey must be snake_case");
+  return normalized;
+};
+
+const loadPublicLegalDocument = async (
+  serviceClient: ReturnType<typeof createClient>,
+  docKey: string,
+) => {
+  const { data, error } = await serviceClient
+    .from("legal_documents")
+    .select("doc_key, version, title, jurisdiction, summary, content_markdown, requires_acceptance, effective_at, published_at, updated_at")
+    .eq("doc_key", docKey)
+    .eq("status", "published")
+    .order("effective_at", { ascending: false, nullsFirst: false })
+    .order("published_at", { ascending: false, nullsFirst: false })
+    .limit(1)
+    .maybeSingle();
+  if (error) throw error;
+  if (!data) throw new Error(`Published legal document not found for key: ${docKey}`);
+  return data;
+};
+
+const listPublicLegalDocumentIndex = async (
+  serviceClient: ReturnType<typeof createClient>,
+) => {
+  const { data, error } = await serviceClient
+    .from("legal_documents")
+    .select("doc_key, version, title, summary, requires_acceptance, effective_at, published_at")
+    .eq("status", "published")
+    .order("doc_key", { ascending: true })
+    .order("effective_at", { ascending: false, nullsFirst: false });
+  if (error) throw error;
+
+  const byKey = new Map<string, Record<string, unknown>>();
+  for (const row of data ?? []) {
+    const key = String(row.doc_key);
+    if (!byKey.has(key)) byKey.set(key, row as unknown as Record<string, unknown>);
+  }
+  return Array.from(byKey.values());
+};
+
+const acceptLegalDocument = async (
+  client: ReturnType<typeof createClient>,
+  req: Request,
+  userId: string,
+  payload: Record<string, unknown>,
+) => {
+  const docKey = normalizeLegalDocKey(payload.docKey);
+  const version = toTrimmedString(payload.version, 40);
+  const source = toTrimmedString(payload.source, 60) ?? "app";
+
+  let publishedQuery = client
+    .from("legal_documents")
+    .select("doc_key, version, status")
+    .eq("doc_key", docKey)
+    .eq("status", "published")
+    .order("effective_at", { ascending: false, nullsFirst: false })
+    .order("published_at", { ascending: false, nullsFirst: false })
+    .limit(1);
+  if (version) {
+    publishedQuery = client
+      .from("legal_documents")
+      .select("doc_key, version, status")
+      .eq("doc_key", docKey)
+      .eq("version", version)
+      .eq("status", "published")
+      .limit(1);
+  }
+  const { data: docRows, error: docError } = await publishedQuery;
+  if (docError) throw docError;
+  const doc = (docRows ?? [])[0];
+  if (!doc) throw new Error("Published legal document/version not found");
+
+  const ipHash = await hashText(getRequestIp(req));
+  const userAgent = (req.headers.get("user-agent") || "").slice(0, 500);
+  const metadata = safeMetadataObject(payload.metadata);
+
+  const { data, error } = await client
+    .from("legal_document_acceptances")
+    .upsert({
+      user_id: userId,
+      doc_key: doc.doc_key,
+      version: doc.version,
+      source,
+      ip_hash: ipHash,
+      user_agent: userAgent,
+      metadata,
+      accepted_at: new Date().toISOString(),
+    }, { onConflict: "user_id,doc_key,version" })
+    .select("id, user_id, doc_key, version, accepted_at, source, updated_at")
+    .single();
+  if (error || !data) throw error ?? new Error("Failed to store legal document acceptance");
+
+  await recordComplianceAuditEvent(client, {
+    actorUserId: userId,
+    eventType: "legal_document_accepted",
+    entityType: "legal_document_acceptances",
+    entityId: data.id,
+    payload: {
+      doc_key: data.doc_key,
+      version: data.version,
+      accepted_at: data.accepted_at,
+    },
+  });
+
+  return data;
+};
+
+const listLegalDocumentAcceptanceStatus = async (
+  client: ReturnType<typeof createClient>,
+  userId: string,
+  options?: { docKey?: string | null; limit?: number },
+) => {
+  const limit = Math.max(1, Math.min(200, Number(options?.limit ?? 60)));
+  let query = client
+    .from("legal_document_acceptances")
+    .select("id, doc_key, version, accepted_at, source, updated_at")
+    .eq("user_id", userId)
+    .order("accepted_at", { ascending: false })
+    .limit(limit);
+  const docKey = toTrimmedString(options?.docKey ?? null, 120);
+  if (docKey) query = query.eq("doc_key", normalizeLegalDocKey(docKey));
+  const { data, error } = await query;
+  if (error) throw error;
+  return data ?? [];
+};
+
+const listLegalDocumentsByAdmin = async (
+  client: ReturnType<typeof createClient>,
+  options?: { status?: string | null; docKey?: string | null; limit?: number; offset?: number },
+) => {
+  const limit = Math.max(1, Math.min(300, Number(options?.limit ?? 120)));
+  const offset = Math.max(0, Number(options?.offset ?? 0));
+  let query = client
+    .from("legal_documents")
+    .select("id, doc_key, version, title, jurisdiction, status, summary, requires_acceptance, effective_at, published_at, approved_by, approved_at, created_by, updated_at")
+    .order("updated_at", { ascending: false })
+    .range(offset, offset + limit - 1);
+  const status = toTrimmedString(options?.status ?? null, 30);
+  if (status) query = query.eq("status", status);
+  const docKey = toTrimmedString(options?.docKey ?? null, 120);
+  if (docKey) query = query.eq("doc_key", normalizeLegalDocKey(docKey));
+  const { data, error } = await query;
+  if (error) throw error;
+  return data ?? [];
+};
+
+const publishLegalDocumentByAdmin = async (
+  client: ReturnType<typeof createClient>,
+  adminUserId: string,
+  payload: Record<string, unknown>,
+) => {
+  const docKey = normalizeLegalDocKey(payload.docKey);
+  const version = toTrimmedString(payload.version, 40);
+  const title = toTrimmedString(payload.title, 180);
+  const contentMarkdown = typeof payload.contentMarkdown === "string" ? payload.contentMarkdown.trim() : "";
+  if (!version) throw new Error("version is required");
+  if (!title) throw new Error("title is required");
+  if (!contentMarkdown) throw new Error("contentMarkdown is required");
+  const jurisdiction = toTrimmedString(payload.jurisdiction, 20) ?? "IN";
+  const summary = toTrimmedString(payload.summary, 2000);
+  const requiresAcceptance = payload.requiresAcceptance !== false;
+  const effectiveAtRaw = toTrimmedString(payload.effectiveAt, 80);
+  const effectiveAt = effectiveAtRaw ? new Date(effectiveAtRaw).toISOString() : new Date().toISOString();
+  const metadata = safeMetadataObject(payload.metadata);
+  const nowIso = new Date().toISOString();
+
+  const { error: archiveError } = await client
+    .from("legal_documents")
+    .update({ status: "archived" })
+    .eq("doc_key", docKey)
+    .eq("status", "published");
+  if (archiveError) throw archiveError;
+
+  const { data, error } = await client
+    .from("legal_documents")
+    .upsert({
+      doc_key: docKey,
+      version,
+      title,
+      jurisdiction,
+      status: "published",
+      summary,
+      content_markdown: contentMarkdown,
+      requires_acceptance: requiresAcceptance,
+      effective_at: effectiveAt,
+      published_at: nowIso,
+      approved_by: adminUserId,
+      approved_at: nowIso,
+      created_by: adminUserId,
+      metadata,
+    }, { onConflict: "doc_key,version" })
+    .select("id, doc_key, version, title, status, requires_acceptance, effective_at, published_at, approved_by, approved_at, updated_at")
+    .single();
+  if (error || !data) throw error ?? new Error("Failed to publish legal document");
+
+  await recordComplianceAuditEvent(client, {
+    actorUserId: adminUserId,
+    eventType: "legal_document_published",
+    entityType: "legal_documents",
+    entityId: data.id,
+    payload: {
+      doc_key: data.doc_key,
+      version: data.version,
+      title: data.title,
+      effective_at: data.effective_at,
+    },
+  });
+
+  return data;
+};
+
 const COMPLIANCE_REQUEST_TYPES = new Set(["access_export", "deletion", "rectification", "restriction"]);
 const COMPLIANCE_REQUEST_STATUSES = new Set(["submitted", "under_review", "approved", "rejected", "completed", "cancelled"]);
 const TERMINAL_COMPLIANCE_STATUSES = new Set(["rejected", "completed", "cancelled"]);
@@ -5956,12 +6187,14 @@ const collectComplianceLegalReadinessSignals = async (
 ) => {
   const nowIso = new Date().toISOString();
   const staleSubmittedIso = new Date(Date.now() - 7 * 24 * 60 * 60 * 1000).toISOString();
-  const [profileCountResult, disclaimerRowsResult, openRequestsResult, overdueRequestsResult, staleSubmittedResult] = await Promise.all([
+  const [profileCountResult, disclaimerRowsResult, openRequestsResult, overdueRequestsResult, staleSubmittedResult, publishedDocsResult, legalDocAcceptanceResult] = await Promise.all([
     client.from("profiles").select("user_id", { count: "exact", head: true }),
     client.from("legal_disclaimer_acceptances").select("user_id").eq("disclaimer_key", "ai_assisted_drafting").limit(5000),
     client.from("compliance_data_requests").select("id", { count: "exact", head: true }).in("status", ["submitted", "under_review", "approved"]),
     client.from("compliance_data_requests").select("id", { count: "exact", head: true }).in("status", ["submitted", "under_review", "approved"]).lt("due_at", nowIso),
     client.from("compliance_data_requests").select("id", { count: "exact", head: true }).eq("status", "submitted").lt("submitted_at", staleSubmittedIso),
+    client.from("legal_documents").select("doc_key").eq("status", "published").in("doc_key", [...LEGAL_DOC_REQUIRED_KEYS]),
+    client.from("legal_document_acceptances").select("user_id, doc_key").in("doc_key", ["privacy_policy", "terms_of_service"]).limit(5000),
   ]);
 
   if (profileCountResult.error) throw profileCountResult.error;
@@ -5969,6 +6202,8 @@ const collectComplianceLegalReadinessSignals = async (
   if (openRequestsResult.error) throw openRequestsResult.error;
   if (overdueRequestsResult.error) throw overdueRequestsResult.error;
   if (staleSubmittedResult.error) throw staleSubmittedResult.error;
+  if (publishedDocsResult.error) throw publishedDocsResult.error;
+  if (legalDocAcceptanceResult.error) throw legalDocAcceptanceResult.error;
 
   const totalUsers = Number(profileCountResult.count ?? 0);
   const acceptedUserCount = new Set((disclaimerRowsResult.data ?? []).map((row) => String(row.user_id))).size;
@@ -5976,9 +6211,17 @@ const collectComplianceLegalReadinessSignals = async (
   const openRequests = Number(openRequestsResult.count ?? 0);
   const overdueOpenRequests = Number(overdueRequestsResult.count ?? 0);
   const staleSubmittedRequests = Number(staleSubmittedResult.count ?? 0);
+  const publishedDocKeys = new Set((publishedDocsResult.data ?? []).map((row) => String(row.doc_key)));
+  const requiredMissingDocs = LEGAL_DOC_REQUIRED_KEYS.filter((key) => !publishedDocKeys.has(key));
+  const usersAcceptedCoreDocs = new Set(
+    (legalDocAcceptanceResult.data ?? [])
+      .filter((row) => row.doc_key === "privacy_policy" || row.doc_key === "terms_of_service")
+      .map((row) => String(row.user_id)),
+  ).size;
+  const usersMissingCoreDocAcceptance = Math.max(0, totalUsers - usersAcceptedCoreDocs);
 
-  const critical = overdueOpenRequests;
-  const high = staleSubmittedRequests + (missingDisclaimerUsers > 0 ? 1 : 0);
+  const critical = overdueOpenRequests + requiredMissingDocs.length;
+  const high = staleSubmittedRequests + (missingDisclaimerUsers > 0 ? 1 : 0) + (usersMissingCoreDocAcceptance > 0 ? 1 : 0);
   const medium = openRequests;
 
   return {
@@ -5991,6 +6234,10 @@ const collectComplianceLegalReadinessSignals = async (
       users_total: totalUsers,
       users_with_ai_disclaimer: acceptedUserCount,
       users_missing_ai_disclaimer: missingDisclaimerUsers,
+      required_docs_published: LEGAL_DOC_REQUIRED_KEYS.length - requiredMissingDocs.length,
+      required_docs_missing: requiredMissingDocs,
+      users_with_core_legal_acceptance: usersAcceptedCoreDocs,
+      users_missing_core_legal_acceptance: usersMissingCoreDocAcceptance,
       open_data_requests: openRequests,
       overdue_open_data_requests: overdueOpenRequests,
       stale_submitted_requests_older_than_7d: staleSubmittedRequests,
@@ -6020,7 +6267,12 @@ serve(async (req: Request) => {
       });
     }
 
-    if (path.endsWith("public/landing/overview") || path.endsWith("public/landing/lead")) {
+    if (
+      path.endsWith("public/landing/overview") ||
+      path.endsWith("public/landing/lead") ||
+      path.endsWith("public/legal-documents") ||
+      path.endsWith("public/legal-documents/index")
+    ) {
       const serviceClient = getServiceClient();
       if (!serviceClient) {
         return json(req, 500, { error: "Server is not configured for public landing APIs" });
@@ -6037,6 +6289,17 @@ serve(async (req: Request) => {
           return json(req, 400, { error: "request body is required" });
         }
         return json(req, 200, { ok: true, data: await createLandingLead(serviceClient, req, body as Record<string, unknown>) });
+      }
+
+      if (req.method === "GET" && path.endsWith("public/legal-documents/index")) {
+        await enforcePublicRateLimit(serviceClient, req, "public-legal-documents-index", { limit: 60, windowSeconds: 60 });
+        return json(req, 200, { ok: true, data: await listPublicLegalDocumentIndex(serviceClient) });
+      }
+
+      if (req.method === "GET" && path.endsWith("public/legal-documents")) {
+        await enforcePublicRateLimit(serviceClient, req, "public-legal-documents", { limit: 60, windowSeconds: 60 });
+        const docKey = normalizeLegalDocKey(url.searchParams.get("doc_key"));
+        return json(req, 200, { ok: true, data: await loadPublicLegalDocument(serviceClient, docKey) });
       }
     }
 
@@ -6176,6 +6439,28 @@ serve(async (req: Request) => {
       return json(req, 200, {
         ok: true,
         data: await createComplianceDataRequest(client, user.id, body as Record<string, unknown>),
+      });
+    }
+
+    if (req.method === "GET" && path.endsWith("compliance/legal-documents/acceptance-status")) {
+      const limitRaw = Number(url.searchParams.get("limit") ?? 60);
+      return json(req, 200, {
+        ok: true,
+        data: await listLegalDocumentAcceptanceStatus(client, user.id, {
+          docKey: url.searchParams.get("doc_key"),
+          limit: Number.isFinite(limitRaw) ? limitRaw : 60,
+        }),
+      });
+    }
+
+    if (req.method === "POST" && path.endsWith("compliance/legal-documents/accept")) {
+      const body = await req.json().catch(() => ({}));
+      if (!body || typeof body !== "object") {
+        return json(req, 400, { error: "request body is required" });
+      }
+      return json(req, 200, {
+        ok: true,
+        data: await acceptLegalDocument(client, req, user.id, body as Record<string, unknown>),
       });
     }
 
@@ -6564,6 +6849,33 @@ serve(async (req: Request) => {
           limit: Number.isFinite(limitRaw) ? limitRaw : 100,
           offset: Number.isFinite(offsetRaw) ? offsetRaw : 0,
         }),
+      });
+    }
+
+    if (req.method === "GET" && path.endsWith("ops/compliance/legal-documents")) {
+      requireRole(roles, ["admin"]);
+      const limitRaw = Number(url.searchParams.get("limit") ?? 120);
+      const offsetRaw = Number(url.searchParams.get("offset") ?? 0);
+      return json(req, 200, {
+        ok: true,
+        data: await listLegalDocumentsByAdmin(client, {
+          status: url.searchParams.get("status"),
+          docKey: url.searchParams.get("doc_key"),
+          limit: Number.isFinite(limitRaw) ? limitRaw : 120,
+          offset: Number.isFinite(offsetRaw) ? offsetRaw : 0,
+        }),
+      });
+    }
+
+    if (req.method === "POST" && path.endsWith("ops/compliance/legal-documents/publish")) {
+      requireRole(roles, ["admin"]);
+      const body = await req.json().catch(() => ({}));
+      if (!body || typeof body !== "object") {
+        return json(req, 400, { error: "request body is required" });
+      }
+      return json(req, 200, {
+        ok: true,
+        data: await publishLegalDocumentByAdmin(client, user.id, body as Record<string, unknown>),
       });
     }
 

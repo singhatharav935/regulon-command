@@ -175,6 +175,7 @@ export const buildRegressionChecklist = () => ({
     "/ops/draft-audit-integrity-check",
     "/ops/draft-export-integrity-check",
     "/ops/compliance/readiness",
+    "/ops/compliance/legal-documents",
     "/ops/workflow-sla-monitor",
     "/ops/prelaunch-gate",
   ],
