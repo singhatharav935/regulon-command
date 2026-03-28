@@ -5103,6 +5103,11 @@ serve(async (req: Request) => {
       const legalLaneEnabled = resolveLegalLaneEnabled(persona, entitlements);
       const actorQuota = await getActorQuotaSnapshot(client, user.id);
       const firmQuota = await getFirmQuotaSnapshotForActor(client, user.id);
+      const ratePolicy = {
+        max_requests_per_minute: Math.max(10, Number(Deno.env.get("AI_MAX_REQUESTS_PER_MINUTE") ?? "60")),
+        max_concurrent_requests: Math.max(1, Number(Deno.env.get("AI_MAX_CONCURRENT_REQUESTS") ?? "2")),
+        lock_window_seconds: Math.max(15, Number(Deno.env.get("AI_LOCK_WINDOW_SECONDS") ?? "120")),
+      };
 
       return json(req, 200, {
         ok: true,
@@ -5110,8 +5115,8 @@ serve(async (req: Request) => {
           persona,
           roles,
           capabilities: {
-            can_draft_generate: persona === "external_ca" || persona === "in_house_ca" || persona === "ca_firm" || roles.includes("admin"),
-            can_lawyer_manual_override: persona === "in_house_lawyer" || roles.includes("admin"),
+            can_draft_generate: persona === "external_ca" || persona === "in_house_ca" || persona === "ca_firm" || roles.has("admin"),
+            can_lawyer_manual_override: persona === "in_house_lawyer" || roles.has("admin"),
             can_internal_legal_lane: legalLaneEnabled,
             can_assistant_access: entitlements.assistantAccessEnabled,
           },
@@ -5124,6 +5129,7 @@ serve(async (req: Request) => {
             actor: actorQuota,
             firm: firmQuota,
           },
+          rate_policy: ratePolicy,
         },
       });
     }

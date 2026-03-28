@@ -71,6 +71,34 @@ type ClientOption = {
   industry: string;
 };
 
+type DraftingCapabilities = {
+  quota?: {
+    actor?: {
+      monthStart?: string;
+      effectiveLimit?: number;
+      used?: number;
+      remaining?: number;
+      hardBlock?: boolean;
+    } | null;
+    firm?: {
+      monthStart?: string;
+      limit?: number;
+      used?: number;
+      remaining?: number;
+      hardBlock?: boolean;
+      firmName?: string | null;
+    } | null;
+  } | null;
+  rate_policy?: {
+    max_requests_per_minute?: number;
+    max_concurrent_requests?: number;
+    lock_window_seconds?: number;
+  } | null;
+  capabilities?: {
+    can_assistant_access?: boolean;
+  } | null;
+};
+
 type DraftHistoryItem = {
   id: string;
   created_at: string;
@@ -1689,6 +1717,7 @@ const AIDraftingEngine = ({ demoMode = false, includeLawyerReview = true }: AIDr
   const [customsTrainingCaseId, setCustomsTrainingCaseId] = useState<string | null>(null);
   const [contractTrainingCaseId, setContractTrainingCaseId] = useState<string | null>(null);
   const [customTrainingCaseId, setCustomTrainingCaseId] = useState<string | null>(null);
+  const [draftingCapabilities, setDraftingCapabilities] = useState<DraftingCapabilities | null>(null);
   const [showFormatDetails, setShowFormatDetails] = useState(false);
   const [currentDraftRunId, setCurrentDraftRunId] = useState<string | null>(null);
   const [workflowStatus, setWorkflowStatus] = useState<WorkflowStatus>("generated");
@@ -4208,6 +4237,30 @@ const AIDraftingEngine = ({ demoMode = false, includeLawyerReview = true }: AIDr
   }, [demoMode]);
 
   useEffect(() => {
+    if (demoMode) {
+      setDraftingCapabilities(null);
+      return;
+    }
+
+    let mounted = true;
+    const loadDraftingCapabilities = async () => {
+      try {
+        const data = await workspaceBackendRequest<DraftingCapabilities>("/drafting/capabilities");
+        if (!mounted) return;
+        setDraftingCapabilities(data);
+      } catch {
+        if (!mounted) return;
+        setDraftingCapabilities(null);
+      }
+    };
+
+    loadDraftingCapabilities();
+    return () => {
+      mounted = false;
+    };
+  }, [demoMode]);
+
+  useEffect(() => {
     if (!selectedClient) return;
     const exists = clientOptions.some((client) => client.id === selectedClient);
     if (!exists) {
@@ -5877,6 +5930,30 @@ Return only revised final draft text.`);
           {isCheckingDraftService ? "Checking..." : "Recheck Backend"}
         </Button>
       </div>
+
+      {!demoMode && draftingCapabilities?.quota?.actor ? (
+        <div className="mb-4 rounded-lg border border-amber-500/30 bg-amber-500/10 px-3 py-2 text-xs text-amber-100">
+          <p>
+            AI quota: {draftingCapabilities.quota.actor.used ?? 0}/{draftingCapabilities.quota.actor.effectiveLimit ?? 0}
+            {" "}used this month
+            {typeof draftingCapabilities.quota.actor.remaining === "number" ? ` • ${draftingCapabilities.quota.actor.remaining} remaining` : ""}.
+            {draftingCapabilities.quota.actor.hardBlock ? " Account is hard-blocked." : ""}
+          </p>
+          {draftingCapabilities.quota.firm ? (
+            <p className="mt-1">
+              Firm quota: {draftingCapabilities.quota.firm.used ?? 0}/{draftingCapabilities.quota.firm.limit ?? 0}
+              {" "}used
+              {typeof draftingCapabilities.quota.firm.remaining === "number" ? ` • ${draftingCapabilities.quota.firm.remaining} remaining` : ""}.
+            </p>
+          ) : null}
+          {draftingCapabilities.rate_policy ? (
+            <p className="mt-1 text-amber-200/90">
+              Rate policy: {draftingCapabilities.rate_policy.max_requests_per_minute ?? "-"} req/min, {" "}
+              {draftingCapabilities.rate_policy.max_concurrent_requests ?? "-"} concurrent.
+            </p>
+          ) : null}
+        </div>
+      ) : null}
 
       <Tabs defaultValue="create" className="w-full">
         <TabsList className="grid w-full grid-cols-3 mb-6">
