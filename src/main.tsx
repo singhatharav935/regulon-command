@@ -3,8 +3,13 @@ import App from "./App.tsx";
 import "./index.css";
 import StartupErrorBoundary from "./components/system/StartupErrorBoundary.tsx";
 
-if (window.location.pathname === "/university-demo") {
-  window.history.replaceState(null, "", "/app/university");
+const pathname = window.location.pathname;
+if (
+  pathname === "/university-demo" ||
+  pathname === "/university-demo/" ||
+  pathname.startsWith("/university-demo/")
+) {
+  window.history.replaceState(null, "", `/app/university${window.location.search}${window.location.hash}`);
 }
 
 const rootElement = document.getElementById("root");
