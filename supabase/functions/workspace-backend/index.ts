@@ -4041,6 +4041,63 @@ const repairAllDashboardReadinessByAdmin = async (
   };
 };
 
+const runDashboardReadinessSmokeByAdmin = async (
+  client: ReturnType<typeof createClient>,
+  options?: { limit?: number; offset?: number },
+) => {
+  const limit = Math.max(10, Math.min(300, Number(options?.limit ?? 120)));
+  const offset = Math.max(0, Number(options?.offset ?? 0));
+  const snapshot = await listDashboardReadinessUsers(client, { limit, offset });
+
+  const rows: Array<{
+    user_id: string;
+    email: string | null;
+    persona: AppPersona | null;
+    roles: string[];
+    target_dashboard: string;
+    dashboard_ready: boolean;
+    blockers: string[];
+    probe_ok: boolean;
+    probe_error: string | null;
+    probe_error_code: string | null;
+    probe_data_shape?: Record<string, unknown>;
+  }> = [];
+
+  for (const user of snapshot.users) {
+    const effectiveRoles = applyPersonaRoleFallback(new Set(user.roles), user.persona);
+    const probe = await buildSelfDashboardProbe(client, user.user_id, user.persona, Array.from(effectiveRoles));
+    rows.push({
+      user_id: user.user_id,
+      email: user.email ?? null,
+      persona: user.persona,
+      roles: Array.from(effectiveRoles),
+      target_dashboard: probe.target_dashboard,
+      dashboard_ready: user.dashboard_ready,
+      blockers: user.blockers,
+      probe_ok: probe.ok,
+      probe_error: probe.ok ? null : (typeof probe.error === "string" ? probe.error : null),
+      probe_error_code: probe.ok ? null : (typeof probe.error_code === "string" ? probe.error_code : null),
+      probe_data_shape: probe.ok && probe.data_shape && typeof probe.data_shape === "object"
+        ? probe.data_shape as Record<string, unknown>
+        : undefined,
+    });
+  }
+
+  return {
+    offset,
+    limit,
+    sampled_users: rows.length,
+    summary: {
+      ready_users: rows.filter((item) => item.dashboard_ready).length,
+      blocked_users: rows.filter((item) => !item.dashboard_ready).length,
+      probe_passed: rows.filter((item) => item.probe_ok).length,
+      probe_failed: rows.filter((item) => !item.probe_ok).length,
+      failed_despite_ready: rows.filter((item) => item.dashboard_ready && !item.probe_ok).length,
+    },
+    users: rows,
+  };
+};
+
 const loadAuthorityBackendCoverage = async (
   client: ReturnType<typeof createClient>,
 ) => {
@@ -4176,6 +4233,7 @@ const bootstrapCompanyAuthorityWorkflowsByAdmin = async (
 const getRouteAccessMatrix = () => ({
   dashboards: [
     { route: "GET /dashboard/readiness/self", roles: ["authenticated"] },
+    { route: "GET /ops/dashboard-readiness/smoke", roles: ["admin"] },
     { route: "GET /company/dashboard", roles: ["user", "manager", "admin"] },
     { route: "POST /company/bootstrap-data", roles: ["user", "manager", "admin"] },
     { route: "GET /ca/dashboard", roles: ["manager", "admin"] },
@@ -4865,6 +4923,19 @@ serve(async (req: Request) => {
         data: await repairAllDashboardReadinessByAdmin(serviceClient, {
           limit: Number.isFinite(limitRaw) ? limitRaw : 120,
           seedWorkflows,
+        }),
+      });
+    }
+
+    if (req.method === "GET" && path.endsWith("ops/dashboard-readiness/smoke")) {
+      requireRole(roles, ["admin"]);
+      const limitRaw = Number(url.searchParams.get("limit") ?? 120);
+      const offsetRaw = Number(url.searchParams.get("offset") ?? 0);
+      return json(req, 200, {
+        ok: true,
+        data: await runDashboardReadinessSmokeByAdmin(client, {
+          limit: Number.isFinite(limitRaw) ? limitRaw : 120,
+          offset: Number.isFinite(offsetRaw) ? offsetRaw : 0,
         }),
       });
     }
