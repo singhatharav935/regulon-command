@@ -3453,6 +3453,120 @@ const collectDeployReadinessSignals = async (
   };
 };
 
+const listDashboardReadinessUsers = async (
+  client: ReturnType<typeof createClient>,
+  options?: { limit?: number; offset?: number },
+) => {
+  const limit = Math.max(10, Math.min(300, Number(options?.limit ?? 100)));
+  const offset = Math.max(0, Number(options?.offset ?? 0));
+
+  const { data: profiles, error: profilesError } = await client
+    .from("profiles")
+    .select("user_id, full_name, email, created_at")
+    .order("created_at", { ascending: false })
+    .range(offset, offset + limit - 1);
+  if (profilesError) throw profilesError;
+
+  const userIds = Array.from(new Set((profiles ?? []).map((row) => row.user_id).filter(Boolean)));
+  if (userIds.length === 0) {
+    return { users: [], offset, limit, total_sampled: 0 };
+  }
+
+  const [rolesResult, personasResult, companyMembersResult, caFirmMembersResult, verificationResult] = await Promise.all([
+    client.from("user_roles").select("user_id, role").in("user_id", userIds),
+    client.from("user_personas").select("user_id, persona").in("user_id", userIds),
+    client.from("company_members").select("user_id, company_id").in("user_id", userIds),
+    client.from("ca_firm_members").select("user_id, ca_firm_id, role").in("user_id", userIds),
+    client.from("user_verifications").select("user_id, status, is_verified").in("user_id", userIds),
+  ]);
+  if (rolesResult.error) throw rolesResult.error;
+  if (personasResult.error) throw personasResult.error;
+  if (companyMembersResult.error) throw companyMembersResult.error;
+  if (caFirmMembersResult.error) throw caFirmMembersResult.error;
+  if (verificationResult.error) throw verificationResult.error;
+
+  const rolesByUser = new Map<string, string[]>();
+  for (const row of rolesResult.data ?? []) {
+    const list = rolesByUser.get(row.user_id) ?? [];
+    list.push(String(row.role));
+    rolesByUser.set(row.user_id, list);
+  }
+
+  const personaByUser = new Map<string, string>();
+  for (const row of personasResult.data ?? []) {
+    personaByUser.set(row.user_id, String(row.persona));
+  }
+
+  const companyCountByUser = new Map<string, number>();
+  for (const row of companyMembersResult.data ?? []) {
+    companyCountByUser.set(row.user_id, (companyCountByUser.get(row.user_id) ?? 0) + 1);
+  }
+
+  const caFirmCountByUser = new Map<string, number>();
+  for (const row of caFirmMembersResult.data ?? []) {
+    caFirmCountByUser.set(row.user_id, (caFirmCountByUser.get(row.user_id) ?? 0) + 1);
+  }
+
+  const verificationByUser = new Map<string, { status: string | null; is_verified: boolean }>();
+  for (const row of verificationResult.data ?? []) {
+    verificationByUser.set(row.user_id, {
+      status: typeof row.status === "string" ? row.status : null,
+      is_verified: Boolean(row.is_verified),
+    });
+  }
+
+  const users = (profiles ?? []).map((profile) => {
+    const userId = profile.user_id;
+    const roles = rolesByUser.get(userId) ?? [];
+    const persona = personaByUser.get(userId) ?? null;
+    const companyMemberships = companyCountByUser.get(userId) ?? 0;
+    const caFirmMemberships = caFirmCountByUser.get(userId) ?? 0;
+    const verification = verificationByUser.get(userId) ?? { status: null, is_verified: false };
+
+    const blockers: string[] = [];
+    if (!persona) blockers.push("Missing persona");
+    if (roles.length === 0) blockers.push("Missing app role");
+    if (
+      persona === "company_owner" ||
+      persona === "external_ca" ||
+      persona === "in_house_ca" ||
+      persona === "in_house_lawyer"
+    ) {
+      if (companyMemberships === 0) blockers.push("No company assignment");
+    }
+    if (persona === "ca_firm" && caFirmMemberships === 0) {
+      blockers.push("No CA firm membership");
+    }
+    const dashboardReady = blockers.length === 0;
+
+    return {
+      user_id: userId,
+      full_name: profile.full_name ?? null,
+      email: profile.email ?? null,
+      persona,
+      roles,
+      memberships: {
+        company: companyMemberships,
+        ca_firm: caFirmMemberships,
+      },
+      verification,
+      dashboard_ready: dashboardReady,
+      blockers,
+    };
+  });
+
+  return {
+    users,
+    offset,
+    limit,
+    total_sampled: users.length,
+    summary: {
+      ready: users.filter((item) => item.dashboard_ready).length,
+      blocked: users.filter((item) => !item.dashboard_ready).length,
+    },
+  };
+};
+
 const getRouteAccessMatrix = () => ({
   dashboards: [
     { route: "GET /company/dashboard", roles: ["user", "manager", "admin"] },
@@ -3477,6 +3591,7 @@ const getRouteAccessMatrix = () => ({
     { route: "GET /ops/workflow-integrity-check", roles: ["admin"] },
     { route: "GET /ops/workflow-sla-monitor", roles: ["admin"] },
     { route: "GET /ops/deploy-readiness", roles: ["admin"] },
+    { route: "GET /ops/dashboard-readiness/users", roles: ["admin"] },
     { route: "GET /ops/route-access-matrix", roles: ["admin"] },
     { route: "GET /ops/landing/leads", roles: ["admin"] },
     { route: "GET /ops/landing/metrics", roles: ["admin"] },
@@ -4071,6 +4186,19 @@ serve(async (req: Request) => {
           signals: result.signals,
           checked_at: new Date().toISOString(),
         },
+      });
+    }
+
+    if (req.method === "GET" && path.endsWith("ops/dashboard-readiness/users")) {
+      requireRole(roles, ["admin"]);
+      const limitRaw = Number(url.searchParams.get("limit") ?? 100);
+      const offsetRaw = Number(url.searchParams.get("offset") ?? 0);
+      return json(req, 200, {
+        ok: true,
+        data: await listDashboardReadinessUsers(client, {
+          limit: Number.isFinite(limitRaw) ? limitRaw : 100,
+          offset: Number.isFinite(offsetRaw) ? offsetRaw : 0,
+        }),
       });
     }
 
