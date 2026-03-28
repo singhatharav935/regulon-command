@@ -2,7 +2,7 @@ import { Toaster } from "@/components/ui/toaster";
 import { Toaster as Sonner } from "@/components/ui/sonner";
 import { TooltipProvider } from "@/components/ui/tooltip";
 import { QueryClient, QueryClientProvider } from "@tanstack/react-query";
-import { BrowserRouter, Routes, Route } from "react-router-dom";
+import { BrowserRouter, Routes, Route, Navigate } from "react-router-dom";
 import { Suspense, lazy } from "react";
 import Index from "./pages/Index";
 import Auth from "./pages/Auth";
@@ -18,7 +18,6 @@ const AdminDashboard = lazy(() => import("./pages/AdminDashboard"));
 const AppDashboard = lazy(() => import("./pages/AppDashboard"));
 const AppCADashboard = lazy(() => import("./pages/AppCADashboard"));
 const AppAdminDashboard = lazy(() => import("./pages/AppAdminDashboard"));
-const UniversityDemoDashboard = lazy(() => import("./pages/UniversityDemoDashboard"));
 const AppUniversityDashboard = lazy(() => import("./pages/AppUniversityDashboard"));
 const AppLegalDashboard = lazy(() => import("./pages/AppLegalDashboard"));
 const AppVerification = lazy(() => import("./pages/AppVerification"));
@@ -81,7 +80,7 @@ const App = () => (
             <Route path="/dashboard" element={<Dashboard />} />
             <Route path="/ca-dashboard" element={<CADashboard />} />
             <Route path="/admin-dashboard" element={<AdminDashboard />} />
-            <Route path="/university-demo" element={<UniversityDemoDashboard />} />
+            <Route path="/university-demo" element={<Navigate to="/app/university" replace />} />
             <Route path="/ca-firm-dashboard" element={<CAFirmDashboard />} />
             <Route path="/agent-work-review" element={<AgentWorkReview />} />
 

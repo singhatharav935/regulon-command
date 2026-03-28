@@ -26,6 +26,7 @@ import {
 } from "lucide-react";
 import Navbar from "@/components/layout/Navbar";
 import Footer from "@/components/layout/Footer";
+import DashboardTypeNav from "@/components/dashboard/DashboardTypeNav";
 import AIVoiceBriefAgent from "@/components/voice/AIVoiceBriefAgent";
 import { Badge } from "@/components/ui/badge";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
@@ -962,6 +963,8 @@ const UniversityDashboardShell = ({ mode }: UniversityDashboardShellProps) => {
 
       <main className="pt-24 pb-16">
         <div className="container mx-auto px-4 max-w-7xl space-y-4">
+          <DashboardTypeNav activeType="university" routePrefix="/app" />
+
           <div className="rounded-2xl border border-primary/20 bg-card/40 p-4">
             <div className="flex flex-col lg:flex-row lg:items-center lg:justify-between gap-3">
               <div>
