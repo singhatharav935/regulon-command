@@ -12,6 +12,9 @@ import { Textarea } from "@/components/ui/textarea";
 import { useToast } from "@/hooks/use-toast";
 import { previewBypassEnabled } from "@/lib/runtime-flags";
 
+const VERIFICATION_ALLOWED_MIME_TYPES = new Set(["application/pdf", "image/png", "image/jpeg"]);
+const VERIFICATION_MAX_FILE_SIZE_BYTES = 5 * 1024 * 1024;
+
 const AppVerification = () => {
   const { user, persona, verificationStatus, isVerified } = useAuth();
   const navigate = useNavigate();
@@ -137,6 +140,30 @@ const AppVerification = () => {
     }
   };
 
+  const handleDocumentSelect = (file: File | null) => {
+    if (!file) {
+      setDocumentFile(null);
+      return;
+    }
+    if (!VERIFICATION_ALLOWED_MIME_TYPES.has(file.type)) {
+      toast({
+        title: "Unsupported file type",
+        description: "Allowed types: PDF, PNG, JPEG.",
+        variant: "destructive",
+      });
+      return;
+    }
+    if (file.size > VERIFICATION_MAX_FILE_SIZE_BYTES) {
+      toast({
+        title: "File too large",
+        description: "Maximum verification document size is 5 MB.",
+        variant: "destructive",
+      });
+      return;
+    }
+    setDocumentFile(file);
+  };
+
   return (
     <div className="min-h-screen bg-background">
       <Navbar />
@@ -187,7 +214,12 @@ const AppVerification = () => {
               {hasField("document") && (
                 <div className="space-y-2">
                   <Label>Upload Verification Document{verificationOptional ? " (Optional)" : ""}</Label>
-                  <Input type="file" accept=".pdf,.png,.jpg,.jpeg" onChange={(e) => setDocumentFile(e.target.files?.[0] ?? null)} />
+                  <Input
+                    type="file"
+                    accept=".pdf,.png,.jpg,.jpeg,application/pdf,image/png,image/jpeg"
+                    onChange={(e) => handleDocumentSelect(e.target.files?.[0] ?? null)}
+                  />
+                  <p className="text-xs text-muted-foreground">Allowed: PDF/PNG/JPEG up to 5 MB.</p>
                 </div>
               )}
 

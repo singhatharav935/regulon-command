@@ -1110,6 +1110,19 @@ const extractErrorMessage = (error: unknown) => {
   return "Internal error";
 };
 
+const decodeJwtPayload = (token: string): Record<string, unknown> | null => {
+  const parts = token.split(".");
+  if (parts.length < 2) return null;
+  try {
+    const normalized = parts[1].replace(/-/g, "+").replace(/_/g, "/");
+    const padLength = (4 - (normalized.length % 4)) % 4;
+    const decoded = atob(`${normalized}${"=".repeat(padLength)}`);
+    return JSON.parse(decoded) as Record<string, unknown>;
+  } catch {
+    return null;
+  }
+};
+
 const toIsoDate = (daysFromNow: number) => {
   const date = new Date(Date.now() + daysFromNow * 24 * 60 * 60 * 1000);
   return date.toISOString().slice(0, 10);
@@ -3515,6 +3528,81 @@ const collectDeployReadinessSignals = async (
   };
 };
 
+const collectSecurityReadinessSignals = async (
+  client: ReturnType<typeof createClient>,
+) => {
+  const serviceClient = getServiceClient() ?? client;
+  const enforceAuthEnabled = (Deno.env.get("ENFORCE_AUTH") ?? "").trim().toLowerCase() === "true";
+  const allowLocalOriginsEnabled = (Deno.env.get("ALLOW_LOCAL_ORIGINS") ?? "").trim().toLowerCase() === "true";
+  const allowedOrigins = (Deno.env.get("ALLOWED_ORIGINS") ?? "")
+    .split(",")
+    .map((item) => item.trim())
+    .filter(Boolean);
+  const hasWildcardOrigin = allowedOrigins.includes("*");
+
+  const { data: rlsSnapshot, error: rlsError } = await serviceClient.rpc("security_readiness_snapshot");
+  if (rlsError) throw rlsError;
+  const rlsData = (rlsSnapshot ?? {}) as Record<string, unknown>;
+  const rlsSummary = (rlsData.summary ?? {}) as Record<string, unknown>;
+
+  const { data: bucketRows, error: bucketError } = await serviceClient
+    .schema("storage")
+    .from("buckets")
+    .select("id, public, file_size_limit, allowed_mime_types")
+    .eq("id", "verification-documents")
+    .limit(1);
+  if (bucketError) throw bucketError;
+  const bucket = bucketRows?.[0] as
+    | {
+      id: string;
+      public: boolean;
+      file_size_limit: number | null;
+      allowed_mime_types: string[] | null;
+    }
+    | undefined;
+
+  const allowedMimes = new Set((bucket?.allowed_mime_types ?? []).map((item) => String(item).toLowerCase()));
+  const uploadMimeOk =
+    allowedMimes.has("application/pdf") &&
+    allowedMimes.has("image/png") &&
+    allowedMimes.has("image/jpeg");
+  const uploadFileSizeOk = Number(bucket?.file_size_limit ?? 0) > 0 && Number(bucket?.file_size_limit ?? 0) <= 5242880;
+
+  return {
+    env: {
+      enforce_auth_enabled: enforceAuthEnabled,
+      allow_local_origins_enabled: allowLocalOriginsEnabled,
+      allowed_origins: allowedOrigins,
+      wildcard_origin_present: hasWildcardOrigin,
+    },
+    rls_rbac: {
+      summary: rlsSummary,
+      tables: rlsData.tables ?? [],
+    },
+    upload_security: {
+      bucket_exists: Boolean(bucket),
+      bucket_public: Boolean(bucket?.public),
+      bucket_file_size_limit: bucket?.file_size_limit ?? null,
+      bucket_allowed_mime_types: bucket?.allowed_mime_types ?? [],
+      mime_policy_ok: uploadMimeOk,
+      file_size_policy_ok: uploadFileSizeOk,
+    },
+    overall: {
+      pass:
+        enforceAuthEnabled &&
+        !allowLocalOriginsEnabled &&
+        !hasWildcardOrigin &&
+        Number(rlsSummary.missing ?? 0) === 0 &&
+        Number(rlsSummary.rls_disabled ?? 0) === 0 &&
+        Number(rlsSummary.without_policies ?? 0) === 0 &&
+        Boolean(bucket) &&
+        bucket?.public === false &&
+        uploadMimeOk &&
+        uploadFileSizeOk,
+    },
+  };
+};
+
 const listDashboardReadinessUsers = async (
   client: ReturnType<typeof createClient>,
   options?: { limit?: number; offset?: number },
@@ -4497,6 +4585,8 @@ const getRouteAccessMatrix = () => ({
   ],
   adminOps: [
     { route: "GET /ops/config-check", roles: ["admin"] },
+    { route: "GET /ops/security/readiness", roles: ["admin"] },
+    { route: "GET /ops/security/session-check", roles: ["user", "manager", "admin"] },
     { route: "GET /ops/workflow-integrity-check", roles: ["admin"] },
     { route: "GET /ops/workflow-sla-monitor", roles: ["admin"] },
     { route: "GET /ops/deploy-readiness", roles: ["admin"] },
@@ -5160,6 +5250,42 @@ serve(async (req: Request) => {
         env_present: envKeys,
         db_probe_ok: !probeError,
         db_probe_rows: (tablesProbe ?? []).length,
+      });
+    }
+
+    if (req.method === "GET" && path.endsWith("ops/security/session-check")) {
+      requireRole(roles, ["user", "manager", "admin"]);
+      const claims = decodeJwtPayload(token) ?? {};
+      const exp = typeof claims.exp === "number" ? claims.exp : null;
+      const iat = typeof claims.iat === "number" ? claims.iat : null;
+      const nowSeconds = Math.floor(Date.now() / 1000);
+      const expiresInSeconds = exp ? exp - nowSeconds : null;
+
+      return json(req, 200, {
+        ok: true,
+        data: {
+          user_id: user.id,
+          persona,
+          roles: Array.from(roles),
+          session: {
+            issued_at_unix: iat,
+            expires_at_unix: exp,
+            expires_in_seconds: expiresInSeconds,
+            is_expired: typeof expiresInSeconds === "number" ? expiresInSeconds <= 0 : null,
+          },
+        },
+      });
+    }
+
+    if (req.method === "GET" && path.endsWith("ops/security/readiness")) {
+      requireRole(roles, ["admin"]);
+      const result = await collectSecurityReadinessSignals(client);
+      return json(req, 200, {
+        ok: true,
+        data: {
+          ...result,
+          checked_at: new Date().toISOString(),
+        },
       });
     }
 
