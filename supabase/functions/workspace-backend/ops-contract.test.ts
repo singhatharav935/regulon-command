@@ -18,6 +18,7 @@ describe("ops-contract", () => {
       tenantIsolation: { critical: 0, high: 0, medium: 0 },
       auditTrail: { critical: 0, high: 0, medium: 0 },
       exportIntegrity: { critical: 0, high: 0, medium: 0 },
+      complianceLegal: { critical: 0, high: 0, medium: 0 },
     });
 
     expect(result.status).toBe("fail");
@@ -40,6 +41,7 @@ describe("ops-contract", () => {
       tenantIsolation: { critical: 0, high: 0, medium: 0 },
       auditTrail: { critical: 0, high: 0, medium: 0 },
       exportIntegrity: { critical: 0, high: 0, medium: 0 },
+      complianceLegal: { critical: 0, high: 0, medium: 0 },
     });
 
     expect(result.status).toBe("warn");
@@ -62,6 +64,7 @@ describe("ops-contract", () => {
       tenantIsolation: { critical: 0, high: 0, medium: 0 },
       auditTrail: { critical: 0, high: 0, medium: 0 },
       exportIntegrity: { critical: 0, high: 0, medium: 0 },
+      complianceLegal: { critical: 0, high: 0, medium: 0 },
     });
 
     expect(result.status).toBe("pass");
@@ -76,6 +79,7 @@ describe("ops-contract", () => {
     expect(checklist.requiredEndpoints).toContain("/ops/prelaunch-gate");
     expect(checklist.requiredEndpoints).toContain("/ops/draft-audit-integrity-check");
     expect(checklist.requiredEndpoints).toContain("/ops/draft-export-integrity-check");
+    expect(checklist.requiredEndpoints).toContain("/ops/compliance/readiness");
   });
 
   it("fails gate when required schema is missing", () => {
@@ -94,6 +98,7 @@ describe("ops-contract", () => {
       tenantIsolation: { critical: 0, high: 0, medium: 0 },
       auditTrail: { critical: 0, high: 0, medium: 0 },
       exportIntegrity: { critical: 0, high: 0, medium: 0 },
+      complianceLegal: { critical: 0, high: 0, medium: 0 },
     });
 
     expect(result.status).toBe("fail");
@@ -115,6 +120,7 @@ describe("ops-contract", () => {
       tenantIsolation: { critical: 0, high: 2, medium: 1 },
       auditTrail: { critical: 0, high: 0, medium: 0 },
       exportIntegrity: { critical: 0, high: 0, medium: 0 },
+      complianceLegal: { critical: 0, high: 0, medium: 0 },
     });
 
     expect(result.status).toBe("warn");
@@ -136,6 +142,7 @@ describe("ops-contract", () => {
       tenantIsolation: { critical: 0, high: 0, medium: 0 },
       auditTrail: { critical: 2, high: 0, medium: 0 },
       exportIntegrity: { critical: 0, high: 0, medium: 0 },
+      complianceLegal: { critical: 0, high: 0, medium: 0 },
     });
 
     expect(result.status).toBe("fail");
@@ -157,8 +164,31 @@ describe("ops-contract", () => {
       tenantIsolation: { critical: 0, high: 0, medium: 0 },
       auditTrail: { critical: 0, high: 0, medium: 0 },
       exportIntegrity: { critical: 0, high: 3, medium: 0 },
+      complianceLegal: { critical: 0, high: 0, medium: 0 },
     });
 
     expect(result.status).toBe("warn");
+  });
+
+  it("fails gate when compliance/legal has critical findings", () => {
+    const result = computePrelaunchGate({
+      envPresent: {
+        SUPABASE_URL: true,
+        SUPABASE_ANON_KEY: true,
+      },
+      schemaReadiness: {
+        missingTables: [],
+        probeErrors: 0,
+      },
+      workflowIntegrity: { critical: 0, high: 0, medium: 0 },
+      workflowSla: { critical: 0, high: 0, medium: 0 },
+      aiOps: { sampledRows: 120, failedCount: 2, staleProcessingCount: 0 },
+      tenantIsolation: { critical: 0, high: 0, medium: 0 },
+      auditTrail: { critical: 0, high: 0, medium: 0 },
+      exportIntegrity: { critical: 0, high: 0, medium: 0 },
+      complianceLegal: { critical: 1, high: 0, medium: 0 },
+    });
+
+    expect(result.status).toBe("fail");
   });
 });

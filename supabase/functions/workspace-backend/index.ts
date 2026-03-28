@@ -1087,6 +1087,8 @@ const resolveErrorCode = (message: string) => {
   if (message.startsWith("AI quota exceeded:")) return "AI_QUOTA_EXCEEDED";
   if (message.startsWith("Public rate limit exceeded:")) return "AI_RATE_LIMITED";
   if (message.startsWith("Unsupported documentType:")) return "VALIDATION_INVALID_FIELD";
+  if (message.includes("must be one of:")) return "VALIDATION_INVALID_FIELD";
+  if (message.startsWith("dueAt must be a valid ISO date")) return "VALIDATION_INVALID_FIELD";
   if (message.includes("must be a valid UUID")) return "VALIDATION_INVALID_FIELD";
   if (message.startsWith("Invalid workflow transition:")) return "WORKFLOW_TRANSITION_INVALID";
   if (message.startsWith("Invalid event type for transition:")) return "WORKFLOW_EVENT_INVALID";
@@ -3949,12 +3951,13 @@ const collectPrelaunchSignals = async (
     OPENAI_MODEL: Boolean(Deno.env.get("OPENAI_MODEL")),
   };
 
-  const [integrity, sla, tenantIsolation, auditTrail, exportIntegrity] = await Promise.all([
+  const [integrity, sla, tenantIsolation, auditTrail, exportIntegrity, complianceLegal] = await Promise.all([
     runWorkflowIntegrityCheck(client, { limit: 300 }),
     runWorkflowSlaMonitor(client, { limit: 500 }),
     runTenantIsolationCheck(client, { limitPerTable: 3000 }),
     runDraftAuditTrailIntegrityCheck(client, { limit: 1200 }),
     runDraftExportIntegrityCheck(client, { limit: 1200 }),
+    collectComplianceLegalReadinessSignals(client),
   ]);
   const deployReadiness = await collectDeployReadinessSignals(client);
 
@@ -3988,6 +3991,7 @@ const collectPrelaunchSignals = async (
     tenantIsolation: tenantIsolation.summary,
     auditTrail: auditTrail.summary,
     exportIntegrity: exportIntegrity.summary,
+    complianceLegal: complianceLegal.summary,
   };
 };
 
@@ -4024,6 +4028,10 @@ const collectDeployReadinessSignals = async (
     "landing_public_content",
     "landing_leads",
     "landing_public_rate_limits",
+    "compliance_user_consents",
+    "legal_disclaimer_acceptances",
+    "compliance_data_requests",
+    "compliance_audit_events",
   ];
   const missingTables: string[] = [];
   const tableProbeErrors: Array<{ table: string; code: string | null; message: string }> = [];
@@ -5107,6 +5115,12 @@ const getRouteAccessMatrix = () => ({
     { route: "GET /ca-firm/dashboard", roles: ["manager", "admin"] },
     { route: "POST /ca-firm/bootstrap-data", roles: ["manager", "admin"] },
     { route: "GET /admin/dashboard", roles: ["admin"] },
+    { route: "GET /compliance/consent/status", roles: ["authenticated"] },
+    { route: "POST /compliance/consent/events", roles: ["authenticated"] },
+    { route: "GET /compliance/legal-disclaimer/status", roles: ["authenticated"] },
+    { route: "POST /compliance/legal-disclaimer/accept", roles: ["authenticated"] },
+    { route: "GET /compliance/data-requests", roles: ["authenticated"] },
+    { route: "POST /compliance/data-requests", roles: ["authenticated"] },
   ],
   drafts: [
     { route: "POST /drafts", roles: ["manager", "admin"] },
@@ -5137,6 +5151,9 @@ const getRouteAccessMatrix = () => ({
     { route: "GET /ops/landing/leads", roles: ["admin"] },
     { route: "GET /ops/landing/metrics", roles: ["admin"] },
     { route: "POST /ops/landing/leads/:id/status", roles: ["admin"] },
+    { route: "GET /ops/compliance/readiness", roles: ["admin"] },
+    { route: "GET /ops/compliance/data-requests", roles: ["admin"] },
+    { route: "POST /ops/compliance/data-requests/:id/status", roles: ["admin"] },
     { route: "POST /ops/assign/company-member", roles: ["admin"] },
     { route: "POST /ops/assign/ca-firm-member", roles: ["admin"] },
     { route: "POST /ops/bootstrap/company-workflow", roles: ["admin"] },
@@ -5594,6 +5611,396 @@ const loadLandingMetrics = async (client: ReturnType<typeof createClient>) => {
   };
 };
 
+const COMPLIANCE_REQUEST_TYPES = new Set(["access_export", "deletion", "rectification", "restriction"]);
+const COMPLIANCE_REQUEST_STATUSES = new Set(["submitted", "under_review", "approved", "rejected", "completed", "cancelled"]);
+const TERMINAL_COMPLIANCE_STATUSES = new Set(["rejected", "completed", "cancelled"]);
+
+const normalizeComplianceConsentStatus = (value: unknown): "accepted" | "revoked" => {
+  const normalized = String(value ?? "accepted").trim().toLowerCase();
+  if (normalized === "accepted" || normalized === "revoked") return normalized;
+  throw new Error("consentStatus must be one of: accepted, revoked");
+};
+
+const normalizeComplianceDataRequestType = (value: unknown) => {
+  const normalized = String(value ?? "").trim().toLowerCase();
+  if (!COMPLIANCE_REQUEST_TYPES.has(normalized)) {
+    throw new Error("requestType must be one of: access_export, deletion, rectification, restriction");
+  }
+  return normalized;
+};
+
+const normalizeComplianceDataRequestStatus = (value: unknown) => {
+  const normalized = String(value ?? "").trim().toLowerCase();
+  if (!COMPLIANCE_REQUEST_STATUSES.has(normalized)) {
+    throw new Error("status must be one of: submitted, under_review, approved, rejected, completed, cancelled");
+  }
+  return normalized;
+};
+
+const toTrimmedString = (value: unknown, maxLength: number): string | null => {
+  if (typeof value !== "string") return null;
+  const trimmed = value.trim();
+  if (!trimmed) return null;
+  return trimmed.slice(0, maxLength);
+};
+
+const safeMetadataObject = (value: unknown): Record<string, unknown> => {
+  if (!value || typeof value !== "object" || Array.isArray(value)) return {};
+  return value as Record<string, unknown>;
+};
+
+const recordComplianceAuditEvent = async (
+  client: ReturnType<typeof createClient>,
+  params: {
+    actorUserId: string;
+    eventType: string;
+    entityType: string;
+    entityId: string | null;
+    companyId?: string | null;
+    payload?: Record<string, unknown>;
+  },
+) => {
+  const { error } = await client.from("compliance_audit_events").insert({
+    actor_user_id: params.actorUserId,
+    company_id: params.companyId ?? null,
+    event_type: params.eventType,
+    entity_type: params.entityType,
+    entity_id: params.entityId,
+    payload: params.payload ?? {},
+  });
+  if (error) throw error;
+};
+
+const upsertComplianceConsent = async (
+  client: ReturnType<typeof createClient>,
+  req: Request,
+  userId: string,
+  payload: Record<string, unknown>,
+) => {
+  const consentKey = toTrimmedString(payload.consentKey, 120);
+  if (!consentKey) throw new Error("consentKey is required");
+  const consentVersion = toTrimmedString(payload.consentVersion, 40) ?? "v1";
+  const consentStatus = normalizeComplianceConsentStatus(payload.consentStatus);
+  const consentSource = toTrimmedString(payload.source, 60) ?? "app";
+  const acceptedAt = consentStatus === "accepted" ? new Date().toISOString() : null;
+  const revokedAt = consentStatus === "revoked" ? new Date().toISOString() : null;
+  const ipHash = await hashText(getRequestIp(req));
+  const userAgent = (req.headers.get("user-agent") || "").slice(0, 500);
+  const metadata = safeMetadataObject(payload.metadata);
+
+  const { data, error } = await client
+    .from("compliance_user_consents")
+    .upsert({
+      user_id: userId,
+      consent_key: consentKey,
+      consent_version: consentVersion,
+      consent_status: consentStatus,
+      consent_source: consentSource,
+      ip_hash: ipHash,
+      user_agent: userAgent,
+      metadata,
+      accepted_at: acceptedAt,
+      revoked_at: revokedAt,
+    }, { onConflict: "user_id,consent_key,consent_version" })
+    .select("id, user_id, consent_key, consent_version, consent_status, consent_source, accepted_at, revoked_at, updated_at")
+    .single();
+  if (error || !data) throw error ?? new Error("Failed to persist consent event");
+
+  await recordComplianceAuditEvent(client, {
+    actorUserId: userId,
+    eventType: consentStatus === "accepted" ? "consent_accepted" : "consent_revoked",
+    entityType: "compliance_user_consents",
+    entityId: data.id,
+    payload: {
+      consent_key: data.consent_key,
+      consent_version: data.consent_version,
+      consent_status: data.consent_status,
+    },
+  });
+
+  return data;
+};
+
+const listComplianceConsentStatus = async (
+  client: ReturnType<typeof createClient>,
+  userId: string,
+  options?: { consentKey?: string | null; limit?: number },
+) => {
+  const limit = Math.max(1, Math.min(200, Number(options?.limit ?? 50)));
+  let query = client
+    .from("compliance_user_consents")
+    .select("id, consent_key, consent_version, consent_status, consent_source, accepted_at, revoked_at, updated_at")
+    .eq("user_id", userId)
+    .order("updated_at", { ascending: false })
+    .limit(limit);
+  const consentKey = toTrimmedString(options?.consentKey ?? null, 120);
+  if (consentKey) query = query.eq("consent_key", consentKey);
+  const { data, error } = await query;
+  if (error) throw error;
+  return data ?? [];
+};
+
+const upsertLegalDisclaimerAcceptance = async (
+  client: ReturnType<typeof createClient>,
+  req: Request,
+  userId: string,
+  payload: Record<string, unknown>,
+) => {
+  const disclaimerKey = toTrimmedString(payload.disclaimerKey, 120) ?? "ai_assisted_drafting";
+  const disclaimerVersion = toTrimmedString(payload.disclaimerVersion, 40) ?? "v1";
+  const source = toTrimmedString(payload.source, 60) ?? "app";
+  const ipHash = await hashText(getRequestIp(req));
+  const userAgent = (req.headers.get("user-agent") || "").slice(0, 500);
+  const metadata = safeMetadataObject(payload.metadata);
+
+  const { data, error } = await client
+    .from("legal_disclaimer_acceptances")
+    .upsert({
+      user_id: userId,
+      disclaimer_key: disclaimerKey,
+      disclaimer_version: disclaimerVersion,
+      source,
+      ip_hash: ipHash,
+      user_agent: userAgent,
+      metadata,
+      accepted_at: new Date().toISOString(),
+    }, { onConflict: "user_id,disclaimer_key,disclaimer_version" })
+    .select("id, user_id, disclaimer_key, disclaimer_version, source, accepted_at, updated_at")
+    .single();
+  if (error || !data) throw error ?? new Error("Failed to persist legal disclaimer acceptance");
+
+  await recordComplianceAuditEvent(client, {
+    actorUserId: userId,
+    eventType: "legal_disclaimer_accepted",
+    entityType: "legal_disclaimer_acceptances",
+    entityId: data.id,
+    payload: {
+      disclaimer_key: data.disclaimer_key,
+      disclaimer_version: data.disclaimer_version,
+    },
+  });
+
+  return data;
+};
+
+const listLegalDisclaimerStatus = async (
+  client: ReturnType<typeof createClient>,
+  userId: string,
+  options?: { disclaimerKey?: string | null; limit?: number },
+) => {
+  const limit = Math.max(1, Math.min(200, Number(options?.limit ?? 50)));
+  let query = client
+    .from("legal_disclaimer_acceptances")
+    .select("id, disclaimer_key, disclaimer_version, source, accepted_at, updated_at")
+    .eq("user_id", userId)
+    .order("accepted_at", { ascending: false })
+    .limit(limit);
+  const disclaimerKey = toTrimmedString(options?.disclaimerKey ?? null, 120);
+  if (disclaimerKey) query = query.eq("disclaimer_key", disclaimerKey);
+  const { data, error } = await query;
+  if (error) throw error;
+  return data ?? [];
+};
+
+const createComplianceDataRequest = async (
+  client: ReturnType<typeof createClient>,
+  userId: string,
+  payload: Record<string, unknown>,
+) => {
+  const requestType = normalizeComplianceDataRequestType(payload.requestType);
+  const jurisdiction = toTrimmedString(payload.jurisdiction, 40) ?? "IN-DPDP";
+  const adminNotes = toTrimmedString(payload.notes, 2000);
+  const requestPayload = safeMetadataObject(payload.requestPayload ?? payload.details);
+  const companyIdRaw = toTrimmedString(payload.companyId, 80);
+  const companyId = companyIdRaw && companyIdRaw !== "none" ? companyIdRaw : null;
+  if (companyId) assertUuid(companyId, "companyId");
+  if (companyId) {
+    const companyIds = await getUserCompanyIds(client, userId);
+    if (!companyIds.includes(companyId)) {
+      throw new Error("Forbidden");
+    }
+  }
+
+  const dueAtCandidate = toTrimmedString(payload.dueAt, 80);
+  let dueAt = new Date(Date.now() + 30 * 24 * 60 * 60 * 1000).toISOString();
+  if (dueAtCandidate) {
+    const parsed = new Date(dueAtCandidate);
+    if (Number.isNaN(parsed.getTime())) {
+      throw new Error("dueAt must be a valid ISO date");
+    }
+    dueAt = parsed.toISOString();
+  }
+
+  const { data, error } = await client
+    .from("compliance_data_requests")
+    .insert({
+      user_id: userId,
+      company_id: companyId,
+      request_type: requestType,
+      status: "submitted",
+      jurisdiction,
+      request_payload: requestPayload,
+      admin_notes: adminNotes,
+      due_at: dueAt,
+    })
+    .select("id, user_id, company_id, request_type, status, jurisdiction, request_payload, admin_notes, due_at, submitted_at, resolved_at, resolved_by, updated_at")
+    .single();
+  if (error || !data) throw error ?? new Error("Failed to create compliance data request");
+
+  await recordComplianceAuditEvent(client, {
+    actorUserId: userId,
+    eventType: "compliance_data_request_submitted",
+    entityType: "compliance_data_requests",
+    entityId: data.id,
+    companyId: data.company_id,
+    payload: {
+      request_type: data.request_type,
+      jurisdiction: data.jurisdiction,
+      due_at: data.due_at,
+    },
+  });
+
+  return data;
+};
+
+const listComplianceDataRequests = async (
+  client: ReturnType<typeof createClient>,
+  userId: string,
+  options?: { status?: string | null; limit?: number; offset?: number },
+) => {
+  const limit = Math.max(1, Math.min(200, Number(options?.limit ?? 50)));
+  const offset = Math.max(0, Number(options?.offset ?? 0));
+  let query = client
+    .from("compliance_data_requests")
+    .select("id, user_id, company_id, request_type, status, jurisdiction, request_payload, admin_notes, due_at, submitted_at, resolved_at, resolved_by, updated_at")
+    .eq("user_id", userId)
+    .order("submitted_at", { ascending: false })
+    .range(offset, offset + limit - 1);
+  const status = toTrimmedString(options?.status ?? null, 40);
+  if (status) query = query.eq("status", normalizeComplianceDataRequestStatus(status));
+  const { data, error } = await query;
+  if (error) throw error;
+  return data ?? [];
+};
+
+const listComplianceDataRequestsByAdmin = async (
+  client: ReturnType<typeof createClient>,
+  options?: { status?: string | null; requestType?: string | null; limit?: number; offset?: number },
+) => {
+  const limit = Math.max(1, Math.min(300, Number(options?.limit ?? 100)));
+  const offset = Math.max(0, Number(options?.offset ?? 0));
+  let query = client
+    .from("compliance_data_requests")
+    .select("id, user_id, company_id, request_type, status, jurisdiction, request_payload, admin_notes, due_at, submitted_at, resolved_at, resolved_by, updated_at")
+    .order("submitted_at", { ascending: false })
+    .range(offset, offset + limit - 1);
+  const status = toTrimmedString(options?.status ?? null, 40);
+  if (status) query = query.eq("status", normalizeComplianceDataRequestStatus(status));
+  const requestType = toTrimmedString(options?.requestType ?? null, 40);
+  if (requestType) query = query.eq("request_type", normalizeComplianceDataRequestType(requestType));
+  const { data, error } = await query;
+  if (error) throw error;
+  return data ?? [];
+};
+
+const updateComplianceDataRequestStatusByAdmin = async (
+  client: ReturnType<typeof createClient>,
+  adminUserId: string,
+  requestId: string,
+  payload: Record<string, unknown>,
+) => {
+  assertUuid(requestId, "requestId");
+  const nextStatus = normalizeComplianceDataRequestStatus(payload.status);
+  const adminNotes = toTrimmedString(payload.adminNotes, 2000);
+  const nowIso = new Date().toISOString();
+  const patch: Record<string, unknown> = {
+    status: nextStatus,
+    admin_notes: adminNotes,
+  };
+  if (TERMINAL_COMPLIANCE_STATUSES.has(nextStatus)) {
+    patch.resolved_at = nowIso;
+    patch.resolved_by = adminUserId;
+  } else {
+    patch.resolved_at = null;
+    patch.resolved_by = null;
+  }
+
+  const { data, error } = await client
+    .from("compliance_data_requests")
+    .update(patch)
+    .eq("id", requestId)
+    .select("id, user_id, company_id, request_type, status, jurisdiction, request_payload, admin_notes, due_at, submitted_at, resolved_at, resolved_by, updated_at")
+    .maybeSingle();
+  if (error) throw error;
+  if (!data) throw new Error("compliance data request not found");
+
+  await recordComplianceAuditEvent(client, {
+    actorUserId: adminUserId,
+    eventType: "compliance_data_request_status_updated",
+    entityType: "compliance_data_requests",
+    entityId: data.id,
+    companyId: data.company_id,
+    payload: {
+      request_type: data.request_type,
+      status: data.status,
+      resolved_at: data.resolved_at,
+      resolved_by: data.resolved_by,
+    },
+  });
+
+  return data;
+};
+
+const collectComplianceLegalReadinessSignals = async (
+  client: ReturnType<typeof createClient>,
+) => {
+  const nowIso = new Date().toISOString();
+  const staleSubmittedIso = new Date(Date.now() - 7 * 24 * 60 * 60 * 1000).toISOString();
+  const [profileCountResult, disclaimerRowsResult, openRequestsResult, overdueRequestsResult, staleSubmittedResult] = await Promise.all([
+    client.from("profiles").select("user_id", { count: "exact", head: true }),
+    client.from("legal_disclaimer_acceptances").select("user_id").eq("disclaimer_key", "ai_assisted_drafting").limit(5000),
+    client.from("compliance_data_requests").select("id", { count: "exact", head: true }).in("status", ["submitted", "under_review", "approved"]),
+    client.from("compliance_data_requests").select("id", { count: "exact", head: true }).in("status", ["submitted", "under_review", "approved"]).lt("due_at", nowIso),
+    client.from("compliance_data_requests").select("id", { count: "exact", head: true }).eq("status", "submitted").lt("submitted_at", staleSubmittedIso),
+  ]);
+
+  if (profileCountResult.error) throw profileCountResult.error;
+  if (disclaimerRowsResult.error) throw disclaimerRowsResult.error;
+  if (openRequestsResult.error) throw openRequestsResult.error;
+  if (overdueRequestsResult.error) throw overdueRequestsResult.error;
+  if (staleSubmittedResult.error) throw staleSubmittedResult.error;
+
+  const totalUsers = Number(profileCountResult.count ?? 0);
+  const acceptedUserCount = new Set((disclaimerRowsResult.data ?? []).map((row) => String(row.user_id))).size;
+  const missingDisclaimerUsers = Math.max(0, totalUsers - acceptedUserCount);
+  const openRequests = Number(openRequestsResult.count ?? 0);
+  const overdueOpenRequests = Number(overdueRequestsResult.count ?? 0);
+  const staleSubmittedRequests = Number(staleSubmittedResult.count ?? 0);
+
+  const critical = overdueOpenRequests;
+  const high = staleSubmittedRequests + (missingDisclaimerUsers > 0 ? 1 : 0);
+  const medium = openRequests;
+
+  return {
+    summary: {
+      critical,
+      high,
+      medium,
+    },
+    metrics: {
+      users_total: totalUsers,
+      users_with_ai_disclaimer: acceptedUserCount,
+      users_missing_ai_disclaimer: missingDisclaimerUsers,
+      open_data_requests: openRequests,
+      overdue_open_data_requests: overdueOpenRequests,
+      stale_submitted_requests_older_than_7d: staleSubmittedRequests,
+    },
+    overall: {
+      pass: critical === 0 && high === 0,
+    },
+  };
+};
+
 serve(async (req: Request) => {
   const corsHeaders = getCorsHeaders(req);
   if (corsHeaders["Access-Control-Allow-Origin"] === "null") {
@@ -5701,6 +6108,74 @@ serve(async (req: Request) => {
           probe,
           checked_at: new Date().toISOString(),
         },
+      });
+    }
+
+    if (req.method === "GET" && path.endsWith("compliance/consent/status")) {
+      const limitRaw = Number(url.searchParams.get("limit") ?? 50);
+      return json(req, 200, {
+        ok: true,
+        data: await listComplianceConsentStatus(client, user.id, {
+          consentKey: url.searchParams.get("consent_key"),
+          limit: Number.isFinite(limitRaw) ? limitRaw : 50,
+        }),
+      });
+    }
+
+    if (req.method === "POST" && path.endsWith("compliance/consent/events")) {
+      const body = await req.json().catch(() => ({}));
+      if (!body || typeof body !== "object") {
+        return json(req, 400, { error: "request body is required" });
+      }
+      return json(req, 200, {
+        ok: true,
+        data: await upsertComplianceConsent(client, req, user.id, body as Record<string, unknown>),
+      });
+    }
+
+    if (req.method === "GET" && path.endsWith("compliance/legal-disclaimer/status")) {
+      const limitRaw = Number(url.searchParams.get("limit") ?? 50);
+      return json(req, 200, {
+        ok: true,
+        data: await listLegalDisclaimerStatus(client, user.id, {
+          disclaimerKey: url.searchParams.get("disclaimer_key"),
+          limit: Number.isFinite(limitRaw) ? limitRaw : 50,
+        }),
+      });
+    }
+
+    if (req.method === "POST" && path.endsWith("compliance/legal-disclaimer/accept")) {
+      const body = await req.json().catch(() => ({}));
+      if (!body || typeof body !== "object") {
+        return json(req, 400, { error: "request body is required" });
+      }
+      return json(req, 200, {
+        ok: true,
+        data: await upsertLegalDisclaimerAcceptance(client, req, user.id, body as Record<string, unknown>),
+      });
+    }
+
+    if (req.method === "GET" && path.endsWith("compliance/data-requests")) {
+      const limitRaw = Number(url.searchParams.get("limit") ?? 50);
+      const offsetRaw = Number(url.searchParams.get("offset") ?? 0);
+      return json(req, 200, {
+        ok: true,
+        data: await listComplianceDataRequests(client, user.id, {
+          status: url.searchParams.get("status"),
+          limit: Number.isFinite(limitRaw) ? limitRaw : 50,
+          offset: Number.isFinite(offsetRaw) ? offsetRaw : 0,
+        }),
+      });
+    }
+
+    if (req.method === "POST" && path.endsWith("compliance/data-requests")) {
+      const body = await req.json().catch(() => ({}));
+      if (!body || typeof body !== "object") {
+        return json(req, 400, { error: "request body is required" });
+      }
+      return json(req, 200, {
+        ok: true,
+        data: await createComplianceDataRequest(client, user.id, body as Record<string, unknown>),
       });
     }
 
@@ -6066,6 +6541,42 @@ serve(async (req: Request) => {
       return json(req, 200, {
         ok: true,
         data: await loadLandingMetrics(client),
+      });
+    }
+
+    if (req.method === "GET" && path.endsWith("ops/compliance/readiness")) {
+      requireRole(roles, ["admin"]);
+      return json(req, 200, {
+        ok: true,
+        data: await collectComplianceLegalReadinessSignals(client),
+      });
+    }
+
+    if (req.method === "GET" && path.endsWith("ops/compliance/data-requests")) {
+      requireRole(roles, ["admin"]);
+      const limitRaw = Number(url.searchParams.get("limit") ?? 100);
+      const offsetRaw = Number(url.searchParams.get("offset") ?? 0);
+      return json(req, 200, {
+        ok: true,
+        data: await listComplianceDataRequestsByAdmin(client, {
+          status: url.searchParams.get("status"),
+          requestType: url.searchParams.get("request_type"),
+          limit: Number.isFinite(limitRaw) ? limitRaw : 100,
+          offset: Number.isFinite(offsetRaw) ? offsetRaw : 0,
+        }),
+      });
+    }
+
+    if (req.method === "POST" && path.includes("ops/compliance/data-requests/") && path.endsWith("/status")) {
+      requireRole(roles, ["admin"]);
+      const requestId = path.split("ops/compliance/data-requests/")[1].replace("/status", "");
+      const body = await req.json().catch(() => ({}));
+      if (!body || typeof body !== "object") {
+        return json(req, 400, { error: "request body is required" });
+      }
+      return json(req, 200, {
+        ok: true,
+        data: await updateComplianceDataRequestStatusByAdmin(client, user.id, requestId, body as Record<string, unknown>),
       });
     }
 

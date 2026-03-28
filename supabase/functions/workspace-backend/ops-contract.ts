@@ -36,6 +36,11 @@ export type PrelaunchSignals = {
     high: number;
     medium: number;
   };
+  complianceLegal: {
+    critical: number;
+    high: number;
+    medium: number;
+  };
 };
 
 export const computePrelaunchGate = (signals: PrelaunchSignals) => {
@@ -91,6 +96,12 @@ export const computePrelaunchGate = (signals: PrelaunchSignals) => {
       title: "Export Integrity (PDF/DOCX)",
       status: signals.exportIntegrity.critical > 0 ? "fail" : signals.exportIntegrity.high > 0 ? "warn" : "pass",
       detail: "Export metadata, mime/format parity, and delivery audit chain are complete.",
+    },
+    {
+      id: "compliance_legal",
+      title: "Compliance & Legal Readiness",
+      status: signals.complianceLegal.critical > 0 ? "fail" : signals.complianceLegal.high > 0 ? "warn" : "pass",
+      detail: "Consent capture, legal disclaimers, and data subject request workflow are operational.",
     },
   ] as const;
 
@@ -163,6 +174,7 @@ export const buildRegressionChecklist = () => ({
     "/ops/workflow-integrity-check",
     "/ops/draft-audit-integrity-check",
     "/ops/draft-export-integrity-check",
+    "/ops/compliance/readiness",
     "/ops/workflow-sla-monitor",
     "/ops/prelaunch-gate",
   ],
