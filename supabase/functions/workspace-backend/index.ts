@@ -3701,6 +3701,138 @@ const loadSingleUserDashboardReadiness = async (
   };
 };
 
+const resolveTargetDashboardPath = (persona: AppPersona | null, roles: string[]) => {
+  if (persona === "admin" || roles.includes("admin")) return "/app/admin-dashboard";
+  if (persona === "in_house_lawyer") return "/app/legal-dashboard";
+  if (persona === "external_ca" || persona === "in_house_ca") return "/app/ca-dashboard";
+  if (persona === "ca_firm") return "/app/ca-firm-dashboard";
+  return "/app/dashboard";
+};
+
+const inferReadinessActions = (readiness: {
+  blockers: string[];
+  persona: AppPersona | null;
+  roles: string[];
+  memberships: { company: number; ca_firm: number };
+}) => {
+  const actions: string[] = [];
+  for (const blocker of readiness.blockers) {
+    if (blocker === "Missing persona") {
+      actions.push("Set a valid persona in user_personas (company_owner, external_ca, in_house_ca, in_house_lawyer, ca_firm, admin).");
+      continue;
+    }
+    if (blocker === "Missing app role") {
+      actions.push("Insert matching app role in user_roles (user/manager/admin) based on persona.");
+      continue;
+    }
+    if (blocker === "No company assignment") {
+      actions.push("Assign company membership in company_members or create company workspace via POST /company/workspace.");
+      continue;
+    }
+    if (blocker === "No CA firm membership") {
+      actions.push("Assign CA firm membership in ca_firm_members or create firm workspace via POST /ca-firm/workspace.");
+      continue;
+    }
+  }
+  if (actions.length === 0) {
+    if (readiness.persona === "ca_firm" && readiness.memberships.ca_firm > 0) {
+      actions.push("Workspace is ready. Continue with /app/ca-firm-dashboard.");
+    } else if (readiness.memberships.company > 0 || readiness.roles.includes("admin")) {
+      actions.push("Workspace is ready. Continue with your role dashboard.");
+    } else {
+      actions.push("Complete profile assignment and membership setup.");
+    }
+  }
+  return actions;
+};
+
+const buildSelfDashboardProbe = async (
+  client: ReturnType<typeof createClient>,
+  userId: string,
+  persona: AppPersona | null,
+  roles: string[],
+) => {
+  const targetPath = resolveTargetDashboardPath(persona, roles);
+  try {
+    if (targetPath === "/app/admin-dashboard") {
+      const admin = await buildAdminDashboard(client);
+      return {
+        target_dashboard: targetPath,
+        ok: true,
+        data_shape: {
+          companies: admin.companies.length,
+          tasks: admin.tasks.length,
+          documents: admin.documents.length,
+          drafts: admin.drafts.length,
+        },
+      };
+    }
+
+    if (targetPath === "/app/legal-dashboard") {
+      const legal = await buildLegalDashboard(client, userId);
+      return {
+        target_dashboard: targetPath,
+        ok: true,
+        data_shape: {
+          companies: legal.companyIds.length,
+          runs: legal.runs.length,
+          events: legal.events.length,
+        },
+      };
+    }
+
+    if (targetPath === "/app/ca-dashboard") {
+      const ca = await buildCaDashboard(client, userId);
+      return {
+        target_dashboard: targetPath,
+        ok: true,
+        data_shape: {
+          companies: ca.companies.length,
+          tasks: ca.tasks.length,
+          deadlines: ca.deadlines.length,
+          documents: ca.documents.length,
+          drafts: ca.drafts.length,
+        },
+      };
+    }
+
+    if (targetPath === "/app/ca-firm-dashboard") {
+      const firm = await buildCaFirmDashboard(client, userId);
+      return {
+        target_dashboard: targetPath,
+        ok: true,
+        data_shape: {
+          firm_present: Boolean(firm.firm),
+          members: firm.members.length,
+          directory: firm.directory.length,
+          runs: firm.runs.length,
+        },
+      };
+    }
+
+    const company = await buildCompanyDashboard(client, userId);
+    return {
+      target_dashboard: targetPath,
+      ok: true,
+      data_shape: {
+        company_present: Boolean(company.company),
+        exposures: company.exposures.length,
+        tasks: company.tasks.length,
+        documents: company.documents.length,
+        deadlines: company.deadlines.length,
+        draft_runs: company.draftRuns.length,
+      },
+    };
+  } catch (error) {
+    return {
+      target_dashboard: targetPath,
+      ok: false,
+      error: extractErrorMessage(error),
+      error_code: resolveErrorCode(extractErrorMessage(error)),
+    };
+  }
+};
+
 const repairUserDashboardReadinessByAdmin = async (
   serviceClient: ReturnType<typeof createClient>,
   params: {
@@ -4043,6 +4175,7 @@ const bootstrapCompanyAuthorityWorkflowsByAdmin = async (
 
 const getRouteAccessMatrix = () => ({
   dashboards: [
+    { route: "GET /dashboard/readiness/self", roles: ["authenticated"] },
     { route: "GET /company/dashboard", roles: ["user", "manager", "admin"] },
     { route: "POST /company/bootstrap-data", roles: ["user", "manager", "admin"] },
     { route: "GET /ca/dashboard", roles: ["manager", "admin"] },
@@ -4574,6 +4707,24 @@ serve(async (req: Request) => {
     const { client, user, token } = await getUserClient(req);
     const persona = await getUserPersona(client, user.id, user);
     const roles = applyPersonaRoleFallback(await getUserRoles(client, user.id), persona);
+
+    if (req.method === "GET" && path.endsWith("dashboard/readiness/self")) {
+      const readiness = await loadSingleUserDashboardReadiness(client, user.id);
+      const probe = await buildSelfDashboardProbe(client, user.id, persona, Array.from(roles));
+      return json(req, 200, {
+        ok: true,
+        data: {
+          user_id: user.id,
+          persona,
+          roles: Array.from(roles),
+          readiness,
+          target_dashboard: resolveTargetDashboardPath(persona, Array.from(roles)),
+          suggested_actions: inferReadinessActions(readiness),
+          probe,
+          checked_at: new Date().toISOString(),
+        },
+      });
+    }
 
     if (req.method === "GET" && path.endsWith("company/dashboard")) {
       requireRole(roles, ["user", "manager", "admin"]);
