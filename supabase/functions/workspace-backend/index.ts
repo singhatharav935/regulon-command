@@ -1031,13 +1031,147 @@ const extractErrorMessage = (error: unknown) => {
   return "Internal error";
 };
 
-const createCompanyWorkspace = async (client: ReturnType<typeof createClient>, name: string, industry: string | null) => {
-  const { error } = await client.rpc("create_company_with_owner", {
+const toIsoDate = (daysFromNow: number) => {
+  const date = new Date(Date.now() + daysFromNow * 24 * 60 * 60 * 1000);
+  return date.toISOString().slice(0, 10);
+};
+
+const bootstrapCompanyWorkspaceData = async (
+  client: ReturnType<typeof createClient>,
+  params: { companyId: string; ownerUserId: string },
+) => {
+  const { companyId, ownerUserId } = params;
+  const [exposureCountResult, taskCountResult, documentCountResult, deadlineCountResult] = await Promise.all([
+    client.from("regulatory_exposure").select("id", { count: "exact", head: true }).eq("company_id", companyId),
+    client.from("compliance_tasks").select("id", { count: "exact", head: true }).eq("company_id", companyId),
+    client.from("documents").select("id", { count: "exact", head: true }).eq("company_id", companyId),
+    client.from("deadlines").select("id", { count: "exact", head: true }).eq("company_id", companyId),
+  ]);
+
+  if (exposureCountResult.error) throw exposureCountResult.error;
+  if (taskCountResult.error) throw taskCountResult.error;
+  if (documentCountResult.error) throw documentCountResult.error;
+  if (deadlineCountResult.error) throw deadlineCountResult.error;
+
+  const exposureCount = Number(exposureCountResult.count ?? 0);
+  const taskCount = Number(taskCountResult.count ?? 0);
+  const documentCount = Number(documentCountResult.count ?? 0);
+  const deadlineCount = Number(deadlineCountResult.count ?? 0);
+
+  if (exposureCount === 0) {
+    const { error } = await client.from("regulatory_exposure").upsert([
+      { company_id: companyId, regulator: "MCA", status: "potential", notes: "MCA statutory calendar initialized." },
+      { company_id: companyId, regulator: "GST", status: "potential", notes: "GST monthly return watchlist initialized." },
+      { company_id: companyId, regulator: "Income Tax", status: "potential", notes: "Income tax assessment workflow initialized." },
+      { company_id: companyId, regulator: "RBI", status: "not_applicable", notes: "RBI applicability placeholder set." },
+      { company_id: companyId, regulator: "SEBI", status: "not_applicable", notes: "SEBI applicability placeholder set." },
+    ], { onConflict: "company_id,regulator" });
+    if (error) throw error;
+  }
+
+  if (deadlineCount === 0) {
+    const { error } = await client.from("deadlines").insert([
+      { company_id: companyId, title: "Monthly GST Return Filing", regulator: "GST", due_date: toIsoDate(7), is_recurring: true },
+      { company_id: companyId, title: "TDS Compliance Review", regulator: "Income Tax", due_date: toIsoDate(12), is_recurring: true },
+      { company_id: companyId, title: "MCA ROC Form Preparedness", regulator: "MCA", due_date: toIsoDate(18), is_recurring: true },
+      { company_id: companyId, title: "Quarterly Regulatory Exposure Review", regulator: "MCA", due_date: toIsoDate(25), is_recurring: true },
+    ]);
+    if (error) throw error;
+  }
+
+  if (taskCount === 0) {
+    const { error } = await client.from("compliance_tasks").insert([
+      {
+        company_id: companyId,
+        title: "Compile GST supporting invoices and reconciliations",
+        description: "Prepare monthly invoice reconciliation pack for GST filing.",
+        regulator: "GST",
+        priority: "high",
+        status: "pending",
+        due_date: toIsoDate(6),
+        assigned_to: ownerUserId,
+      },
+      {
+        company_id: companyId,
+        title: "Prepare Income Tax advance tax working note",
+        description: "Review payable projections and supporting assumptions.",
+        regulator: "Income Tax",
+        priority: "critical",
+        status: "in_progress",
+        due_date: toIsoDate(10),
+        assigned_to: ownerUserId,
+      },
+      {
+        company_id: companyId,
+        title: "Validate board and statutory records for MCA cycle",
+        description: "Cross-check director registers and statutory filings.",
+        regulator: "MCA",
+        priority: "medium",
+        status: "pending",
+        due_date: toIsoDate(14),
+        assigned_to: ownerUserId,
+      },
+      {
+        company_id: companyId,
+        title: "Review contract compliance exceptions",
+        description: "Check key customer/vendor contracts for compliance triggers.",
+        regulator: "Contract",
+        priority: "medium",
+        status: "under_review",
+        due_date: toIsoDate(16),
+        assigned_to: ownerUserId,
+      },
+    ]);
+    if (error) throw error;
+  }
+
+  if (documentCount === 0) {
+    const { error } = await client.from("documents").insert([
+      { company_id: companyId, name: "GST Reconciliation Pack", file_type: "xlsx", regulator: "GST", status: "draft", uploaded_by: ownerUserId },
+      { company_id: companyId, name: "Income Tax Working Papers", file_type: "pdf", regulator: "Income Tax", status: "under_review", uploaded_by: ownerUserId },
+      { company_id: companyId, name: "MCA Board Records Summary", file_type: "docx", regulator: "MCA", status: "submitted", uploaded_by: ownerUserId },
+      { company_id: companyId, name: "Contract Compliance Tracker", file_type: "xlsx", regulator: "Contract", status: "draft", uploaded_by: ownerUserId },
+    ]);
+    if (error) throw error;
+  }
+
+  return {
+    company_id: companyId,
+    seeded: {
+      exposures: exposureCount === 0,
+      tasks: taskCount === 0,
+      documents: documentCount === 0,
+      deadlines: deadlineCount === 0,
+    },
+  };
+};
+
+const createCompanyWorkspace = async (
+  client: ReturnType<typeof createClient>,
+  userId: string,
+  name: string,
+  industry: string | null,
+) => {
+  const { data: companyId, error } = await client.rpc("create_company_with_owner", {
     _name: name,
     _industry: industry,
   });
   if (error) throw error;
-  return { created: true };
+  let seeded = null;
+  let seedError: string | null = null;
+
+  if (typeof companyId === "string" && companyId) {
+    try {
+      seeded = await bootstrapCompanyWorkspaceData(client, {
+        companyId,
+        ownerUserId: userId,
+      });
+    } catch (error) {
+      seedError = extractErrorMessage(error);
+    }
+  }
+
+  return { created: true, companyId: typeof companyId === "string" ? companyId : null, seeded, seedError };
 };
 
 const createCaFirmWorkspace = async (
@@ -3071,6 +3205,7 @@ const collectDeployReadinessSignals = async (
 const getRouteAccessMatrix = () => ({
   dashboards: [
     { route: "GET /company/dashboard", roles: ["user", "manager", "admin"] },
+    { route: "POST /company/bootstrap-data", roles: ["user", "manager", "admin"] },
     { route: "GET /ca/dashboard", roles: ["manager", "admin"] },
     { route: "GET /legal/dashboard", roles: ["manager", "admin"] },
     { route: "GET /ca-firm/dashboard", roles: ["manager", "admin"] },
@@ -4612,7 +4747,28 @@ serve(async (req: Request) => {
       const name = String(body.name || "").trim();
       const industry = typeof body.industry === "string" && body.industry.trim() ? body.industry.trim() : null;
       if (!name) return json(req, 400, { error: "name is required" });
-      return json(req, 200, { ok: true, data: await createCompanyWorkspace(client, name, industry) });
+      return json(req, 200, { ok: true, data: await createCompanyWorkspace(client, user.id, name, industry) });
+    }
+
+    if (req.method === "POST" && path.endsWith("company/bootstrap-data")) {
+      requireRole(roles, ["user", "manager", "admin"]);
+      const body = await req.json().catch(() => ({}));
+      const companyIdRaw = typeof body.companyId === "string" && body.companyId.trim() ? body.companyId.trim() : null;
+      const companyIds = await getUserCompanyIds(client, user.id);
+      let targetCompanyId = companyIdRaw;
+      if (!targetCompanyId) {
+        targetCompanyId = companyIds[0] ?? null;
+      }
+      if (!targetCompanyId) {
+        return json(req, 400, { error: "No company assignment found for bootstrap" });
+      }
+      if (!roles.has("admin") && !companyIds.includes(targetCompanyId)) {
+        return json(req, 403, { error: "Forbidden" });
+      }
+      return json(req, 200, {
+        ok: true,
+        data: await bootstrapCompanyWorkspaceData(client, { companyId: targetCompanyId, ownerUserId: user.id }),
+      });
     }
 
     if (req.method === "POST" && path.endsWith("ca-firm/workspace")) {
