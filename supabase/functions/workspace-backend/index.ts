@@ -90,6 +90,16 @@ const hashText = async (text: string) => {
   return bytes.map((value) => value.toString(16).padStart(2, "0")).join("");
 };
 
+const isMissingRelationError = (error: unknown, relation: string) => {
+  if (!error || typeof error !== "object") return false;
+  const objectError = error as Record<string, unknown>;
+  const code = typeof objectError.code === "string" ? objectError.code.trim().toUpperCase() : "";
+  if (code === "42P01" || code === "PGRST205") return true;
+  const message = typeof objectError.message === "string" ? objectError.message.toLowerCase() : "";
+  if (!message.includes(relation.toLowerCase())) return false;
+  return message.includes("does not exist") || message.includes("could not find the table") || message.includes("schema cache");
+};
+
 const enforcePublicRateLimit = async (
   serviceClient: ReturnType<typeof createClient>,
   req: Request,
@@ -109,7 +119,10 @@ const enforcePublicRateLimit = async (
     .eq("route", route)
     .eq("window_bucket", windowBucket)
     .maybeSingle();
-  if (existingError) throw existingError;
+  if (existingError) {
+    if (isMissingRelationError(existingError, "landing_public_rate_limits")) return;
+    throw existingError;
+  }
 
   if (!existing) {
     const { error: insertError } = await serviceClient.from("landing_public_rate_limits").insert({
@@ -118,7 +131,10 @@ const enforcePublicRateLimit = async (
       window_bucket: windowBucket,
       request_count: 1,
     });
-    if (insertError) throw insertError;
+    if (insertError) {
+      if (isMissingRelationError(insertError, "landing_public_rate_limits")) return;
+      throw insertError;
+    }
     return;
   }
 
@@ -132,7 +148,10 @@ const enforcePublicRateLimit = async (
       request_count: Number(existing.request_count ?? 0) + 1,
     })
     .eq("id", existing.id);
-  if (updateError) throw updateError;
+  if (updateError) {
+    if (isMissingRelationError(updateError, "landing_public_rate_limits")) return;
+    throw updateError;
+  }
 };
 
 const getUserRoles = async (client: ReturnType<typeof createClient>, userId: string) => {
@@ -949,6 +968,11 @@ const assertAiOperationPayloadShape = (operation: string, payload: Record<string
 const resolveErrorCode = (message: string) => {
   if (message === "Unauthorized") return "AUTH_UNAUTHORIZED";
   if (message.startsWith("Forbidden")) return "ACCESS_FORBIDDEN";
+  if (message.startsWith("Landing lead capture is not configured yet")) return "SERVICE_NOT_READY";
+  if (message.includes("could not find the table")) return "SERVICE_NOT_READY";
+  if (message.includes("relation") && message.includes("does not exist")) return "SERVICE_NOT_READY";
+  if (message.includes("[42P01]")) return "SERVICE_NOT_READY";
+  if (message.includes("[PGRST205]")) return "SERVICE_NOT_READY";
   if (message === "Draft not found" || message === "Draft export not found") return "RESOURCE_NOT_FOUND";
   if (message.startsWith("Draft version conflict:")) return "WORKFLOW_VERSION_CONFLICT";
   if (message.startsWith("Draft state conflict:")) return "WORKFLOW_STATE_CONFLICT";
@@ -964,6 +988,23 @@ const resolveErrorCode = (message: string) => {
   if (message.startsWith("Invalid event type for transition:")) return "WORKFLOW_EVENT_INVALID";
   if (message.includes(" is required") || message.includes(" are required")) return "VALIDATION_REQUIRED_FIELD";
   return "INTERNAL_ERROR";
+};
+
+const extractErrorMessage = (error: unknown) => {
+  if (error instanceof Error && typeof error.message === "string" && error.message.trim()) {
+    return error.message.trim();
+  }
+  if (typeof error === "string" && error.trim()) {
+    return error.trim();
+  }
+  if (error && typeof error === "object") {
+    const objectError = error as Record<string, unknown>;
+    const message = typeof objectError.message === "string" ? objectError.message.trim() : "";
+    const code = typeof objectError.code === "string" ? objectError.code.trim() : "";
+    if (message && code) return `${message} [${code}]`;
+    if (message) return message;
+  }
+  return "Internal error";
 };
 
 const createCompanyWorkspace = async (client: ReturnType<typeof createClient>, name: string, industry: string | null) => {
@@ -3345,8 +3386,8 @@ const loadLandingOverview = async (serviceClient: ReturnType<typeof createClient
       .select("id", { count: "exact", head: true })
       .gte("created_at", new Date(Date.now() - 7 * 24 * 60 * 60 * 1000).toISOString()),
   ]);
-  if (contentError) throw contentError;
-  if (leadsError) throw leadsError;
+  if (contentError && !isMissingRelationError(contentError, "landing_public_content")) throw contentError;
+  if (leadsError && !isMissingRelationError(leadsError, "landing_leads")) throw leadsError;
 
   const fallback = {
     title: "REGULON",
@@ -3366,7 +3407,7 @@ const loadLandingOverview = async (serviceClient: ReturnType<typeof createClient
     ...fallback,
     ...(content ?? {}),
     telemetry: {
-      leads_last_7d: leads7d ?? 0,
+      leads_last_7d: leadsError ? 0 : (leads7d ?? 0),
     },
   };
 };
@@ -3399,7 +3440,12 @@ const createLandingLead = async (
     })
     .select("id, status, created_at")
     .single();
-  if (error || !data) throw error ?? new Error("Failed to create landing lead");
+  if (error || !data) {
+    if (isMissingRelationError(error, "landing_leads")) {
+      throw new Error("Landing lead capture is not configured yet (landing_leads table missing)");
+    }
+    throw error ?? new Error("Failed to create landing lead");
+  }
   return data;
 };
 
@@ -4787,7 +4833,7 @@ serve(async (req: Request) => {
 
     return json(req, 404, { error: "Route not found" });
   } catch (error) {
-    const message = error instanceof Error ? error.message : "Internal error";
+    const message = extractErrorMessage(error);
     const errorCode = resolveErrorCode(message);
     const status =
       errorCode === "AUTH_UNAUTHORIZED"
@@ -4796,6 +4842,8 @@ serve(async (req: Request) => {
           ? 404
         : errorCode === "ACCESS_FORBIDDEN" || errorCode === "WORKFLOW_ACTOR_FORBIDDEN"
           ? 403
+        : errorCode === "SERVICE_NOT_READY"
+          ? 503
         : errorCode === "AI_REQUEST_IN_PROGRESS"
             || errorCode === "WORKFLOW_VERSION_CONFLICT"
             || errorCode === "WORKFLOW_STATE_CONFLICT"
