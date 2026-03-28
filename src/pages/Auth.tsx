@@ -8,6 +8,8 @@ import { Label } from "@/components/ui/label";
 import { supabase } from "@/integrations/supabase/client";
 import { useToast } from "@/hooks/use-toast";
 import { z } from "zod";
+import { previewBypassEnabled } from "@/lib/runtime-flags";
+import { clearLocalPreviewPersona, setLocalPreviewPersona } from "@/lib/local-preview-auth";
 
 const emailSchema = z.string().email("Please enter a valid email address");
 const passwordSchema = z.string().min(6, "Password must be at least 6 characters");
@@ -155,6 +157,7 @@ const Auth = () => {
   const [loading, setLoading] = useState(false);
   const [errors, setErrors] = useState<{ email?: string; password?: string; fullName?: string }>({});
   const submitFailSafeRef = useRef<ReturnType<typeof setTimeout> | null>(null);
+  const previewModeEnabled = previewBypassEnabled;
 
   useEffect(() => {
     const syncMode = searchParams.get("mode") === "signup" ? "signup" : "login";
@@ -249,6 +252,18 @@ const Auth = () => {
           }
         }
         if (loginError) throw loginError;
+        clearLocalPreviewPersona();
+
+        const {
+          data: { user: activeUser },
+        } = await supabase.auth.getUser();
+        const activeRole = String(activeUser?.user_metadata?.registration_role ?? "");
+        if (activeRole && activeRole !== selectedPersona) {
+          toast({
+            title: "Logged in with account role",
+            description: `This account is mapped to "${activeRole.replaceAll("_", " ")}". Role selector does not switch existing account role.`,
+          });
+        }
 
         toast({ title: "Welcome back", description: "Login successful. Redirecting to your workspace." });
         navigate(returnPath || "/app", { replace: true });
@@ -271,6 +286,7 @@ const Auth = () => {
         });
 
         if (error) throw error;
+        clearLocalPreviewPersona();
 
         if (data.user) {
           const supabaseAny = supabase as any;
@@ -328,6 +344,42 @@ const Auth = () => {
             <h1 className="text-2xl font-bold mb-2 text-gradient-primary">REGULON ACCESS</h1>
             <p className="text-muted-foreground">Role-specific authentication and verification-first onboarding</p>
           </div>
+
+          {previewModeEnabled ? (
+            <div className="mb-6 rounded-xl border border-cyan-500/30 bg-cyan-500/10 p-4">
+              <div className="flex items-center justify-between gap-3 flex-wrap">
+                <p className="text-sm text-cyan-200">
+                  Local preview mode is enabled. You can enter dashboards without real login/register.
+                </p>
+                <Button
+                  type="button"
+                  variant="outline"
+                  onClick={() => {
+                    clearLocalPreviewPersona();
+                    toast({ title: "Preview session cleared" });
+                  }}
+                >
+                  Clear Preview Session
+                </Button>
+              </div>
+              <div className="mt-3 flex flex-wrap gap-2">
+                {personas.map((persona) => (
+                  <Button
+                    key={`preview-${persona.id}`}
+                    type="button"
+                    size="sm"
+                    variant="secondary"
+                    onClick={() => {
+                      setLocalPreviewPersona(persona.id);
+                      navigate("/app", { replace: true });
+                    }}
+                  >
+                    Open as {persona.label}
+                  </Button>
+                ))}
+              </div>
+            </div>
+          ) : null}
 
           <div className="grid grid-cols-1 md:grid-cols-2 gap-3 mb-6">
             {personas.map((persona) => {

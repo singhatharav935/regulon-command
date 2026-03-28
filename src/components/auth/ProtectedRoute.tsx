@@ -5,6 +5,7 @@ import { useAuth } from "@/hooks/use-auth";
 import type { Database } from "@/integrations/supabase/types";
 import type { AppPersona } from "@/hooks/use-auth";
 import { previewBypassEnabled } from "@/lib/runtime-flags";
+import { getLocalPreviewPersona, personaToFallbackRole } from "@/lib/local-preview-auth";
 
 type AppRole = Database["public"]["Enums"]["app_role"];
 
@@ -36,9 +37,13 @@ const ProtectedRoute = ({ children, allowRoles, allowPersonas, requireVerified =
   const { loading, user, roles, persona, isVerified } = useAuth();
   const location = useLocation();
   const [forceResolve, setForceResolve] = useState(false);
-  const unresolvedIdentity = Boolean(user) && !persona && roles.length === 0;
+  const previewPersona = VERIFICATION_OPTIONAL_FOR_NOW ? getLocalPreviewPersona() : null;
+  const previewRoles: AppRole[] = previewPersona ? [personaToFallbackRole(previewPersona)] : [];
+  const effectiveRoles = roles.length > 0 ? roles : previewRoles;
   const fallbackPersona = inferPersonaFromMetadata(user?.user_metadata?.registration_role);
-  const effectivePersona = persona ?? fallbackPersona;
+  const effectivePersona = persona ?? fallbackPersona ?? previewPersona;
+  const hasAccessIdentity = Boolean(user) || Boolean(previewPersona);
+  const unresolvedIdentity = hasAccessIdentity && !effectivePersona && effectiveRoles.length === 0;
 
   useEffect(() => {
     if (!loading) return;
@@ -61,7 +66,7 @@ const ProtectedRoute = ({ children, allowRoles, allowPersonas, requireVerified =
     return <Navigate to="/auth" replace state={{ from: location.pathname }} />;
   }
 
-  if (!user) {
+  if (!hasAccessIdentity) {
     return <Navigate to="/auth" replace state={{ from: location.pathname }} />;
   }
 
@@ -83,7 +88,7 @@ const ProtectedRoute = ({ children, allowRoles, allowPersonas, requireVerified =
   }
 
   if (allowRoles && allowRoles.length > 0) {
-    const hasAllowedRole = allowRoles.some((role) => roles.includes(role));
+    const hasAllowedRole = allowRoles.some((role) => effectiveRoles.includes(role));
 
     if (!hasAllowedRole && (!allowPersonas || allowPersonas.length === 0)) {
       return <Navigate to="/app/dashboard" replace />;
@@ -93,7 +98,7 @@ const ProtectedRoute = ({ children, allowRoles, allowPersonas, requireVerified =
   if (allowPersonas && allowPersonas.length > 0) {
     const hasAllowedPersona = effectivePersona ? allowPersonas.includes(effectivePersona) : false;
     const hasAllowedRole = allowRoles && allowRoles.length > 0
-      ? allowRoles.some((role) => roles.includes(role))
+      ? allowRoles.some((role) => effectiveRoles.includes(role))
       : false;
 
     // Fallback for older users/sessions where persona row is not present yet.

@@ -3,6 +3,7 @@ import { Navigate } from "react-router-dom";
 import { useAuth } from "@/hooks/use-auth";
 import type { AppPersona } from "@/hooks/use-auth";
 import { previewBypassEnabled } from "@/lib/runtime-flags";
+import { getLocalPreviewPersona, personaToFallbackRole } from "@/lib/local-preview-auth";
 
 const VERIFICATION_OPTIONAL_FOR_NOW = previewBypassEnabled;
 
@@ -46,6 +47,13 @@ const RoleLandingRoute = () => {
   const { loading, user, roles, persona, isVerified } = useAuth();
   const [forceResolve, setForceResolve] = useState(false);
   const metadataPersona = inferPersonaFromMetadata(user?.user_metadata?.registration_role);
+  const previewPersona = VERIFICATION_OPTIONAL_FOR_NOW ? getLocalPreviewPersona() : null;
+  const effectivePersona = persona ?? metadataPersona ?? previewPersona;
+  const effectiveRoles = roles.length > 0
+    ? roles
+    : previewPersona
+      ? [personaToFallbackRole(previewPersona)]
+      : [];
 
   useEffect(() => {
     if (!loading) return;
@@ -80,33 +88,35 @@ const RoleLandingRoute = () => {
   if (loading && forceResolve) {
     return (
       <Navigate
-        to={hasPersistedSession ? resolveLandingPath({ persona, roles, metadataPersona }) : "/auth"}
+        to={hasPersistedSession || Boolean(previewPersona)
+          ? resolveLandingPath({ persona: effectivePersona, roles: effectiveRoles, metadataPersona: null })
+          : "/auth"}
         replace
       />
     );
   }
 
-  if (!user) {
+  if (!user && !previewPersona) {
     return <Navigate to="/auth" replace />;
   }
 
-  if (!persona && roles.length === 0) {
-    return <Navigate to={resolveLandingPath({ persona, roles, metadataPersona })} replace />;
+  if (!effectivePersona && effectiveRoles.length === 0) {
+    return <Navigate to={resolveLandingPath({ persona: effectivePersona, roles: effectiveRoles, metadataPersona: null })} replace />;
   }
 
   const requiresVerification =
-    persona === "external_ca" ||
-    persona === "in_house_ca" ||
-    persona === "in_house_lawyer" ||
-    persona === "company_owner" ||
-    persona === "admin" ||
-    persona === "ca_firm";
+    effectivePersona === "external_ca" ||
+    effectivePersona === "in_house_ca" ||
+    effectivePersona === "in_house_lawyer" ||
+    effectivePersona === "company_owner" ||
+    effectivePersona === "admin" ||
+    effectivePersona === "ca_firm";
 
   if (!VERIFICATION_OPTIONAL_FOR_NOW && requiresVerification && !isVerified) {
     return <Navigate to="/app/verification" replace />;
   }
 
-  return <Navigate to={resolveLandingPath({ persona, roles, metadataPersona })} replace />;
+  return <Navigate to={resolveLandingPath({ persona: effectivePersona, roles: effectiveRoles, metadataPersona: null })} replace />;
 };
 
 export default RoleLandingRoute;
