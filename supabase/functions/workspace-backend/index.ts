@@ -1912,6 +1912,52 @@ const buildExportBaseName = (documentType: string | null, draftMode: string | nu
   return `${doc}-${mode}-${shortId}`;
 };
 
+const EXPORT_MIME_BY_FORMAT: Record<"pdf" | "docx", string> = {
+  pdf: "application/pdf",
+  docx: "application/vnd.openxmlformats-officedocument.wordprocessingml.document",
+};
+
+const EXPORT_EXTENSION_BY_FORMAT: Record<"pdf" | "docx", string> = {
+  pdf: ".pdf",
+  docx: ".docx",
+};
+
+const normalizeExportFormat = (value: unknown): "pdf" | "docx" => {
+  const normalized = String(value ?? "").trim().toLowerCase();
+  if (normalized === "pdf" || normalized === "docx") return normalized;
+  throw new Error("format must be pdf or docx");
+};
+
+const toHex = (bytes: Uint8Array) =>
+  Array.from(bytes).map((value) => value.toString(16).padStart(2, "0")).join("");
+
+const sha256Hex = async (bytes: Uint8Array) => {
+  const digest = await crypto.subtle.digest("SHA-256", bytes);
+  return toHex(new Uint8Array(digest));
+};
+
+const assertDraftExportRowIntegrity = (row: {
+  id: string;
+  format: string;
+  mime_type: string | null;
+  file_name: string | null;
+  storage_path: string | null;
+}) => {
+  const format = normalizeExportFormat(row.format);
+  const expectedMime = EXPORT_MIME_BY_FORMAT[format];
+  const expectedExtension = EXPORT_EXTENSION_BY_FORMAT[format];
+
+  if (row.mime_type !== expectedMime) {
+    throw new Error(`Export integrity failed: mime mismatch for export ${row.id}`);
+  }
+  if (!row.file_name || !row.file_name.toLowerCase().endsWith(expectedExtension)) {
+    throw new Error(`Export integrity failed: file extension mismatch for export ${row.id}`);
+  }
+  if (!row.storage_path || !row.storage_path.endsWith(row.file_name)) {
+    throw new Error(`Export integrity failed: storage path mismatch for export ${row.id}`);
+  }
+};
+
 const createDraftPdfBytes = async (options: {
   title: string;
   documentType: string | null;
@@ -2013,7 +2059,8 @@ const createDraftExport = async (
     typeof run.draft_mode === "string" ? run.draft_mode : null,
     run.id,
   );
-  const fileName = `${baseName}.${body.format}`;
+  const format = normalizeExportFormat(body.format);
+  const fileName = `${baseName}.${format}`;
   const title = `REGULON Filing Draft`;
   const now = new Date();
 
@@ -2022,7 +2069,7 @@ const createDraftExport = async (
     throw new Error("Missing Supabase service role configuration");
   }
 
-  const byteData = body.format === "pdf"
+  const byteData = format === "pdf"
     ? await createDraftPdfBytes({
       title,
       documentType: run.document_type,
@@ -2039,9 +2086,8 @@ const createDraftExport = async (
     });
 
   const storagePath = `${userId}/${run.id}/${now.toISOString().replace(/[:.]/g, "-")}-${fileName}`;
-  const mimeType = body.format === "pdf"
-    ? "application/pdf"
-    : "application/vnd.openxmlformats-officedocument.wordprocessingml.document";
+  const mimeType = EXPORT_MIME_BY_FORMAT[format];
+  const exportHashSha256 = await sha256Hex(byteData);
 
   const { error: uploadError } = await serviceClient
     .storage
@@ -2061,7 +2107,7 @@ const createDraftExport = async (
       draft_run_id: run.id,
       requested_by: userId,
       company_id: run.company_id,
-      format: body.format,
+      format,
       status: "generated",
       file_name: fileName,
       mime_type: mimeType,
@@ -2069,6 +2115,9 @@ const createDraftExport = async (
       metadata: {
         source: "workspace-backend",
         workflow_status: run.status,
+        byte_size: byteData.byteLength,
+        sha256: exportHashSha256,
+        generator: "workspace-backend@v1",
       },
       completed_at: new Date().toISOString(),
     })
@@ -2094,10 +2143,12 @@ const createDraftExport = async (
     "filing_export_generated",
     {
       export_generated: true,
-      export_format: body.format,
+      export_format: format,
       export_id: exportRow.id,
       file_name: fileName,
       storage_path: storagePath,
+      sha256: exportHashSha256,
+      byte_size: byteData.byteLength,
     },
   );
 
@@ -2159,6 +2210,13 @@ const getDraftExportDownloadLink = async (
   if (error) throw error;
   if (!row) throw new Error("Draft export not found");
   if (!row.storage_path) throw new Error("Draft export file is unavailable");
+  assertDraftExportRowIntegrity({
+    id: row.id,
+    format: String(row.format),
+    mime_type: row.mime_type,
+    file_name: row.file_name,
+    storage_path: row.storage_path,
+  });
 
   await loadDraftReview(client, userId, roles, row.draft_run_id);
 
@@ -2184,6 +2242,7 @@ const getDraftExportDownloadLink = async (
         review_surface: "workspace-backend",
         export_id: row.id,
         export_format: row.format,
+        file_name: row.file_name,
         requested_ttl_seconds: safeTtl,
       },
     });
@@ -3715,6 +3774,169 @@ const runDraftAuditTrailIntegrityCheck = async (
   };
 };
 
+const runDraftExportIntegrityCheck = async (
+  client: ReturnType<typeof createClient>,
+  options?: { limit?: number; companyId?: string | null },
+) => {
+  const limit = Math.max(50, Math.min(5000, Number(options?.limit ?? 1200)));
+  const companyId = typeof options?.companyId === "string" && options.companyId.trim() ? options.companyId.trim() : null;
+
+  let exportsQuery = client
+    .from("draft_exports")
+    .select("id, draft_run_id, company_id, format, status, file_name, mime_type, storage_path, metadata, completed_at, created_at")
+    .order("created_at", { ascending: false })
+    .limit(limit);
+  if (companyId) exportsQuery = exportsQuery.eq("company_id", companyId);
+
+  const { data: exportRows, error: exportsError } = await exportsQuery;
+  if (exportsError) throw exportsError;
+  const rows = exportRows ?? [];
+  if (rows.length === 0) {
+    return {
+      scanned: 0,
+      findings: [],
+      summary: { critical: 0, high: 0, medium: 0 },
+      overall: { pass: true },
+    };
+  }
+
+  const runIds = Array.from(new Set(rows.map((row) => row.draft_run_id)));
+  const [runsResult, eventsResult] = await Promise.all([
+    client
+      .from("draft_runs")
+      .select("id, company_id")
+      .in("id", runIds),
+    client
+      .from("draft_audit_events")
+      .select("draft_run_id, event_type, payload, created_at")
+      .in("draft_run_id", runIds)
+      .in("event_type", ["filing_export_generated", "filing_export_download_link_issued"]),
+  ]);
+  if (runsResult.error) throw runsResult.error;
+  if (eventsResult.error) throw eventsResult.error;
+
+  const runById = new Map((runsResult.data ?? []).map((row) => [row.id, row]));
+  const eventsByRun = new Map<string, Array<{ event_type: string; payload: Record<string, unknown> | null }>>();
+  for (const event of eventsResult.data ?? []) {
+    const list = eventsByRun.get(event.draft_run_id) ?? [];
+    list.push({
+      event_type: String(event.event_type),
+      payload: event.payload && typeof event.payload === "object" ? event.payload as Record<string, unknown> : null,
+    });
+    eventsByRun.set(event.draft_run_id, list);
+  }
+
+  const findings: Array<{
+    severity: "critical" | "high" | "medium";
+    code: string;
+    export_id: string;
+    draft_run_id: string;
+    detail: string;
+  }> = [];
+
+  for (const row of rows) {
+    const run = runById.get(row.draft_run_id);
+    if (!run) {
+      findings.push({
+        severity: "critical",
+        code: "EXPORT_WITHOUT_DRAFT_RUN",
+        export_id: row.id,
+        draft_run_id: row.draft_run_id,
+        detail: "Export row references a missing draft run.",
+      });
+      continue;
+    }
+
+    if (row.company_id && run.company_id && row.company_id !== run.company_id) {
+      findings.push({
+        severity: "critical",
+        code: "EXPORT_COMPANY_MISMATCH",
+        export_id: row.id,
+        draft_run_id: row.draft_run_id,
+        detail: "Export company_id differs from draft run company_id.",
+      });
+    }
+
+    try {
+      assertDraftExportRowIntegrity({
+        id: row.id,
+        format: String(row.format),
+        mime_type: row.mime_type,
+        file_name: row.file_name,
+        storage_path: row.storage_path,
+      });
+    } catch (error) {
+      findings.push({
+        severity: "critical",
+        code: "EXPORT_FILE_METADATA_INVALID",
+        export_id: row.id,
+        draft_run_id: row.draft_run_id,
+        detail: error instanceof Error ? error.message : "Invalid export metadata",
+      });
+    }
+
+    const rowMetadata = row.metadata && typeof row.metadata === "object" ? row.metadata as Record<string, unknown> : null;
+    const byteSize = Number(rowMetadata?.byte_size ?? 0);
+    const sha256 = typeof rowMetadata?.sha256 === "string" ? rowMetadata.sha256 : "";
+    if (!Number.isInteger(byteSize) || byteSize <= 0) {
+      findings.push({
+        severity: "high",
+        code: "EXPORT_BYTE_SIZE_MISSING",
+        export_id: row.id,
+        draft_run_id: row.draft_run_id,
+        detail: "Export metadata does not include a valid byte_size.",
+      });
+    }
+    if (!/^[a-f0-9]{64}$/i.test(sha256)) {
+      findings.push({
+        severity: "high",
+        code: "EXPORT_HASH_MISSING",
+        export_id: row.id,
+        draft_run_id: row.draft_run_id,
+        detail: "Export metadata does not include a valid sha256 hash.",
+      });
+    }
+
+    if (row.status === "generated" && !row.completed_at) {
+      findings.push({
+        severity: "high",
+        code: "EXPORT_GENERATED_WITHOUT_COMPLETED_AT",
+        export_id: row.id,
+        draft_run_id: row.draft_run_id,
+        detail: "Generated export is missing completed_at timestamp.",
+      });
+    }
+
+    const runEvents = eventsByRun.get(row.draft_run_id) ?? [];
+    const hasGenerationEvent = runEvents.some((event) =>
+      event.event_type === "filing_export_generated" &&
+      String(event.payload?.export_id ?? "") === row.id,
+    );
+    if (!hasGenerationEvent) {
+      findings.push({
+        severity: "high",
+        code: "MISSING_EXPORT_GENERATED_AUDIT_EVENT",
+        export_id: row.id,
+        draft_run_id: row.draft_run_id,
+        detail: "No filing_export_generated audit event found for export row.",
+      });
+    }
+  }
+
+  return {
+    scanned: rows.length,
+    findings: findings.slice(0, 300),
+    summary: {
+      critical: findings.filter((item) => item.severity === "critical").length,
+      high: findings.filter((item) => item.severity === "high").length,
+      medium: findings.filter((item) => item.severity === "medium").length,
+    },
+    overall: {
+      pass: findings.length === 0,
+    },
+  };
+};
+
 const collectPrelaunchSignals = async (
   client: ReturnType<typeof createClient>,
 ) => {
@@ -3727,11 +3949,12 @@ const collectPrelaunchSignals = async (
     OPENAI_MODEL: Boolean(Deno.env.get("OPENAI_MODEL")),
   };
 
-  const [integrity, sla, tenantIsolation, auditTrail] = await Promise.all([
+  const [integrity, sla, tenantIsolation, auditTrail, exportIntegrity] = await Promise.all([
     runWorkflowIntegrityCheck(client, { limit: 300 }),
     runWorkflowSlaMonitor(client, { limit: 500 }),
     runTenantIsolationCheck(client, { limitPerTable: 3000 }),
     runDraftAuditTrailIntegrityCheck(client, { limit: 1200 }),
+    runDraftExportIntegrityCheck(client, { limit: 1200 }),
   ]);
   const deployReadiness = await collectDeployReadinessSignals(client);
 
@@ -3764,6 +3987,7 @@ const collectPrelaunchSignals = async (
     },
     tenantIsolation: tenantIsolation.summary,
     auditTrail: auditTrail.summary,
+    exportIntegrity: exportIntegrity.summary,
   };
 };
 
@@ -4899,6 +5123,7 @@ const getRouteAccessMatrix = () => ({
     { route: "GET /ops/security/session-check", roles: ["user", "manager", "admin"] },
     { route: "GET /ops/workflow-integrity-check", roles: ["admin"] },
     { route: "GET /ops/draft-audit-integrity-check", roles: ["admin"] },
+    { route: "GET /ops/draft-export-integrity-check", roles: ["admin"] },
     { route: "GET /ops/workflow-sla-monitor", roles: ["admin"] },
     { route: "GET /ops/tenant-isolation-check", roles: ["admin"] },
     { route: "GET /ops/deploy-readiness", roles: ["admin"] },
@@ -5731,6 +5956,20 @@ serve(async (req: Request) => {
       return json(req, 200, {
         ok: true,
         data: await runDraftAuditTrailIntegrityCheck(client, {
+          limit,
+          companyId,
+        }),
+      });
+    }
+
+    if (req.method === "GET" && path.endsWith("ops/draft-export-integrity-check")) {
+      requireRole(roles, ["admin"]);
+      const limitRaw = Number(url.searchParams.get("limit") ?? 1200);
+      const limit = Number.isFinite(limitRaw) ? limitRaw : 1200;
+      const companyId = url.searchParams.get("company_id");
+      return json(req, 200, {
+        ok: true,
+        data: await runDraftExportIntegrityCheck(client, {
           limit,
           companyId,
         }),
@@ -6894,14 +7133,16 @@ serve(async (req: Request) => {
       requireRole(roles, ["manager", "admin"]);
       const draftRunId = path.split("drafts/")[1].replace("/exports", "");
       const body = await req.json().catch(() => ({}));
-      const format = String(body.format || "pdf").trim().toLowerCase();
-      if (format !== "pdf" && format !== "docx") {
-        return json(req, 400, { error: "format must be pdf or docx" });
+      let format: "pdf" | "docx";
+      try {
+        format = normalizeExportFormat(body.format ?? "pdf");
+      } catch (error) {
+        return json(req, 400, { error: error instanceof Error ? error.message : "format must be pdf or docx" });
       }
       return json(req, 200, {
         ok: true,
         data: await createDraftExport(client, user.id, roles, persona, draftRunId, {
-          format: format as "pdf" | "docx",
+          format,
         }),
       });
     }
