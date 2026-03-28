@@ -20,6 +20,7 @@ describe("ops-contract", () => {
       exportIntegrity: { critical: 0, high: 0, medium: 0 },
       complianceLegal: { critical: 0, high: 0, medium: 0 },
       commercialReadiness: { critical: 0, high: 0, medium: 0 },
+      operationsReadiness: { critical: 0, high: 0, medium: 0 },
     });
 
     expect(result.status).toBe("fail");
@@ -44,6 +45,7 @@ describe("ops-contract", () => {
       exportIntegrity: { critical: 0, high: 0, medium: 0 },
       complianceLegal: { critical: 0, high: 0, medium: 0 },
       commercialReadiness: { critical: 0, high: 0, medium: 0 },
+      operationsReadiness: { critical: 0, high: 0, medium: 0 },
     });
 
     expect(result.status).toBe("warn");
@@ -68,6 +70,7 @@ describe("ops-contract", () => {
       exportIntegrity: { critical: 0, high: 0, medium: 0 },
       complianceLegal: { critical: 0, high: 0, medium: 0 },
       commercialReadiness: { critical: 0, high: 0, medium: 0 },
+      operationsReadiness: { critical: 0, high: 0, medium: 0 },
     });
 
     expect(result.status).toBe("pass");
@@ -85,6 +88,7 @@ describe("ops-contract", () => {
     expect(checklist.requiredEndpoints).toContain("/ops/compliance/readiness");
     expect(checklist.requiredEndpoints).toContain("/ops/compliance/legal-documents");
     expect(checklist.requiredEndpoints).toContain("/ops/commercial/readiness");
+    expect(checklist.requiredEndpoints).toContain("/ops/operations/readiness");
   });
 
   it("fails gate when required schema is missing", () => {
@@ -105,6 +109,7 @@ describe("ops-contract", () => {
       exportIntegrity: { critical: 0, high: 0, medium: 0 },
       complianceLegal: { critical: 0, high: 0, medium: 0 },
       commercialReadiness: { critical: 0, high: 0, medium: 0 },
+      operationsReadiness: { critical: 0, high: 0, medium: 0 },
     });
 
     expect(result.status).toBe("fail");
@@ -128,6 +133,7 @@ describe("ops-contract", () => {
       exportIntegrity: { critical: 0, high: 0, medium: 0 },
       complianceLegal: { critical: 0, high: 0, medium: 0 },
       commercialReadiness: { critical: 0, high: 0, medium: 0 },
+      operationsReadiness: { critical: 0, high: 0, medium: 0 },
     });
 
     expect(result.status).toBe("warn");
@@ -151,6 +157,7 @@ describe("ops-contract", () => {
       exportIntegrity: { critical: 0, high: 0, medium: 0 },
       complianceLegal: { critical: 0, high: 0, medium: 0 },
       commercialReadiness: { critical: 0, high: 0, medium: 0 },
+      operationsReadiness: { critical: 0, high: 0, medium: 0 },
     });
 
     expect(result.status).toBe("fail");
@@ -174,6 +181,7 @@ describe("ops-contract", () => {
       exportIntegrity: { critical: 0, high: 3, medium: 0 },
       complianceLegal: { critical: 0, high: 0, medium: 0 },
       commercialReadiness: { critical: 0, high: 0, medium: 0 },
+      operationsReadiness: { critical: 0, high: 0, medium: 0 },
     });
 
     expect(result.status).toBe("warn");
@@ -197,6 +205,7 @@ describe("ops-contract", () => {
       exportIntegrity: { critical: 0, high: 0, medium: 0 },
       complianceLegal: { critical: 1, high: 0, medium: 0 },
       commercialReadiness: { critical: 0, high: 0, medium: 0 },
+      operationsReadiness: { critical: 0, high: 0, medium: 0 },
     });
 
     expect(result.status).toBe("fail");
@@ -220,8 +229,33 @@ describe("ops-contract", () => {
       exportIntegrity: { critical: 0, high: 0, medium: 0 },
       complianceLegal: { critical: 0, high: 0, medium: 0 },
       commercialReadiness: { critical: 0, high: 2, medium: 0 },
+      operationsReadiness: { critical: 0, high: 0, medium: 0 },
     });
 
     expect(result.status).toBe("warn");
+  });
+
+  it("fails gate when operations readiness has critical findings", () => {
+    const result = computePrelaunchGate({
+      envPresent: {
+        SUPABASE_URL: true,
+        SUPABASE_ANON_KEY: true,
+      },
+      schemaReadiness: {
+        missingTables: [],
+        probeErrors: 0,
+      },
+      workflowIntegrity: { critical: 0, high: 0, medium: 0 },
+      workflowSla: { critical: 0, high: 0, medium: 0 },
+      aiOps: { sampledRows: 100, failedCount: 1, staleProcessingCount: 0 },
+      tenantIsolation: { critical: 0, high: 0, medium: 0 },
+      auditTrail: { critical: 0, high: 0, medium: 0 },
+      exportIntegrity: { critical: 0, high: 0, medium: 0 },
+      complianceLegal: { critical: 0, high: 0, medium: 0 },
+      commercialReadiness: { critical: 0, high: 0, medium: 0 },
+      operationsReadiness: { critical: 1, high: 0, medium: 0 },
+    });
+
+    expect(result.status).toBe("fail");
   });
 });

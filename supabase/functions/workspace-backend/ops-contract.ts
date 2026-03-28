@@ -46,6 +46,11 @@ export type PrelaunchSignals = {
     high: number;
     medium: number;
   };
+  operationsReadiness: {
+    critical: number;
+    high: number;
+    medium: number;
+  };
 };
 
 export const computePrelaunchGate = (signals: PrelaunchSignals) => {
@@ -113,6 +118,12 @@ export const computePrelaunchGate = (signals: PrelaunchSignals) => {
       title: "Commercial Readiness",
       status: signals.commercialReadiness.critical > 0 ? "fail" : signals.commercialReadiness.high > 0 ? "warn" : "pass",
       detail: "Plans, subscriptions, invoicing, payment retry handling, and usage metering are operational.",
+    },
+    {
+      id: "operations_readiness",
+      title: "Operations Readiness",
+      status: signals.operationsReadiness.critical > 0 ? "fail" : signals.operationsReadiness.high > 0 ? "warn" : "pass",
+      detail: "Support ticketing, assignment workflows, and ops activity logs are operational.",
     },
   ] as const;
 
@@ -188,6 +199,7 @@ export const buildRegressionChecklist = () => ({
     "/ops/compliance/readiness",
     "/ops/compliance/legal-documents",
     "/ops/commercial/readiness",
+    "/ops/operations/readiness",
     "/ops/workflow-sla-monitor",
     "/ops/prelaunch-gate",
   ],

@@ -1101,6 +1101,11 @@ const resolveErrorCode = (message: string) => {
   if (message.includes("must be a non-negative number")) return "VALIDATION_INVALID_FIELD";
   if (message.startsWith("Active billing plan not found")) return "VALIDATION_INVALID_FIELD";
   if (message.startsWith("billing subscription not found")) return "RESOURCE_NOT_FOUND";
+  if (message.startsWith("support ticket not found")) return "RESOURCE_NOT_FOUND";
+  if (message.startsWith("assignment request not found")) return "RESOURCE_NOT_FOUND";
+  if (message.startsWith("category must be one of:")) return "VALIDATION_INVALID_FIELD";
+  if (message.startsWith("priority must be one of:")) return "VALIDATION_INVALID_FIELD";
+  if (message.startsWith("assignmentType must be one of:")) return "VALIDATION_INVALID_FIELD";
   if (message.includes("must be a valid UUID")) return "VALIDATION_INVALID_FIELD";
   if (message.startsWith("Invalid workflow transition:")) return "WORKFLOW_TRANSITION_INVALID";
   if (message.startsWith("Invalid event type for transition:")) return "WORKFLOW_EVENT_INVALID";
@@ -3963,7 +3968,7 @@ const collectPrelaunchSignals = async (
     OPENAI_MODEL: Boolean(Deno.env.get("OPENAI_MODEL")),
   };
 
-  const [integrity, sla, tenantIsolation, auditTrail, exportIntegrity, complianceLegal, commercialReadiness] = await Promise.all([
+  const [integrity, sla, tenantIsolation, auditTrail, exportIntegrity, complianceLegal, commercialReadiness, operationsReadiness] = await Promise.all([
     runWorkflowIntegrityCheck(client, { limit: 300 }),
     runWorkflowSlaMonitor(client, { limit: 500 }),
     runTenantIsolationCheck(client, { limitPerTable: 3000 }),
@@ -3971,6 +3976,7 @@ const collectPrelaunchSignals = async (
     runDraftExportIntegrityCheck(client, { limit: 1200 }),
     collectComplianceLegalReadinessSignals(client),
     collectCommercialReadinessSignals(client),
+    collectOperationsReadinessSignals(client),
   ]);
   const deployReadiness = await collectDeployReadinessSignals(client);
 
@@ -4006,6 +4012,7 @@ const collectPrelaunchSignals = async (
     exportIntegrity: exportIntegrity.summary,
     complianceLegal: complianceLegal.summary,
     commercialReadiness: commercialReadiness.summary,
+    operationsReadiness: operationsReadiness.summary,
   };
 };
 
@@ -4055,6 +4062,10 @@ const collectDeployReadinessSignals = async (
     "billing_usage_meters",
     "billing_usage_events",
     "billing_usage_monthly_rollups",
+    "ops_support_tickets",
+    "ops_support_ticket_messages",
+    "ops_client_assignment_requests",
+    "ops_activity_logs",
   ];
   const missingTables: string[] = [];
   const tableProbeErrors: Array<{ table: string; code: string | null; message: string }> = [];
@@ -5154,6 +5165,14 @@ const getRouteAccessMatrix = () => ({
     { route: "GET /billing/invoices", roles: ["authenticated"] },
     { route: "POST /billing/usage/events", roles: ["manager", "admin"] },
     { route: "GET /billing/usage/summary", roles: ["authenticated"] },
+    { route: "GET /ops/support/tickets", roles: ["authenticated"] },
+    { route: "POST /ops/support/tickets", roles: ["authenticated"] },
+    { route: "POST /ops/support/tickets/:id/update", roles: ["authenticated"] },
+    { route: "POST /ops/support/tickets/:id/messages", roles: ["authenticated"] },
+    { route: "GET /ops/assignment/requests", roles: ["authenticated"] },
+    { route: "POST /ops/assignment/requests", roles: ["authenticated"] },
+    { route: "POST /ops/assignment/requests/:id/decide", roles: ["admin"] },
+    { route: "GET /ops/activity/logs", roles: ["authenticated"] },
   ],
   drafts: [
     { route: "POST /drafts", roles: ["manager", "admin"] },
@@ -5190,6 +5209,7 @@ const getRouteAccessMatrix = () => ({
     { route: "POST /ops/compliance/legal-documents/publish", roles: ["admin"] },
     { route: "POST /ops/compliance/data-requests/:id/status", roles: ["admin"] },
     { route: "GET /ops/commercial/readiness", roles: ["admin"] },
+    { route: "GET /ops/operations/readiness", roles: ["admin"] },
     { route: "POST /ops/billing/invoice/issue", roles: ["admin"] },
     { route: "POST /ops/billing/payment-attempt", roles: ["admin"] },
     { route: "POST /ops/assign/company-member", roles: ["admin"] },
@@ -6810,6 +6830,395 @@ const collectCommercialReadinessSignals = async (
   };
 };
 
+const OPS_TICKET_ALLOWED_STATUSES = new Set(["open", "in_progress", "waiting_customer", "resolved", "closed"]);
+const OPS_TICKET_ALLOWED_PRIORITIES = new Set(["low", "medium", "high", "critical"]);
+const OPS_TICKET_ALLOWED_CATEGORIES = new Set(["general", "billing", "kyc", "technical", "workflow", "dispute", "security"]);
+const OPS_ASSIGNMENT_ALLOWED_STATUSES = new Set(["pending", "approved", "rejected", "cancelled"]);
+const OPS_ASSIGNMENT_ALLOWED_TYPES = new Set(["external_ca", "in_house_ca", "in_house_lawyer", "ca_firm"]);
+
+const createOpsActivityLog = async (
+  client: ReturnType<typeof createClient>,
+  params: {
+    actorUserId: string;
+    companyId?: string | null;
+    caFirmId?: string | null;
+    activityType: string;
+    entityType: string;
+    entityId?: string | null;
+    details?: Record<string, unknown>;
+  },
+) => {
+  const { error } = await client.from("ops_activity_logs").insert({
+    actor_user_id: params.actorUserId,
+    company_id: params.companyId ?? null,
+    ca_firm_id: params.caFirmId ?? null,
+    activity_type: params.activityType,
+    entity_type: params.entityType,
+    entity_id: params.entityId ?? null,
+    details: params.details ?? {},
+  });
+  if (error) throw error;
+};
+
+const createSupportTicket = async (
+  client: ReturnType<typeof createClient>,
+  params: {
+    actorUserId: string;
+    scope: { companyId: string | null; caFirmId: string | null };
+    category: string;
+    priority: string;
+    subject: string;
+    description?: string | null;
+    dueAt?: string | null;
+    metadata?: Record<string, unknown>;
+  },
+) => {
+  if (!OPS_TICKET_ALLOWED_CATEGORIES.has(params.category)) {
+    throw new Error("category must be one of: general, billing, kyc, technical, workflow, dispute, security");
+  }
+  if (!OPS_TICKET_ALLOWED_PRIORITIES.has(params.priority)) {
+    throw new Error("priority must be one of: low, medium, high, critical");
+  }
+  const subject = toTrimmedString(params.subject, 220);
+  if (!subject) throw new Error("subject is required");
+  const description = toTrimmedString(params.description ?? null, 6000);
+  const dueAtRaw = toTrimmedString(params.dueAt ?? null, 80);
+  const dueAt = dueAtRaw ? new Date(dueAtRaw).toISOString() : null;
+
+  const { data, error } = await client
+    .from("ops_support_tickets")
+    .insert({
+      company_id: params.scope.companyId,
+      ca_firm_id: params.scope.caFirmId,
+      raised_by: params.actorUserId,
+      category: params.category,
+      priority: params.priority,
+      status: "open",
+      subject,
+      description,
+      due_at: dueAt,
+      metadata: params.metadata ?? {},
+    })
+    .select("id, company_id, ca_firm_id, raised_by, assigned_to, category, priority, status, subject, description, due_at, created_at, updated_at")
+    .single();
+  if (error || !data) throw error ?? new Error("Failed to create support ticket");
+
+  await createOpsActivityLog(client, {
+    actorUserId: params.actorUserId,
+    companyId: data.company_id,
+    caFirmId: data.ca_firm_id,
+    activityType: "support_ticket_created",
+    entityType: "ops_support_tickets",
+    entityId: data.id,
+    details: { category: data.category, priority: data.priority, status: data.status },
+  });
+  return data;
+};
+
+const listSupportTickets = async (
+  client: ReturnType<typeof createClient>,
+  scope: { companyId: string | null; caFirmId: string | null },
+  options?: { limit?: number; offset?: number; status?: string | null; category?: string | null },
+) => {
+  const limit = Math.max(1, Math.min(200, Number(options?.limit ?? 60)));
+  const offset = Math.max(0, Number(options?.offset ?? 0));
+  let query = client
+    .from("ops_support_tickets")
+    .select("id, company_id, ca_firm_id, raised_by, assigned_to, category, priority, status, subject, due_at, first_response_at, resolved_at, resolution_summary, created_at, updated_at")
+    .order("created_at", { ascending: false })
+    .range(offset, offset + limit - 1);
+  if (scope.companyId) query = query.eq("company_id", scope.companyId);
+  if (scope.caFirmId) query = query.eq("ca_firm_id", scope.caFirmId);
+  const status = toTrimmedString(options?.status ?? null, 40);
+  if (status) query = query.eq("status", status);
+  const category = toTrimmedString(options?.category ?? null, 80);
+  if (category) query = query.eq("category", category);
+  const { data, error } = await query;
+  if (error) throw error;
+  return data ?? [];
+};
+
+const updateSupportTicket = async (
+  client: ReturnType<typeof createClient>,
+  params: {
+    actorUserId: string;
+    ticketId: string;
+    status?: string | null;
+    priority?: string | null;
+    assignedTo?: string | null;
+    resolutionSummary?: string | null;
+  },
+) => {
+  assertUuid(params.ticketId, "ticketId");
+  const patch: Record<string, unknown> = {};
+  const status = toTrimmedString(params.status ?? null, 40);
+  if (status) {
+    if (!OPS_TICKET_ALLOWED_STATUSES.has(status)) {
+      throw new Error("status must be one of: open, in_progress, waiting_customer, resolved, closed");
+    }
+    patch.status = status;
+    if (status === "resolved" || status === "closed") patch.resolved_at = new Date().toISOString();
+  }
+  const priority = toTrimmedString(params.priority ?? null, 40);
+  if (priority) {
+    if (!OPS_TICKET_ALLOWED_PRIORITIES.has(priority)) {
+      throw new Error("priority must be one of: low, medium, high, critical");
+    }
+    patch.priority = priority;
+  }
+  if (typeof params.assignedTo === "string") {
+    const assigned = params.assignedTo.trim();
+    patch.assigned_to = assigned ? assigned : null;
+  }
+  const resolutionSummary = toTrimmedString(params.resolutionSummary ?? null, 3000);
+  if (resolutionSummary) patch.resolution_summary = resolutionSummary;
+
+  const { data, error } = await client
+    .from("ops_support_tickets")
+    .update(patch)
+    .eq("id", params.ticketId)
+    .select("id, company_id, ca_firm_id, assigned_to, status, priority, resolution_summary, updated_at")
+    .maybeSingle();
+  if (error) throw error;
+  if (!data) throw new Error("support ticket not found");
+
+  await createOpsActivityLog(client, {
+    actorUserId: params.actorUserId,
+    companyId: data.company_id,
+    caFirmId: data.ca_firm_id,
+    activityType: "support_ticket_updated",
+    entityType: "ops_support_tickets",
+    entityId: data.id,
+    details: { status: data.status, priority: data.priority, assigned_to: data.assigned_to },
+  });
+  return data;
+};
+
+const createSupportTicketMessage = async (
+  client: ReturnType<typeof createClient>,
+  params: {
+    actorUserId: string;
+    ticketId: string;
+    message: string;
+    isInternal?: boolean;
+    attachments?: unknown;
+  },
+) => {
+  assertUuid(params.ticketId, "ticketId");
+  const message = toTrimmedString(params.message, 12000);
+  if (!message) throw new Error("message is required");
+  const attachments = Array.isArray(params.attachments) ? params.attachments : [];
+
+  const { data, error } = await client
+    .from("ops_support_ticket_messages")
+    .insert({
+      ticket_id: params.ticketId,
+      sender_user_id: params.actorUserId,
+      message,
+      is_internal: params.isInternal === true,
+      attachments,
+    })
+    .select("id, ticket_id, sender_user_id, message, is_internal, attachments, created_at")
+    .single();
+  if (error || !data) throw error ?? new Error("Failed to create support message");
+
+  const { data: ticket, error: ticketError } = await client
+    .from("ops_support_tickets")
+    .select("id, company_id, ca_firm_id, first_response_at")
+    .eq("id", params.ticketId)
+    .maybeSingle();
+  if (ticketError) throw ticketError;
+  if (ticket && !ticket.first_response_at) {
+    await client.from("ops_support_tickets").update({ first_response_at: new Date().toISOString() }).eq("id", params.ticketId);
+  }
+
+  await createOpsActivityLog(client, {
+    actorUserId: params.actorUserId,
+    companyId: ticket?.company_id ?? null,
+    caFirmId: ticket?.ca_firm_id ?? null,
+    activityType: "support_ticket_message_added",
+    entityType: "ops_support_ticket_messages",
+    entityId: data.id,
+    details: { ticket_id: data.ticket_id, is_internal: data.is_internal },
+  });
+  return data;
+};
+
+const createAssignmentRequest = async (
+  client: ReturnType<typeof createClient>,
+  params: {
+    actorUserId: string;
+    companyId: string;
+    assignmentType: string;
+    requestedCaUserId?: string | null;
+    requestedCaFirmId?: string | null;
+    justification?: string | null;
+  },
+) => {
+  assertUuid(params.companyId, "companyId");
+  if (!OPS_ASSIGNMENT_ALLOWED_TYPES.has(params.assignmentType)) {
+    throw new Error("assignmentType must be one of: external_ca, in_house_ca, in_house_lawyer, ca_firm");
+  }
+  const requestedCaUserId = toTrimmedString(params.requestedCaUserId ?? null, 80);
+  const requestedCaFirmId = toTrimmedString(params.requestedCaFirmId ?? null, 80);
+  if (requestedCaUserId) assertUuid(requestedCaUserId, "requestedCaUserId");
+  if (requestedCaFirmId) assertUuid(requestedCaFirmId, "requestedCaFirmId");
+  const justification = toTrimmedString(params.justification ?? null, 3000);
+
+  const { data, error } = await client
+    .from("ops_client_assignment_requests")
+    .insert({
+      company_id: params.companyId,
+      requested_by: params.actorUserId,
+      requested_ca_user_id: requestedCaUserId,
+      requested_ca_firm_id: requestedCaFirmId,
+      assignment_type: params.assignmentType,
+      status: "pending",
+      justification,
+    })
+    .select("id, company_id, requested_by, requested_ca_user_id, requested_ca_firm_id, assignment_type, status, justification, created_at")
+    .single();
+  if (error || !data) throw error ?? new Error("Failed to create assignment request");
+
+  await createOpsActivityLog(client, {
+    actorUserId: params.actorUserId,
+    companyId: data.company_id,
+    activityType: "assignment_request_created",
+    entityType: "ops_client_assignment_requests",
+    entityId: data.id,
+    details: { assignment_type: data.assignment_type, status: data.status },
+  });
+  return data;
+};
+
+const listAssignmentRequests = async (
+  client: ReturnType<typeof createClient>,
+  scope: { companyId: string | null },
+  options?: { status?: string | null; limit?: number; offset?: number },
+) => {
+  const limit = Math.max(1, Math.min(200, Number(options?.limit ?? 80)));
+  const offset = Math.max(0, Number(options?.offset ?? 0));
+  let query = client
+    .from("ops_client_assignment_requests")
+    .select("id, company_id, requested_by, requested_ca_user_id, requested_ca_firm_id, assignment_type, status, justification, admin_notes, decided_by, decided_at, created_at, updated_at")
+    .order("created_at", { ascending: false })
+    .range(offset, offset + limit - 1);
+  if (scope.companyId) query = query.eq("company_id", scope.companyId);
+  const status = toTrimmedString(options?.status ?? null, 30);
+  if (status) query = query.eq("status", status);
+  const { data, error } = await query;
+  if (error) throw error;
+  return data ?? [];
+};
+
+const decideAssignmentRequestByAdmin = async (
+  client: ReturnType<typeof createClient>,
+  params: {
+    adminUserId: string;
+    requestId: string;
+    status: string;
+    adminNotes?: string | null;
+  },
+) => {
+  assertUuid(params.requestId, "requestId");
+  if (!OPS_ASSIGNMENT_ALLOWED_STATUSES.has(params.status)) {
+    throw new Error("status must be one of: pending, approved, rejected, cancelled");
+  }
+  const adminNotes = toTrimmedString(params.adminNotes ?? null, 3000);
+  const nowIso = new Date().toISOString();
+
+  const { data, error } = await client
+    .from("ops_client_assignment_requests")
+    .update({
+      status: params.status,
+      admin_notes: adminNotes,
+      decided_by: params.adminUserId,
+      decided_at: nowIso,
+    })
+    .eq("id", params.requestId)
+    .select("id, company_id, assignment_type, status, requested_ca_user_id, requested_ca_firm_id, decided_by, decided_at, updated_at")
+    .maybeSingle();
+  if (error) throw error;
+  if (!data) throw new Error("assignment request not found");
+
+  await createOpsActivityLog(client, {
+    actorUserId: params.adminUserId,
+    companyId: data.company_id,
+    activityType: "assignment_request_decided",
+    entityType: "ops_client_assignment_requests",
+    entityId: data.id,
+    details: { assignment_type: data.assignment_type, status: data.status },
+  });
+  return data;
+};
+
+const listOpsActivityLogs = async (
+  client: ReturnType<typeof createClient>,
+  scope: { companyId: string | null; caFirmId: string | null },
+  options?: { limit?: number; offset?: number; activityType?: string | null },
+) => {
+  const limit = Math.max(1, Math.min(250, Number(options?.limit ?? 100)));
+  const offset = Math.max(0, Number(options?.offset ?? 0));
+  let query = client
+    .from("ops_activity_logs")
+    .select("id, actor_user_id, company_id, ca_firm_id, activity_type, entity_type, entity_id, details, created_at")
+    .order("created_at", { ascending: false })
+    .range(offset, offset + limit - 1);
+  if (scope.companyId) query = query.eq("company_id", scope.companyId);
+  if (scope.caFirmId) query = query.eq("ca_firm_id", scope.caFirmId);
+  const activityType = toTrimmedString(options?.activityType ?? null, 120);
+  if (activityType) query = query.eq("activity_type", activityType);
+  const { data, error } = await query;
+  if (error) throw error;
+  return data ?? [];
+};
+
+const collectOperationsReadinessSignals = async (
+  client: ReturnType<typeof createClient>,
+) => {
+  const staleTicketIso = new Date(Date.now() - 72 * 60 * 60 * 1000).toISOString();
+  const [openTicketsResult, criticalOpenTicketsResult, staleOpenTicketsResult, noResponseTicketsResult, pendingAssignmentsResult, activityLogsResult] = await Promise.all([
+    client.from("ops_support_tickets").select("id", { count: "exact", head: true }).in("status", ["open", "in_progress", "waiting_customer"]),
+    client.from("ops_support_tickets").select("id", { count: "exact", head: true }).eq("priority", "critical").in("status", ["open", "in_progress", "waiting_customer"]),
+    client.from("ops_support_tickets").select("id", { count: "exact", head: true }).in("status", ["open", "in_progress", "waiting_customer"]).lt("created_at", staleTicketIso),
+    client.from("ops_support_tickets").select("id", { count: "exact", head: true }).in("status", ["open", "in_progress", "waiting_customer"]).is("first_response_at", null).lt("created_at", new Date(Date.now() - 24 * 60 * 60 * 1000).toISOString()),
+    client.from("ops_client_assignment_requests").select("id", { count: "exact", head: true }).eq("status", "pending"),
+    client.from("ops_activity_logs").select("id", { count: "exact", head: true }).gte("created_at", new Date(Date.now() - 7 * 24 * 60 * 60 * 1000).toISOString()),
+  ]);
+
+  if (openTicketsResult.error) throw openTicketsResult.error;
+  if (criticalOpenTicketsResult.error) throw criticalOpenTicketsResult.error;
+  if (staleOpenTicketsResult.error) throw staleOpenTicketsResult.error;
+  if (noResponseTicketsResult.error) throw noResponseTicketsResult.error;
+  if (pendingAssignmentsResult.error) throw pendingAssignmentsResult.error;
+  if (activityLogsResult.error) throw activityLogsResult.error;
+
+  const criticalOpen = Number(criticalOpenTicketsResult.count ?? 0);
+  const staleOpen = Number(staleOpenTicketsResult.count ?? 0);
+  const noResponse = Number(noResponseTicketsResult.count ?? 0);
+  const pendingAssignments = Number(pendingAssignmentsResult.count ?? 0);
+  const activity7d = Number(activityLogsResult.count ?? 0);
+
+  return {
+    summary: {
+      critical: criticalOpen,
+      high: staleOpen + noResponse,
+      medium: pendingAssignments,
+    },
+    metrics: {
+      open_tickets: Number(openTicketsResult.count ?? 0),
+      critical_open_tickets: criticalOpen,
+      stale_open_tickets_72h: staleOpen,
+      open_tickets_without_first_response_24h: noResponse,
+      pending_assignment_requests: pendingAssignments,
+      ops_activity_logs_7d: activity7d,
+    },
+    overall: {
+      pass: criticalOpen === 0 && staleOpen === 0 && noResponse === 0,
+    },
+  };
+};
+
 serve(async (req: Request) => {
   const corsHeaders = getCorsHeaders(req);
   if (corsHeaders["Access-Control-Allow-Origin"] === "null") {
@@ -7152,6 +7561,154 @@ serve(async (req: Request) => {
         ok: true,
         data: await loadBillingUsageSummary(client, scope, {
           monthStart: url.searchParams.get("month_start"),
+        }),
+      });
+    }
+
+    if (req.method === "GET" && path.endsWith("ops/support/tickets")) {
+      const scope = await resolveBillingScopeForUser(client, user.id, roles, {
+        companyId: url.searchParams.get("company_id"),
+        caFirmId: url.searchParams.get("ca_firm_id"),
+      });
+      const limitRaw = Number(url.searchParams.get("limit") ?? 60);
+      const offsetRaw = Number(url.searchParams.get("offset") ?? 0);
+      return json(req, 200, {
+        ok: true,
+        data: await listSupportTickets(client, scope, {
+          limit: Number.isFinite(limitRaw) ? limitRaw : 60,
+          offset: Number.isFinite(offsetRaw) ? offsetRaw : 0,
+          status: url.searchParams.get("status"),
+          category: url.searchParams.get("category"),
+        }),
+      });
+    }
+
+    if (req.method === "POST" && path.endsWith("ops/support/tickets")) {
+      const body = await req.json().catch(() => ({}));
+      if (!body || typeof body !== "object") {
+        return json(req, 400, { error: "request body is required" });
+      }
+      const scope = await resolveBillingScopeForUser(client, user.id, roles, {
+        companyId: typeof body.companyId === "string" ? body.companyId : null,
+        caFirmId: typeof body.caFirmId === "string" ? body.caFirmId : null,
+      });
+      return json(req, 200, {
+        ok: true,
+        data: await createSupportTicket(client, {
+          actorUserId: user.id,
+          scope,
+          category: typeof body.category === "string" ? body.category.trim().toLowerCase() : "general",
+          priority: typeof body.priority === "string" ? body.priority.trim().toLowerCase() : "medium",
+          subject: typeof body.subject === "string" ? body.subject : "",
+          description: typeof body.description === "string" ? body.description : null,
+          dueAt: typeof body.dueAt === "string" ? body.dueAt : null,
+          metadata: safeMetadataObject(body.metadata),
+        }),
+      });
+    }
+
+    if (req.method === "POST" && path.includes("ops/support/tickets/") && path.endsWith("/update")) {
+      const ticketId = path.split("ops/support/tickets/")[1].replace("/update", "");
+      const body = await req.json().catch(() => ({}));
+      if (!body || typeof body !== "object") {
+        return json(req, 400, { error: "request body is required" });
+      }
+      return json(req, 200, {
+        ok: true,
+        data: await updateSupportTicket(client, {
+          actorUserId: user.id,
+          ticketId,
+          status: typeof body.status === "string" ? body.status.trim().toLowerCase() : null,
+          priority: typeof body.priority === "string" ? body.priority.trim().toLowerCase() : null,
+          assignedTo: typeof body.assignedTo === "string" ? body.assignedTo : null,
+          resolutionSummary: typeof body.resolutionSummary === "string" ? body.resolutionSummary : null,
+        }),
+      });
+    }
+
+    if (req.method === "POST" && path.includes("ops/support/tickets/") && path.endsWith("/messages")) {
+      const ticketId = path.split("ops/support/tickets/")[1].replace("/messages", "");
+      const body = await req.json().catch(() => ({}));
+      if (!body || typeof body !== "object") {
+        return json(req, 400, { error: "request body is required" });
+      }
+      return json(req, 200, {
+        ok: true,
+        data: await createSupportTicketMessage(client, {
+          actorUserId: user.id,
+          ticketId,
+          message: typeof body.message === "string" ? body.message : "",
+          isInternal: body.isInternal === true && roles.has("admin"),
+          attachments: Array.isArray(body.attachments) ? body.attachments : [],
+        }),
+      });
+    }
+
+    if (req.method === "GET" && path.endsWith("ops/assignment/requests")) {
+      const scope = await resolveBillingScopeForUser(client, user.id, roles, {
+        companyId: url.searchParams.get("company_id"),
+      });
+      const limitRaw = Number(url.searchParams.get("limit") ?? 80);
+      const offsetRaw = Number(url.searchParams.get("offset") ?? 0);
+      return json(req, 200, {
+        ok: true,
+        data: await listAssignmentRequests(client, { companyId: scope.companyId }, {
+          status: url.searchParams.get("status"),
+          limit: Number.isFinite(limitRaw) ? limitRaw : 80,
+          offset: Number.isFinite(offsetRaw) ? offsetRaw : 0,
+        }),
+      });
+    }
+
+    if (req.method === "POST" && path.endsWith("ops/assignment/requests")) {
+      const body = await req.json().catch(() => ({}));
+      if (!body || typeof body !== "object") {
+        return json(req, 400, { error: "request body is required" });
+      }
+      return json(req, 200, {
+        ok: true,
+        data: await createAssignmentRequest(client, {
+          actorUserId: user.id,
+          companyId: typeof body.companyId === "string" ? body.companyId : "",
+          assignmentType: typeof body.assignmentType === "string" ? body.assignmentType.trim().toLowerCase() : "",
+          requestedCaUserId: typeof body.requestedCaUserId === "string" ? body.requestedCaUserId : null,
+          requestedCaFirmId: typeof body.requestedCaFirmId === "string" ? body.requestedCaFirmId : null,
+          justification: typeof body.justification === "string" ? body.justification : null,
+        }),
+      });
+    }
+
+    if (req.method === "POST" && path.includes("ops/assignment/requests/") && path.endsWith("/decide")) {
+      requireRole(roles, ["admin"]);
+      const requestId = path.split("ops/assignment/requests/")[1].replace("/decide", "");
+      const body = await req.json().catch(() => ({}));
+      if (!body || typeof body !== "object") {
+        return json(req, 400, { error: "request body is required" });
+      }
+      return json(req, 200, {
+        ok: true,
+        data: await decideAssignmentRequestByAdmin(client, {
+          adminUserId: user.id,
+          requestId,
+          status: typeof body.status === "string" ? body.status.trim().toLowerCase() : "",
+          adminNotes: typeof body.adminNotes === "string" ? body.adminNotes : null,
+        }),
+      });
+    }
+
+    if (req.method === "GET" && path.endsWith("ops/activity/logs")) {
+      const scope = await resolveBillingScopeForUser(client, user.id, roles, {
+        companyId: url.searchParams.get("company_id"),
+        caFirmId: url.searchParams.get("ca_firm_id"),
+      });
+      const limitRaw = Number(url.searchParams.get("limit") ?? 100);
+      const offsetRaw = Number(url.searchParams.get("offset") ?? 0);
+      return json(req, 200, {
+        ok: true,
+        data: await listOpsActivityLogs(client, scope, {
+          limit: Number.isFinite(limitRaw) ? limitRaw : 100,
+          offset: Number.isFinite(offsetRaw) ? offsetRaw : 0,
+          activityType: url.searchParams.get("activity_type"),
         }),
       });
     }
@@ -7589,6 +8146,14 @@ serve(async (req: Request) => {
       return json(req, 200, {
         ok: true,
         data: await collectCommercialReadinessSignals(client),
+      });
+    }
+
+    if (req.method === "GET" && path.endsWith("ops/operations/readiness")) {
+      requireRole(roles, ["admin"]);
+      return json(req, 200, {
+        ok: true,
+        data: await collectOperationsReadinessSignals(client),
       });
     }
 
