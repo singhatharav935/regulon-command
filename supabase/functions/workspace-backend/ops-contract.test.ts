@@ -8,6 +8,10 @@ describe("ops-contract", () => {
         SUPABASE_URL: true,
         SUPABASE_ANON_KEY: false,
       },
+      schemaReadiness: {
+        missingTables: [],
+        probeErrors: 0,
+      },
       workflowIntegrity: { critical: 0, high: 0, medium: 0 },
       workflowSla: { critical: 0, high: 0, medium: 0 },
       aiOps: { sampledRows: 10, failedCount: 1, staleProcessingCount: 0 },
@@ -22,6 +26,10 @@ describe("ops-contract", () => {
       envPresent: {
         SUPABASE_URL: true,
         SUPABASE_ANON_KEY: true,
+      },
+      schemaReadiness: {
+        missingTables: [],
+        probeErrors: 0,
       },
       workflowIntegrity: { critical: 0, high: 1, medium: 0 },
       workflowSla: { critical: 0, high: 0, medium: 0 },
@@ -38,6 +46,10 @@ describe("ops-contract", () => {
         SUPABASE_URL: true,
         SUPABASE_ANON_KEY: true,
       },
+      schemaReadiness: {
+        missingTables: [],
+        probeErrors: 0,
+      },
       workflowIntegrity: { critical: 0, high: 0, medium: 0 },
       workflowSla: { critical: 0, high: 0, medium: 0 },
       aiOps: { sampledRows: 100, failedCount: 3, staleProcessingCount: 0 },
@@ -53,5 +65,23 @@ describe("ops-contract", () => {
     expect(runbooks.items.length).toBeGreaterThan(0);
     expect(checklist.flows.length).toBeGreaterThan(0);
     expect(checklist.requiredEndpoints).toContain("/ops/prelaunch-gate");
+  });
+
+  it("fails gate when required schema is missing", () => {
+    const result = computePrelaunchGate({
+      envPresent: {
+        SUPABASE_URL: true,
+        SUPABASE_ANON_KEY: true,
+      },
+      schemaReadiness: {
+        missingTables: ["landing_leads"],
+        probeErrors: 0,
+      },
+      workflowIntegrity: { critical: 0, high: 0, medium: 0 },
+      workflowSla: { critical: 0, high: 0, medium: 0 },
+      aiOps: { sampledRows: 50, failedCount: 2, staleProcessingCount: 0 },
+    });
+
+    expect(result.status).toBe("fail");
   });
 });

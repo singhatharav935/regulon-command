@@ -6,6 +6,11 @@ export type DeployReadinessSignal = {
   };
   db: {
     requiredTablesMissing: string[];
+    tableProbeErrors: Array<{
+      table: string;
+      code: string | null;
+      message: string;
+    }>;
   };
   functionConfig: {
     landingPublicEnabled: boolean;
@@ -42,6 +47,12 @@ export const evaluateDeployReadiness = (signal: DeployReadinessSignal) => {
       title: "Database Schema Readiness",
       status: signal.db.requiredTablesMissing.length === 0 ? "pass" : "fail",
       detail: "Required tables are available after migrations.",
+    },
+    {
+      id: "db_probe_health",
+      title: "Database Probe Health",
+      status: signal.db.tableProbeErrors.length === 0 ? "pass" : "fail",
+      detail: "Readiness probes can query required tables without unexpected errors.",
     },
     {
       id: "landing_public_routes",

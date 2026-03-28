@@ -100,6 +100,30 @@ const isMissingRelationError = (error: unknown, relation: string) => {
   return message.includes("does not exist") || message.includes("could not find the table") || message.includes("schema cache");
 };
 
+const getErrorCode = (error: unknown) => {
+  if (!error || typeof error !== "object") return null;
+  const objectError = error as Record<string, unknown>;
+  const code = typeof objectError.code === "string" ? objectError.code.trim() : "";
+  return code || null;
+};
+
+const getErrorMessage = (error: unknown) => {
+  if (!error || typeof error !== "object") return "";
+  const objectError = error as Record<string, unknown>;
+  return typeof objectError.message === "string" ? objectError.message.trim() : "";
+};
+
+const isMissingTableProbeError = (error: unknown, table: string) => {
+  if (!error || typeof error !== "object") return false;
+  const code = (getErrorCode(error) || "").toUpperCase();
+  const message = getErrorMessage(error).toLowerCase();
+  if (code === "42P01") return true;
+  if (code === "PGRST205") {
+    return message.includes(table.toLowerCase());
+  }
+  return message.includes("does not exist") && message.includes(table.toLowerCase());
+};
+
 const enforcePublicRateLimit = async (
   serviceClient: ReturnType<typeof createClient>,
   req: Request,
@@ -2942,6 +2966,7 @@ const collectPrelaunchSignals = async (
     runWorkflowIntegrityCheck(client, { limit: 300 }),
     runWorkflowSlaMonitor(client, { limit: 500 }),
   ]);
+  const deployReadiness = await collectDeployReadinessSignals(client);
 
   const sinceIso = new Date(Date.now() - 24 * 60 * 60 * 1000).toISOString();
   const { data: aiRows, error: aiRowsError } = await client
@@ -2959,6 +2984,10 @@ const collectPrelaunchSignals = async (
 
   return {
     envPresent,
+    schemaReadiness: {
+      missingTables: deployReadiness.signals.db.requiredTablesMissing,
+      probeErrors: deployReadiness.signals.db.tableProbeErrors.length,
+    },
     workflowIntegrity: integrity.summary,
     workflowSla: sla.summary,
     aiOps: {
@@ -3003,11 +3032,19 @@ const collectDeployReadinessSignals = async (
     "landing_public_rate_limits",
   ];
   const missingTables: string[] = [];
+  const tableProbeErrors: Array<{ table: string; code: string | null; message: string }> = [];
   for (const table of requiredTables) {
     const { error } = await probeClient.from(table).select("*", { count: "exact", head: true });
-    if (error && (error as { code?: string }).code === "42P01") {
+    if (!error) continue;
+    if (isMissingTableProbeError(error, table)) {
       missingTables.push(table);
+      continue;
     }
+    tableProbeErrors.push({
+      table,
+      code: getErrorCode(error),
+      message: getErrorMessage(error) || "Unknown table probe error",
+    });
   }
 
   const signals = {
@@ -3018,6 +3055,7 @@ const collectDeployReadinessSignals = async (
     },
     db: {
       requiredTablesMissing: missingTables,
+      tableProbeErrors,
     },
     functionConfig: {
       landingPublicEnabled: true,

@@ -2,6 +2,10 @@ export type GateStatus = "pass" | "warn" | "fail";
 
 export type PrelaunchSignals = {
   envPresent: Record<string, boolean>;
+  schemaReadiness: {
+    missingTables: string[];
+    probeErrors: number;
+  };
   workflowIntegrity: {
     critical: number;
     high: number;
@@ -26,6 +30,12 @@ export const computePrelaunchGate = (signals: PrelaunchSignals) => {
       title: "Environment Configuration",
       status: Object.values(signals.envPresent).every(Boolean) ? "pass" : "fail",
       detail: "Core runtime secrets and Supabase keys are present.",
+    },
+    {
+      id: "schema_readiness",
+      title: "Schema Readiness",
+      status: signals.schemaReadiness.missingTables.length > 0 || signals.schemaReadiness.probeErrors > 0 ? "fail" : "pass",
+      detail: "All required database tables are present and readiness probes are healthy.",
     },
     {
       id: "workflow_integrity",

@@ -11,6 +11,7 @@ describe("deploy-readiness-contract", () => {
       },
       db: {
         requiredTablesMissing: ["landing_leads"],
+        tableProbeErrors: [],
       },
       functionConfig: {
         landingPublicEnabled: false,
@@ -29,6 +30,7 @@ describe("deploy-readiness-contract", () => {
       },
       db: {
         requiredTablesMissing: [],
+        tableProbeErrors: [],
       },
       functionConfig: {
         landingPublicEnabled: true,
@@ -47,6 +49,7 @@ describe("deploy-readiness-contract", () => {
       },
       db: {
         requiredTablesMissing: [],
+        tableProbeErrors: [],
       },
       functionConfig: {
         landingPublicEnabled: true,
@@ -54,5 +57,30 @@ describe("deploy-readiness-contract", () => {
     });
     expect(result.status).toBe("pass");
     expect(result.score).toBe(100);
+  });
+
+  it("fails when table probes return unexpected errors", () => {
+    const result = evaluateDeployReadiness({
+      env: {
+        requiredPresent: { OPENAI_API_KEY: true, OPENAI_MODEL: true },
+        enforceAuthEnabled: true,
+        allowedOrigins: ["https://app.regulon.com"],
+      },
+      db: {
+        requiredTablesMissing: [],
+        tableProbeErrors: [
+          {
+            table: "draft_runs",
+            code: "PGRST301",
+            message: "permission denied",
+          },
+        ],
+      },
+      functionConfig: {
+        landingPublicEnabled: true,
+      },
+    });
+    expect(result.status).toBe("fail");
+    expect(result.summary.fail).toBeGreaterThan(0);
   });
 });
