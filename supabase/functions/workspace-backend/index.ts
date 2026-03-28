@@ -1025,6 +1025,7 @@ const resolveErrorCode = (message: string) => {
   if (message.startsWith("AI quota exceeded:")) return "AI_QUOTA_EXCEEDED";
   if (message.startsWith("Public rate limit exceeded:")) return "AI_RATE_LIMITED";
   if (message.startsWith("Unsupported documentType:")) return "VALIDATION_INVALID_FIELD";
+  if (message.includes("must be a valid UUID")) return "VALIDATION_INVALID_FIELD";
   if (message.startsWith("Invalid workflow transition:")) return "WORKFLOW_TRANSITION_INVALID";
   if (message.startsWith("Invalid event type for transition:")) return "WORKFLOW_EVENT_INVALID";
   if (message.includes(" is required") || message.includes(" are required")) return "VALIDATION_REQUIRED_FIELD";
@@ -1274,6 +1275,169 @@ const createCaFirmWorkspace = async (
   }
 
   return { created: true, caFirmId: typeof caFirmId === "string" ? caFirmId : null, seeded, seedError };
+};
+
+const UUID_REGEX = /^[0-9a-f]{8}-[0-9a-f]{4}-[1-5][0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$/i;
+
+const assertUuid = (value: string, fieldName: string) => {
+  if (!UUID_REGEX.test(value)) {
+    throw new Error(`${fieldName} must be a valid UUID`);
+  }
+};
+
+const assignCompanyMembershipByAdmin = async (
+  serviceClient: ReturnType<typeof createClient>,
+  params: { companyId: string; userId: string; role: "user" | "manager" | "admin" },
+) => {
+  const { companyId, userId, role } = params;
+  assertUuid(companyId, "companyId");
+  assertUuid(userId, "userId");
+
+  const [{ data: company, error: companyError }, { data: profile, error: profileError }] = await Promise.all([
+    serviceClient.from("companies").select("id, name").eq("id", companyId).maybeSingle(),
+    serviceClient.from("profiles").select("user_id, full_name, email").eq("user_id", userId).maybeSingle(),
+  ]);
+  if (companyError) throw companyError;
+  if (profileError) throw profileError;
+  if (!company) throw new Error("Company not found");
+  if (!profile) throw new Error("Target user profile not found");
+
+  const { error: memberError } = await serviceClient
+    .from("company_members")
+    .upsert({ user_id: userId, company_id: companyId, role }, { onConflict: "user_id,company_id" });
+  if (memberError) throw memberError;
+
+  const { error: roleError } = await serviceClient
+    .from("user_roles")
+    .upsert({ user_id: userId, role }, { onConflict: "user_id,role" });
+  if (roleError) throw roleError;
+
+  return {
+    assigned: true,
+    company: { id: company.id, name: company.name },
+    user: { id: profile.user_id, full_name: profile.full_name ?? null, email: profile.email ?? null },
+    role,
+  };
+};
+
+const assignCaFirmMembershipByAdmin = async (
+  serviceClient: ReturnType<typeof createClient>,
+  params: { caFirmId: string; userId: string; role: "owner" | "partner" | "manager" | "analyst" },
+) => {
+  const { caFirmId, userId, role } = params;
+  assertUuid(caFirmId, "caFirmId");
+  assertUuid(userId, "userId");
+
+  const [{ data: firm, error: firmError }, { data: profile, error: profileError }] = await Promise.all([
+    serviceClient.from("ca_firms").select("id, name").eq("id", caFirmId).maybeSingle(),
+    serviceClient.from("profiles").select("user_id, full_name, email").eq("user_id", userId).maybeSingle(),
+  ]);
+  if (firmError) throw firmError;
+  if (profileError) throw profileError;
+  if (!firm) throw new Error("CA firm not found");
+  if (!profile) throw new Error("Target user profile not found");
+
+  const { error: memberError } = await serviceClient
+    .from("ca_firm_members")
+    .upsert({ ca_firm_id: caFirmId, user_id: userId, role }, { onConflict: "ca_firm_id,user_id" });
+  if (memberError) throw memberError;
+
+  const { error: roleError } = await serviceClient
+    .from("user_roles")
+    .upsert({ user_id: userId, role: "manager" }, { onConflict: "user_id,role" });
+  if (roleError) throw roleError;
+
+  return {
+    assigned: true,
+    firm: { id: firm.id, name: firm.name },
+    user: { id: profile.user_id, full_name: profile.full_name ?? null, email: profile.email ?? null },
+    role,
+  };
+};
+
+const seedCompanyWorkflowByAdmin = async (
+  serviceClient: ReturnType<typeof createClient>,
+  params: { companyId: string; actorUserId?: string | null; documentType?: string | null; draftMode?: string | null },
+) => {
+  const companyId = params.companyId.trim();
+  assertUuid(companyId, "companyId");
+
+  const { data: company, error: companyError } = await serviceClient
+    .from("companies")
+    .select("id, name")
+    .eq("id", companyId)
+    .maybeSingle();
+  if (companyError) throw companyError;
+  if (!company) throw new Error("Company not found");
+
+  const { data: members, error: membersError } = await serviceClient
+    .from("company_members")
+    .select("user_id, role")
+    .eq("company_id", companyId)
+    .in("role", ["admin", "manager"]);
+  if (membersError) throw membersError;
+
+  const preferredActor = typeof params.actorUserId === "string" && params.actorUserId.trim() ? params.actorUserId.trim() : null;
+  const actorUserId = preferredActor ?? members?.[0]?.user_id ?? null;
+  if (!actorUserId) throw new Error("No admin/manager company member found to seed workflow");
+  assertUuid(actorUserId, "actorUserId");
+
+  const documentType = typeof params.documentType === "string" && params.documentType.trim() ? params.documentType.trim() : "gst";
+  const draftMode = typeof params.draftMode === "string" && params.draftMode.trim() ? params.draftMode.trim() : "defensive";
+  const draftContent = [
+    "Draft workflow bootstrap generated for dashboard readiness.",
+    `Company: ${company.name}`,
+    `Document Type: ${documentType}`,
+    "Summary: Preliminary response structure prepared with chronology and evidence anchors.",
+    "Action Items: Review factual matrix, validate annexures, and submit for legal review.",
+  ].join("\n");
+
+  const { data: run, error: runError } = await serviceClient
+    .from("draft_runs")
+    .insert({
+      user_id: actorUserId,
+      company_id: companyId,
+      document_type: documentType,
+      draft_mode: draftMode,
+      status: "under_review",
+      notice_input: "Dashboard workflow bootstrap seed",
+      draft_content: draftContent,
+      qa: { seeded: true, source: "ops_company_workflow_seed" },
+      package: { seeded: true },
+    })
+    .select("id, company_id, user_id, status, document_type, draft_mode, created_at")
+    .single();
+  if (runError || !run) throw runError ?? new Error("Failed to create seeded draft run");
+
+  const { error: versionError } = await serviceClient.from("draft_versions").insert({
+    draft_run_id: run.id,
+    user_id: actorUserId,
+    version_number: 1,
+    content: draftContent,
+  });
+  if (versionError) throw versionError;
+
+  const { error: eventError } = await serviceClient.from("draft_audit_events").insert([
+    {
+      draft_run_id: run.id,
+      user_id: actorUserId,
+      event_type: "submitted_for_review",
+      payload: { seeded: true, source: "ops_company_workflow_seed" },
+    },
+    {
+      draft_run_id: run.id,
+      user_id: actorUserId,
+      event_type: "review_started",
+      payload: { seeded: true, source: "ops_company_workflow_seed" },
+    },
+  ]);
+  if (eventError) throw eventError;
+
+  return {
+    seeded: true,
+    company: { id: company.id, name: company.name },
+    draft_run: run,
+  };
 };
 
 const loadCaWorkspaceProfile = async (client: ReturnType<typeof createClient>, userId: string) => {
@@ -3317,6 +3481,9 @@ const getRouteAccessMatrix = () => ({
     { route: "GET /ops/landing/leads", roles: ["admin"] },
     { route: "GET /ops/landing/metrics", roles: ["admin"] },
     { route: "POST /ops/landing/leads/:id/status", roles: ["admin"] },
+    { route: "POST /ops/assign/company-member", roles: ["admin"] },
+    { route: "POST /ops/assign/ca-firm-member", roles: ["admin"] },
+    { route: "POST /ops/bootstrap/company-workflow", roles: ["admin"] },
     { route: "GET /ops/runbooks", roles: ["admin"] },
     { route: "GET /ops/regression-checklist", roles: ["admin"] },
     { route: "GET /ops/prelaunch-gate", roles: ["admin"] },
@@ -4022,6 +4189,51 @@ serve(async (req: Request) => {
       if (error) return json(req, 400, { error: error.message });
       if (!data) return json(req, 404, { error: "landing lead not found" });
       return json(req, 200, { ok: true, data });
+    }
+
+    if (req.method === "POST" && path.endsWith("ops/assign/company-member")) {
+      requireRole(roles, ["admin"]);
+      const serviceClient = getServiceClient();
+      if (!serviceClient) return json(req, 500, { error: "Missing Supabase service role configuration" });
+      const body = await req.json().catch(() => ({}));
+      const companyId = typeof body.companyId === "string" ? body.companyId.trim() : "";
+      const userId = typeof body.userId === "string" ? body.userId.trim() : "";
+      const roleRaw = typeof body.role === "string" ? body.role.trim().toLowerCase() : "user";
+      const role = roleRaw === "admin" || roleRaw === "manager" ? roleRaw : "user";
+      return json(req, 200, {
+        ok: true,
+        data: await assignCompanyMembershipByAdmin(serviceClient, { companyId, userId, role }),
+      });
+    }
+
+    if (req.method === "POST" && path.endsWith("ops/assign/ca-firm-member")) {
+      requireRole(roles, ["admin"]);
+      const serviceClient = getServiceClient();
+      if (!serviceClient) return json(req, 500, { error: "Missing Supabase service role configuration" });
+      const body = await req.json().catch(() => ({}));
+      const caFirmId = typeof body.caFirmId === "string" ? body.caFirmId.trim() : "";
+      const userId = typeof body.userId === "string" ? body.userId.trim() : "";
+      const roleRaw = typeof body.role === "string" ? body.role.trim().toLowerCase() : "analyst";
+      const role = roleRaw === "owner" || roleRaw === "partner" || roleRaw === "manager" ? roleRaw : "analyst";
+      return json(req, 200, {
+        ok: true,
+        data: await assignCaFirmMembershipByAdmin(serviceClient, { caFirmId, userId, role }),
+      });
+    }
+
+    if (req.method === "POST" && path.endsWith("ops/bootstrap/company-workflow")) {
+      requireRole(roles, ["admin"]);
+      const serviceClient = getServiceClient();
+      if (!serviceClient) return json(req, 500, { error: "Missing Supabase service role configuration" });
+      const body = await req.json().catch(() => ({}));
+      const companyId = typeof body.companyId === "string" ? body.companyId.trim() : "";
+      const actorUserId = typeof body.actorUserId === "string" ? body.actorUserId.trim() : null;
+      const documentType = typeof body.documentType === "string" ? body.documentType : null;
+      const draftMode = typeof body.draftMode === "string" ? body.draftMode : null;
+      return json(req, 200, {
+        ok: true,
+        data: await seedCompanyWorkflowByAdmin(serviceClient, { companyId, actorUserId, documentType, draftMode }),
+      });
     }
 
     if (req.method === "GET" && path.endsWith("drafting/ai-ops/actor-entitlement")) {
