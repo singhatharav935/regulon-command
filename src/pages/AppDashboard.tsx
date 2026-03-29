@@ -16,7 +16,7 @@ import AuditEvidenceVault from "@/components/dashboard/AuditEvidenceVault";
 import AIBusinessIntelligencePanel from "@/components/dashboard/AIBusinessIntelligencePanel";
 import RegulatoryIntelligenceCenter from "@/components/dashboard/RegulatoryIntelligenceCenter";
 import AIVoiceBriefAgent from "@/components/voice/AIVoiceBriefAgent";
-import { AIAgentPanel } from "@/components/ai/AIAgentSystem";
+import RegulonLiveAgent from "@/components/ai/RegulonLiveAgent";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { useToast } from "@/hooks/use-toast";
@@ -414,14 +414,13 @@ const AppDashboard = () => {
               deadlines={mappedData.deadlines}
             />
 
-            {/* AI Agent System - 2 Agents for Company: Ingestor, Sentinel */}
-            <section className="mb-12">
-              <h2 className="text-3xl font-bold text-white mb-4">AI Agents for Compliance</h2>
-              <p className="text-slate-300 mb-8">
-                2 specialized AI agents are extracting compliance data and tracking regulatory deadlines for your company.
-              </p>
-              <AIAgentPanel dashboardType="company" />
-            </section>
+            {/* Regulon Live AI Agent - Conversational like Siri/Alexa */}
+            <RegulonLiveAgent
+              dashboardId="app-company"
+              dashboardType="company"
+              userName="Company Admin"
+              companyName={mappedData.company.name}
+            />
 
             <RegulatoryIntelligenceCenter
               currentHealthScore={mappedData.company.complianceHealth}

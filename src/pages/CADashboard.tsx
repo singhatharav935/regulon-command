@@ -15,7 +15,7 @@ import CAAnalyticsSection from "@/components/ca-dashboard/CAAnalyticsSection";
 import AIDraftingEngine from "@/components/ca-dashboard/AIDraftingEngine";
 import ComplianceChatbot from "@/components/ca-dashboard/ComplianceChatbot";
 import AIVoiceBriefAgent from "@/components/voice/AIVoiceBriefAgent";
-import { AIAgentPanel } from "@/components/ai/AIAgentSystem";
+import RegulonLiveAgent from "@/components/ai/RegulonLiveAgent";
 
 const CADashboard = () => {
   const [isLoading, setIsLoading] = useState(true);
@@ -54,6 +54,14 @@ const CADashboard = () => {
               <strong>CA Professional Dashboard</strong> — Manage all assigned companies and compliance tasks from one control center.
             </p>
           </motion.div>
+
+          {/* Regulon Live AI Agent - Conversational like Siri/Alexa */}
+          <RegulonLiveAgent
+            dashboardId="demo-ca"
+            dashboardType="ca"
+            userName="CA Professional"
+            companyName="Your Clients"
+          />
 
           <AIVoiceBriefAgent
             dashboardId="demo-ca"
@@ -107,21 +115,6 @@ const CADashboard = () => {
           />
 
           <CAHomeSection />
-          
-          {/* AI Agent System - 4 Agents: Ingestor, Matchmaker, Architect, Sentinel */}
-          <section className="mb-12">
-            <motion.div
-              initial={{ opacity: 0 }}
-              animate={{ opacity: 1 }}
-              transition={{ delay: 0.3 }}
-            >
-              <h2 className="text-3xl font-bold text-white mb-4">AI Agents Working For You</h2>
-              <p className="text-slate-300 mb-8">
-                Your 4 specialized AI agents are autonomously handling data entry, reconciliation, balance sheet generation, and compliance filing. Review and approve their work below.
-              </p>
-              <AIAgentPanel dashboardType="ca" />
-            </motion.div>
-          </section>
           
           {/* AI Drafting Engine - CA Only */}
           <AIDraftingEngine demoMode />

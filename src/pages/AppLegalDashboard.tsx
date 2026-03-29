@@ -9,7 +9,7 @@ import { Badge } from "@/components/ui/badge";
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table";
 import { Button } from "@/components/ui/button";
 import AIVoiceBriefAgent from "@/components/voice/AIVoiceBriefAgent";
-import { AIAgentPanel } from "@/components/ai/AIAgentSystem";
+import RegulonLiveAgent from "@/components/ai/RegulonLiveAgent";
 import { useAuth } from "@/hooks/use-auth";
 import { workspaceBackendRequest } from "@/lib/workspace-backend";
 
@@ -96,13 +96,13 @@ const AppLegalDashboard = () => {
             ]}
           />
 
-          <div className="mb-12">
-            <h2 className="text-3xl font-bold text-white mb-4">AI Agents for Legal Review</h2>
-            <p className="text-slate-300 mb-8">
-              2 specialized AI agents are handling document extraction and finalization. Monitor their work in the legal review process.
-            </p>
-            <AIAgentPanel dashboardType="legal" />
-          </div>
+          {/* Regulon Live AI Agent - Conversational like Siri/Alexa */}
+          <RegulonLiveAgent
+            dashboardId="app-legal"
+            dashboardType="legal"
+            userName="Legal Reviewer"
+            companyName="In-House Legal"
+          />
 
           <div className="grid grid-cols-2 md:grid-cols-4 gap-4 mb-8">
             <Card className="glass-card border-border/40"><CardContent className="p-4"><p className="text-xs text-muted-foreground">Draft Runs</p><p className="text-2xl font-bold">{data?.runs.length ?? 0}</p></CardContent></Card>

@@ -7,7 +7,7 @@ import DashboardTypeNav from "@/components/dashboard/DashboardTypeNav";
 import AIDraftingEngine from "@/components/ca-dashboard/AIDraftingEngine";
 import ComplianceChatbot from "@/components/ca-dashboard/ComplianceChatbot";
 import AIVoiceBriefAgent from "@/components/voice/AIVoiceBriefAgent";
-import { AIAgentPanel } from "@/components/ai/AIAgentSystem";
+import RegulonLiveAgent from "@/components/ai/RegulonLiveAgent";
 import { useCAWorkspace } from "@/hooks/use-ca-workspace";
 import { useAuth } from "@/hooks/use-auth";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
@@ -290,14 +290,13 @@ const AppCADashboard = () => {
             )}
           </RuntimeErrorBoundary>
 
-          {/* AI Agent System - 4 Agents: Ingestor, Matchmaker, Architect, Sentinel */}
-          <section className="mb-12">
-            <h2 className="text-3xl font-bold text-white mb-4">AI Agents For Your Clients</h2>
-            <p className="text-slate-300 mb-8">
-              4 specialized AI agents are working autonomously on balance sheet generation, reconciliation, data entry, and compliance filing. Review and approve their work for each client.
-            </p>
-            <AIAgentPanel dashboardType="ca" />
-          </section>
+          {/* Regulon Live AI Agent - Conversational like Siri/Alexa */}
+          <RegulonLiveAgent
+            dashboardId="app-ca"
+            dashboardType="ca"
+            userName="CA Professional"
+            companyName="Your Clients"
+          />
 
           <RuntimeErrorBoundary scopeLabel="CA Drafting Engine">
             <AIDraftingEngine includeLawyerReview={isRegulonCA} />

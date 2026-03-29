@@ -8,7 +8,7 @@ import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table";
 import { Badge } from "@/components/ui/badge";
 import AIVoiceBriefAgent from "@/components/voice/AIVoiceBriefAgent";
-import { AIAgentPanel } from "@/components/ai/AIAgentSystem";
+import RegulonLiveAgent from "@/components/ai/RegulonLiveAgent";
 import { useAuth } from "@/hooks/use-auth";
 import { workspaceBackendRequest } from "@/lib/workspace-backend";
 
@@ -125,14 +125,13 @@ const AppAdminDashboard = () => {
             ]}
           />
 
-          {/* AI Agent System - 3 Agents for Admin: Ingestor, Architect, Sentinel */}
-          <section className="mb-12">
-            <h2 className="text-3xl font-bold text-white mb-4">Platform AI Agents</h2>
-            <p className="text-slate-300 mb-8">
-              3 specialized AI agents are managing platform-wide data processing, account finalization, and regulatory compliance tracking across all tenants.
-            </p>
-            <AIAgentPanel dashboardType="admin" />
-          </section>
+          {/* Regulon Live AI Agent - Conversational like Siri/Alexa */}
+          <RegulonLiveAgent
+            dashboardId="app-admin"
+            dashboardType="admin"
+            userName="Platform Admin"
+            companyName="All Tenants"
+          />
 
           {mapped && (
             <>
