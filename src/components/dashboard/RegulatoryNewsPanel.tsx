@@ -10,6 +10,8 @@ import {
   Target,
   Clock,
   Building2,
+  ChevronDown,
+  ChevronUp,
 } from "lucide-react";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Badge } from "@/components/ui/badge";
@@ -34,6 +36,7 @@ interface NewsItem {
 const RegulatoryNewsPanel = () => {
   const [news, setNews] = useState<NewsItem[]>([]);
   const [loading, setLoading] = useState(true);
+  const [isExpanded, setIsExpanded] = useState(false);
   const [expandedId, setExpandedId] = useState<string | null>(null);
   const [error, setError] = useState<string | null>(null);
 
@@ -92,204 +95,182 @@ const RegulatoryNewsPanel = () => {
 
   return (
     <Card className="border-purple-500/30 bg-gradient-to-br from-slate-950 via-slate-900 to-slate-950">
-      <CardHeader className="border-b border-purple-500/20 pb-4">
+      {/* Collapsible Header */}
+      <CardHeader 
+        className="border-b border-purple-500/20 pb-3 cursor-pointer hover:bg-purple-500/5 transition"
+        onClick={() => setIsExpanded(!isExpanded)}
+      >
         <div className="flex items-center justify-between">
-          <div className="flex items-center gap-3">
-            <Globe className="w-6 h-6 text-purple-400 animate-pulse" />
-            <div>
-              <CardTitle className="text-lg text-white">
-                Indian Regulatory News & Compliance Updates
-              </CardTitle>
-              <p className="text-xs text-gray-400 mt-1">
-                Major regulatory changes from past 30 days | 7 Government Sources
+          <div className="flex items-center gap-3 flex-1">
+            <Globe className="w-5 h-5 text-purple-400 animate-pulse" />
+            <div className="flex-1">
+              <div className="flex items-center gap-2">
+                <CardTitle className="text-sm text-white">
+                  Indian Regulatory News
+                </CardTitle>
+                <Badge variant="outline" className="bg-purple-500/20 border-purple-500/50 text-purple-300 text-xs">
+                  {news.length}
+                </Badge>
+              </div>
+              <p className="text-xs text-gray-400 mt-0.5">
+                {isExpanded ? "Click to collapse" : "Click to view major changes from past 30 days"}
               </p>
             </div>
           </div>
-          <Badge variant="outline" className="bg-purple-500/20 border-purple-500/50 text-purple-300">
-            {news.length} Major Changes
-          </Badge>
+          <motion.div
+            animate={{ rotate: isExpanded ? 180 : 0 }}
+            transition={{ duration: 0.2 }}
+          >
+            <ChevronDown className="w-5 h-5 text-purple-400" />
+          </motion.div>
         </div>
       </CardHeader>
 
-      <CardContent className="pt-4">
-        {loading ? (
-          <div className="flex items-center justify-center py-12">
-            <div className="animate-spin rounded-full h-8 w-8 border-b-2 border-purple-400" />
-          </div>
-        ) : error ? (
-          <div className="bg-rose-500/10 border border-rose-500/30 rounded-lg p-4 text-rose-300 text-sm">
-            {error}
-          </div>
-        ) : news.length === 0 ? (
-          <div className="text-center py-8 text-gray-400">
-            No regulatory updates in past 30 days
-          </div>
-        ) : (
-          <div className="space-y-3">
-            <AnimatePresence>
-              {news.map((item, idx) => (
-                <motion.div
-                  key={item.id}
-                  initial={{ opacity: 0, y: 20 }}
-                  animate={{ opacity: 1, y: 0 }}
-                  exit={{ opacity: 0, y: -20 }}
-                  transition={{ delay: idx * 0.05 }}
-                >
-                  <div
-                    className={`rounded-lg border p-4 cursor-pointer transition-all hover:shadow-lg ${getSeverityBgColor(
-                      item.severity
-                    )}`}
-                    onClick={() =>
-                      setExpandedId(
-                        expandedId === item.id ? null : item.id
-                      )
-                    }
-                  >
-                    <div className="flex items-start gap-3">
-                      <div className="mt-1">{getSeverityIcon(item.severity)}</div>
-                      <div className="flex-1 min-w-0">
-                        {/* Top badges */}
-                        <div className="flex items-center gap-2 flex-wrap mb-2">
-                          <Badge
-                            variant="outline"
-                            className="text-xs bg-purple-900/40 border-purple-600/60 text-purple-200"
-                          >
-                            {item.category}
-                          </Badge>
-                          <Badge
-                            variant="outline"
-                            className="text-xs bg-slate-800 border-slate-600"
-                          >
-                            {item.regulatoryArea}
-                          </Badge>
-                          <Badge
-                            variant="outline"
-                            className={`text-xs ${
-                              item.urgency === "High"
-                                ? "bg-rose-900/40 border-rose-600/60 text-rose-200"
-                                : "bg-amber-900/40 border-amber-600/60 text-amber-200"
-                            }`}
-                          >
-                            {item.urgency} Priority
-                          </Badge>
-                        </div>
-
-                        {/* Title and authority */}
-                        <h4 className="text-sm font-semibold text-white line-clamp-2">
-                          {item.title}
-                        </h4>
-                        <p className="text-xs text-purple-300 mt-1 font-medium">
-                          {item.authority}
-                        </p>
-
-                        {/* Summary preview */}
-                        {item.summary && (
-                          <p className="text-xs text-gray-300 mt-2 line-clamp-2">
-                            {item.summary}
-                          </p>
-                        )}
-
-                        {/* Expandable section */}
-                        <AnimatePresence>
-                          {expandedId === item.id && (
-                            <motion.div
-                              initial={{ opacity: 0, height: 0 }}
-                              animate={{ opacity: 1, height: "auto" }}
-                              exit={{ opacity: 0, height: 0 }}
-                              className="mt-4 space-y-4 border-t border-slate-700 pt-4"
-                            >
-                              {/* Impact Type & Status Grid */}
-                              <div className="grid grid-cols-2 gap-3">
-                                <div>
-                                  <p className="text-xs font-semibold text-purple-300 mb-1 flex items-center gap-1">
-                                    <Target className="w-3 h-3" /> Impact Type
-                                  </p>
-                                  <p className="text-xs text-gray-200">
-                                    {item.impactType}
-                                  </p>
-                                </div>
-
-                                <div>
-                                  <p className="text-xs font-semibold text-purple-300 mb-1 flex items-center gap-1">
-                                    <Clock className="w-3 h-3" /> Status
-                                  </p>
-                                  <p className="text-xs text-gray-200">
-                                    {item.implementationStatus}
-                                  </p>
+      {/* Expandable Content */}
+      <AnimatePresence>
+        {isExpanded && (
+          <motion.div
+            initial={{ opacity: 0, height: 0 }}
+            animate={{ opacity: 1, height: "auto" }}
+            exit={{ opacity: 0, height: 0 }}
+            transition={{ duration: 0.3 }}
+          >
+            <CardContent className="pt-4">
+              {loading ? (
+                <div className="flex items-center justify-center py-8">
+                  <div className="animate-spin rounded-full h-6 w-6 border-b-2 border-purple-400" />
+                </div>
+              ) : error ? (
+                <div className="bg-rose-500/10 border border-rose-500/30 rounded-lg p-3 text-rose-300 text-xs">
+                  {error}
+                </div>
+              ) : news.length === 0 ? (
+                <div className="text-center py-6 text-gray-400 text-sm">
+                  No regulatory updates in past 30 days
+                </div>
+              ) : (
+                <div className="space-y-2 max-h-96 overflow-y-auto">
+                  <AnimatePresence>
+                    {news.map((item, idx) => (
+                      <motion.div
+                        key={item.id}
+                        initial={{ opacity: 0, y: 10 }}
+                        animate={{ opacity: 1, y: 0 }}
+                        exit={{ opacity: 0, y: -10 }}
+                        transition={{ delay: idx * 0.03 }}
+                      >
+                        <div
+                          className={`rounded-lg border p-3 cursor-pointer transition-all hover:shadow-md ${getSeverityBgColor(
+                            item.severity
+                          )}`}
+                          onClick={() =>
+                            setExpandedId(
+                              expandedId === item.id ? null : item.id
+                            )
+                          }
+                        >
+                          <div className="flex items-start gap-2">
+                            <div className="mt-0.5">{getSeverityIcon(item.severity)}</div>
+                            <div className="flex-1 min-w-0">
+                              {/* Compact header */}
+                              <div className="flex items-start justify-between gap-2">
+                                <div className="flex-1">
+                                  <div className="flex items-center gap-1 flex-wrap mb-1">
+                                    <Badge
+                                      variant="outline"
+                                      className="text-xs bg-purple-900/40 border-purple-600/60 text-purple-200"
+                                    >
+                                      {item.category}
+                                    </Badge>
+                                    <Badge
+                                      variant="outline"
+                                      className={`text-xs ${
+                                        item.urgency === "High"
+                                          ? "bg-rose-900/40 border-rose-600/60 text-rose-200"
+                                          : "bg-amber-900/40 border-amber-600/60 text-amber-200"
+                                      }`}
+                                    >
+                                      {item.urgency}
+                                    </Badge>
+                                  </div>
+                                  <h4 className="text-xs font-semibold text-white line-clamp-1">
+                                    {item.title}
+                                  </h4>
                                 </div>
                               </div>
 
-                              {/* Affected Entities */}
-                              <div>
-                                <p className="text-xs font-semibold text-purple-300 mb-1 flex items-center gap-1">
-                                  <Building2 className="w-3 h-3" /> Affected Entities
-                                </p>
-                                <p className="text-xs text-gray-200">
-                                  {item.affectedEntities}
-                                </p>
-                              </div>
+                              {/* Expandable details */}
+                              <AnimatePresence>
+                                {expandedId === item.id && (
+                                  <motion.div
+                                    initial={{ opacity: 0, height: 0 }}
+                                    animate={{ opacity: 1, height: "auto" }}
+                                    exit={{ opacity: 0, height: 0 }}
+                                    className="mt-2 space-y-2 border-t border-slate-700 pt-2"
+                                  >
+                                    {/* Summary */}
+                                    {item.summary && (
+                                      <p className="text-xs text-gray-300">
+                                        {item.summary}
+                                      </p>
+                                    )}
 
-                              {/* Full Summary */}
-                              <div>
-                                <p className="text-xs font-semibold text-purple-300 mb-1">
-                                  Detailed Summary
-                                </p>
-                                <p className="text-xs text-gray-300 leading-relaxed">
-                                  {item.summary || "No detailed summary available"}
-                                </p>
-                              </div>
+                                    {/* Metadata grid */}
+                                    <div className="grid grid-cols-2 gap-2">
+                                      <div className="text-xs">
+                                        <p className="font-semibold text-purple-300">Impact</p>
+                                        <p className="text-gray-300">{item.impactType}</p>
+                                      </div>
+                                      <div className="text-xs">
+                                        <p className="font-semibold text-purple-300">Status</p>
+                                        <p className="text-gray-300">{item.implementationStatus}</p>
+                                      </div>
+                                    </div>
 
-                              {/* Previous Notices Count */}
-                              {item.previousNotices && item.previousNotices > 1 && (
-                                <div className="bg-slate-800/50 rounded px-2 py-1.5">
-                                  <p className="text-xs text-gray-300">
-                                    <span className="text-purple-300 font-semibold">
-                                      {item.previousNotices}
-                                    </span>{" "}
-                                    related notices from this authority in past 30 days
-                                  </p>
+                                    {/* Affected entities */}
+                                    <div className="text-xs">
+                                      <p className="font-semibold text-purple-300">Affected</p>
+                                      <p className="text-gray-300">{item.affectedEntities}</p>
+                                    </div>
+
+                                    {/* View Source Link */}
+                                    <div className="flex items-center justify-between pt-1 border-t border-slate-700">
+                                      <span className="text-xs text-gray-400">
+                                        {formatDate(item.date)}
+                                      </span>
+                                      <a
+                                        href={item.sourceUrl}
+                                        target="_blank"
+                                        rel="noopener noreferrer"
+                                        className="flex items-center gap-1 text-xs text-purple-400 hover:text-purple-300 transition font-semibold"
+                                      >
+                                        View Source
+                                        <ExternalLink className="w-3 h-3" />
+                                      </a>
+                                    </div>
+                                  </motion.div>
+                                )}
+                              </AnimatePresence>
+
+                              {/* Collapsed footer */}
+                              {expandedId !== item.id && (
+                                <div className="flex items-center justify-between mt-1">
+                                  <span className="text-xs text-gray-400">{formatDate(item.date)}</span>
+                                  <span className="text-xs text-purple-400">+</span>
                                 </div>
                               )}
-
-                              {/* Date and View Official Source Button */}
-                              <div className="flex items-center justify-between pt-2 border-t border-slate-700">
-                                <span className="text-xs text-gray-400">
-                                  {formatDate(item.date)}
-                                </span>
-                                <a
-                                  href={item.sourceUrl}
-                                  target="_blank"
-                                  rel="noopener noreferrer"
-                                  className="flex items-center gap-1 text-xs text-purple-400 hover:text-purple-300 transition font-semibold bg-purple-500/20 px-3 py-1.5 rounded"
-                                >
-                                  View Official Source
-                                  <ExternalLink className="w-3 h-3" />
-                                </a>
-                              </div>
-                            </motion.div>
-                          )}
-                        </AnimatePresence>
-
-                        {/* Collapsed view footer */}
-                        {expandedId !== item.id && (
-                          <div className="flex items-center justify-between mt-2 pt-2 border-t border-slate-700/50">
-                            <span className="text-xs text-gray-400">
-                              {formatDate(item.date)}
-                            </span>
-                            <span className="text-xs text-purple-400 font-semibold">
-                              View Details →
-                            </span>
+                            </div>
                           </div>
-                        )}
-                      </div>
-                    </div>
-                  </div>
-                </motion.div>
-              ))}
-            </AnimatePresence>
-          </div>
+                        </div>
+                      </motion.div>
+                    ))}
+                  </AnimatePresence>
+                </div>
+              )}
+            </CardContent>
+          </motion.div>
         )}
-      </CardContent>
+      </AnimatePresence>
     </Card>
   );
 };
