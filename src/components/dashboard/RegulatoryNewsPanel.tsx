@@ -44,10 +44,91 @@ const RegulatoryNewsPanel = () => {
     const fetchNews = async () => {
       try {
         setLoading(true);
-        const response = await fetch("http://localhost:8787/regulatory-news");
-        if (!response.ok) throw new Error("Failed to fetch news");
-        const data = await response.json();
-        setNews(data);
+        // Mock data for Indian regulatory news - past 1 month compliance updates
+        const mockNews: NewsItem[] = [
+          {
+            id: "news-001",
+            category: "GST",
+            title: "New GST Return Filing Format - GSTR-3B Auto-Population",
+            summary: "GSTN introduces simplified GSTR-3B filing with auto-population from GSTR-2B. Reduces manual entry errors.",
+            authority: "Goods and Services Tax Network (GSTN)",
+            sourceUrl: "https://www.gstn.org/news",
+            impactType: "filing_change",
+            affectedEntities: "All GST registered businesses",
+            implementationStatus: "active",
+            urgency: "high",
+            regulatoryArea: "GST Compliance",
+            date: "2024-03-01",
+            severity: "high",
+            previousNotices: 3,
+          },
+          {
+            id: "news-002",
+            category: "Income Tax",
+            title: "TDS Rate Changes on Contractor Payments",
+            summary: "Increase in TDS rate from 1% to 2% on contractor payments above ₹30,000.",
+            authority: "Income Tax Department",
+            sourceUrl: "https://www.incometaxindia.gov.in/notices",
+            impactType: "rate_change",
+            affectedEntities: "Businesses making contractor payments",
+            implementationStatus: "active",
+            urgency: "high",
+            regulatoryArea: "Income Tax",
+            date: "2024-02-28",
+            severity: "high",
+            previousNotices: 2,
+          },
+          {
+            id: "news-003",
+            category: "Labour Compliance",
+            title: "Updated Provident Fund Contribution Rates FY 2024-25",
+            summary: "EPF contribution rates adjusted. Employee contribution increased by 0.5%.",
+            authority: "Employee Provident Fund Organization (EPFO)",
+            sourceUrl: "https://www.epfo.gov.in",
+            impactType: "rate_change",
+            affectedEntities: "Employers with EPF members",
+            implementationStatus: "active",
+            urgency: "medium",
+            regulatoryArea: "Labour Compliance",
+            date: "2024-02-15",
+            severity: "medium",
+            previousNotices: 1,
+          },
+          {
+            id: "news-004",
+            category: "MCA",
+            title: "E-Filing Requirements - Digital Signature Mandatory",
+            summary: "All MCA filings require advanced e-signature. Class 2 certificates no longer accepted.",
+            authority: "Ministry of Corporate Affairs (MCA)",
+            sourceUrl: "https://www.mca.gov.in",
+            impactType: "compliance_requirement",
+            affectedEntities: "Private limited companies",
+            implementationStatus: "active",
+            urgency: "high",
+            regulatoryArea: "MCA Compliance",
+            date: "2024-02-10",
+            severity: "medium",
+            previousNotices: 0,
+          },
+          {
+            id: "news-005",
+            category: "RBI",
+            title: "Enhanced KYC Verification for Bank Accounts",
+            summary: "RBI mandates face-to-face verification. Video KYC accepted as alternative.",
+            authority: "Reserve Bank of India (RBI)",
+            sourceUrl: "https://www.rbi.org.in",
+            impactType: "kyc_requirement",
+            affectedEntities: "All bank account holders",
+            implementationStatus: "active",
+            urgency: "high",
+            regulatoryArea: "Banking Compliance",
+            date: "2024-03-05",
+            severity: "high",
+            previousNotices: 1,
+          },
+        ];
+        
+        setNews(mockNews);
         setError(null);
       } catch (err) {
         setError(err instanceof Error ? err.message : "Failed to load news");
@@ -58,9 +139,10 @@ const RegulatoryNewsPanel = () => {
     };
 
     fetchNews();
-    const interval = setInterval(fetchNews, 60000); // Refresh every 60s
+    const interval = setInterval(fetchNews, 60000);
     return () => clearInterval(interval);
   }, []);
+
 
   const getSeverityIcon = (severity: string) => {
     switch (severity) {
