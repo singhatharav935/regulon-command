@@ -13,6 +13,7 @@ import ComplianceGapSection from "@/components/dashboard/ComplianceGapSection";
 import UpcomingLawImpactSection from "@/components/dashboard/UpcomingLawImpactSection";
 import AuditEvidenceVault from "@/components/dashboard/AuditEvidenceVault";
 import AIBusinessIntelligencePanel from "@/components/dashboard/AIBusinessIntelligencePanel";
+import RegulatoryIntelligenceCenter from "@/components/dashboard/RegulatoryIntelligenceCenter";
 import AIVoiceBriefAgent from "@/components/voice/AIVoiceBriefAgent";
 
 // Demo data for the dashboard example
@@ -53,6 +54,51 @@ const demoDeadlines = [
   { id: "3", title: "Annual Return (MGT-7)", regulator: "MCA", dueDate: "Feb 15, 2026", isRecurring: false, daysLeft: 21 },
   { id: "4", title: "Advance Tax Q4", regulator: "Income Tax", dueDate: "Mar 15, 2026", isRecurring: true, daysLeft: 49 },
   { id: "5", title: "RBI Annual Certificate", regulator: "RBI", dueDate: "Mar 31, 2026", isRecurring: false, daysLeft: 65 },
+];
+
+const demoRegulatoryUpdates = [
+  {
+    id: "u1",
+    title: "GST return validation change announced",
+    source: "gstn",
+    sourceLabel: "GSTN",
+    announcedBy: "GST Council",
+    announcedOn: "March 20, 2026",
+    effectiveDate: "April 1, 2026",
+    actionDeadline: "March 30, 2026",
+    impactScore: 6.8,
+    companyExposure: "medium" as const,
+    actionOwner: "Indirect Tax Lead",
+    originalUrl: "https://www.gst.gov.in/newsandupdates",
+  },
+  {
+    id: "u2",
+    title: "MCA annual compliance disclosure expansion",
+    source: "mca",
+    sourceLabel: "MCA",
+    announcedBy: "Ministry of Corporate Affairs",
+    announcedOn: "March 18, 2026",
+    effectiveDate: "April 10, 2026",
+    actionDeadline: "April 5, 2026",
+    impactScore: 4.1,
+    companyExposure: "low" as const,
+    actionOwner: "Company Secretary",
+    originalUrl: "https://www.mca.gov.in/content/mca/global/en/notifications-orders/notifications.html",
+  },
+  {
+    id: "u3",
+    title: "Income Tax scrutiny documentation tightening",
+    source: "incometax",
+    sourceLabel: "Income Tax India",
+    announcedBy: "CBDT",
+    announcedOn: "March 22, 2026",
+    effectiveDate: "April 15, 2026",
+    actionDeadline: "April 8, 2026",
+    impactScore: 9.3,
+    companyExposure: "high" as const,
+    actionOwner: "Direct Tax Lead",
+    originalUrl: "https://www.incometaxindia.gov.in/pages/communications/notifications.aspx",
+  },
 ];
 
 const Dashboard = () => {
@@ -146,6 +192,11 @@ const Dashboard = () => {
             exposures={demoExposures}
             tasks={demoTasks}
             deadlines={demoDeadlines}
+          />
+
+          <RegulatoryIntelligenceCenter
+            currentHealthScore={demoCompany.complianceHealth}
+            updates={demoRegulatoryUpdates}
           />
 
           {/* New Sections */}

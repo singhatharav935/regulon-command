@@ -5176,16 +5176,27 @@ const bootstrapCompanyAuthorityWorkflowsByAdmin = async (
 };
 
 const getRouteAccessMatrix = () => ({
+  public: [
+    { route: "GET /public/landing/overview", roles: ["public"] },
+    { route: "POST /public/landing/lead", roles: ["public"] },
+    { route: "GET /public/legal-documents", roles: ["public"] },
+    { route: "GET /public/legal-documents/index", roles: ["public"] },
+    { route: "GET /public/regulatory-announcements", roles: ["public"] },
+    { route: "POST /public/regulatory-announcements/sync-now", roles: ["public"] },
+  ],
   dashboards: [
     { route: "GET /onboarding/status", roles: ["authenticated"] },
     { route: "POST /onboarding/repair-self", roles: ["authenticated"] },
     { route: "GET /dashboard/readiness/self", roles: ["authenticated"] },
     { route: "GET /ops/dashboard-readiness/smoke", roles: ["admin"] },
+    { route: "GET /ca/workspace-profile", roles: ["manager", "admin"] },
     { route: "GET /company/dashboard", roles: ["user", "manager", "admin"] },
+    { route: "POST /company/workspace", roles: ["user", "manager", "admin"] },
     { route: "POST /company/bootstrap-data", roles: ["user", "manager", "admin"] },
     { route: "GET /ca/dashboard", roles: ["manager", "admin"] },
     { route: "GET /legal/dashboard", roles: ["manager", "admin"] },
     { route: "GET /ca-firm/dashboard", roles: ["manager", "admin"] },
+    { route: "POST /ca-firm/workspace", roles: ["manager", "admin"] },
     { route: "POST /ca-firm/bootstrap-data", roles: ["manager", "admin"] },
     { route: "GET /admin/dashboard", roles: ["admin"] },
     { route: "GET /compliance/consent/status", roles: ["authenticated"] },
@@ -5214,6 +5225,13 @@ const getRouteAccessMatrix = () => ({
     { route: "GET /ops/activity/logs", roles: ["authenticated"] },
   ],
   drafts: [
+    { route: "GET /draft-review/:id", roles: ["manager", "admin"] },
+    { route: "POST /draft-review/:id/save", roles: ["manager", "admin"] },
+    { route: "GET /drafting/preferences", roles: ["manager", "admin"] },
+    { route: "GET /drafting/capabilities", roles: ["manager", "admin"] },
+    { route: "GET /drafting/clients", roles: ["manager", "admin"] },
+    { route: "POST /drafting/ai", roles: ["manager", "admin"] },
+    { route: "POST /drafting/ai-stream", roles: ["manager", "admin"] },
     { route: "POST /drafts", roles: ["manager", "admin"] },
     { route: "POST /drafts/:id/snapshot", roles: ["manager", "admin"] },
     { route: "POST /drafts/:id/rollback", roles: ["manager", "admin"] },
@@ -5796,6 +5814,131 @@ const listPublicLegalDocumentIndex = async (
     if (!byKey.has(key)) byKey.set(key, row as unknown as Record<string, unknown>);
   }
   return Array.from(byKey.values());
+};
+
+const listPublicRegulatoryAnnouncements = async (
+  serviceClient: ReturnType<typeof createClient>,
+  options?: { limit?: number },
+) => {
+  const triggerRegulatoryAgentSync = async (triggerReason: string) => {
+    try {
+      const { url, serviceRole } = getEnv();
+      const endpoint = `${url}/functions/v1/regulatory-intel-agent/sync`;
+      const cronSecret = Deno.env.get("REGULATORY_AGENT_CRON_SECRET") ?? "";
+      const response = await fetch(endpoint, {
+        method: "POST",
+        headers: {
+          Authorization: `Bearer ${serviceRole}`,
+          apikey: serviceRole,
+          "Content-Type": "application/json",
+          ...(cronSecret ? { "x-cron-secret": cronSecret } : {}),
+        },
+        body: JSON.stringify({ trigger: triggerReason }),
+      });
+      if (!response.ok) {
+        const body = await response.text().catch(() => "");
+        return { attempted: true, ok: false, error: `agent sync failed (${response.status}) ${body.slice(0, 200)}` };
+      }
+      return { attempted: true, ok: true, error: null as string | null };
+    } catch (error) {
+      return {
+        attempted: true,
+        ok: false,
+        error: error instanceof Error ? error.message : "agent sync failed",
+      };
+    }
+  };
+
+  const fetchAnnouncements = async (limit: number) => {
+    const { data, error } = await serviceClient
+      .from("government_announcements")
+      .select("id, source, source_label, title, summary, category, announced_by, source_url, announced_on, published_date, detected_at, effective_date, action_deadline, impact_score, company_exposure, action_owner, original_url, source_verified, created_at")
+      .order("published_date", { ascending: false, nullsFirst: false })
+      .order("detected_at", { ascending: false, nullsFirst: false })
+      .limit(limit);
+    if (error) {
+      if (isMissingRelationError(error, "government_announcements")) {
+        return [];
+      }
+      throw error;
+    }
+    return data ?? [];
+  };
+
+  const limit = Math.max(3, Math.min(100, Number(options?.limit ?? 30)));
+  const monitoredSources = [
+    { source: "pib", source_label: "PIB India" },
+    { source: "gstn", source_label: "GSTN" },
+    { source: "cbic", source_label: "CBIC" },
+    { source: "incometax", source_label: "Income Tax India" },
+    { source: "mca", source_label: "MCA" },
+  ];
+  let data = await fetchAnnouncements(limit);
+
+  const { data: syncRun, error: syncError } = await serviceClient
+    .from("regulatory_agent_sync_runs")
+    .select("created_at, monitored_portals")
+    .order("created_at", { ascending: false })
+    .limit(1)
+    .maybeSingle();
+  if (syncError && !isMissingRelationError(syncError, "regulatory_agent_sync_runs")) throw syncError;
+
+  let bootstrap = { attempted: false, ok: false, error: null as string | null };
+  if (data.length === 0 && !syncRun?.created_at) {
+    bootstrap = await triggerRegulatoryAgentSync("workspace-backend-empty-feed-bootstrap");
+    data = await fetchAnnouncements(limit);
+  }
+
+  const { data: sourceStateRows, error: sourceStateError } = await serviceClient
+    .from("regulatory_source_states")
+    .select("source, source_label, last_status, last_success_at, last_error");
+  if (sourceStateError && !isMissingRelationError(sourceStateError, "regulatory_source_states")) throw sourceStateError;
+
+  const sourceStatus = monitoredSources.map((sourceRow) => {
+    const latest = (data ?? []).find((row) => row.source === sourceRow.source);
+    const state = (sourceStateRows ?? []).find((row) => row.source === sourceRow.source);
+    const resolvedStatus = state?.last_status === "failed" || state?.last_status === "partial"
+      ? "awaiting_feed"
+      : latest || state?.last_success_at
+        ? "active"
+        : "awaiting_feed";
+    return {
+      source: sourceRow.source,
+      source_label: state?.source_label ?? sourceRow.source_label,
+      status: resolvedStatus,
+      latest_notice_at: latest?.published_date ?? latest?.announced_on ?? state?.last_success_at ?? null,
+      latest_notice_title: latest?.title ?? null,
+      last_error: state?.last_error ?? null,
+    };
+  });
+
+  return {
+    announcements: (data ?? []).map((row) => ({
+      id: row.id,
+      source: row.source,
+      source_label: row.source_label,
+      title: row.title,
+      summary: row.summary,
+      category: row.category,
+      announced_by: row.announced_by,
+      source_url: row.source_url ?? row.original_url,
+      announced_on: row.published_date ?? row.announced_on,
+      published_date: row.published_date ?? row.announced_on,
+      detected_at: row.detected_at ?? row.created_at,
+      effective_date: row.effective_date,
+      action_deadline: row.action_deadline,
+      impact_score: Number(row.impact_score ?? 0),
+      company_exposure: row.company_exposure,
+      action_owner: row.action_owner,
+      original_url: row.original_url,
+      source_verified: row.source_verified !== false,
+    })),
+    last_synced_at: syncRun?.created_at ?? null,
+    monitored_portals: Number(syncRun?.monitored_portals ?? 12),
+    sync_status: syncRun?.created_at ? "agent_active" : "awaiting_first_sync",
+    source_status: sourceStatus,
+    bootstrap,
+  };
 };
 
 const acceptLegalDocument = async (
@@ -8990,7 +9133,9 @@ serve(async (req: Request) => {
       path.endsWith("public/landing/overview") ||
       path.endsWith("public/landing/lead") ||
       path.endsWith("public/legal-documents") ||
-      path.endsWith("public/legal-documents/index")
+      path.endsWith("public/legal-documents/index") ||
+      path.endsWith("public/regulatory-announcements") ||
+      path.endsWith("public/regulatory-announcements/sync-now")
     ) {
       const serviceClient = getServiceClient();
       if (!serviceClient) {
@@ -9019,6 +9164,21 @@ serve(async (req: Request) => {
         await enforcePublicRateLimit(serviceClient, req, "public-legal-documents", { limit: 60, windowSeconds: 60 });
         const docKey = normalizeLegalDocKey(url.searchParams.get("doc_key"));
         return json(req, 200, { ok: true, data: await loadPublicLegalDocument(serviceClient, docKey) });
+      }
+
+      if (req.method === "GET" && path.endsWith("public/regulatory-announcements")) {
+        await enforcePublicRateLimit(serviceClient, req, "public-regulatory-announcements", { limit: 60, windowSeconds: 60 });
+        const limit = Number(url.searchParams.get("limit") ?? 25);
+        return json(req, 200, {
+          ok: true,
+          data: await listPublicRegulatoryAnnouncements(serviceClient, { limit }),
+        });
+      }
+
+      if (req.method === "POST" && path.endsWith("public/regulatory-announcements/sync-now")) {
+        await enforcePublicRateLimit(serviceClient, req, "public-regulatory-announcements-sync-now", { limit: 2, windowSeconds: 60 });
+        const feed = await listPublicRegulatoryAnnouncements(serviceClient, { limit: 10 });
+        return json(req, 200, { ok: true, data: feed });
       }
     }
 

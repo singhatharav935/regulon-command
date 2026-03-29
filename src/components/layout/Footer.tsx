@@ -20,10 +20,11 @@ const Footer = () => {
           <div>
             <h4 className="text-sm font-semibold text-foreground mb-4">Platform</h4>
             <ul className="space-y-3">
-              <li><Link to="/platform" className="text-sm text-muted-foreground hover:text-foreground transition-colors">Overview</Link></li>
-              <li><Link to="/platform/how-it-works" className="text-sm text-muted-foreground hover:text-foreground transition-colors">How It Works</Link></li>
-              <li><Link to="/platform/ai-assistant" className="text-sm text-muted-foreground hover:text-foreground transition-colors">AI Assistant</Link></li>
-              <li><Link to="/platform/audit" className="text-sm text-muted-foreground hover:text-foreground transition-colors">Audit Trail</Link></li>
+              <li><Link to="/platform/infrastructure" className="text-sm text-muted-foreground hover:text-foreground transition-colors">Sovereign Infrastructure Overview</Link></li>
+              <li><Link to="/platform/ai-human-review" className="text-sm text-muted-foreground hover:text-foreground transition-colors">Agentic Execution Model</Link></li>
+              <li><Link to="/platform" className="text-sm text-muted-foreground hover:text-foreground transition-colors">Compliance Command Center</Link></li>
+              <li><Link to="/platform/ai-assistant" className="text-sm text-muted-foreground hover:text-foreground transition-colors">Nexus-9 Drafting Engine</Link></li>
+              <li><Link to="/platform/audit" className="text-sm text-muted-foreground hover:text-foreground transition-colors">Audit & Traceability Vault</Link></li>
             </ul>
           </div>
 
@@ -31,10 +32,13 @@ const Footer = () => {
           <div>
             <h4 className="text-sm font-semibold text-foreground mb-4">Solutions</h4>
             <ul className="space-y-3">
-              <li><Link to="/solutions/roc" className="text-sm text-muted-foreground hover:text-foreground transition-colors">Corporate & ROC</Link></li>
-              <li><Link to="/solutions/gst" className="text-sm text-muted-foreground hover:text-foreground transition-colors">GST Compliance</Link></li>
-              <li><Link to="/solutions/rbi" className="text-sm text-muted-foreground hover:text-foreground transition-colors">RBI Regulatory</Link></li>
-              <li><Link to="/solutions/sebi" className="text-sm text-muted-foreground hover:text-foreground transition-colors">SEBI Regulatory</Link></li>
+              <li><Link to="/solutions/gst" className="text-sm text-muted-foreground hover:text-foreground transition-colors">Statutory GST Compliance</Link></li>
+              <li><Link to="/solutions/income-tax" className="text-sm text-muted-foreground hover:text-foreground transition-colors">Direct Tax Scrutiny Management</Link></li>
+              <li><Link to="/solutions/roc" className="text-sm text-muted-foreground hover:text-foreground transition-colors">Corporate & MCA Governance</Link></li>
+              <li><Link to="/solutions/rbi" className="text-sm text-muted-foreground hover:text-foreground transition-colors">RBI & FEMA Regulatory</Link></li>
+              <li><Link to="/solutions/sebi" className="text-sm text-muted-foreground hover:text-foreground transition-colors">SEBI & Market Oversight</Link></li>
+              <li><Link to="/solutions/labour-law" className="text-sm text-muted-foreground hover:text-foreground transition-colors">Labour Law & EPFO Audits</Link></li>
+              <li><Link to="/solutions/contracts" className="text-sm text-muted-foreground hover:text-foreground transition-colors">Lattice Contract Reviews</Link></li>
             </ul>
           </div>
 
@@ -53,11 +57,11 @@ const Footer = () => {
           <div>
             <h4 className="text-sm font-semibold text-foreground mb-4">Legal</h4>
             <ul className="space-y-3">
-              <li><Link to="/privacy" className="text-sm text-muted-foreground hover:text-foreground transition-colors">Privacy Policy</Link></li>
-              <li><Link to="/terms" className="text-sm text-muted-foreground hover:text-foreground transition-colors">Terms of Service</Link></li>
-              <li><Link to="/refund-policy" className="text-sm text-muted-foreground hover:text-foreground transition-colors">Refund Policy</Link></li>
-              <li><Link to="/dpa" className="text-sm text-muted-foreground hover:text-foreground transition-colors">DPA Terms</Link></li>
-              <li><Link to="/compliance" className="text-sm text-muted-foreground hover:text-foreground transition-colors">Compliance</Link></li>
+              <li><Link to="/privacy" className="text-sm text-muted-foreground hover:text-foreground transition-colors">Statutory Privacy Policy</Link></li>
+              <li><Link to="/terms" className="text-sm text-muted-foreground hover:text-foreground transition-colors">Sovereign Service Terms</Link></li>
+              <li><Link to="/dpa" className="text-sm text-muted-foreground hover:text-foreground transition-colors">DPA (Data Processing Agreement) Terms</Link></li>
+              <li><Link to="/compliance" className="text-sm text-muted-foreground hover:text-foreground transition-colors">Standard Regulatory Disclaimer</Link></li>
+              <li><Link to="/compliance" className="text-sm text-muted-foreground hover:text-foreground transition-colors">Ethics & Professional Standards</Link></li>
             </ul>
           </div>
         </div>
@@ -68,10 +72,7 @@ const Footer = () => {
             <AlertTriangle className="w-5 h-5 text-warning shrink-0 mt-0.5" />
             <div className="space-y-2">
               <p className="text-sm text-muted-foreground">
-                <strong className="text-foreground">Important Disclaimer:</strong> REGULON provides compliance assistance and regulatory guidance through AI-powered analysis verified by licensed professionals. This platform does not provide legal or financial advice. All regulatory filings and compliance actions are executed through verified Chartered Accountants and Lawyers.
-              </p>
-              <p className="text-sm text-muted-foreground">
-                REGULON is not endorsed by or affiliated with any regulatory authority including MCA, GST Council, Income Tax Department, RBI, or SEBI. All actions taken through this platform are fully auditable and traceable.
+                <strong className="text-foreground">Official Regulatory Disclaimer:</strong> REGULON acts as a Sovereign Compliance Infrastructure provider. All AI-generated analysis (Nexus-9™) must be validated and signed by a licensed professional (CA/CS/Lawyer) before statutory filing. REGULON is an independent entity and is not an official arm of the GST Council, CBDT, or MCA. Data is processed in alignment with the Digital Personal Data Protection (DPDP) Act, 2026.
               </p>
             </div>
           </div>

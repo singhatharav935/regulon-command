@@ -14,13 +14,14 @@ import ComplianceGapSection from "@/components/dashboard/ComplianceGapSection";
 import UpcomingLawImpactSection from "@/components/dashboard/UpcomingLawImpactSection";
 import AuditEvidenceVault from "@/components/dashboard/AuditEvidenceVault";
 import AIBusinessIntelligencePanel from "@/components/dashboard/AIBusinessIntelligencePanel";
+import RegulatoryIntelligenceCenter from "@/components/dashboard/RegulatoryIntelligenceCenter";
 import AIVoiceBriefAgent from "@/components/voice/AIVoiceBriefAgent";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { useToast } from "@/hooks/use-toast";
 import { useAuth } from "@/hooks/use-auth";
 import RuntimeErrorBoundary from "@/components/common/RuntimeErrorBoundary";
-import { workspaceBackendRequest } from "@/lib/workspace-backend";
+import { workspaceBackendRequest, workspacePublicRequest } from "@/lib/workspace-backend";
 
 const AppDashboard = () => {
   const { user } = useAuth();
@@ -64,6 +65,45 @@ const AppDashboard = () => {
       }>("/onboarding/status");
     },
   });
+  const { data: regulatoryFeed, refetch: refetchRegulatoryFeed } = useQuery({
+    queryKey: ["public-regulatory-announcements", "app-company"],
+    queryFn: async () =>
+      workspacePublicRequest<{
+        announcements: Array<{
+          id: string;
+          source: string;
+          source_label: string;
+          title: string;
+          summary: string | null;
+          category: string | null;
+          announced_by: string;
+          source_url: string | null;
+          announced_on: string;
+          published_date: string | null;
+          detected_at: string | null;
+          effective_date: string | null;
+          action_deadline: string | null;
+          impact_score: number;
+          company_exposure: "low" | "medium" | "high";
+          action_owner: string;
+          original_url: string | null;
+          source_verified: boolean;
+        }>;
+        last_synced_at: string | null;
+        monitored_portals: number;
+        sync_status: "agent_active" | "awaiting_first_sync";
+        source_status: Array<{
+          source: string;
+          source_label: string;
+          status: "active" | "awaiting_feed";
+          latest_notice_at: string | null;
+          latest_notice_title: string | null;
+        }>;
+      }>("/public/regulatory-announcements?limit=20"),
+    staleTime: 60_000,
+    refetchInterval: 15_000,
+    retry: 1,
+  });
 
   const mappedData = useMemo(() => {
     if (!data) return null;
@@ -78,7 +118,6 @@ const AppDashboard = () => {
       Contract: ["Review clause obligations", "Map exception register", "Prepare amendment recommendations"],
       Customs: ["Validate BOE documentation", "Prepare valuation support", "Compile duty computation trail"],
     };
-
     return {
       company: {
         name: data.company?.name ?? "Your Company",
@@ -372,6 +411,41 @@ const AppDashboard = () => {
               exposures={mappedData.exposures}
               tasks={mappedData.tasks}
               deadlines={mappedData.deadlines}
+            />
+
+            <RegulatoryIntelligenceCenter
+              currentHealthScore={mappedData.company.complianceHealth}
+              updates={(regulatoryFeed?.announcements ?? []).map((item) => ({
+                id: item.id,
+                source: item.source,
+                sourceLabel: item.source_label,
+                title: item.title,
+                summary: item.summary,
+                category: item.category,
+                announcedBy: item.announced_by,
+                announcedOn: item.announced_on,
+                effectiveDate: item.effective_date,
+                actionDeadline: item.action_deadline,
+                impactScore: Number(item.impact_score ?? 0),
+                companyExposure: item.company_exposure,
+                actionOwner: item.action_owner,
+                sourceVerified: item.source_verified,
+                originalUrl: item.source_url ?? item.original_url,
+              }))}
+              lastSyncedAt={regulatoryFeed?.last_synced_at ?? null}
+              monitoredPortals={regulatoryFeed?.monitored_portals ?? 12}
+              syncStatus={regulatoryFeed?.sync_status ?? "awaiting_first_sync"}
+              sourceStatus={(regulatoryFeed?.source_status ?? []).map((item) => ({
+                source: item.source,
+                sourceLabel: item.source_label,
+                status: item.status,
+                latestNoticeAt: item.latest_notice_at,
+                latestNoticeTitle: item.latest_notice_title,
+              }))}
+              onSyncNow={async () => {
+                await workspacePublicRequest("/public/regulatory-announcements/sync-now", { method: "POST" });
+                await refetchRegulatoryFeed();
+              }}
             />
 
             <ComplianceGapSection gaps={mappedData.complianceGaps} useDemoFallback={false} />

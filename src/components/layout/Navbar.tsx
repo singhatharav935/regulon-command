@@ -1,32 +1,42 @@
 import { useState } from "react";
 import { Link, useNavigate } from "react-router-dom";
 import { motion, AnimatePresence } from "framer-motion";
-import { ChevronDown, Menu, X, Shield, Cpu, Building2, Users, Lock, BookOpen, Info, LogIn, Briefcase } from "lucide-react";
+import { ChevronDown, Menu, X, Shield, Cpu, Building2, Users, Lock, LogIn, Landmark, FileCheck } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { cn } from "@/lib/utils";
 
+type NavDropdownItem = {
+  title: string;
+  detail: string;
+  href: string;
+  icon?: typeof Shield;
+};
+
 const platformLinks = [
-  { label: "Platform Overview", href: "/platform", icon: Cpu },
-  { label: "How the Platform Works", href: "/platform/how-it-works", icon: Shield },
-  { label: "Compliance Infrastructure", href: "/platform/infrastructure", icon: Building2 },
-  { label: "AI + Human Review Model", href: "/platform/ai-human-review", icon: Users },
-  { label: "Company Dashboards", href: "/dashboard", icon: Building2 },
-  { label: "CA Firm Demo Dashboard", href: "/ca-firm-dashboard", icon: Briefcase },
-  { label: "University Demo Dashboard", href: "/university-demo", icon: Building2 },
-  { label: "Regulatory Coverage", href: "/platform/regulators", icon: Shield },
-  { label: "AI Assistant", href: "/platform/ai-assistant", icon: Cpu },
-  { label: "Audit & Traceability", href: "/platform/audit", icon: Lock },
-];
+  { title: "Sovereign Infrastructure Overview", detail: "How REGULON Secures National Data.", href: "/platform/infrastructure", icon: Landmark },
+  { title: "Agentic Execution Model", detail: "Understanding AI + Human Review Workflows.", href: "/platform/ai-human-review", icon: Users },
+  { title: "Compliance Command Center", detail: "Unified Dashboard for Multiple Taxpayer Entities.", href: "/platform", icon: Building2 },
+  { title: "Nexus-9™ Drafting Engine", detail: "Autonomous Legal & Regulatory Document Generation.", href: "/platform/ai-assistant", icon: Cpu },
+  { title: "Audit & Traceability Vault", detail: "100% Immutable Logs for Every Regulatory Action.", href: "/platform/audit", icon: Lock },
+  { title: "Sentinel™ Live Monitoring", detail: "24/7 Portal Scanning & Risk Alert System.", href: "/platform/regulators", icon: Shield },
+] satisfies NavDropdownItem[];
 
 const solutionsLinks = [
-  { label: "Corporate & ROC Compliance", href: "/solutions/roc" },
-  { label: "GST Compliance", href: "/solutions/gst" },
-  { label: "Income Tax Compliance", href: "/solutions/income-tax" },
-  { label: "Labour Law Compliance", href: "/solutions/labour-law" },
-  { label: "RBI Regulatory Compliance", href: "/solutions/rbi" },
-  { label: "SEBI Regulatory Compliance", href: "/solutions/sebi" },
-  { label: "Contract Reviews", href: "/solutions/contracts" },
-];
+  { title: "Statutory GST Compliance", detail: "Integrated GSTR-1/3B/9 Execution.", href: "/solutions/gst", icon: FileCheck },
+  { title: "Direct Tax Scrutiny Management", detail: "Faceless Assessment & Sec 143(2) Defense.", href: "/solutions/income-tax", icon: FileCheck },
+  { title: "Corporate & MCA Governance", detail: "ROC Filing & Annual Secretarial Audit.", href: "/solutions/roc", icon: Building2 },
+  { title: "RBI & FEMA Regulatory", detail: "Foreign Remittance & NBFC Compliance Infrastructure.", href: "/solutions/rbi", icon: Landmark },
+  { title: "SEBI & Market Oversight", detail: "Listing Compliance & Insider Trading Prevention.", href: "/solutions/sebi", icon: Shield },
+  { title: "Labour Law & EPFO Audits", detail: "Statutory Payroll & Compliance Health Checks.", href: "/solutions/labour-law", icon: Users },
+  { title: "Lattice™ Contract Reviews", detail: "AI-Powered Risk Analysis of Legal Agreements.", href: "/solutions/contracts", icon: Lock },
+] satisfies NavDropdownItem[];
+
+const securityLinks = [
+  { title: "Data Residency Guarantee", detail: "100% Indian Cloud (MeitY Empaneled).", href: "/security/data-residency", icon: Landmark },
+  { title: "Lattice™ Encryption Standards", detail: "Quantum-Resistant Financial Data Security.", href: "/security/encryption-standards", icon: Shield },
+  { title: "DPDP 2026 Compliance", detail: "Zero-Trust Privacy Framework for Taxpayers.", href: "/security/dpdp-2026", icon: FileCheck },
+  { title: "SOC 2 Type II Certified", detail: "Enterprise-Grade Operational Security.", href: "/security/soc2-type-ii", icon: Shield },
+] satisfies NavDropdownItem[];
 
 const Navbar = () => {
   const navigate = useNavigate();
@@ -40,6 +50,32 @@ const Navbar = () => {
   const handleDropdownLeave = () => {
     setActiveDropdown(null);
   };
+
+  const renderDropdown = (items: NavDropdownItem[], heading: string, subheading: string, columns: "one" | "two" = "two") => (
+    <div className="space-y-2">
+      <div className="px-3 py-2">
+        <p className="text-[11px] tracking-[0.14em] uppercase text-cyan-300">{heading}</p>
+        <p className="text-xs text-muted-foreground mt-0.5">{subheading}</p>
+      </div>
+      <div className={cn("grid gap-2", columns === "two" ? "grid-cols-2" : "grid-cols-1")}>
+        {items.map((link) => (
+          <Link
+            key={link.href}
+            to={link.href}
+            className="group rounded-lg border border-border/30 bg-card/20 px-3 py-3 hover:bg-accent/50 hover:border-primary/40 transition-all"
+          >
+            <div className="flex items-start gap-2.5">
+              {link.icon ? <link.icon className="w-4 h-4 text-primary/80 mt-0.5 shrink-0" /> : null}
+              <div>
+                <p className="text-sm font-medium text-foreground group-hover:text-primary transition-colors">{link.title}</p>
+                <p className="text-xs text-muted-foreground mt-1 leading-relaxed">{link.detail}</p>
+              </div>
+            </div>
+          </Link>
+        ))}
+      </div>
+    </div>
+  );
 
   return (
     <nav className="fixed top-0 left-0 right-0 z-40 border-b border-border/50 bg-background/80 backdrop-blur-xl">
@@ -72,18 +108,9 @@ const Navbar = () => {
                     animate={{ opacity: 1, y: 0 }}
                     exit={{ opacity: 0, y: 10 }}
                     transition={{ duration: 0.15 }}
-                    className="absolute top-full left-0 mt-1 w-72 glass-card p-2"
+                    className="absolute top-full left-0 mt-1 w-[52rem] max-w-[calc(100vw-2rem)] glass-card p-2"
                   >
-                    {platformLinks.map((link) => (
-                      <Link
-                        key={link.href}
-                        to={link.href}
-                        className="flex items-center gap-3 px-3 py-2.5 rounded-lg text-sm text-muted-foreground hover:text-foreground hover:bg-accent/50 transition-colors"
-                      >
-                        <link.icon className="w-4 h-4 text-primary/70" />
-                        {link.label}
-                      </Link>
-                    ))}
+                    {renderDropdown(platformLinks, "Platform Stack", "Deep infrastructure, workflows, and sovereign controls.", "two")}
                   </motion.div>
                 )}
               </AnimatePresence>
@@ -109,17 +136,37 @@ const Navbar = () => {
                     animate={{ opacity: 1, y: 0 }}
                     exit={{ opacity: 0, y: 10 }}
                     transition={{ duration: 0.15 }}
-                    className="absolute top-full left-0 mt-1 w-64 glass-card p-2"
+                    className="absolute top-full left-0 mt-1 w-[52rem] max-w-[calc(100vw-2rem)] glass-card p-2"
                   >
-                    {solutionsLinks.map((link) => (
-                      <Link
-                        key={link.href}
-                        to={link.href}
-                        className="block px-3 py-2.5 rounded-lg text-sm text-muted-foreground hover:text-foreground hover:bg-accent/50 transition-colors"
-                      >
-                        {link.label}
-                      </Link>
-                    ))}
+                    {renderDropdown(solutionsLinks, "Execution Solutions", "Regulator-specific statutory lanes for CA and enterprise operations.", "two")}
+                  </motion.div>
+                )}
+              </AnimatePresence>
+            </div>
+
+            {/* Security Dropdown */}
+            <div
+              className="relative"
+              onMouseEnter={() => handleDropdownEnter("security")}
+              onMouseLeave={handleDropdownLeave}
+            >
+              <button className="flex items-center gap-1 px-4 py-2 text-sm text-muted-foreground hover:text-foreground transition-colors">
+                Security
+                <ChevronDown className={cn(
+                  "w-4 h-4 transition-transform duration-200",
+                  activeDropdown === "security" && "rotate-180"
+                )} />
+              </button>
+              <AnimatePresence>
+                {activeDropdown === "security" && (
+                  <motion.div
+                    initial={{ opacity: 0, y: 10 }}
+                    animate={{ opacity: 1, y: 0 }}
+                    exit={{ opacity: 0, y: 10 }}
+                    transition={{ duration: 0.15 }}
+                    className="absolute top-full left-0 mt-1 w-[44rem] max-w-[calc(100vw-2rem)] glass-card p-2"
+                  >
+                    {renderDropdown(securityLinks, "Security & Trust", "Institutional-grade privacy, encryption, and residency guarantees.", "one")}
                   </motion.div>
                 )}
               </AnimatePresence>
@@ -127,9 +174,6 @@ const Navbar = () => {
 
             <Link to="/customers" className="px-4 py-2 text-sm text-muted-foreground hover:text-foreground transition-colors">
               Customers
-            </Link>
-            <Link to="/security" className="px-4 py-2 text-sm text-muted-foreground hover:text-foreground transition-colors">
-              Security
             </Link>
             <Link to="/resources" className="px-4 py-2 text-sm text-muted-foreground hover:text-foreground transition-colors">
               Resources
@@ -179,7 +223,7 @@ const Navbar = () => {
                     className="block px-3 py-2 text-sm text-foreground/80 hover:text-foreground"
                     onClick={() => setMobileOpen(false)}
                   >
-                    {link.label}
+                    {link.title}
                   </Link>
                 ))}
               </div>
@@ -192,7 +236,20 @@ const Navbar = () => {
                     className="block px-3 py-2 text-sm text-foreground/80 hover:text-foreground"
                     onClick={() => setMobileOpen(false)}
                   >
-                    {link.label}
+                    {link.title}
+                  </Link>
+                ))}
+              </div>
+              <div className="space-y-2">
+                <p className="text-xs font-semibold text-muted-foreground uppercase tracking-wider px-3">Security</p>
+                {securityLinks.map((link) => (
+                  <Link
+                    key={link.href}
+                    to={link.href}
+                    className="block px-3 py-2 text-sm text-foreground/80 hover:text-foreground"
+                    onClick={() => setMobileOpen(false)}
+                  >
+                    {link.title}
                   </Link>
                 ))}
               </div>
