@@ -27,6 +27,7 @@ import {
 import Navbar from "@/components/layout/Navbar";
 import Footer from "@/components/layout/Footer";
 import AIVoiceBriefAgent from "@/components/voice/AIVoiceBriefAgent";
+import { AIAgentPanel } from "@/components/ai/AIAgentSystem";
 import { Badge } from "@/components/ui/badge";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
@@ -991,6 +992,21 @@ const UniversityDashboardShell = ({ mode }: UniversityDashboardShellProps) => {
               "Flagged deadline-sensitive items for same-day review",
             ]}
           />
+
+          {/* AI Agent System - 1 Agent for University: Ingestor */}
+          <section className="mb-12">
+            <Card className="bg-card/50 border-border/50">
+              <CardHeader>
+                <CardTitle className="text-xl">AI Data Ingestor for Compliance Records</CardTitle>
+              </CardHeader>
+              <CardContent>
+                <p className="text-sm text-muted-foreground mb-6">
+                  The Ingestor AI agent is extracting and validating compliance data from emails, documents, and portals to keep your compliance records synchronized and audit-ready.
+                </p>
+                <AIAgentPanel dashboardType="university" />
+              </CardContent>
+            </Card>
+          </section>
 
           <div className="grid grid-cols-1 xl:grid-cols-4 gap-4">
             <Card className="bg-card/50 border-border/50 xl:col-span-1">

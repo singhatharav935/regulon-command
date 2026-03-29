@@ -13,6 +13,7 @@ import IncidentManagement from "@/components/admin-dashboard/IncidentManagement"
 import SystemActivityLogs from "@/components/admin-dashboard/SystemActivityLogs";
 import PlatformAnalytics from "@/components/admin-dashboard/PlatformAnalytics";
 import AIVoiceBriefAgent from "@/components/voice/AIVoiceBriefAgent";
+import { AIAgentPanel } from "@/components/ai/AIAgentSystem";
 
 const AdminDashboard = () => {
   const [isLoading, setIsLoading] = useState(true);
@@ -72,6 +73,22 @@ const AdminDashboard = () => {
           />
 
           <AdminHomeSection />
+          
+          {/* AI Agent System - 3 Agents for Admin: Ingestor, Architect, Sentinel */}
+          <section className="mb-12">
+            <motion.div
+              initial={{ opacity: 0 }}
+              animate={{ opacity: 1 }}
+              transition={{ delay: 0.3 }}
+            >
+              <h2 className="text-3xl font-bold text-white mb-4">Platform AI Agents</h2>
+              <p className="text-slate-300 mb-8">
+                Your 3 specialized AI agents are managing platform-wide data processing, account finalization, and regulatory compliance tracking. Monitor their activity below.
+              </p>
+              <AIAgentPanel dashboardType="admin" />
+            </motion.div>
+          </section>
+          
           <CompanyRiskOversight />
           <CAManagementSection />
           <RegulationRuleEngine />

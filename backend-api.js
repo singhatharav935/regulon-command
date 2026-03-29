@@ -1486,6 +1486,164 @@ app.use((req, res) => {
   });
 });
 
+// ============================================================================
+// AI AGENT ENDPOINTS
+// ============================================================================
+
+// Store AI agent action for review and approval
+app.post('/api/agents/actions', (req, res) => {
+  const { workspaceId, agentId, actionType, description, relatedEntity } = req.body;
+
+  if (!agentId || !actionType || !description) {
+    return res.status(400).json({ error: 'Missing required fields' });
+  }
+
+  const action = {
+    id: `action-${Date.now()}-${Math.random().toString(36).substr(2, 9)}`,
+    workspaceId: workspaceId || 'default',
+    agentId,
+    actionType,
+    description,
+    relatedEntity: relatedEntity || null,
+    status: 'pending_approval',
+    createdAt: new Date().toISOString(),
+    completedAt: null,
+  };
+
+  if (!db.agentActions) db.agentActions = [];
+  db.agentActions.push(action);
+
+  res.json({
+    success: true,
+    action,
+  });
+});
+
+// Get agent actions with filtering
+app.get('/api/agents/actions', (req, res) => {
+  const { workspaceId, agentId, status } = req.query;
+
+  let actions = db.agentActions || [];
+
+  if (workspaceId) {
+    actions = actions.filter(a => a.workspaceId === workspaceId);
+  }
+  if (agentId) {
+    actions = actions.filter(a => a.agentId === agentId);
+  }
+  if (status) {
+    actions = actions.filter(a => a.status === status);
+  }
+
+  res.json({
+    actions: actions.slice(-50), // Return last 50 actions
+    total: actions.length,
+  });
+});
+
+// Approve an agent action
+app.put('/api/agents/actions/:id/approve', (req, res) => {
+  const { id } = req.params;
+  const { approvedBy, notes } = req.body;
+
+  if (!db.agentActions) {
+    return res.status(404).json({ error: 'Action not found' });
+  }
+
+  const action = db.agentActions.find(a => a.id === id);
+  if (!action) {
+    return res.status(404).json({ error: 'Action not found' });
+  }
+
+  action.status = 'approved';
+  action.approvedBy = approvedBy || 'CA';
+  action.approvalNotes = notes || null;
+  action.approvedAt = new Date().toISOString();
+
+  res.json({
+    success: true,
+    action,
+  });
+});
+
+// Reject an agent action
+app.put('/api/agents/actions/:id/reject', (req, res) => {
+  const { id } = req.params;
+  const { rejectedBy, reason } = req.body;
+
+  if (!db.agentActions) {
+    return res.status(404).json({ error: 'Action not found' });
+  }
+
+  const action = db.agentActions.find(a => a.id === id);
+  if (!action) {
+    return res.status(404).json({ error: 'Action not found' });
+  }
+
+  action.status = 'rejected';
+  action.rejectedBy = rejectedBy || 'CA';
+  action.rejectionReason = reason || null;
+  action.rejectedAt = new Date().toISOString();
+
+  res.json({
+    success: true,
+    action,
+  });
+});
+
+// Get agent performance summary
+app.get('/api/agents/performance', (req, res) => {
+  const { workspaceId } = req.query;
+
+  const actions = db.agentActions || [];
+  let filteredActions = actions;
+
+  if (workspaceId) {
+    filteredActions = actions.filter(a => a.workspaceId === workspaceId);
+  }
+
+  const agentStats = {
+    ingestor: {
+      total: filteredActions.filter(a => a.agentId === 'ingestor').length,
+      approved: filteredActions.filter(a => a.agentId === 'ingestor' && a.status === 'approved').length,
+      rejected: filteredActions.filter(a => a.agentId === 'ingestor' && a.status === 'rejected').length,
+      pending: filteredActions.filter(a => a.agentId === 'ingestor' && a.status === 'pending_approval').length,
+    },
+    matchmaker: {
+      total: filteredActions.filter(a => a.agentId === 'matchmaker').length,
+      approved: filteredActions.filter(a => a.agentId === 'matchmaker' && a.status === 'approved').length,
+      rejected: filteredActions.filter(a => a.agentId === 'matchmaker' && a.status === 'rejected').length,
+      pending: filteredActions.filter(a => a.agentId === 'matchmaker' && a.status === 'pending_approval').length,
+    },
+    architect: {
+      total: filteredActions.filter(a => a.agentId === 'architect').length,
+      approved: filteredActions.filter(a => a.agentId === 'architect' && a.status === 'approved').length,
+      rejected: filteredActions.filter(a => a.agentId === 'architect' && a.status === 'rejected').length,
+      pending: filteredActions.filter(a => a.agentId === 'architect' && a.status === 'pending_approval').length,
+    },
+    sentinel: {
+      total: filteredActions.filter(a => a.agentId === 'sentinel').length,
+      approved: filteredActions.filter(a => a.agentId === 'sentinel' && a.status === 'approved').length,
+      rejected: filteredActions.filter(a => a.agentId === 'sentinel' && a.status === 'rejected').length,
+      pending: filteredActions.filter(a => a.agentId === 'sentinel' && a.status === 'pending_approval').length,
+    },
+  };
+
+  const totalApprovalRate = filteredActions.length > 0
+    ? ((filteredActions.filter(a => a.status === 'approved').length / filteredActions.length) * 100).toFixed(1)
+    : 0;
+
+  res.json({
+    agentStats,
+    totalApprovalRate: parseFloat(totalApprovalRate),
+    totalActionsProcessed: filteredActions.length,
+  });
+});
+
+// ============================================================================
+// ERROR HANDLERS
+// ============================================================================
+
 app.use((err, req, res, next) => {
   console.error('Error:', err);
   res.status(500).json({
@@ -1493,6 +1651,7 @@ app.use((err, req, res, next) => {
     message: err.message,
   });
 });
+
 
 // ============================================================================
 // START SERVER
@@ -1520,6 +1679,12 @@ app.listen(API_PORT, () => {
   console.log(`   ✓ Learning Resources (2 endpoints) - Documentation, Webinars`);
   console.log(`   ✓ Indian Regulatory Frameworks (3 endpoints) - Frameworks, Details, Alerts`);
   console.log(`   ✓ Dashboard Analytics (2 endpoints) - Overview, Compliance Score`);
+  console.log(`   ✓ AI Agent Management (4 endpoints) - Store, Retrieve, Approve, Performance`);
+  console.log(`\n🤖 AI Agent System:`);
+  console.log(`   - The Ingestor (Data Entry & OCR)`);
+  console.log(`   - The Matchmaker (Reconciliation)`);
+  console.log(`   - The Architect (Balance Sheet Generation)`);
+  console.log(`   - The Sentinel (Compliance & Filing)`);
   console.log(`\n🌍 Indian Regulatory Monitoring:`);
   console.log(`   - GST Compliance (GSTN)`);
   console.log(`   - Income Tax India (Central)`);
