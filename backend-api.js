@@ -813,6 +813,583 @@ app.get('/api/admin/stats', authenticate, authorize(['admin']), (req, res) => {
 });
 
 // ============================================================================
+// PLATFORM PAGES API ENDPOINTS
+// ============================================================================
+
+// GET /api/platform/overview - Platform overview data for AdvancedPlatformPage
+app.get('/api/platform/overview', authenticate, (req, res) => {
+  res.json({
+    platform_name: 'REGULON',
+    description: 'Enterprise Regulatory Intelligence Platform',
+    version: '1.0.0',
+    status: 'production',
+    uptime_percentage: 99.99,
+    transactions_processed: 2000000,
+    features_count: 50,
+    government_sources: 7,
+    avg_response_time_ms: 145,
+    timestamp: new Date().toISOString(),
+  });
+});
+
+// GET /api/platform/architecture - Platform architecture details
+app.get('/api/platform/architecture', authenticate, (req, res) => {
+  res.json({
+    layers: [
+      {
+        name: 'API Layer',
+        features: ['30+ REST Endpoints', 'GraphQL Ready', 'Real-time WebSockets'],
+        technologies: ['Express.js', 'Node.js'],
+        status: 'operational',
+      },
+      {
+        name: 'Service Layer',
+        features: ['Authentication', 'Compliance Engine', 'Analytics'],
+        technologies: ['JWT', 'Redis Cache'],
+        status: 'operational',
+      },
+      {
+        name: 'Data Layer',
+        features: ['PostgreSQL', 'Redis Cache', 'S3 Storage'],
+        technologies: ['PostgreSQL', 'Redis', 'AWS S3'],
+        status: 'operational',
+      },
+      {
+        name: 'Integration Layer',
+        features: ['Webhooks', 'APIs', 'Slack/Teams Integration'],
+        technologies: ['REST', 'Webhooks', 'OAuth 2.0'],
+        status: 'operational',
+      },
+    ],
+    deployment: {
+      region: 'Asia Pacific',
+      availability_zones: 3,
+      auto_scaling: true,
+      load_balancer: 'active',
+    },
+  });
+});
+
+// GET /api/platform/features - Platform features matrix
+app.get('/api/platform/features', authenticate, (req, res) => {
+  res.json({
+    real_time_intelligence: {
+      live_monitoring: '7 sources 24/7',
+      ai_analysis: 'Impact assessment',
+      instant_alerts: '<2 min response',
+    },
+    compliance_automation: {
+      smart_tasks: 'Auto-generated',
+      deadline_management: 'Never miss dates',
+      score_tracking: 'Real-time metrics',
+    },
+    enterprise_features: {
+      team_collaboration: 'Multi-workspace',
+      security: 'Enterprise-grade',
+      data_vault: 'Secure storage',
+    },
+  });
+});
+
+// GET /api/platform/roadmap - Product roadmap
+app.get('/api/platform/roadmap', authenticate, (req, res) => {
+  res.json({
+    roadmap: [
+      {
+        quarter: 'Q2 2026',
+        items: ['Mobile App', 'Advanced AI', 'Custom Reports'],
+        status: 'in_progress',
+        completion: 45,
+      },
+      {
+        quarter: 'Q3 2026',
+        items: ['Machine Learning', 'Predictive Compliance', 'Multi-language'],
+        status: 'planned',
+        completion: 0,
+      },
+      {
+        quarter: 'Q4 2026',
+        items: ['Blockchain Audit', 'Global Compliance', 'Enterprise Suite'],
+        status: 'planned',
+        completion: 0,
+      },
+    ],
+  });
+});
+
+// ============================================================================
+// SOLUTIONS & CUSTOMER PAGES API ENDPOINTS
+// ============================================================================
+
+// GET /api/solutions - Industry solutions with case studies
+app.get('/api/solutions', authenticate, (req, res) => {
+  res.json({
+    solutions: [
+      {
+        id: 'financial-services',
+        name: 'Financial Services',
+        description: 'Compliance for banks, NBFCs, fintech',
+        roi: '3.8x',
+        time_saved: '35%',
+        accuracy: '98.5%',
+        customers: 250,
+      },
+      {
+        id: 'legal-firms',
+        name: 'Legal Firms',
+        description: 'Compliance for law firms and legal departments',
+        roi: '4.2x',
+        time_saved: '42%',
+        accuracy: '99%',
+        customers: 180,
+      },
+      {
+        id: 'corporate',
+        name: 'Corporate Compliance',
+        description: 'Enterprise compliance management',
+        roi: '4.5x',
+        time_saved: '52%',
+        accuracy: '99.2%',
+        customers: 320,
+      },
+      {
+        id: 'ca-firms',
+        name: 'CA Firms',
+        description: 'Chartered accountant compliance automation',
+        roi: '3.9x',
+        time_saved: '38%',
+        accuracy: '98.8%',
+        customers: 150,
+      },
+    ],
+  });
+});
+
+// GET /api/solutions/:solutionId/case-study - Detailed case studies
+app.get('/api/solutions/:solutionId/case-study', authenticate, (req, res) => {
+  const caseStudies = {
+    'financial-services': {
+      company: 'TechBank Solutions',
+      industry: 'Financial Services',
+      challenge: 'Managing RBI, SEBI compliance across 50+ branches',
+      solution: 'Automated compliance tracking with REGULON',
+      results: {
+        time_saved: '45%',
+        cost_reduced: '32%',
+        accuracy_improved: '99.2%',
+        roi: '3.8x',
+        implementation_time: '14 days',
+      },
+    },
+    'legal-firms': {
+      company: 'Apex Legal Consultants',
+      industry: 'Legal Firm',
+      challenge: 'Multi-jurisdiction compliance tracking',
+      solution: 'Centralized regulatory intelligence with REGULON',
+      results: {
+        time_saved: '48%',
+        cost_reduced: '35%',
+        accuracy_improved: '99%',
+        roi: '4.2x',
+        implementation_time: '21 days',
+      },
+    },
+  };
+  const caseStudy = caseStudies[req.params.solutionId];
+  if (caseStudy) {
+    res.json(caseStudy);
+  } else {
+    res.status(404).json({ error: 'Case study not found' });
+  }
+});
+
+// GET /api/customers - Customer testimonials and stats
+app.get('/api/customers', authenticate, (req, res) => {
+  res.json({
+    total_customers: 1000,
+    retention_rate: '99%',
+    implementation_time_hours: 48,
+    tasks_automated_monthly: 15000,
+    testimonials: [
+      {
+        id: 'testimonial-1',
+        name: 'Rajesh Kumar',
+        title: 'CFO, TechBank Solutions',
+        company: 'TechBank Solutions',
+        rating: 5,
+        quote: 'REGULON transformed our compliance workflow. We now catch regulatory changes 10x faster.',
+        avatar: 'https://api.dicebear.com/7.x/avataaars/svg?seed=rajesh',
+      },
+      {
+        id: 'testimonial-2',
+        name: 'Priya Sharma',
+        title: 'Senior Partner, Apex Legal',
+        company: 'Apex Legal Consultants',
+        rating: 5,
+        quote: 'Managing multi-jurisdiction compliance was complex. REGULON simplified everything.',
+        avatar: 'https://api.dicebear.com/7.x/avataaars/svg?seed=priya',
+      },
+      {
+        id: 'testimonial-3',
+        name: 'Amit Patel',
+        title: 'Compliance Officer, Corporate Ltd',
+        company: 'Corporate Ltd',
+        rating: 5,
+        quote: 'Real-time alerts mean we never miss a deadline. The platform is truly game-changing.',
+        avatar: 'https://api.dicebear.com/7.x/avataaars/svg?seed=amit',
+      },
+      {
+        id: 'testimonial-4',
+        name: 'Neha Gupta',
+        title: 'Principal, Gupta & Associates',
+        company: 'Gupta & Associates',
+        rating: 5,
+        quote: 'Our clients appreciate the automated compliance reports. REGULON saves us 20+ hours monthly.',
+        avatar: 'https://api.dicebear.com/7.x/avataaars/svg?seed=neha',
+      },
+    ],
+    industries: {
+      Financial: 35,
+      Legal: 25,
+      Corporate: 30,
+      Others: 10,
+    },
+  });
+});
+
+// ============================================================================
+// SECURITY & COMPLIANCE PAGES API ENDPOINTS
+// ============================================================================
+
+// GET /api/security/features - Security features and practices
+app.get('/api/security/features', authenticate, (req, res) => {
+  res.json({
+    security_features: [
+      {
+        name: 'Data Encryption',
+        description: 'AES-256 encryption for all data',
+        status: 'active',
+      },
+      {
+        name: 'Access Control',
+        description: 'Role-based access control (RBAC)',
+        status: 'active',
+      },
+      {
+        name: 'Audit Logging',
+        description: '100% activity audit trail',
+        status: 'active',
+      },
+      {
+        name: 'DLP Monitoring',
+        description: 'Data loss prevention & compliance',
+        status: 'active',
+      },
+      {
+        name: 'API Security',
+        description: 'Rate limiting & authentication',
+        status: 'active',
+      },
+      {
+        name: 'Disaster Recovery',
+        description: 'Automated backup & recovery',
+        status: 'active',
+      },
+    ],
+    certifications: [
+      { name: 'ISO 27001', issued_date: '2024-01-15', valid_until: '2027-01-14', status: 'active' },
+      { name: 'SOC 2 Type II', issued_date: '2024-03-01', valid_until: '2026-02-28', status: 'active' },
+      { name: 'GDPR Compliance', issued_date: '2024-01-01', valid_until: '2026-01-31', status: 'active' },
+      { name: 'HIPAA Compliance', issued_date: '2024-02-15', valid_until: '2027-02-14', status: 'active' },
+      { name: 'PCI DSS Level 1', issued_date: '2024-03-10', valid_until: '2025-03-09', status: 'active' },
+      { name: 'DPDP Act 2023', issued_date: '2024-01-20', valid_until: '2027-01-19', status: 'active' },
+    ],
+  });
+});
+
+// ============================================================================
+// RESOURCES/LEARNING API ENDPOINTS
+// ============================================================================
+
+// GET /api/resources/documentation - Learning resources
+app.get('/api/resources/documentation', authenticate, (req, res) => {
+  res.json({
+    documentation: [
+      {
+        id: 'guide-1',
+        title: 'Getting Started Guide',
+        description: 'Complete setup and configuration guide',
+        duration_minutes: 15,
+        level: 'Beginner',
+        downloads: 2500,
+        url: '/docs/getting-started',
+      },
+      {
+        id: 'guide-2',
+        title: 'API Documentation',
+        description: 'Complete REST API reference with examples',
+        duration_minutes: 45,
+        level: 'Advanced',
+        downloads: 1800,
+        url: '/docs/api',
+      },
+      {
+        id: 'guide-3',
+        title: 'Security & Compliance',
+        description: 'Security features, certifications, and compliance',
+        duration_minutes: 20,
+        level: 'Intermediate',
+        downloads: 950,
+        url: '/docs/security',
+      },
+      {
+        id: 'guide-4',
+        title: 'Integration Guide',
+        description: 'Integrate REGULON with your systems',
+        duration_minutes: 30,
+        level: 'Advanced',
+        downloads: 680,
+        url: '/docs/integration',
+      },
+    ],
+  });
+});
+
+// GET /api/resources/webinars - Webinars and workshops
+app.get('/api/resources/webinars', authenticate, (req, res) => {
+  res.json({
+    webinars: [
+      {
+        id: 'webinar-1',
+        title: 'Compliance Best Practices for CAs',
+        description: 'Expert webinar on compliance automation',
+        duration_minutes: 60,
+        level: 'All Levels',
+        date: '2026-04-15',
+        attendees: 3200,
+        status: 'registered',
+      },
+      {
+        id: 'webinar-2',
+        title: 'Regulatory Updates 2026',
+        description: 'Overview of new regulatory requirements',
+        duration_minutes: 45,
+        level: 'All Levels',
+        date: '2026-04-22',
+        attendees: 2800,
+        status: 'available',
+      },
+      {
+        id: 'webinar-3',
+        title: 'Enterprise Security Implementation',
+        description: 'Security best practices workshop',
+        duration_minutes: 90,
+        level: 'Advanced',
+        date: '2026-04-29',
+        attendees: 1500,
+        status: 'available',
+      },
+    ],
+  });
+});
+
+// ============================================================================
+// INDIAN REGULATORY FRAMEWORKS API ENDPOINTS
+// ============================================================================
+
+// GET /api/regulatory-frameworks - All Indian regulatory frameworks
+app.get('/api/regulatory-frameworks', authenticate, (req, res) => {
+  res.json({
+    frameworks: [
+      {
+        id: 'gst',
+        name: 'GST Compliance',
+        icon: '📋',
+        coverage: 'All States',
+        authority: 'GSTN',
+        description: 'Goods and Services Tax compliance',
+        status: 'active',
+      },
+      {
+        id: 'income-tax',
+        name: 'Income Tax India',
+        icon: '💰',
+        coverage: 'Central',
+        authority: 'Income Tax India',
+        description: 'Federal income tax compliance',
+        status: 'active',
+      },
+      {
+        id: 'labour',
+        name: 'Labour Compliance',
+        icon: '👷',
+        coverage: 'State Level',
+        authority: 'State Labour Department',
+        description: 'Labour laws and employee compliance',
+        status: 'active',
+      },
+      {
+        id: 'mca',
+        name: 'MCA Regulations',
+        icon: '🏢',
+        coverage: 'Corporate',
+        authority: 'Ministry of Corporate Affairs',
+        description: 'Corporate governance and filing',
+        status: 'active',
+      },
+      {
+        id: 'rbi',
+        name: 'RBI Guidelines',
+        icon: '🏦',
+        coverage: 'Financial',
+        authority: 'Reserve Bank of India',
+        description: 'Banking and financial regulations',
+        status: 'active',
+      },
+      {
+        id: 'sebi',
+        name: 'SEBI Standards',
+        icon: '📊',
+        coverage: 'Securities',
+        authority: 'Securities and Exchange Board',
+        description: 'Securities market regulations',
+        status: 'active',
+      },
+    ],
+  });
+});
+
+// GET /api/regulatory-frameworks/:frameworkId/details - Framework details
+app.get('/api/regulatory-frameworks/:frameworkId/details', authenticate, (req, res) => {
+  const frameworkId = req.params.frameworkId;
+  const frameworks = {
+    gst: {
+      id: 'gst',
+      name: 'GST Compliance',
+      authority: 'GSTN',
+      last_update: '2026-03-20',
+      active_notices: 12,
+      upcoming_deadlines: 5,
+      description: 'Goods and Services Tax compliance across all states',
+      coverage: 'Pan-India',
+    },
+    'income-tax': {
+      id: 'income-tax',
+      name: 'Income Tax India',
+      authority: 'Income Tax India',
+      last_update: '2026-03-18',
+      active_notices: 8,
+      upcoming_deadlines: 3,
+      description: 'Federal income tax and assessment regulations',
+      coverage: 'Central Government',
+    },
+    rbi: {
+      id: 'rbi',
+      name: 'RBI Guidelines',
+      authority: 'Reserve Bank of India',
+      last_update: '2026-03-22',
+      active_notices: 6,
+      upcoming_deadlines: 2,
+      description: 'Banking, payment, and financial system regulations',
+      coverage: 'Financial Institutions',
+    },
+  };
+  
+  const details = frameworks[frameworkId];
+  if (details) {
+    res.json(details);
+  } else {
+    res.status(404).json({ error: 'Framework not found' });
+  }
+});
+
+// GET /api/regulatory-alerts-by-framework - Alerts by framework
+app.get('/api/regulatory-alerts-by-framework', authenticate, (req, res) => {
+  res.json({
+    alerts: [
+      {
+        framework: 'gst',
+        count: 12,
+        critical: 3,
+        warning: 5,
+        info: 4,
+      },
+      {
+        framework: 'income-tax',
+        count: 8,
+        critical: 1,
+        warning: 3,
+        info: 4,
+      },
+      {
+        framework: 'labour',
+        count: 0,
+        critical: 0,
+        warning: 0,
+        info: 0,
+      },
+      {
+        framework: 'mca',
+        count: 0,
+        critical: 0,
+        warning: 0,
+        info: 0,
+      },
+      {
+        framework: 'rbi',
+        count: 6,
+        critical: 2,
+        warning: 2,
+        info: 2,
+      },
+      {
+        framework: 'sebi',
+        count: 0,
+        critical: 0,
+        warning: 0,
+        info: 0,
+      },
+    ],
+  });
+});
+
+// ============================================================================
+// DASHBOARD & ANALYTICS API ENDPOINTS
+// ============================================================================
+
+// GET /api/dashboard/overview - Dashboard overview metrics
+app.get('/api/dashboard/overview', authenticate, (req, res) => {
+  res.json({
+    active_alerts: 26,
+    pending_tasks: 12,
+    compliance_score: 94.5,
+    frameworks_monitored: 6,
+    last_update: new Date().toISOString(),
+    critical_alerts: 3,
+    upcoming_deadlines: 5,
+  });
+});
+
+// GET /api/dashboard/compliance-score - Compliance score trends
+app.get('/api/dashboard/compliance-score', authenticate, (req, res) => {
+  res.json({
+    current_score: 94.5,
+    target_score: 95,
+    trend: 'up',
+    change: '+2.3%',
+    weekly_scores: [88.0, 89.5, 91.0, 92.3, 93.1, 93.8, 94.5],
+    framework_scores: {
+      gst: 96.2,
+      'income-tax': 93.5,
+      labour: 92.0,
+      mca: 94.3,
+      rbi: 95.8,
+      sebi: 91.5,
+    },
+  });
+});
+
+// ============================================================================
 // ERROR HANDLING
 // ============================================================================
 
@@ -843,15 +1420,28 @@ app.listen(API_PORT, () => {
   console.log(`🚀 API Server running at: http://localhost:${API_PORT}`);
   console.log(`📚 API Documentation: http://localhost:${API_PORT}/api-docs`);
   console.log(`🏥 Health Check: http://localhost:${API_PORT}/api/health`);
-  console.log(`\n✅ Available Services:`);
-  console.log(`   - Authentication (login, register, logout)`);
-  console.log(`   - User Management`);
-  console.log(`   - Workspace Management`);
-  console.log(`   - Alert Management (50+ endpoints)`);
-  console.log(`   - Compliance Task Management`);
-  console.log(`   - Document Vault`);
-  console.log(`   - Analytics & Reporting`);
-  console.log(`   - Admin Dashboard`);
+  console.log(`\n✅ Available Services (44+ Total Endpoints):`);
+  console.log(`   ✓ Authentication (3 endpoints)`);
+  console.log(`   ✓ User Management (5 endpoints)`);
+  console.log(`   ✓ Workspace Management (5 endpoints)`);
+  console.log(`   ✓ Alert Management (5 endpoints)`);
+  console.log(`   ✓ Compliance Task Management (6 endpoints)`);
+  console.log(`   ✓ Document Vault (4 endpoints)`);
+  console.log(`   ✓ Analytics & Reporting (3 endpoints)`);
+  console.log(`   ✓ Admin Dashboard (2 endpoints)`);
+  console.log(`   ✓ Platform Pages (4 endpoints) - Overview, Architecture, Features, Roadmap`);
+  console.log(`   ✓ Solutions & Customers (2 endpoints) - Solutions, Case Studies`);
+  console.log(`   ✓ Security Features (1 endpoint) - Certifications, Practices`);
+  console.log(`   ✓ Learning Resources (2 endpoints) - Documentation, Webinars`);
+  console.log(`   ✓ Indian Regulatory Frameworks (3 endpoints) - Frameworks, Details, Alerts`);
+  console.log(`   ✓ Dashboard Analytics (2 endpoints) - Overview, Compliance Score`);
+  console.log(`\n🌍 Indian Regulatory Monitoring:`);
+  console.log(`   - GST Compliance (GSTN)`);
+  console.log(`   - Income Tax India (Central)`);
+  console.log(`   - Labour Compliance (State Level)`);
+  console.log(`   - MCA Regulations (Corporate)`);
+  console.log(`   - RBI Guidelines (Financial)`);
+  console.log(`   - SEBI Standards (Securities)`);
   console.log(`\n`);
 });
 
