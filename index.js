@@ -762,124 +762,204 @@ app.get("/health", (_req, res) => {
   return res.json({ service: "regulon-agent", status: "running", scanned_sources: Object.keys(SOURCES).length });
 });
 
-// Regulatory News & Changes endpoint (for CA compliance updates)
+// Advanced Regulatory News & Changes endpoint (for CA compliance updates)
+// Shows major regulatory changes from past 30 days with direct source links
 const generateRegulatoryNews = (alerts) => {
-  const news = [];
+  // Filter alerts from past 30 days
+  const now = new Date();
+  const thirtyDaysAgo = new Date(now.getTime() - 30 * 24 * 60 * 60 * 1000);
   
-  // Group by category/type to create meaningful news items
-  const byType = {};
-  for (const alert of alerts) {
-    const key = alert.authority;
-    if (!byType[key]) byType[key] = [];
-    byType[key].push(alert);
+  const recentAlerts = alerts.filter(alert => {
+    const alertDate = new Date(alert.publishDate || alert.publish_date);
+    return alertDate >= thirtyDaysAgo && alertDate <= now;
+  });
+  
+  // Group by authority to identify major changes
+  const byAuthority = {};
+  for (const alert of recentAlerts) {
+    const key = alert.authority || alert.source;
+    if (!byAuthority[key]) byAuthority[key] = [];
+    byAuthority[key].push(alert);
   }
   
-  // Create news summaries from major changes
-  const newsItems = [
-    // GST-related changes
-    ...(byType.GSTN?.slice(0, 2).map(item => ({
-      id: `news-gst-${item.id}`,
-      category: "GST Update",
-      title: item.title,
-      summary: item.summary?.slice(0, 200),
-      authority: "GST Network",
-      impact: "High - Affects all registered businesses",
-      caActionItems: [
-        "Review impact on current compliance",
-        "Update GST return filings if applicable",
-        "Inform clients of new procedures"
-      ],
-      date: item.publishDate,
-      severity: "high"
-    })) || []),
-    
-    // Income Tax changes
-    ...(byType.INCOMETAX?.slice(0, 2).map(item => ({
-      id: `news-it-${item.id}`,
-      category: "Income Tax Update",
-      title: item.title,
-      summary: item.summary?.slice(0, 200),
-      authority: "Income Tax India",
-      impact: "High - Affects tax planning & filings",
-      caActionItems: [
-        "Update tax computation methods",
-        "Review client tax implications",
-        "Plan for implementation timeline"
-      ],
-      date: item.publishDate,
-      severity: "high"
-    })) || []),
-    
-    // RBI/Banking changes
-    ...(byType.RBI?.slice(0, 1).map(item => ({
-      id: `news-rbi-${item.id}`,
-      category: "RBI Circular",
-      title: item.title,
-      summary: item.summary?.slice(0, 200),
-      authority: "Reserve Bank of India",
-      impact: "Medium - Affects banking & finance clients",
-      caActionItems: [
-        "Monitor policy rate implications",
-        "Advise finance clients on changes",
-        "Update treasury policies if needed"
-      ],
-      date: item.publishDate,
-      severity: "medium"
-    })) || []),
-    
-    // SEBI changes
-    ...(byType.SEBI?.slice(0, 1).map(item => ({
-      id: `news-sebi-${item.id}`,
-      category: "SEBI Regulation",
-      title: item.title,
-      summary: item.summary?.slice(0, 200),
-      authority: "SEBI",
-      impact: "Medium - Affects listed companies & securities",
-      caActionItems: [
-        "Review impact on listed clients",
-        "Check disclosure requirements",
-        "Update audit procedures if needed"
-      ],
-      date: item.publishDate,
-      severity: "medium"
-    })) || []),
-    
-    // MCA/Company Law changes
-    ...(byType.MCA?.slice(0, 1).map(item => ({
-      id: `news-mca-${item.id}`,
-      category: "Company Law Update",
-      title: item.title,
-      summary: item.summary?.slice(0, 200),
-      authority: "Ministry of Corporate Affairs",
-      impact: "High - Affects corporate governance & compliance",
-      caActionItems: [
-        "Review impact on current compliance",
-        "Update client governance policies",
-        "Plan implementation timeline"
-      ],
-      date: item.publishDate,
-      severity: "high"
-    })) || []),
-    
-    // Customs/CBIC changes
-    ...(byType.CBIC?.slice(0, 1).map(item => ({
-      id: `news-cbic-${item.id}`,
-      category: "Customs Update",
-      title: item.title,
-      summary: item.summary?.slice(0, 200),
-      authority: "CBIC",
-      impact: "Medium - Affects import/export operations",
-      caActionItems: [
-        "Review tariff implications",
-        "Update customs procedures",
-        "Advise trading clients on changes"
-      ],
-      date: item.publishDate,
-      severity: "medium"
-    })) || []),
-  ];
+  // Create advanced news items with real data and source links
+  const sourceUrlMap = {
+    GSTN: "https://www.gst.gov.in/newsandupdates",
+    RBI: "https://rbi.org.in/Scripts/NotificationUser.aspx",
+    SEBI: "https://www.sebi.gov.in/sebiweb/home/HomeAction.do?doListing=yes&sid=1&ssid=7&smid=0",
+    CBIC: "https://www.cbic.gov.in",
+    INCOMETAX: "https://www.incometax.gov.in/iec/foportal/latest-news",
+    MCA: "https://www.mca.gov.in/content/mca/global/en/notifications-tenders.html",
+    EGAZETTE: "https://egazette.gov.in"
+  };
   
-  return newsItems.filter(n => n).sort((a, b) => new Date(b.date) - new Date(a.date));
+  const newsItems = [];
+  
+  // GST - Show major compliance changes
+  if (byAuthority.GSTN && byAuthority.GSTN.length > 0) {
+    const topGst = byAuthority.GSTN[0];
+    const detailedUrl = topGst.sourceUrl || sourceUrlMap.GSTN;
+    
+    newsItems.push({
+      id: `news-gst-${topGst.id || 'major'}`,
+      category: "GST Regulatory Amendment",
+      title: topGst.title,
+      summary: topGst.summary?.slice(0, 180),
+      authority: "GST Network",
+      sourceUrl: detailedUrl,
+      impactType: "Compliance Change",
+      affectedEntities: "All GST-registered businesses",
+      implementationStatus: "Active",
+      urgency: "High",
+      date: topGst.publishDate || topGst.publish_date,
+      severity: "high",
+      regulatoryArea: "Indirect Tax",
+      previousNotices: byAuthority.GSTN.length
+    });
+  }
+  
+  // Income Tax - Show major amendments
+  if (byAuthority.INCOMETAX && byAuthority.INCOMETAX.length > 0) {
+    const topIT = byAuthority.INCOMETAX[0];
+    const detailedUrl = topIT.sourceUrl || sourceUrlMap.INCOMETAX;
+    
+    newsItems.push({
+      id: `news-it-${topIT.id || 'major'}`,
+      category: "Income Tax Amendment",
+      title: topIT.title,
+      summary: topIT.summary?.slice(0, 180),
+      authority: "Income Tax India",
+      sourceUrl: detailedUrl,
+      impactType: "Tax Policy Change",
+      affectedEntities: "Individuals, Companies, Partners",
+      implementationStatus: "Scheduled",
+      urgency: "High",
+      date: topIT.publishDate || topIT.publish_date,
+      severity: "high",
+      regulatoryArea: "Direct Tax",
+      previousNotices: byAuthority.INCOMETAX.length
+    });
+  }
+  
+  // RBI - Show monetary policy & banking changes
+  if (byAuthority.RBI && byAuthority.RBI.length > 0) {
+    const topRbi = byAuthority.RBI[0];
+    const detailedUrl = topRbi.sourceUrl || sourceUrlMap.RBI;
+    
+    newsItems.push({
+      id: `news-rbi-${topRbi.id || 'major'}`,
+      category: "RBI Policy Directive",
+      title: topRbi.title,
+      summary: topRbi.summary?.slice(0, 180),
+      authority: "Reserve Bank of India",
+      sourceUrl: detailedUrl,
+      impactType: "Monetary Policy",
+      affectedEntities: "Financial institutions, Exporters, Importers",
+      implementationStatus: "Active",
+      urgency: "Medium",
+      date: topRbi.publishDate || topRbi.publish_date,
+      severity: "medium",
+      regulatoryArea: "Banking & Finance",
+      previousNotices: byAuthority.RBI.length
+    });
+  }
+  
+  // SEBI - Show market regulation changes
+  if (byAuthority.SEBI && byAuthority.SEBI.length > 0) {
+    const topSebi = byAuthority.SEBI[0];
+    const detailedUrl = topSebi.sourceUrl || sourceUrlMap.SEBI;
+    
+    newsItems.push({
+      id: `news-sebi-${topSebi.id || 'major'}`,
+      category: "SEBI Regulation Update",
+      title: topSebi.title,
+      summary: topSebi.summary?.slice(0, 180),
+      authority: "SEBI",
+      sourceUrl: detailedUrl,
+      impactType: "Market Regulation",
+      affectedEntities: "Listed companies, Brokers, Investors",
+      implementationStatus: "Effective",
+      urgency: "Medium",
+      date: topSebi.publishDate || topSebi.publish_date,
+      severity: "medium",
+      regulatoryArea: "Capital Markets",
+      previousNotices: byAuthority.SEBI.length
+    });
+  }
+  
+  // MCA - Show company law changes
+  if (byAuthority.MCA && byAuthority.MCA.length > 0) {
+    const topMca = byAuthority.MCA[0];
+    const detailedUrl = topMca.sourceUrl || sourceUrlMap.MCA;
+    
+    newsItems.push({
+      id: `news-mca-${topMca.id || 'major'}`,
+      category: "Company Law Amendment",
+      title: topMca.title,
+      summary: topMca.summary?.slice(0, 180),
+      authority: "Ministry of Corporate Affairs",
+      sourceUrl: detailedUrl,
+      impactType: "Corporate Governance",
+      affectedEntities: "All registered companies",
+      implementationStatus: "Scheduled",
+      urgency: "Medium",
+      date: topMca.publishDate || topMca.publish_date,
+      severity: "high",
+      regulatoryArea: "Corporate Law",
+      previousNotices: byAuthority.MCA.length
+    });
+  }
+  
+  // CBIC - Show customs/excise changes
+  if (byAuthority.CBIC && byAuthority.CBIC.length > 0) {
+    const topCbic = byAuthority.CBIC[0];
+    const detailedUrl = topCbic.sourceUrl || sourceUrlMap.CBIC;
+    
+    newsItems.push({
+      id: `news-cbic-${topCbic.id || 'major'}`,
+      category: "Customs & Excise Notice",
+      title: topCbic.title,
+      summary: topCbic.summary?.slice(0, 180),
+      authority: "CBIC",
+      sourceUrl: detailedUrl,
+      impactType: "Trade Regulation",
+      affectedEntities: "Importers, Exporters, Manufacturers",
+      implementationStatus: "Effective",
+      urgency: "Medium",
+      date: topCbic.publishDate || topCbic.publish_date,
+      severity: "medium",
+      regulatoryArea: "Trade & Customs",
+      previousNotices: byAuthority.CBIC.length
+    });
+  }
+  
+  // eGazette - Show official gazette notifications
+  if (byAuthority.EGAZETTE && byAuthority.EGAZETTE.length > 0) {
+    const topGaz = byAuthority.EGAZETTE[0];
+    const detailedUrl = topGaz.sourceUrl || sourceUrlMap.EGAZETTE;
+    
+    newsItems.push({
+      id: `news-gaz-${topGaz.id || 'major'}`,
+      category: "Official Gazette Notification",
+      title: topGaz.title,
+      summary: topGaz.summary?.slice(0, 180),
+      authority: "Government of India",
+      sourceUrl: detailedUrl,
+      impactType: "Statutory Notification",
+      affectedEntities: "General public, Businesses",
+      implementationStatus: "Effective",
+      urgency: "Medium",
+      date: topGaz.publishDate || topGaz.publish_date,
+      severity: "medium",
+      regulatoryArea: "General Notification",
+      previousNotices: byAuthority.EGAZETTE.length
+    });
+  }
+  
+  // Sort by date (newest first) and limit to top 7 major changes
+  return newsItems
+    .sort((a, b) => new Date(b.date) - new Date(a.date))
+    .slice(0, 7);
 };
 
 let cachedNews = [];

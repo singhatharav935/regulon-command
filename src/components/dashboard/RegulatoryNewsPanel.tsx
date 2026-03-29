@@ -5,8 +5,11 @@ import {
   TrendingUp,
   Zap,
   Shield,
-  CheckCircle2,
   ExternalLink,
+  Globe,
+  Target,
+  Clock,
+  Building2,
 } from "lucide-react";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Badge } from "@/components/ui/badge";
@@ -17,10 +20,15 @@ interface NewsItem {
   title: string;
   summary?: string;
   authority: string;
-  impact: string;
-  caActionItems?: string[];
+  sourceUrl: string;
+  impactType: string;
+  affectedEntities: string;
+  implementationStatus: string;
+  urgency: string;
+  regulatoryArea: string;
   date: string;
   severity: "high" | "medium" | "low";
+  previousNotices?: number;
 }
 
 const RegulatoryNewsPanel = () => {
@@ -47,7 +55,7 @@ const RegulatoryNewsPanel = () => {
     };
 
     fetchNews();
-    const interval = setInterval(fetchNews, 30000); // Refresh every 30s
+    const interval = setInterval(fetchNews, 60000); // Refresh every 60s
     return () => clearInterval(interval);
   }, []);
 
@@ -83,22 +91,22 @@ const RegulatoryNewsPanel = () => {
   };
 
   return (
-    <Card className="border-indigo-500/30 bg-gradient-to-br from-slate-950 via-slate-900 to-slate-950">
-      <CardHeader className="border-b border-indigo-500/20 pb-4">
+    <Card className="border-purple-500/30 bg-gradient-to-br from-slate-950 via-slate-900 to-slate-950">
+      <CardHeader className="border-b border-purple-500/20 pb-4">
         <div className="flex items-center justify-between">
           <div className="flex items-center gap-3">
-            <Shield className="w-6 h-6 text-indigo-400" />
+            <Globe className="w-6 h-6 text-purple-400 animate-pulse" />
             <div>
               <CardTitle className="text-lg text-white">
-                Regulatory Compliance Updates
+                Indian Regulatory News & Compliance Updates
               </CardTitle>
               <p className="text-xs text-gray-400 mt-1">
-                Latest regulatory changes & CA action items
+                Major regulatory changes from past 30 days | 7 Government Sources
               </p>
             </div>
           </div>
-          <Badge variant="outline" className="bg-indigo-500/20 border-indigo-500/50">
-            {news.length} Updates
+          <Badge variant="outline" className="bg-purple-500/20 border-purple-500/50 text-purple-300">
+            {news.length} Major Changes
           </Badge>
         </div>
       </CardHeader>
@@ -106,7 +114,7 @@ const RegulatoryNewsPanel = () => {
       <CardContent className="pt-4">
         {loading ? (
           <div className="flex items-center justify-center py-12">
-            <div className="animate-spin rounded-full h-8 w-8 border-b-2 border-indigo-400" />
+            <div className="animate-spin rounded-full h-8 w-8 border-b-2 border-purple-400" />
           </div>
         ) : error ? (
           <div className="bg-rose-500/10 border border-rose-500/30 rounded-lg p-4 text-rose-300 text-sm">
@@ -114,7 +122,7 @@ const RegulatoryNewsPanel = () => {
           </div>
         ) : news.length === 0 ? (
           <div className="text-center py-8 text-gray-400">
-            No regulatory news available
+            No regulatory updates in past 30 days
           </div>
         ) : (
           <div className="space-y-3">
@@ -128,7 +136,7 @@ const RegulatoryNewsPanel = () => {
                   transition={{ delay: idx * 0.05 }}
                 >
                   <div
-                    className={`rounded-lg border p-3 cursor-pointer transition-all ${getSeverityBgColor(
+                    className={`rounded-lg border p-4 cursor-pointer transition-all hover:shadow-lg ${getSeverityBgColor(
                       item.severity
                     )}`}
                     onClick={() =>
@@ -140,27 +148,39 @@ const RegulatoryNewsPanel = () => {
                     <div className="flex items-start gap-3">
                       <div className="mt-1">{getSeverityIcon(item.severity)}</div>
                       <div className="flex-1 min-w-0">
-                        <div className="flex items-start justify-between gap-2">
-                          <div className="flex-1">
-                            <div className="flex items-center gap-2 flex-wrap">
-                              <Badge
-                                variant="outline"
-                                className="text-xs bg-slate-800 border-slate-600"
-                              >
-                                {item.category}
-                              </Badge>
-                              <Badge
-                                variant="outline"
-                                className="text-xs bg-slate-700 border-slate-600"
-                              >
-                                {item.authority}
-                              </Badge>
-                            </div>
-                            <h4 className="text-sm font-semibold text-white mt-2 line-clamp-2">
-                              {item.title}
-                            </h4>
-                          </div>
+                        {/* Top badges */}
+                        <div className="flex items-center gap-2 flex-wrap mb-2">
+                          <Badge
+                            variant="outline"
+                            className="text-xs bg-purple-900/40 border-purple-600/60 text-purple-200"
+                          >
+                            {item.category}
+                          </Badge>
+                          <Badge
+                            variant="outline"
+                            className="text-xs bg-slate-800 border-slate-600"
+                          >
+                            {item.regulatoryArea}
+                          </Badge>
+                          <Badge
+                            variant="outline"
+                            className={`text-xs ${
+                              item.urgency === "High"
+                                ? "bg-rose-900/40 border-rose-600/60 text-rose-200"
+                                : "bg-amber-900/40 border-amber-600/60 text-amber-200"
+                            }`}
+                          >
+                            {item.urgency} Priority
+                          </Badge>
                         </div>
+
+                        {/* Title and authority */}
+                        <h4 className="text-sm font-semibold text-white line-clamp-2">
+                          {item.title}
+                        </h4>
+                        <p className="text-xs text-purple-300 mt-1 font-medium">
+                          {item.authority}
+                        </p>
 
                         {/* Summary preview */}
                         {item.summary && (
@@ -176,49 +196,75 @@ const RegulatoryNewsPanel = () => {
                               initial={{ opacity: 0, height: 0 }}
                               animate={{ opacity: 1, height: "auto" }}
                               exit={{ opacity: 0, height: 0 }}
-                              className="mt-3 space-y-3 border-t border-slate-700 pt-3"
+                              className="mt-4 space-y-4 border-t border-slate-700 pt-4"
                             >
-                              {/* Impact section */}
+                              {/* Impact Type & Status Grid */}
+                              <div className="grid grid-cols-2 gap-3">
+                                <div>
+                                  <p className="text-xs font-semibold text-purple-300 mb-1 flex items-center gap-1">
+                                    <Target className="w-3 h-3" /> Impact Type
+                                  </p>
+                                  <p className="text-xs text-gray-200">
+                                    {item.impactType}
+                                  </p>
+                                </div>
+
+                                <div>
+                                  <p className="text-xs font-semibold text-purple-300 mb-1 flex items-center gap-1">
+                                    <Clock className="w-3 h-3" /> Status
+                                  </p>
+                                  <p className="text-xs text-gray-200">
+                                    {item.implementationStatus}
+                                  </p>
+                                </div>
+                              </div>
+
+                              {/* Affected Entities */}
                               <div>
-                                <p className="text-xs font-semibold text-gray-300 mb-1">
-                                  Impact Level:
+                                <p className="text-xs font-semibold text-purple-300 mb-1 flex items-center gap-1">
+                                  <Building2 className="w-3 h-3" /> Affected Entities
                                 </p>
-                                <p className="text-sm text-gray-200">
-                                  {item.impact}
+                                <p className="text-xs text-gray-200">
+                                  {item.affectedEntities}
                                 </p>
                               </div>
 
-                              {/* CA Action Items */}
-                              {item.caActionItems && item.caActionItems.length > 0 && (
-                                <div>
-                                  <p className="text-xs font-semibold text-indigo-300 mb-2">
-                                    CA Action Items:
+                              {/* Full Summary */}
+                              <div>
+                                <p className="text-xs font-semibold text-purple-300 mb-1">
+                                  Detailed Summary
+                                </p>
+                                <p className="text-xs text-gray-300 leading-relaxed">
+                                  {item.summary || "No detailed summary available"}
+                                </p>
+                              </div>
+
+                              {/* Previous Notices Count */}
+                              {item.previousNotices && item.previousNotices > 1 && (
+                                <div className="bg-slate-800/50 rounded px-2 py-1.5">
+                                  <p className="text-xs text-gray-300">
+                                    <span className="text-purple-300 font-semibold">
+                                      {item.previousNotices}
+                                    </span>{" "}
+                                    related notices from this authority in past 30 days
                                   </p>
-                                  <ul className="space-y-1">
-                                    {item.caActionItems.map(
-                                      (action, actionIdx) => (
-                                        <li
-                                          key={actionIdx}
-                                          className="flex items-start gap-2 text-xs text-gray-300"
-                                        >
-                                          <CheckCircle2 className="w-3 h-3 mt-0.5 text-indigo-400 flex-shrink-0" />
-                                          <span>{action}</span>
-                                        </li>
-                                      )
-                                    )}
-                                  </ul>
                                 </div>
                               )}
 
-                              {/* Date */}
+                              {/* Date and View Official Source Button */}
                               <div className="flex items-center justify-between pt-2 border-t border-slate-700">
                                 <span className="text-xs text-gray-400">
                                   {formatDate(item.date)}
                                 </span>
-                                <button className="flex items-center gap-1 text-xs text-indigo-400 hover:text-indigo-300 transition">
-                                  View Details
+                                <a
+                                  href={item.sourceUrl}
+                                  target="_blank"
+                                  rel="noopener noreferrer"
+                                  className="flex items-center gap-1 text-xs text-purple-400 hover:text-purple-300 transition font-semibold bg-purple-500/20 px-3 py-1.5 rounded"
+                                >
+                                  View Official Source
                                   <ExternalLink className="w-3 h-3" />
-                                </button>
+                                </a>
                               </div>
                             </motion.div>
                           )}
@@ -226,12 +272,12 @@ const RegulatoryNewsPanel = () => {
 
                         {/* Collapsed view footer */}
                         {expandedId !== item.id && (
-                          <div className="flex items-center justify-between mt-2">
+                          <div className="flex items-center justify-between mt-2 pt-2 border-t border-slate-700/50">
                             <span className="text-xs text-gray-400">
                               {formatDate(item.date)}
                             </span>
-                            <span className="text-xs text-indigo-400">
-                              {item.caActionItems?.length || 0} actions →
+                            <span className="text-xs text-purple-400 font-semibold">
+                              View Details →
                             </span>
                           </div>
                         )}
