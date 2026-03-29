@@ -27,6 +27,11 @@ const AppCAFirmDashboard = lazy(() => import("./pages/AppCAFirmDashboard"));
 const AgentWorkReview = lazy(() => import("./pages/AgentWorkReview"));
 const LegalPolicyPage = lazy(() => import("./pages/LegalPolicyPage"));
 const ComplianceCenter = lazy(() => import("./pages/ComplianceCenter"));
+const AdvancedPlatformPage = lazy(() => import("./pages/AdvancedPlatformPage"));
+const AdvancedSolutionsPage = lazy(() => import("./pages/AdvancedSolutionsPage"));
+const AdvancedSecurityPage = lazy(() => import("./pages/AdvancedSecurityPage"));
+const AdvancedCustomersPage = lazy(() => import("./pages/AdvancedCustomersPage"));
+const AdvancedResourcesPage = lazy(() => import("./pages/AdvancedResourcesPage"));
 
 const queryClient = new QueryClient();
 
@@ -49,27 +54,28 @@ const App = () => (
           <Suspense fallback={<RouteFallback />}>
             <Routes>
             <Route path="/" element={<Index />} />
-            <Route path="/platform" element={<MarketingOptionPage />} />
-            <Route path="/platform/how-it-works" element={<MarketingOptionPage />} />
-            <Route path="/platform/infrastructure" element={<MarketingOptionPage />} />
-            <Route path="/platform/ai-human-review" element={<MarketingOptionPage />} />
-            <Route path="/platform/regulators" element={<MarketingOptionPage />} />
-            <Route path="/platform/ai-assistant" element={<MarketingOptionPage />} />
-            <Route path="/platform/audit" element={<MarketingOptionPage />} />
-            <Route path="/solutions/roc" element={<MarketingOptionPage />} />
-            <Route path="/solutions/gst" element={<MarketingOptionPage />} />
-            <Route path="/solutions/income-tax" element={<MarketingOptionPage />} />
-            <Route path="/solutions/labour-law" element={<MarketingOptionPage />} />
-            <Route path="/solutions/rbi" element={<MarketingOptionPage />} />
-            <Route path="/solutions/sebi" element={<MarketingOptionPage />} />
-            <Route path="/solutions/contracts" element={<MarketingOptionPage />} />
-            <Route path="/customers" element={<MarketingOptionPage />} />
-            <Route path="/security" element={<MarketingOptionPage />} />
-            <Route path="/security/data-residency" element={<MarketingOptionPage />} />
-            <Route path="/security/encryption-standards" element={<MarketingOptionPage />} />
-            <Route path="/security/dpdp-2026" element={<MarketingOptionPage />} />
-            <Route path="/security/soc2-type-ii" element={<MarketingOptionPage />} />
-            <Route path="/resources" element={<MarketingOptionPage />} />
+            <Route path="/platform" element={<AdvancedPlatformPage />} />
+            <Route path="/platform/how-it-works" element={<AdvancedPlatformPage />} />
+            <Route path="/platform/infrastructure" element={<AdvancedPlatformPage />} />
+            <Route path="/platform/ai-human-review" element={<AdvancedPlatformPage />} />
+            <Route path="/platform/regulators" element={<AdvancedPlatformPage />} />
+            <Route path="/platform/ai-assistant" element={<AdvancedPlatformPage />} />
+            <Route path="/platform/audit" element={<AdvancedPlatformPage />} />
+            <Route path="/solutions" element={<AdvancedSolutionsPage />} />
+            <Route path="/solutions/roc" element={<AdvancedSolutionsPage />} />
+            <Route path="/solutions/gst" element={<AdvancedSolutionsPage />} />
+            <Route path="/solutions/income-tax" element={<AdvancedSolutionsPage />} />
+            <Route path="/solutions/labour-law" element={<AdvancedSolutionsPage />} />
+            <Route path="/solutions/rbi" element={<AdvancedSolutionsPage />} />
+            <Route path="/solutions/sebi" element={<AdvancedSolutionsPage />} />
+            <Route path="/solutions/contracts" element={<AdvancedSolutionsPage />} />
+            <Route path="/customers" element={<AdvancedCustomersPage />} />
+            <Route path="/security" element={<AdvancedSecurityPage />} />
+            <Route path="/security/data-residency" element={<AdvancedSecurityPage />} />
+            <Route path="/security/encryption-standards" element={<AdvancedSecurityPage />} />
+            <Route path="/security/dpdp-2026" element={<AdvancedSecurityPage />} />
+            <Route path="/security/soc2-type-ii" element={<AdvancedSecurityPage />} />
+            <Route path="/resources" element={<AdvancedResourcesPage />} />
             <Route path="/about" element={<MarketingOptionPage />} />
             <Route path="/privacy" element={<LegalPolicyPage docKey="privacy_policy" fallbackTitle="Privacy Policy" />} />
             <Route path="/terms" element={<LegalPolicyPage docKey="terms_of_service" fallbackTitle="Terms of Service" />} />
