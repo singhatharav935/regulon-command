@@ -3,7 +3,7 @@ import { useQuery } from "@tanstack/react-query";
 import { format, parseISO } from "date-fns";
 import Navbar from "@/components/layout/Navbar";
 import Footer from "@/components/layout/Footer";
-import DashboardTypeNav from "@/components/dashboard/DashboardTypeNav";
+// DashboardTypeNav removed - users should only see their assigned dashboard based on role
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table";
 import { Badge } from "@/components/ui/badge";
@@ -28,33 +28,10 @@ const AppAdminDashboard = () => {
           roles: Array<{ id: string; role: string; user_id: string }>;
           drafts: Array<{ id: string; user_id: string | null; status: string; document_type: string; created_at: string }>;
         }>("/admin/dashboard");
-      } catch {
-        // Return demo data when backend is unavailable
-        return {
-          companies: [
-            { id: "c1", name: "GlobalTech Corp", industry: "Technology", compliance_health: 85, created_at: new Date().toISOString() },
-            { id: "c2", name: "Finance Solutions", industry: "Finance", compliance_health: 75, created_at: new Date().toISOString() },
-          ],
-          tasks: [
-            { id: "t1", company_id: "c1", title: "Compliance Audit", priority: "high", status: "in_progress", due_date: new Date().toISOString(), created_at: new Date().toISOString() },
-            { id: "t2", company_id: "c2", title: "Document Review", priority: "medium", status: "pending", due_date: new Date().toISOString(), created_at: new Date().toISOString() },
-          ],
-          documents: [
-            { id: "d1", company_id: "c1", status: "approved", created_at: new Date().toISOString() },
-            { id: "d2", company_id: "c2", status: "pending", created_at: new Date().toISOString() },
-          ],
-          deadlines: [
-            { id: "dl1", company_id: "c1", title: "Q2 Filing", due_date: new Date().toISOString(), created_at: new Date().toISOString() },
-          ],
-          roles: [
-            { id: "r1", role: "admin", user_id: user?.id || "admin-1" },
-            { id: "r2", role: "manager", user_id: "manager-1" },
-            { id: "r3", role: "user", user_id: "user-1" },
-          ],
-          drafts: [
-            { id: "dr1", user_id: "user-1", status: "completed", document_type: "report", created_at: new Date().toISOString() },
-          ],
-        };
+      } catch (error) {
+        console.error("Failed to load admin dashboard data:", error);
+        // Don't return demo data - show proper error message
+        throw new Error("Unable to load admin dashboard data. Please check system configuration.");
       }
     },
   });
@@ -127,7 +104,7 @@ const AppAdminDashboard = () => {
 
       <main className="pt-24 pb-16">
         <div className="container mx-auto px-4 max-w-7xl">
-          <DashboardTypeNav activeType="admin" routePrefix="/app" />
+          {/* Dashboard navigation removed - Admin users access admin panel only */}
 
           <div className="mb-6 p-4 rounded-xl bg-purple-500/10 border border-purple-500/20 text-center">
             <p className="text-sm text-purple-300">

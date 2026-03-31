@@ -3,7 +3,7 @@ import { useQuery } from "@tanstack/react-query";
 import { differenceInCalendarDays, format, parseISO } from "date-fns";
 import Navbar from "@/components/layout/Navbar";
 import Footer from "@/components/layout/Footer";
-import DashboardTypeNav from "@/components/dashboard/DashboardTypeNav";
+// DashboardTypeNav removed - users should only see their assigned dashboard based on role
 import AIDraftingEngine from "@/components/ca-dashboard/AIDraftingEngine";
 import ComplianceChatbot from "@/components/ca-dashboard/ComplianceChatbot";
 import AIVoiceBriefAgent from "@/components/voice/AIVoiceBriefAgent";
@@ -42,27 +42,10 @@ const AppCADashboard = () => {
           documents: Array<{ id: string; company_id: string; name: string; status: string; created_at: string }>;
           drafts: Array<{ id: string; company_id: string | null; document_type: string; draft_mode: string; status: string; created_at: string }>;
         }>("/ca/dashboard");
-      } catch {
-        // Return demo data when backend is unavailable
-        return {
-          companies: [
-            { id: "c1", name: "TechCorp Ltd", industry: "Technology", compliance_health: 80 },
-            { id: "c2", name: "FinServe Inc", industry: "Finance", compliance_health: 70 },
-          ],
-          tasks: [
-            { id: "t1", company_id: "c1", title: "Q1 Audit", regulator: "SEBI", priority: "high", status: "in_progress", due_date: new Date().toISOString() },
-            { id: "t2", company_id: "c2", title: "Compliance Check", regulator: "RBI", priority: "medium", status: "pending", due_date: new Date().toISOString() },
-          ],
-          deadlines: [
-            { id: "d1", company_id: "c1", title: "Q2 Filing", regulator: "SEBI", due_date: new Date().toISOString() },
-          ],
-          documents: [
-            { id: "doc1", company_id: "c1", name: "Audit.pdf", status: "approved", created_at: new Date().toISOString() },
-          ],
-          drafts: [
-            { id: "dr1", company_id: "c1", document_type: "report", draft_mode: "auto", status: "completed", created_at: new Date().toISOString() },
-          ],
-        };
+      } catch (error) {
+        console.error("Failed to load CA dashboard data:", error);
+        // Don't return demo data - show proper error message for setup
+        throw new Error("Unable to load CA dashboard data. Please complete your CA registration and verification.");
       }
     },
   });
@@ -76,11 +59,11 @@ const AppCADashboard = () => {
           blockers: Array<{ code: string; message: string; severity: string }>;
           next_steps: string[];
         }>("/onboarding/status");
-      } catch {
-        // Return demo onboarding data
+      } catch (error) {
+        console.error("Failed to load onboarding status:", error);
         return {
-          blockers: [],
-          next_steps: ["Setup client accounts", "Configure audit schedule"],
+          blockers: [{ code: "CA_SETUP_REQUIRED", message: "CA registration not completed", severity: "warning" }],
+          next_steps: ["Complete CA verification", "Upload professional certificates"],
         };
       }
     },
@@ -164,7 +147,7 @@ const AppCADashboard = () => {
 
       <main className="pt-24 pb-16">
         <div className="container mx-auto px-4 max-w-7xl">
-          <DashboardTypeNav activeType="ca" routePrefix="/app" />
+          {/* Dashboard navigation removed - CA users should only access CA dashboard */}
 
           <div className="mb-6 p-4 rounded-xl bg-cyan-500/10 border border-cyan-500/20 text-center">
             <p className="text-sm text-cyan-400">

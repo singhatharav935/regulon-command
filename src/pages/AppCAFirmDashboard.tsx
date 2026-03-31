@@ -2,7 +2,7 @@ import { useMemo, useState } from "react";
 import { useQuery } from "@tanstack/react-query";
 import Navbar from "@/components/layout/Navbar";
 import Footer from "@/components/layout/Footer";
-import DashboardTypeNav from "@/components/dashboard/DashboardTypeNav";
+// DashboardTypeNav removed - users should only see their assigned dashboard based on role
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Input } from "@/components/ui/input";
 import { Button } from "@/components/ui/button";
@@ -137,7 +137,7 @@ const AppCAFirmDashboard = () => {
       <Navbar />
       <main className="pt-24 pb-16">
         <div className="container mx-auto px-4 max-w-7xl">
-          <DashboardTypeNav activeType="ca-firm" routePrefix="/app" />
+          {/* Dashboard navigation removed - CA Firm users access firm dashboard only */}
 
           {!data?.firm ? (
             <Card className="glass-card border-border/40 max-w-lg">

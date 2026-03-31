@@ -3,7 +3,7 @@ import { useQuery } from "@tanstack/react-query";
 import { differenceInCalendarDays, format, parseISO } from "date-fns";
 import Navbar from "@/components/layout/Navbar";
 import Footer from "@/components/layout/Footer";
-import DashboardTypeNav from "@/components/dashboard/DashboardTypeNav";
+// DashboardTypeNav removed - users should only see their assigned dashboard
 import DashboardHeader from "@/components/dashboard/DashboardHeader";
 import RegulatoryExposurePanel from "@/components/dashboard/RegulatoryExposurePanel";
 import ComplianceTasksTable from "@/components/dashboard/ComplianceTasksTable";
@@ -49,32 +49,10 @@ const AppDashboard = () => {
           draftRuns: Array<{ id: string; document_type: string; draft_mode: string; status: string; created_at: string }>;
           draftAuditEvents: Array<{ id: string; draft_run_id: string; event_type: string; created_at: string }>;
         }>("/company/dashboard");
-      } catch {
-        // Return demo data when backend is unavailable
-        return {
-          company: { name: "Demo Company", industry: "Technology", compliance_health: 75 },
-          exposures: [
-            { regulator: "SEBI", status: "compliant", notes: "All requirements met" },
-            { regulator: "RBI", status: "compliant", notes: "Quarterly filing updated" },
-          ],
-          tasks: [
-            { id: "t1", title: "Q1 Compliance Report", regulator: "SEBI", priority: "high", status: "in_progress", due_date: new Date().toISOString() },
-            { id: "t2", title: "Annual Audit", regulator: "RBI", priority: "medium", status: "pending", due_date: new Date().toISOString() },
-          ],
-          documents: [
-            { id: "d1", name: "Q1 Report.pdf", file_type: "pdf", regulator: "SEBI", status: "approved", created_at: new Date().toISOString() },
-            { id: "d2", name: "Audit Certificate.pdf", file_type: "pdf", regulator: "RBI", status: "pending", created_at: new Date().toISOString() },
-          ],
-          deadlines: [
-            { id: "dl1", title: "SEBI Q2 Filing", regulator: "SEBI", due_date: new Date().toISOString(), is_recurring: true },
-          ],
-          draftRuns: [
-            { id: "dr1", document_type: "report", draft_mode: "auto", status: "completed", created_at: new Date().toISOString() },
-          ],
-          draftAuditEvents: [
-            { id: "de1", draft_run_id: "dr1", event_type: "created", created_at: new Date().toISOString() },
-          ],
-        };
+      } catch (error) {
+        console.error("Failed to load dashboard data:", error);
+        // Don't return demo data - let error handling show proper message
+        throw new Error("Unable to load dashboard data. Please complete your company setup first.");
       }
     },
   });
@@ -93,13 +71,14 @@ const AppDashboard = () => {
           next_steps: string[];
           blockers: Array<{ code: string; message: string; severity: string }>;
         }>("/onboarding/status");
-      } catch {
-        // Return demo onboarding data
+      } catch (error) {
+        console.error("Failed to load onboarding status:", error);
+        // Return basic onboarding status instead of demo data
         return {
-          ready_for_dashboard: true,
+          ready_for_dashboard: false,
           target_dashboard: "/app/dashboard",
-          next_steps: ["Add team members", "Configure compliance rules"],
-          blockers: [],
+          next_steps: ["Complete company registration", "Verify business documents"],
+          blockers: [{ code: "SETUP_REQUIRED", message: "Company setup not completed", severity: "warning" }],
         };
       }
     },
@@ -368,7 +347,7 @@ const AppDashboard = () => {
         <Navbar />
         <main className="pt-24 pb-16">
           <div className="container mx-auto px-4 max-w-4xl">
-            <DashboardTypeNav activeType="company" routePrefix="/app" />
+            {/* Navigation removed - users should only access their assigned dashboard */}
             <div className="glass-card p-8 text-center">
               <h1 className="text-2xl font-semibold mb-3">No company is assigned yet</h1>
               <p className="text-muted-foreground mb-6">
@@ -418,7 +397,7 @@ const AppDashboard = () => {
 
       <main className="pt-24 pb-16">
         <div className="container mx-auto px-4 max-w-7xl">
-          <DashboardTypeNav activeType="company" routePrefix="/app" />
+          {/* Dashboard type navigation hidden for regular users */}
 
           <RuntimeErrorBoundary scopeLabel="Company Voice Agent">
             <AIVoiceBriefAgent

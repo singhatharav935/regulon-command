@@ -3,7 +3,7 @@ import { format, parseISO } from "date-fns";
 import { useNavigate } from "react-router-dom";
 import Navbar from "@/components/layout/Navbar";
 import Footer from "@/components/layout/Footer";
-import DashboardTypeNav from "@/components/dashboard/DashboardTypeNav";
+// DashboardTypeNav removed - users should only see their assigned dashboard based on role
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Badge } from "@/components/ui/badge";
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table";
@@ -96,7 +96,7 @@ const AppLegalDashboard = () => {
 
       <main className="pt-24 pb-16">
         <div className="container mx-auto px-4 max-w-7xl">
-          <DashboardTypeNav activeType="ca" routePrefix="/app" />
+          {/* Dashboard navigation removed - Lawyer users access legal dashboard only */}
 
           <div className="mb-6 p-4 rounded-xl bg-amber-500/10 border border-amber-500/20 text-center">
             <p className="text-sm text-amber-300">
