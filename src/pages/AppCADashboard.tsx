@@ -34,6 +34,73 @@ const AppCADashboard = () => {
     enabled: Boolean(user?.id),
     queryFn: async () => {
       if (!user?.id) throw new Error("User is not authenticated");
+      
+      // Check if we're in demo mode
+      const isDemoMode = import.meta.env.VITE_ENABLE_PREVIEW_BYPASS === "true" || 
+                        user.id.startsWith("local_");
+      
+      if (isDemoMode) {
+        // Return demo data for CA role
+        return {
+          companies: [
+            { 
+              id: "demo-company-1", 
+              name: "Demo Client Company", 
+              industry: "Technology", 
+              compliance_health: 85 
+            }
+          ],
+          tasks: [
+            {
+              id: "demo-task-1",
+              company_id: "demo-company-1",
+              title: "GST Return Review",
+              regulator: "GST Department",
+              priority: "high",
+              status: "pending",
+              due_date: new Date(Date.now() + 7 * 24 * 60 * 60 * 1000).toISOString()
+            },
+            {
+              id: "demo-task-2", 
+              company_id: "demo-company-1",
+              title: "Income Tax Compliance Check",
+              regulator: "Income Tax Department",
+              priority: "medium",
+              status: "in_progress", 
+              due_date: new Date(Date.now() + 14 * 24 * 60 * 60 * 1000).toISOString()
+            }
+          ],
+          deadlines: [
+            {
+              id: "demo-deadline-1",
+              company_id: "demo-company-1", 
+              title: "Monthly GST Filing",
+              regulator: "GST Department",
+              due_date: new Date(Date.now() + 5 * 24 * 60 * 60 * 1000).toISOString()
+            }
+          ],
+          documents: [
+            {
+              id: "demo-doc-1",
+              company_id: "demo-company-1",
+              name: "GST Certificate",
+              status: "verified",
+              created_at: new Date().toISOString()
+            }
+          ],
+          drafts: [
+            {
+              id: "demo-draft-1",
+              company_id: "demo-company-1",
+              document_type: "compliance_report", 
+              draft_mode: "ai_assisted",
+              status: "draft",
+              created_at: new Date().toISOString()
+            }
+          ]
+        };
+      }
+      
       try {
         return await workspaceBackendRequest<{
           companies: Array<{ id: string; name: string; industry: string | null; compliance_health: number | null }>;
@@ -44,7 +111,6 @@ const AppCADashboard = () => {
         }>("/ca/dashboard");
       } catch (error) {
         console.error("Failed to load CA dashboard data:", error);
-        // Don't return demo data - show proper error message for setup
         throw new Error("Unable to load CA dashboard data. Please complete your CA registration and verification.");
       }
     },

@@ -19,6 +19,75 @@ const AppAdminDashboard = () => {
     enabled: Boolean(user?.id),
     queryFn: async () => {
       if (!user?.id) throw new Error("User is not authenticated");
+      
+      // Check if we're in demo mode
+      const isDemoMode = import.meta.env.VITE_ENABLE_PREVIEW_BYPASS === "true" || 
+                        user.id.startsWith("local_");
+      
+      if (isDemoMode) {
+        // Return demo data for admin role
+        return {
+          companies: [
+            { 
+              id: "demo-company-1", 
+              name: "Demo Tech Corp", 
+              industry: "Technology", 
+              compliance_health: 85, 
+              created_at: new Date().toISOString() 
+            },
+            { 
+              id: "demo-company-2", 
+              name: "Sample Industries", 
+              industry: "Manufacturing", 
+              compliance_health: 72, 
+              created_at: new Date().toISOString() 
+            }
+          ],
+          tasks: [
+            {
+              id: "demo-task-1",
+              company_id: "demo-company-1",
+              title: "System Health Check",
+              priority: "high",
+              status: "pending",
+              due_date: new Date(Date.now() + 7 * 24 * 60 * 60 * 1000).toISOString(),
+              created_at: new Date().toISOString()
+            }
+          ],
+          documents: [
+            {
+              id: "demo-doc-1", 
+              company_id: "demo-company-1",
+              status: "approved",
+              created_at: new Date().toISOString()
+            }
+          ],
+          deadlines: [
+            {
+              id: "demo-deadline-1",
+              company_id: "demo-company-1",
+              title: "Monthly System Review",
+              due_date: new Date(Date.now() + 10 * 24 * 60 * 60 * 1000).toISOString(),
+              created_at: new Date().toISOString()
+            }
+          ],
+          roles: [
+            { id: "demo-role-1", role: "admin", user_id: user.id },
+            { id: "demo-role-2", role: "manager", user_id: "demo-user-2" },
+            { id: "demo-role-3", role: "user", user_id: "demo-user-3" }
+          ],
+          drafts: [
+            {
+              id: "demo-draft-1",
+              user_id: user.id,
+              status: "draft", 
+              document_type: "system_report",
+              created_at: new Date().toISOString()
+            }
+          ]
+        };
+      }
+      
       try {
         return await workspaceBackendRequest<{
           companies: Array<{ id: string; name: string; industry: string | null; compliance_health: number | null; created_at: string }>;
@@ -30,7 +99,6 @@ const AppAdminDashboard = () => {
         }>("/admin/dashboard");
       } catch (error) {
         console.error("Failed to load admin dashboard data:", error);
-        // Don't return demo data - show proper error message
         throw new Error("Unable to load admin dashboard data. Please check system configuration.");
       }
     },

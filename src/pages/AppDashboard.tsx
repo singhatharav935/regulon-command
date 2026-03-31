@@ -39,6 +39,80 @@ const AppDashboard = () => {
       if (!user?.id) {
         throw new Error("User is not authenticated");
       }
+      
+      // Check if we're in demo mode
+      const isDemoMode = import.meta.env.VITE_ENABLE_PREVIEW_BYPASS === "true" || 
+                        user.id.startsWith("local_");
+      
+      if (isDemoMode) {
+        // Return demo data for company owner role
+        return {
+          company: { 
+            name: "Your Demo Company", 
+            industry: "Technology", 
+            compliance_health: 75 
+          },
+          exposures: [
+            { regulator: "GST Department", status: "compliant", notes: "All filings up to date" },
+            { regulator: "Income Tax Department", status: "attention", notes: "Pending return review" }
+          ],
+          tasks: [
+            {
+              id: "demo-task-1",
+              title: "Monthly GST Filing", 
+              regulator: "GST Department",
+              priority: "high",
+              status: "pending",
+              due_date: new Date(Date.now() + 7 * 24 * 60 * 60 * 1000).toISOString()
+            },
+            {
+              id: "demo-task-2",
+              title: "Quarterly IT Return",
+              regulator: "Income Tax Department", 
+              priority: "medium",
+              status: "in_progress",
+              due_date: new Date(Date.now() + 14 * 24 * 60 * 60 * 1000).toISOString()
+            }
+          ],
+          documents: [
+            {
+              id: "demo-doc-1",
+              name: "Business Registration Certificate",
+              file_type: "pdf",
+              regulator: "ROC",
+              status: "verified", 
+              created_at: new Date().toISOString()
+            }
+          ],
+          deadlines: [
+            {
+              id: "demo-deadline-1",
+              title: "GST Return Filing",
+              regulator: "GST Department",
+              due_date: new Date(Date.now() + 5 * 24 * 60 * 60 * 1000).toISOString(),
+              is_recurring: true
+            }
+          ],
+          draftRuns: [
+            {
+              id: "demo-draft-1",
+              document_type: "compliance_report",
+              draft_mode: "ai_assisted", 
+              status: "draft",
+              created_at: new Date().toISOString()
+            }
+          ],
+          draftAuditEvents: [
+            {
+              id: "demo-audit-1",
+              draft_run_id: "demo-draft-1",
+              event_type: "created",
+              created_at: new Date().toISOString()
+            }
+          ]
+        };
+      }
+      
       try {
         return await workspaceBackendRequest<{
           company: { name: string; industry: string | null; compliance_health: number | null } | null;
@@ -51,7 +125,6 @@ const AppDashboard = () => {
         }>("/company/dashboard");
       } catch (error) {
         console.error("Failed to load dashboard data:", error);
-        // Don't return demo data - let error handling show proper message
         throw new Error("Unable to load dashboard data. Please complete your company setup first.");
       }
     },
