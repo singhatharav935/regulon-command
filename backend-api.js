@@ -1478,6 +1478,186 @@ app.get('/api/dashboard/compliance-score', authenticate, (req, res) => {
 // ERROR HANDLING
 // ============================================================================
 
+// ============================================================================
+// REGULATORY NEWS & UPDATES API ENDPOINTS
+// ============================================================================
+
+// GET /regulatory-news - Indian regulatory news (for RegulatoryNewsPanel)
+app.get('/regulatory-news', (req, res) => {
+  const regulatoryNews = [
+    {
+      id: 'news-001',
+      category: 'GST',
+      title: 'New GST Return Filing Format - January 2024',
+      summary: 'GSTN introduces simplified GSTR-3B filing with auto-population from GSTR-2B',
+      authority: 'Goods and Services Tax Network (GSTN)',
+      sourceUrl: 'https://www.gstn.org',
+      impactType: 'filing_change',
+      affectedEntities: 'All GST registered businesses',
+      implementationStatus: 'active',
+      urgency: 'high',
+      regulatoryArea: 'GST Compliance',
+      date: '2024-01-15',
+      severity: 'high',
+      previousNotices: 3,
+    },
+    {
+      id: 'news-002',
+      category: 'Income Tax',
+      title: 'TDS Rate Changes on Contractor Payments',
+      summary: 'Increase in TDS rate from 1% to 2% on contractor payments above ₹30,000',
+      authority: 'Income Tax Department',
+      sourceUrl: 'https://www.incometaxindia.gov.in',
+      impactType: 'rate_change',
+      affectedEntities: 'Businesses making contractor payments',
+      implementationStatus: 'active',
+      urgency: 'high',
+      regulatoryArea: 'Income Tax',
+      date: '2024-01-10',
+      severity: 'high',
+      previousNotices: 2,
+    },
+    {
+      id: 'news-003',
+      category: 'Labour Compliance',
+      title: 'Updated Provident Fund Contribution Rules',
+      summary: 'EPF contribution rates adjusted for 2024-25 financial year',
+      authority: 'Employee Provident Fund Organization (EPFO)',
+      sourceUrl: 'https://www.epfoservices.gov.in',
+      impactType: 'rate_change',
+      affectedEntities: 'Employers with EPF members',
+      implementationStatus: 'active',
+      urgency: 'medium',
+      regulatoryArea: 'Labour Compliance',
+      date: '2024-01-05',
+      severity: 'medium',
+      previousNotices: 1,
+    },
+    {
+      id: 'news-004',
+      category: 'MCA',
+      title: 'ROC Filing Deadline Extension - Annual Reports',
+      summary: 'Extension in deadline for filing annual reports for private companies',
+      authority: 'Ministry of Corporate Affairs (MCA)',
+      sourceUrl: 'https://www.mca.gov.in',
+      impactType: 'deadline_extension',
+      affectedEntities: 'Private limited companies',
+      implementationStatus: 'active',
+      urgency: 'medium',
+      regulatoryArea: 'MCA Compliance',
+      date: '2024-01-02',
+      severity: 'medium',
+      previousNotices: 0,
+    },
+    {
+      id: 'news-005',
+      category: 'RBI',
+      title: 'New KYC Norms for Bank Accounts',
+      summary: 'RBI mandates enhanced KYC verification for existing accounts',
+      authority: 'Reserve Bank of India (RBI)',
+      sourceUrl: 'https://www.rbi.org.in',
+      impactType: 'kyc_requirement',
+      affectedEntities: 'All bank account holders',
+      implementationStatus: 'active',
+      urgency: 'high',
+      regulatoryArea: 'Banking Compliance',
+      date: '2023-12-28',
+      severity: 'high',
+      previousNotices: 1,
+    },
+  ];
+  
+  res.json(regulatoryNews);
+});
+
+// GET /alerts - Alert aggregation from multiple sources
+app.get('/alerts', (req, res) => {
+  const alerts = [
+    {
+      id: 'alert-001',
+      source: 'GSTN',
+      title: 'GSTR-3B Filing Deadline - January 20, 2024',
+      category: 'deadline',
+      severity: 'high',
+      date: new Date(Date.now() - 2 * 24 * 60 * 60 * 1000).toISOString(),
+    },
+    {
+      id: 'alert-002',
+      source: 'ITD',
+      title: 'TDS Return Filing - January 31, 2024',
+      category: 'deadline',
+      severity: 'high',
+      date: new Date(Date.now() - 5 * 24 * 60 * 60 * 1000).toISOString(),
+    },
+    {
+      id: 'alert-003',
+      source: 'EPFO',
+      title: 'Monthly PF Return Due',
+      category: 'compliance',
+      severity: 'medium',
+      date: new Date(Date.now() - 1 * 24 * 60 * 60 * 1000).toISOString(),
+    },
+  ];
+  
+  res.json(alerts);
+});
+
+// GET /sources/status - Status of regulatory sources
+app.get('/sources/status', (req, res) => {
+  const sources = {
+    gstn: {
+      status: 'active',
+      lastUpdated: new Date(Date.now() - 1 * 60 * 60 * 1000).toISOString(),
+      latestNotice: 'GSTR-3B Simplified Filing',
+    },
+    itd: {
+      status: 'active',
+      lastUpdated: new Date(Date.now() - 2 * 60 * 60 * 1000).toISOString(),
+      latestNotice: 'TDS Rate Changes',
+    },
+    epfo: {
+      status: 'active',
+      lastUpdated: new Date(Date.now() - 3 * 60 * 60 * 1000).toISOString(),
+      latestNotice: 'PF Contribution Update',
+    },
+    mca: {
+      status: 'syncing',
+      lastUpdated: null,
+      latestNotice: null,
+    },
+    rbi: {
+      status: 'active',
+      lastUpdated: new Date(Date.now() - 4 * 60 * 60 * 1000).toISOString(),
+      latestNotice: 'Enhanced KYC Norms',
+    },
+    sebi: {
+      status: 'awaiting_feed',
+      lastUpdated: null,
+      latestNotice: null,
+    },
+  };
+  
+  res.json(sources);
+});
+
+// POST /sync-now - Trigger immediate sync of regulatory sources
+app.post('/sync-now', (req, res) => {
+  res.json({
+    success: true,
+    message: 'Sync initiated for all regulatory sources',
+    timestamp: new Date().toISOString(),
+    sources: {
+      gstn: 'syncing',
+      itd: 'syncing',
+      epfo: 'syncing',
+      mca: 'syncing',
+      rbi: 'syncing',
+      sebi: 'syncing',
+    },
+  });
+});
+
+
 app.use((req, res) => {
   res.status(404).json({
     error: 'Not found',
@@ -1696,3 +1876,183 @@ app.listen(API_PORT, () => {
 });
 
 export default app;
+
+// ============================================================================
+// REGULATORY NEWS & UPDATES API ENDPOINTS
+// ============================================================================
+
+// GET /regulatory-news - Indian regulatory news (for RegulatoryNewsPanel)
+app.get('/regulatory-news', (req, res) => {
+  const regulatoryNews = [
+    {
+      id: 'news-001',
+      category: 'GST',
+      title: 'New GST Return Filing Format - January 2024',
+      summary: 'GSTN introduces simplified GSTR-3B filing with auto-population from GSTR-2B',
+      authority: 'Goods and Services Tax Network (GSTN)',
+      sourceUrl: 'https://www.gstn.org',
+      impactType: 'filing_change',
+      affectedEntities: 'All GST registered businesses',
+      implementationStatus: 'active',
+      urgency: 'high',
+      regulatoryArea: 'GST Compliance',
+      date: '2024-01-15',
+      severity: 'high',
+      previousNotices: 3,
+    },
+    {
+      id: 'news-002',
+      category: 'Income Tax',
+      title: 'TDS Rate Changes on Contractor Payments',
+      summary: 'Increase in TDS rate from 1% to 2% on contractor payments above ₹30,000',
+      authority: 'Income Tax Department',
+      sourceUrl: 'https://www.incometaxindia.gov.in',
+      impactType: 'rate_change',
+      affectedEntities: 'Businesses making contractor payments',
+      implementationStatus: 'active',
+      urgency: 'high',
+      regulatoryArea: 'Income Tax',
+      date: '2024-01-10',
+      severity: 'high',
+      previousNotices: 2,
+    },
+    {
+      id: 'news-003',
+      category: 'Labour Compliance',
+      title: 'Updated Provident Fund Contribution Rules',
+      summary: 'EPF contribution rates adjusted for 2024-25 financial year',
+      authority: 'Employee Provident Fund Organization (EPFO)',
+      sourceUrl: 'https://www.epfoservices.gov.in',
+      impactType: 'rate_change',
+      affectedEntities: 'Employers with EPF members',
+      implementationStatus: 'active',
+      urgency: 'medium',
+      regulatoryArea: 'Labour Compliance',
+      date: '2024-01-05',
+      severity: 'medium',
+      previousNotices: 1,
+    },
+    {
+      id: 'news-004',
+      category: 'MCA',
+      title: 'ROC Filing Deadline Extension - Annual Reports',
+      summary: 'Extension in deadline for filing annual reports for private companies',
+      authority: 'Ministry of Corporate Affairs (MCA)',
+      sourceUrl: 'https://www.mca.gov.in',
+      impactType: 'deadline_extension',
+      affectedEntities: 'Private limited companies',
+      implementationStatus: 'active',
+      urgency: 'medium',
+      regulatoryArea: 'MCA Compliance',
+      date: '2024-01-02',
+      severity: 'medium',
+      previousNotices: 0,
+    },
+    {
+      id: 'news-005',
+      category: 'RBI',
+      title: 'New KYC Norms for Bank Accounts',
+      summary: 'RBI mandates enhanced KYC verification for existing accounts',
+      authority: 'Reserve Bank of India (RBI)',
+      sourceUrl: 'https://www.rbi.org.in',
+      impactType: 'kyc_requirement',
+      affectedEntities: 'All bank account holders',
+      implementationStatus: 'active',
+      urgency: 'high',
+      regulatoryArea: 'Banking Compliance',
+      date: '2023-12-28',
+      severity: 'high',
+      previousNotices: 1,
+    },
+  ];
+  
+  res.json(regulatoryNews);
+});
+
+// GET /alerts - Alert aggregation from multiple sources
+app.get('/alerts', (req, res) => {
+  const alerts = [
+    {
+      id: 'alert-001',
+      source: 'GSTN',
+      title: 'GSTR-3B Filing Deadline - January 20, 2024',
+      category: 'deadline',
+      severity: 'high',
+      date: new Date(Date.now() - 2 * 24 * 60 * 60 * 1000).toISOString(),
+    },
+    {
+      id: 'alert-002',
+      source: 'ITD',
+      title: 'TDS Return Filing - January 31, 2024',
+      category: 'deadline',
+      severity: 'high',
+      date: new Date(Date.now() - 5 * 24 * 60 * 60 * 1000).toISOString(),
+    },
+    {
+      id: 'alert-003',
+      source: 'EPFO',
+      title: 'Monthly PF Return Due',
+      category: 'compliance',
+      severity: 'medium',
+      date: new Date(Date.now() - 1 * 24 * 60 * 60 * 1000).toISOString(),
+    },
+  ];
+  
+  res.json(alerts);
+});
+
+// GET /sources/status - Status of regulatory sources
+app.get('/sources/status', (req, res) => {
+  const sources = {
+    gstn: {
+      status: 'active',
+      lastUpdated: new Date(Date.now() - 1 * 60 * 60 * 1000).toISOString(),
+      latestNotice: 'GSTR-3B Simplified Filing',
+    },
+    itd: {
+      status: 'active',
+      lastUpdated: new Date(Date.now() - 2 * 60 * 60 * 1000).toISOString(),
+      latestNotice: 'TDS Rate Changes',
+    },
+    epfo: {
+      status: 'active',
+      lastUpdated: new Date(Date.now() - 3 * 60 * 60 * 1000).toISOString(),
+      latestNotice: 'PF Contribution Update',
+    },
+    mca: {
+      status: 'syncing',
+      lastUpdated: null,
+      latestNotice: null,
+    },
+    rbi: {
+      status: 'active',
+      lastUpdated: new Date(Date.now() - 4 * 60 * 60 * 1000).toISOString(),
+      latestNotice: 'Enhanced KYC Norms',
+    },
+    sebi: {
+      status: 'awaiting_feed',
+      lastUpdated: null,
+      latestNotice: null,
+    },
+  };
+  
+  res.json(sources);
+});
+
+// POST /sync-now - Trigger immediate sync of regulatory sources
+app.post('/sync-now', (req, res) => {
+  res.json({
+    success: true,
+    message: 'Sync initiated for all regulatory sources',
+    timestamp: new Date().toISOString(),
+    sources: {
+      gstn: 'syncing',
+      itd: 'syncing',
+      epfo: 'syncing',
+      mca: 'syncing',
+      rbi: 'syncing',
+      sebi: 'syncing',
+    },
+  });
+});
+

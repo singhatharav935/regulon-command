@@ -1,4 +1,6 @@
 import { useState, useEffect } from "react";
+// Patch for Index.tsx - add live sync import
+import { getLiveRegulatedAnnouncements } from "@/lib/index-live-sync";
 import { useQuery } from "@tanstack/react-query";
 import { useLocation } from "react-router-dom";
 import CinematicEntry from "@/components/CinematicEntry";
@@ -181,50 +183,57 @@ const Index = () => {
     queryKey: ["public-regulatory-announcements"],
     queryFn: async () => {
       try {
-        const backendData = await workspacePublicRequest<{
-          announcements: Array<{
-            id: string;
-            source: string;
-            source_label: string;
-            title: string;
-            summary: string | null;
-            category: string | null;
-            announced_by: string;
-            source_url: string | null;
-            announced_on: string;
-            published_date: string | null;
-            detected_at: string | null;
-            effective_date: string | null;
-            action_deadline: string | null;
-            impact_score: number;
-            company_exposure: "low" | "medium" | "high";
-            action_owner: string;
-            original_url: string | null;
-            source_verified: boolean;
-          }>;
-          last_synced_at: string | null;
-          monitored_portals: number;
-          sync_status: "agent_active" | "awaiting_first_sync";
-          source_status: Array<{
-            source: string;
-            source_label: string;
-            status: "active" | "awaiting_feed";
-            latest_notice_at: string | null;
-            latest_notice_title: string | null;
-          }>;
-        }>("/public/regulatory-announcements?limit=12");
+        // LIVE: Fetch from government portals every minute
+        const liveData = await getLiveRegulatedAnnouncements();
+        return liveData;
+      } catch (liveError) {
+        try {
+          // Fallback: Try backend
+          const backendData = await workspacePublicRequest<{
+            announcements: Array<{
+              id: string;
+              source: string;
+              source_label: string;
+              title: string;
+              summary: string | null;
+              category: string | null;
+              announced_by: string;
+              source_url: string | null;
+              announced_on: string;
+              published_date: string | null;
+              detected_at: string | null;
+              effective_date: string | null;
+              action_deadline: string | null;
+              impact_score: number;
+              company_exposure: "low" | "medium" | "high";
+              action_owner: string;
+              original_url: string | null;
+              source_verified: boolean;
+            }>;
+            last_synced_at: string | null;
+            monitored_portals: number;
+            sync_status: "agent_active" | "awaiting_first_sync";
+            source_status: Array<{
+              source: string;
+              source_label: string;
+              status: "active" | "awaiting_feed";
+              latest_notice_at: string | null;
+              latest_notice_title: string | null;
+            }>;
+          }>("/public/regulatory-announcements?limit=12");
 
-        if (Array.isArray(backendData.announcements) && backendData.announcements.length > 0) {
-          return backendData;
+          if (Array.isArray(backendData.announcements) && backendData.announcements.length > 0) {
+            return backendData;
+          }
+
+          return await buildLocalAgentPayload();
+        } catch {
+          return await buildLocalAgentPayload();
         }
-
-        return await buildLocalAgentPayload();
-      } catch {
-        return await buildLocalAgentPayload();
       }
     },
-    staleTime: 60_000,
-    refetchInterval: 15_000,
+    staleTime: 0, // Always fresh
+    refetchInterval: 60000, // Refresh every 60 seconds (1 minute)
     retry: 1,
   });
 

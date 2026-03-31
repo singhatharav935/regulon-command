@@ -1,10 +1,10 @@
 import { Link, useLocation } from "react-router-dom";
 import { motion } from "framer-motion";
-import { Building2, Briefcase, Shield, Home, ChevronRight, GraduationCap } from "lucide-react";
+import { Building2, Briefcase, Shield, Home, ChevronRight } from "lucide-react";
 import { cn } from "@/lib/utils";
 
 interface DashboardTypeNavProps {
-  activeType: "company" | "ca" | "admin" | "university" | "ca-firm";
+  activeType: "company" | "ca" | "admin" | "ca-firm";
   routePrefix?: string;
 }
 
@@ -31,13 +31,6 @@ const dashboardTypes = [
     description: "Platform administration & oversight"
   },
   {
-    id: "university",
-    label: "University Dashboard",
-    href: "/university",
-    icon: GraduationCap,
-    description: "Campus operations & compliance command"
-  },
-  {
     id: "ca-firm",
     label: "CA Firm Dashboard",
     href: "/ca-firm-dashboard",
@@ -48,9 +41,6 @@ const dashboardTypes = [
 
 const DashboardTypeNav = ({ activeType, routePrefix = "" }: DashboardTypeNavProps) => {
   const withPrefix = (href: string, id: string) => {
-    if (id === "university") {
-      return routePrefix ? "/app/university" : "/university-demo";
-    }
     if (id === "ca-firm") {
       return routePrefix ? "/app/ca-firm-dashboard" : "/ca-firm-dashboard";
     }

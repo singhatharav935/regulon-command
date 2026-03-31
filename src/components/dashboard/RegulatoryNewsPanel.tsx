@@ -12,9 +12,12 @@ import {
   Building2,
   ChevronDown,
   ChevronUp,
+  RefreshCw,
 } from "lucide-react";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Badge } from "@/components/ui/badge";
+import { Button } from "@/components/ui/button";
+import { fetchLiveRegulatoryNews } from "@/lib/live-regulatory-data";
 
 interface NewsItem {
   id: string;
@@ -39,110 +42,35 @@ const RegulatoryNewsPanel = () => {
   const [isExpanded, setIsExpanded] = useState(false);
   const [expandedId, setExpandedId] = useState<string | null>(null);
   const [error, setError] = useState<string | null>(null);
+  const [lastRefresh, setLastRefresh] = useState<Date>(new Date());
+  const [refreshing, setRefreshing] = useState(false);
+
+  const fetchNews = async () => {
+    try {
+      setRefreshing(true);
+      const liveNews = await fetchLiveRegulatoryNews();
+      setNews(liveNews);
+      setError(null);
+      setLastRefresh(new Date());
+    } catch (err) {
+      setError(err instanceof Error ? err.message : "Failed to load news");
+      setNews([]);
+    } finally {
+      setRefreshing(false);
+    }
+  };
 
   useEffect(() => {
-    const fetchNews = async () => {
-      try {
-        setLoading(true);
-        // Mock data for Indian regulatory news - past 1 month compliance updates
-        const mockNews: NewsItem[] = [
-          {
-            id: "news-001",
-            category: "GST",
-            title: "New GST Return Filing Format - GSTR-3B Auto-Population",
-            summary: "GSTN introduces simplified GSTR-3B filing with auto-population from GSTR-2B. Reduces manual entry errors.",
-            authority: "Goods and Services Tax Network (GSTN)",
-            sourceUrl: "https://www.gstn.org/news",
-            impactType: "filing_change",
-            affectedEntities: "All GST registered businesses",
-            implementationStatus: "active",
-            urgency: "high",
-            regulatoryArea: "GST Compliance",
-            date: "2024-03-01",
-            severity: "high",
-            previousNotices: 3,
-          },
-          {
-            id: "news-002",
-            category: "Income Tax",
-            title: "TDS Rate Changes on Contractor Payments",
-            summary: "Increase in TDS rate from 1% to 2% on contractor payments above ₹30,000.",
-            authority: "Income Tax Department",
-            sourceUrl: "https://www.incometaxindia.gov.in/notices",
-            impactType: "rate_change",
-            affectedEntities: "Businesses making contractor payments",
-            implementationStatus: "active",
-            urgency: "high",
-            regulatoryArea: "Income Tax",
-            date: "2024-02-28",
-            severity: "high",
-            previousNotices: 2,
-          },
-          {
-            id: "news-003",
-            category: "Labour Compliance",
-            title: "Updated Provident Fund Contribution Rates FY 2024-25",
-            summary: "EPF contribution rates adjusted. Employee contribution increased by 0.5%.",
-            authority: "Employee Provident Fund Organization (EPFO)",
-            sourceUrl: "https://www.epfo.gov.in",
-            impactType: "rate_change",
-            affectedEntities: "Employers with EPF members",
-            implementationStatus: "active",
-            urgency: "medium",
-            regulatoryArea: "Labour Compliance",
-            date: "2024-02-15",
-            severity: "medium",
-            previousNotices: 1,
-          },
-          {
-            id: "news-004",
-            category: "MCA",
-            title: "E-Filing Requirements - Digital Signature Mandatory",
-            summary: "All MCA filings require advanced e-signature. Class 2 certificates no longer accepted.",
-            authority: "Ministry of Corporate Affairs (MCA)",
-            sourceUrl: "https://www.mca.gov.in",
-            impactType: "compliance_requirement",
-            affectedEntities: "Private limited companies",
-            implementationStatus: "active",
-            urgency: "high",
-            regulatoryArea: "MCA Compliance",
-            date: "2024-02-10",
-            severity: "medium",
-            previousNotices: 0,
-          },
-          {
-            id: "news-005",
-            category: "RBI",
-            title: "Enhanced KYC Verification for Bank Accounts",
-            summary: "RBI mandates face-to-face verification. Video KYC accepted as alternative.",
-            authority: "Reserve Bank of India (RBI)",
-            sourceUrl: "https://www.rbi.org.in",
-            impactType: "kyc_requirement",
-            affectedEntities: "All bank account holders",
-            implementationStatus: "active",
-            urgency: "high",
-            regulatoryArea: "Banking Compliance",
-            date: "2024-03-05",
-            severity: "high",
-            previousNotices: 1,
-          },
-        ];
-        
-        setNews(mockNews);
-        setError(null);
-      } catch (err) {
-        setError(err instanceof Error ? err.message : "Failed to load news");
-        setNews([]);
-      } finally {
-        setLoading(false);
-      }
-    };
-
     fetchNews();
+    
+    // Refresh every 1 minute (60000 ms)
     const interval = setInterval(fetchNews, 60000);
     return () => clearInterval(interval);
   }, []);
 
+  useEffect(() => {
+    setLoading(false);
+  }, []);
 
   const getSeverityIcon = (severity: string) => {
     switch (severity) {
@@ -175,6 +103,13 @@ const RegulatoryNewsPanel = () => {
     });
   };
 
+  const formatTime = (date: Date) => {
+    return date.toLocaleTimeString("en-IN", {
+      hour: "2-digit",
+      minute: "2-digit",
+    });
+  };
+
   return (
     <Card className="border-purple-500/30 bg-gradient-to-br from-slate-950 via-slate-900 to-slate-950">
       {/* Collapsible Header */}
@@ -184,27 +119,50 @@ const RegulatoryNewsPanel = () => {
       >
         <div className="flex items-center justify-between">
           <div className="flex items-center gap-3 flex-1">
-            <Globe className="w-5 h-5 text-purple-400 animate-pulse" />
+            <div className="relative">
+              <Globe className="w-5 h-5 text-purple-400" />
+              {!refreshing && (
+                <motion.div
+                  className="absolute inset-0 rounded-full border border-purple-400"
+                  animate={{ scale: [1, 1.3], opacity: [1, 0] }}
+                  transition={{ duration: 2, repeat: Infinity }}
+                />
+              )}
+            </div>
             <div className="flex-1">
               <div className="flex items-center gap-2">
                 <CardTitle className="text-sm text-white">
                   Indian Regulatory News
                 </CardTitle>
-                <Badge variant="outline" className="bg-purple-500/20 border-purple-500/50 text-purple-300 text-xs">
-                  {news.length}
+                <Badge variant="outline" className="bg-purple-500/20 border-purple-500/50 text-purple-300 text-xs animate-pulse">
+                  {news.length} LIVE
                 </Badge>
               </div>
               <p className="text-xs text-gray-400 mt-0.5">
-                {isExpanded ? "Click to collapse" : "Click to view major changes from past 30 days"}
+                {isExpanded ? "Click to collapse" : `Live from government portals • Last updated: ${formatTime(lastRefresh)}`}
               </p>
             </div>
           </div>
-          <motion.div
-            animate={{ rotate: isExpanded ? 180 : 0 }}
-            transition={{ duration: 0.2 }}
-          >
-            <ChevronDown className="w-5 h-5 text-purple-400" />
-          </motion.div>
+          <div className="flex items-center gap-2">
+            <Button
+              size="sm"
+              variant="ghost"
+              className="h-8 w-8 p-0"
+              onClick={(e) => {
+                e.stopPropagation();
+                fetchNews();
+              }}
+              disabled={refreshing}
+            >
+              <RefreshCw className={`w-4 h-4 ${refreshing ? 'animate-spin' : ''}`} />
+            </Button>
+            <motion.div
+              animate={{ rotate: isExpanded ? 180 : 0 }}
+              transition={{ duration: 0.2 }}
+            >
+              <ChevronDown className="w-5 h-5 text-purple-400" />
+            </motion.div>
+          </div>
         </div>
       </CardHeader>
 
@@ -221,6 +179,7 @@ const RegulatoryNewsPanel = () => {
               {loading ? (
                 <div className="flex items-center justify-center py-8">
                   <div className="animate-spin rounded-full h-6 w-6 border-b-2 border-purple-400" />
+                  <span className="ml-2 text-sm text-gray-400">Fetching live news from government portals...</span>
                 </div>
               ) : error ? (
                 <div className="bg-rose-500/10 border border-rose-500/30 rounded-lg p-3 text-rose-300 text-xs">
@@ -228,7 +187,7 @@ const RegulatoryNewsPanel = () => {
                 </div>
               ) : news.length === 0 ? (
                 <div className="text-center py-6 text-gray-400 text-sm">
-                  No regulatory updates in past 30 days
+                  No regulatory updates found. Checking portals...
                 </div>
               ) : (
                 <div className="space-y-2 max-h-96 overflow-y-auto">
@@ -267,12 +226,15 @@ const RegulatoryNewsPanel = () => {
                                     <Badge
                                       variant="outline"
                                       className={`text-xs ${
-                                        item.urgency === "High"
+                                        item.urgency === "high"
                                           ? "bg-rose-900/40 border-rose-600/60 text-rose-200"
                                           : "bg-amber-900/40 border-amber-600/60 text-amber-200"
                                       }`}
                                     >
-                                      {item.urgency}
+                                      {item.urgency.toUpperCase()}
+                                    </Badge>
+                                    <Badge variant="outline" className="text-xs bg-green-900/40 border-green-600/60 text-green-200">
+                                      LIVE
                                     </Badge>
                                   </div>
                                   <h4 className="text-xs font-semibold text-white line-clamp-1">
@@ -349,6 +311,17 @@ const RegulatoryNewsPanel = () => {
                   </AnimatePresence>
                 </div>
               )}
+              
+              {/* Auto-refresh notice */}
+              <div className="mt-3 text-xs text-gray-500 border-t border-slate-700 pt-2 flex items-center gap-1">
+                <motion.div
+                  animate={{ opacity: [0.5, 1] }}
+                  transition={{ duration: 1, repeat: Infinity }}
+                >
+                  <Globe className="w-3 h-3" />
+                </motion.div>
+                Auto-refreshes every 60 seconds from government portals
+              </div>
             </CardContent>
           </motion.div>
         )}

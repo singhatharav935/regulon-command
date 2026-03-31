@@ -90,24 +90,12 @@ export const AuthProvider = ({ children }: { children: ReactNode }) => {
       const nextRoles = (data ?? []).map((row) => row.role);
       setRoles(sortRoles(nextRoles));
 
-      const supabaseAny = supabase as any;
-      const { data: personaData } = await supabaseAny
-        .from("user_personas")
-        .select("persona")
-        .eq("user_id", activeUser.id)
-        .maybeSingle();
-
-      const nextPersona = personaData?.persona as AppPersona | undefined;
-      if (
-        nextPersona === "external_ca" ||
-        nextPersona === "admin" ||
-        nextPersona === "company_owner" ||
-        nextPersona === "in_house_ca" ||
-        nextPersona === "in_house_lawyer" ||
-        nextPersona === "ca_firm"
-      ) {
-        setPersona(nextPersona);
+      // Check metadata first (stored during signup)
+      const metadataPersona = inferPersonaFromUserMetadata(activeUser);
+      if (metadataPersona) {
+        setPersona(metadataPersona);
       } else {
+        // Fallback to role-based inference
         if (nextRoles.includes("admin")) {
           setPersona("admin");
         } else if (nextRoles.includes("manager")) {
@@ -115,23 +103,37 @@ export const AuthProvider = ({ children }: { children: ReactNode }) => {
         } else if (nextRoles.includes("user")) {
           setPersona("company_owner");
         } else {
-          setPersona(inferPersonaFromUserMetadata(activeUser));
+          setPersona("company_owner"); // Default fallback
         }
       }
 
-      const { data: verificationData } = await supabaseAny
-        .from("user_verifications")
-        .select("status,is_verified")
-        .eq("user_id", activeUser.id)
-        .maybeSingle();
+      // Load verification status from user_verifications table
+      try {
+        const { data: verificationData, error: verificationError } = await supabase
+          .from("user_verifications")
+          .select("status, is_verified")
+          .eq("user_id", activeUser.id)
+          .maybeSingle();
 
-      const nextStatus = verificationData?.status as VerificationStatus | undefined;
-      if (nextStatus === "pending" || nextStatus === "approved" || nextStatus === "rejected") {
-        setVerificationStatus(nextStatus);
-      } else {
+        if (!mounted) return;
+
+        if (verificationError) {
+          // Table might not exist or other error - default to unverified
+          setVerificationStatus(null);
+          setIsVerified(false);
+        } else if (verificationData) {
+          setVerificationStatus(verificationData.status as VerificationStatus);
+          setIsVerified(verificationData.is_verified ?? false);
+        } else {
+          // No verification record exists yet
+          setVerificationStatus("pending");
+          setIsVerified(false);
+        }
+      } catch {
+        // Fallback for any errors
         setVerificationStatus(null);
+        setIsVerified(false);
       }
-      setIsVerified(Boolean(verificationData?.is_verified));
     };
 
     const bootstrap = async () => {

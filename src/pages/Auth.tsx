@@ -1,7 +1,7 @@
 import { useState, useEffect, useRef } from "react";
 import { useLocation, useNavigate, useSearchParams } from "react-router-dom";
 import { motion } from "framer-motion";
-import { Mail, Lock, User, ArrowLeft, Eye, EyeOff, Shield, Briefcase, Building2, Users, Gavel, UserCheck } from "lucide-react";
+import { Mail, Lock, User, ArrowLeft, Eye, EyeOff, Shield, Briefcase, Building2, Users, Gavel, UserCheck, AlertTriangle } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
@@ -10,6 +10,7 @@ import { useToast } from "@/hooks/use-toast";
 import { z } from "zod";
 import { previewBypassEnabled } from "@/lib/runtime-flags";
 import { clearLocalPreviewPersona, setLocalPreviewPersona } from "@/lib/local-preview-auth";
+import { checkRateLimit, recordAttempt, clearRateLimit } from "@/lib/rate-limit";
 
 const emailSchema = z.string().email("Please enter a valid email address");
 const passwordSchema = z.string().min(6, "Password must be at least 6 characters");
@@ -156,8 +157,17 @@ const Auth = () => {
   const [showPassword, setShowPassword] = useState(false);
   const [loading, setLoading] = useState(false);
   const [errors, setErrors] = useState<{ email?: string; password?: string; fullName?: string }>({});
+  const [rateLimitInfo, setRateLimitInfo] = useState<{ isLimited: boolean; retryAfter: string }>({ isLimited: false, retryAfter: '' });
   const submitFailSafeRef = useRef<ReturnType<typeof setTimeout> | null>(null);
   const previewModeEnabled = previewBypassEnabled;
+
+  // Check rate limit on mount and when email changes
+  useEffect(() => {
+    if (email) {
+      const status = checkRateLimit('login', email);
+      setRateLimitInfo({ isLimited: status.isLimited, retryAfter: status.retryAfterFormatted });
+    }
+  }, [email]);
 
   useEffect(() => {
     const syncMode = searchParams.get("mode") === "signup" ? "signup" : "login";
@@ -215,6 +225,31 @@ const Auth = () => {
     if (loading) return;
     if (!validateForm()) return;
 
+    // Check rate limit before attempting login
+    if (mode === "login") {
+      const rateLimitStatus = checkRateLimit('login', email);
+      if (rateLimitStatus.isLimited) {
+        setRateLimitInfo({ isLimited: true, retryAfter: rateLimitStatus.retryAfterFormatted });
+        toast({
+          title: "Too many attempts",
+          description: `Please wait ${rateLimitStatus.retryAfterFormatted} before trying again.`,
+          variant: "destructive",
+        });
+        return;
+      }
+      // Record the attempt
+      const attemptResult = recordAttempt('login', email);
+      if (attemptResult.isBlocked) {
+        setRateLimitInfo({ isLimited: true, retryAfter: attemptResult.blockedUntilFormatted });
+        toast({
+          title: "Account temporarily locked",
+          description: `Too many failed attempts. Try again in ${attemptResult.blockedUntilFormatted}.`,
+          variant: "destructive",
+        });
+        return;
+      }
+    }
+
     setLoading(true);
     submitFailSafeRef.current = setTimeout(() => {
       setLoading(false);
@@ -253,6 +288,9 @@ const Auth = () => {
         }
         if (loginError) throw loginError;
         clearLocalPreviewPersona();
+        // Clear rate limit on successful login
+        clearRateLimit('login', email);
+        setRateLimitInfo({ isLimited: false, retryAfter: '' });
 
         const {
           data: { user: activeUser },
@@ -288,19 +326,8 @@ const Auth = () => {
         if (error) throw error;
         clearLocalPreviewPersona();
 
-        if (data.user) {
-          const supabaseAny = supabase as any;
-          await supabaseAny.from("user_verifications").upsert({
-            user_id: data.user.id,
-            persona: selectedPersona,
-            entity_name: entityName,
-            registration_number: registrationNumber || null,
-            license_number: licenseNumber || null,
-            jurisdiction: jurisdiction,
-            status: "pending",
-            is_verified: false,
-          }, { onConflict: "user_id" });
-        }
+        // Persona is already stored in user_metadata.registration_role during signup
+        // No need to write to non-existent tables
 
         if (data.session) {
           toast({ title: "Account created", description: "Complete verification to unlock dashboard access." });
@@ -412,6 +439,19 @@ const Auth = () => {
           </div>
 
           <form onSubmit={handleSubmit} className="space-y-4">
+            {/* Rate limit warning */}
+            {rateLimitInfo.isLimited && mode === "login" && (
+              <div className="rounded-lg border border-destructive/50 bg-destructive/10 p-4 flex items-start gap-3">
+                <AlertTriangle className="w-5 h-5 text-destructive mt-0.5" />
+                <div>
+                  <p className="font-medium text-destructive">Too many login attempts</p>
+                  <p className="text-sm text-muted-foreground">
+                    For security, please wait {rateLimitInfo.retryAfter} before trying again.
+                  </p>
+                </div>
+              </div>
+            )}
+
             {mode === "signup" && (
               <>
                 <div className="space-y-2">
@@ -470,10 +510,22 @@ const Auth = () => {
               {errors.password && <p className="text-xs text-destructive">{errors.password}</p>}
             </div>
 
-            <Button type="submit" className="w-full btn-glow" disabled={loading}>
-              {loading ? "Please wait..." : mode === "login" ? `Login as ${selectedPersona.replaceAll("_", " ")}` : `Register as ${selectedPersona.replaceAll("_", " ")}`}
+            <Button type="submit" className="w-full btn-glow" disabled={loading || (rateLimitInfo.isLimited && mode === "login")}>
+              {loading ? "Please wait..." : rateLimitInfo.isLimited && mode === "login" ? `Try again in ${rateLimitInfo.retryAfter}` : mode === "login" ? `Login as ${selectedPersona.replaceAll("_", " ")}` : `Register as ${selectedPersona.replaceAll("_", " ")}`}
             </Button>
           </form>
+
+          {mode === "login" && (
+            <div className="mt-4 text-center">
+              <button
+                type="button"
+                onClick={() => navigate("/auth/forgot-password")}
+                className="text-sm text-cyan-400 hover:underline"
+              >
+                Forgot your password?
+              </button>
+            </div>
+          )}
 
           <div className="mt-6 pt-6 border-t border-border flex items-center justify-center gap-2 text-xs text-muted-foreground">
             <Shield className="w-3 h-3" />

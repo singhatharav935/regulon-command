@@ -6,11 +6,27 @@ import { BrowserRouter, Routes, Route } from "react-router-dom";
 import { Suspense, lazy } from "react";
 import Index from "./pages/Index";
 import Auth from "./pages/Auth";
+import ForgotPassword from "./pages/ForgotPassword";
+import ResetPassword from "./pages/ResetPassword";
+import TermsOfService from "./pages/TermsOfService";
+import PrivacyPolicy from "./pages/PrivacyPolicy";
+import Disclaimers from "./pages/Disclaimers";
 import NotFound from "./pages/NotFound";
 import MarketingOptionPage from "./pages/MarketingOptionPage";
 import { AuthProvider } from "./hooks/use-auth";
 import ProtectedRoute from "./components/auth/ProtectedRoute";
 import RoleLandingRoute from "./components/auth/RoleLandingRoute";
+import { PersonaAuthProvider } from "./lib/persona-auth-context";
+import { PersonaRoute } from "./components/auth/PersonaRoute";
+import { PersonaSelector } from "./components/auth/PersonaSelector";
+import { ExternalCADashboard } from "./pages/dashboards/ExternalCADashboard";
+import { ExternalCADashboardFull } from "./pages/dashboards/phases/ExternalCADashboardFull";
+// import { CAFirmDashboardFull } from "./pages/dashboards/phases/CAFirmDashboardFull";
+import { InhouseCADashboard } from "./pages/dashboards/InhouseCADashboard";
+import { CAFirmDashboard } from "./pages/dashboards/CAFirmDashboard";
+import { LawyerDashboard } from "./pages/dashboards/LawyerDashboard";
+import { OwnerDashboard } from "./pages/dashboards/OwnerDashboard";
+import { AdminDashboard as PersonaAdminDashboard } from "./pages/dashboards/AdminDashboard";
 
 const Dashboard = lazy(() => import("./pages/Dashboard"));
 const CADashboard = lazy(() => import("./pages/CADashboard"));
@@ -18,8 +34,6 @@ const AdminDashboard = lazy(() => import("./pages/AdminDashboard"));
 const AppDashboard = lazy(() => import("./pages/AppDashboard"));
 const AppCADashboard = lazy(() => import("./pages/AppCADashboard"));
 const AppAdminDashboard = lazy(() => import("./pages/AppAdminDashboard"));
-const UniversityDemoDashboard = lazy(() => import("./pages/UniversityDemoDashboard"));
-const AppUniversityDashboard = lazy(() => import("./pages/AppUniversityDashboard"));
 const AppLegalDashboard = lazy(() => import("./pages/AppLegalDashboard"));
 const AppVerification = lazy(() => import("./pages/AppVerification"));
 const CAFirmDashboard = lazy(() => import("./pages/CAFirmDashboard"));
@@ -47,7 +61,8 @@ const RouteFallback = () => (
 const App = () => (
   <QueryClientProvider client={queryClient}>
     <AuthProvider>
-      <TooltipProvider>
+      <PersonaAuthProvider>
+        <TooltipProvider>
         <Toaster />
         <Sonner />
         <BrowserRouter>
@@ -84,10 +99,15 @@ const App = () => (
             <Route path="/data-retention" element={<LegalPolicyPage docKey="data_retention_policy" fallbackTitle="Data Retention & Deletion Policy" />} />
             <Route path="/compliance" element={<ComplianceCenter />} />
             <Route path="/auth" element={<Auth />} />
+            <Route path="/auth/forgot-password" element={<ForgotPassword />} />
+            <Route path="/auth/reset-password" element={<ResetPassword />} />
+            <Route path="/terms" element={<TermsOfService />} />
+            <Route path="/privacy" element={<PrivacyPolicy />} />
+            <Route path="/disclaimers" element={<Disclaimers />} />
+            <Route path="/persona-selector" element={<PersonaSelector />} />
             <Route path="/dashboard" element={<Dashboard />} />
             <Route path="/ca-dashboard" element={<CADashboard />} />
             <Route path="/admin-dashboard" element={<AdminDashboard />} />
-            <Route path="/university-demo" element={<UniversityDemoDashboard />} />
             <Route path="/ca-firm-dashboard" element={<CAFirmDashboard />} />
             <Route path="/agent-work-review" element={<AgentWorkReview />} />
 
@@ -157,14 +177,6 @@ const App = () => (
               }
             />
             <Route
-              path="/app/university"
-              element={
-                <ProtectedRoute allowRoles={["user", "manager", "admin"]}>
-                  <AppUniversityDashboard />
-                </ProtectedRoute>
-              }
-            />
-            <Route
               path="/app/agent-work-review"
               element={
                 <ProtectedRoute
@@ -177,12 +189,81 @@ const App = () => (
               }
             />
 
+                        {/* New Persona Dashboards - Phase 1-2 */}
+            <Route
+              path="/dashboards/external-ca"
+              element={
+                <PersonaRoute allowedPersonas={["external_ca"]}>
+                  <ExternalCADashboard />
+                </PersonaRoute>
+              }
+            />
+            {/* Phase 3: Full External CA Dashboard with all features */}
+            <Route
+              path="/dashboards/external-ca/full"
+              element={
+                <PersonaRoute allowedPersonas={["external_ca"]}>
+                  <ExternalCADashboardFull />
+                </PersonaRoute>
+              }
+            />
+            <Route
+              path="/dashboards/inhouse-ca"
+              element={
+                <PersonaRoute allowedPersonas={["inhouse_ca"]}>
+                  <InhouseCADashboard />
+                </PersonaRoute>
+              }
+            />
+            <Route
+              path="/dashboards/ca-firm"
+              element={
+                <PersonaRoute allowedPersonas={["ca_firm"]}>
+                  <CAFirmDashboard />
+                </PersonaRoute>
+              }
+            />
+            {/* Phase 3: Full CA Firm Dashboard (coming soon) */}
+            {/* <Route
+              path="/dashboards/ca-firm/full"
+              element={
+                <PersonaRoute allowedPersonas={["ca_firm"]}>
+                  <CAFirmDashboardFull />
+                </PersonaRoute>
+              }
+            /> */}
+            <Route
+              path="/dashboards/lawyer"
+              element={
+                <PersonaRoute allowedPersonas={["inhouse_lawyer"]}>
+                  <LawyerDashboard />
+                </PersonaRoute>
+              }
+            />
+            <Route
+              path="/dashboards/owner"
+              element={
+                <PersonaRoute allowedPersonas={["company_owner"]}>
+                  <OwnerDashboard />
+                </PersonaRoute>
+              }
+            />
+            <Route
+              path="/dashboards/admin"
+              element={
+                <PersonaRoute allowedPersonas={["admin"]}>
+                  <PersonaAdminDashboard />
+                </PersonaRoute>
+              }
+            />
+
             {/* ADD ALL CUSTOM ROUTES ABOVE THE CATCH-ALL "*" ROUTE */}
               <Route path="*" element={<NotFound />} />
             </Routes>
           </Suspense>
         </BrowserRouter>
       </TooltipProvider>
+      </PersonaAuthProvider>
     </AuthProvider>
   </QueryClientProvider>
 );

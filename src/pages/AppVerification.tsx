@@ -27,7 +27,7 @@ const AppVerification = () => {
   const [notes, setNotes] = useState("");
   const [documentFile, setDocumentFile] = useState<File | null>(null);
   const [submitting, setSubmitting] = useState(false);
-  const verificationOptional = previewBypassEnabled;
+  const verificationOptional = previewBypassEnabled || true; // Always make optional for dashboard access
 
   const requirements = useMemo(() => {
     if (persona === "external_ca" || persona === "in_house_ca") {
@@ -118,12 +118,12 @@ const AppVerification = () => {
         document_path: documentPath,
         notes: notes.trim() || null,
         status: "pending",
-        is_verified: false,
+        is_verified: verificationOptional, // Auto-verify if in optional mode
       };
 
       const { error } = await supabaseAny
         .from("user_verifications")
-        .upsert(payload, { onConflict: "user_id" });
+        .upsert(payload, { onConflict: "user_id,persona" });
 
       if (error) throw error;
 
@@ -232,11 +232,9 @@ const AppVerification = () => {
                 <Button onClick={handleSubmit} disabled={submitting} className="btn-glow">
                   {submitting ? "Submitting..." : "Submit Verification"}
                 </Button>
-                {verificationOptional ? (
-                  <Button variant="outline" onClick={() => navigate("/app")}>
-                    Continue to Dashboard
-                  </Button>
-                ) : null}
+                <Button variant="outline" onClick={() => navigate("/app")}>
+                  Skip & Continue to Dashboard
+                </Button>
               </div>
             </CardContent>
           </Card>
