@@ -10,7 +10,7 @@ import { Badge } from "@/components/ui/badge";
 import AIVoiceBriefAgent from "@/components/voice/AIVoiceBriefAgent";
 import RegulonLiveAgent from "@/components/ai/RegulonLiveAgent";
 import { useAuth } from "@/hooks/use-auth";
-import { workspaceBackendRequest } from "@/lib/workspace-backend";
+import { workspaceBackendRequest } from "@/lib/real-backend";
 
 const AppAdminDashboard = () => {
   const { user } = useAuth();

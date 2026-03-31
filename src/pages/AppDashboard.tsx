@@ -22,7 +22,7 @@ import { Input } from "@/components/ui/input";
 import { useToast } from "@/hooks/use-toast";
 import { useAuth } from "@/hooks/use-auth";
 import RuntimeErrorBoundary from "@/components/common/RuntimeErrorBoundary";
-import { getDemoDashboardData, shouldUseLocalDemo } from "@/lib/local-demo-auth";
+import { workspaceBackendRequest } from "@/lib/real-backend";
 
 const AppDashboard = () => {
   const { user } = useAuth();

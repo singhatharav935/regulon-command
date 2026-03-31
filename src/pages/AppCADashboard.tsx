@@ -14,7 +14,7 @@ import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table";
 import { Badge } from "@/components/ui/badge";
 import RuntimeErrorBoundary from "@/components/common/RuntimeErrorBoundary";
-import { workspaceBackendRequest } from "@/lib/workspace-backend";
+import { workspaceBackendRequest } from "@/lib/real-backend";
 
 const statusClass: Record<string, string> = {
   pending: "bg-yellow-500/20 text-yellow-300 border-yellow-500/40",
