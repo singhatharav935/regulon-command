@@ -9,6 +9,7 @@ import { supabase } from "@/integrations/supabase/client";
 import { useToast } from "@/hooks/use-toast";
 import { z } from "zod";
 import { previewBypassEnabled } from "@/lib/runtime-flags";
+import { clearLocalPreviewPersona, setLocalPreviewPersona } from "@/lib/local-preview-auth";
 import { createLocalDemoUser, loginLocalDemoUser, shouldUseLocalDemo } from "@/lib/local-demo-auth";
 import { checkRateLimit, recordAttempt, clearRateLimit } from "@/lib/rate-limit";
 
