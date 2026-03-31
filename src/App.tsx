@@ -11,6 +11,8 @@ import ResetPassword from "./pages/ResetPassword";
 import TermsOfService from "./pages/TermsOfService";
 import PrivacyPolicy from "./pages/PrivacyPolicy";
 import Disclaimers from "./pages/Disclaimers";
+import RefundPolicy from "./pages/RefundPolicy";
+import ComplianceCenterStandalone from "./pages/ComplianceCenterStandalone";
 import NotFound from "./pages/NotFound";
 import MarketingOptionPage from "./pages/MarketingOptionPage";
 import { AuthProvider } from "./hooks/use-auth";
@@ -92,12 +94,11 @@ const App = () => (
             <Route path="/security/soc2-type-ii" element={<AdvancedSecurityPage />} />
             <Route path="/resources" element={<AdvancedResourcesPage />} />
             <Route path="/about" element={<MarketingOptionPage />} />
-            <Route path="/privacy" element={<LegalPolicyPage docKey="privacy_policy" fallbackTitle="Privacy Policy" />} />
-            <Route path="/terms" element={<LegalPolicyPage docKey="terms_of_service" fallbackTitle="Terms of Service" />} />
-            <Route path="/refund-policy" element={<LegalPolicyPage docKey="refund_policy" fallbackTitle="Refund Policy" />} />
-            <Route path="/dpa" element={<LegalPolicyPage docKey="dpa_terms" fallbackTitle="Data Processing Addendum" />} />
-            <Route path="/data-retention" element={<LegalPolicyPage docKey="data_retention_policy" fallbackTitle="Data Retention & Deletion Policy" />} />
-            <Route path="/compliance" element={<ComplianceCenter />} />
+            <Route path="/privacy" element={<PrivacyPolicy />} />
+            <Route path="/terms" element={<TermsOfService />} />
+            <Route path="/disclaimers" element={<Disclaimers />} />
+            <Route path="/refund-policy" element={<RefundPolicy />} />
+            <Route path="/compliance" element={<ComplianceCenterStandalone />} />
             <Route path="/auth" element={<Auth />} />
             <Route path="/auth/forgot-password" element={<ForgotPassword />} />
             <Route path="/auth/reset-password" element={<ResetPassword />} />
