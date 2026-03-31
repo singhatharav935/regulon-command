@@ -1,6 +1,7 @@
 import { useMemo } from "react";
 import { useQuery } from "@tanstack/react-query";
 import { format, parseISO } from "date-fns";
+import { Settings } from "lucide-react";
 import Navbar from "@/components/layout/Navbar";
 import Footer from "@/components/layout/Footer";
 // DashboardTypeNav removed - users should only see their assigned dashboard based on role
@@ -170,8 +171,32 @@ const AppAdminDashboard = () => {
     <div className="min-h-screen bg-background">
       <Navbar />
 
-      <main className="pt-24 pb-16">
-        <div className="container mx-auto px-4 max-w-7xl">
+      <main className="pt-16 pb-12">
+        <div className="container mx-auto px-6 max-w-6xl">
+          
+          {/* Improved Admin Header Layout */}
+          <div className="mb-10">
+            <div className="text-center">
+              <h1 className="text-4xl font-bold text-foreground mb-3">
+                System Administration
+              </h1>
+              <p className="text-lg text-muted-foreground max-w-2xl mx-auto leading-relaxed">
+                REGULON Platform Management Console
+              </p>
+              <div className="mt-4 flex justify-center">
+                <div className="inline-flex items-center gap-2 bg-muted/50 px-4 py-2 rounded-full text-sm">
+                  <Settings className="w-4 h-4" />
+                  Admin Access Level
+                </div>
+              </div>
+            </div>
+          </div>
+
+          <div className="mb-8 p-4 rounded-lg bg-purple-500/10 border border-purple-500/20 text-center">
+            <p className="text-sm text-purple-300">
+              <strong>Production Admin Workspace</strong> - Live tenant data, role oversight, and delivery monitoring.
+            </p>
+          </div>
           {/* Dashboard navigation removed - Admin users access admin panel only */}
 
           <div className="mb-6 p-4 rounded-xl bg-purple-500/10 border border-purple-500/20 text-center">

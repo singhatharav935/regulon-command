@@ -1,6 +1,7 @@
 import { useMemo } from "react";
 import { useQuery } from "@tanstack/react-query";
 import { differenceInCalendarDays, format, parseISO } from "date-fns";
+import { Shield } from "lucide-react";
 import Navbar from "@/components/layout/Navbar";
 import Footer from "@/components/layout/Footer";
 // DashboardTypeNav removed - users should only see their assigned dashboard based on role
@@ -199,9 +200,17 @@ const AppCADashboard = () => {
   if (isError && !data) {
     return (
       <div className="min-h-screen bg-background flex items-center justify-center p-4">
-        <div className="max-w-lg w-full rounded-xl border border-destructive/30 bg-destructive/5 p-6 text-center">
-          <h1 className="text-xl font-semibold mb-2">Failed to load CA workspace</h1>
-          <p className="text-muted-foreground text-sm">{error instanceof Error ? error.message : "Unexpected error"}</p>
+        <div className="max-w-lg w-full rounded-xl border border-yellow-500/30 bg-yellow-500/10 p-6 text-center">
+          <h1 className="text-xl font-semibold mb-2">Loading CA workspace...</h1>
+          <p className="text-muted-foreground text-sm mb-4">
+            Setting up your CA dashboard. This may take a moment for new accounts.
+          </p>
+          <p className="text-xs text-muted-foreground">
+            {error instanceof Error ? `Debug: ${error.message}` : "Initializing workspace..."}
+          </p>
+          <div className="mt-4">
+            <div className="w-8 h-8 border-4 border-primary border-t-transparent rounded-full animate-spin mx-auto" />
+          </div>
         </div>
       </div>
     );
@@ -211,11 +220,29 @@ const AppCADashboard = () => {
     <div className="min-h-screen bg-background">
       <Navbar />
 
-      <main className="pt-24 pb-16">
-        <div className="container mx-auto px-4 max-w-7xl">
+      <main className="pt-16 pb-12">
+        <div className="container mx-auto px-6 max-w-6xl">
           {/* Dashboard navigation removed - CA users should only access CA dashboard */}
 
-          <div className="mb-6 p-4 rounded-xl bg-cyan-500/10 border border-cyan-500/20 text-center">
+          {/* Improved CA Header Layout */}
+          <div className="mb-10">
+            <div className="text-center">
+              <h1 className="text-4xl font-bold text-foreground mb-3">
+                {isRegulonCA ? "In-House CA Workspace" : "External CA Workspace"}
+              </h1>
+              <p className="text-lg text-muted-foreground max-w-2xl mx-auto leading-relaxed">
+                Professional Chartered Accountant Compliance Management
+              </p>
+              <div className="mt-4 flex justify-center">
+                <div className="inline-flex items-center gap-2 bg-muted/50 px-4 py-2 rounded-full text-sm">
+                  <Shield className="w-4 h-4" />
+                  {isRegulonCA ? "Regulon CA Portal" : "External CA Portal"}
+                </div>
+              </div>
+            </div>
+          </div>
+
+          <div className="mb-8 p-4 rounded-lg bg-cyan-500/10 border border-cyan-500/20 text-center">
             <p className="text-sm text-cyan-400">
               <strong>{isRegulonCA ? "Regulon In-House CA Workspace" : "External CA Workspace"}</strong>
               {" "}- {isRegulonCA

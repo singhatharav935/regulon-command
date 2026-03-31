@@ -5,7 +5,9 @@ import { QueryClient, QueryClientProvider } from "@tanstack/react-query";
 import { BrowserRouter, Routes, Route } from "react-router-dom";
 import { Suspense, lazy } from "react";
 import Index from "./pages/Index";
-import Auth from "./pages/Auth";
+import AuthReal from "./pages/Auth-Real-Enhanced";
+import AccountSettingsPage from "./pages/AccountSettings";
+import { UserOnboardingFlow } from "./components/auth/UserOnboardingFlow";
 import ForgotPassword from "./pages/ForgotPassword";
 import ResetPassword from "./pages/ResetPassword";
 import TermsOfService from "./pages/TermsOfService";
@@ -15,7 +17,9 @@ import RefundPolicy from "./pages/RefundPolicy";
 import ComplianceCenterStandalone from "./pages/ComplianceCenterStandalone";
 import NotFound from "./pages/NotFound";
 import MarketingOptionPage from "./pages/MarketingOptionPage";
+import AboutPage from "./pages/AboutPage";
 import { AuthProvider } from "./hooks/use-auth";
+import { EnhancedAuthProvider } from "./lib/enhanced-auth-context";
 import ProtectedRoute from "./components/auth/ProtectedRoute";
 import RoleLandingRoute from "./components/auth/RoleLandingRoute";
 import { PersonaAuthProvider } from "./lib/persona-auth-context";
@@ -63,13 +67,14 @@ const RouteFallback = () => (
 const App = () => (
   <QueryClientProvider client={queryClient}>
     <AuthProvider>
-      <PersonaAuthProvider>
-        <TooltipProvider>
-        <Toaster />
-        <Sonner />
-        <BrowserRouter>
-          <Suspense fallback={<RouteFallback />}>
-            <Routes>
+      <EnhancedAuthProvider>
+        <PersonaAuthProvider>
+          <TooltipProvider>
+          <Toaster />
+          <Sonner />
+          <BrowserRouter>
+            <Suspense fallback={<RouteFallback />}>
+              <Routes>
             <Route path="/" element={<Index />} />
             <Route path="/platform" element={<AdvancedPlatformPage />} />
             <Route path="/platform/how-it-works" element={<AdvancedPlatformPage />} />
@@ -93,15 +98,17 @@ const App = () => (
             <Route path="/security/dpdp-2026" element={<AdvancedSecurityPage />} />
             <Route path="/security/soc2-type-ii" element={<AdvancedSecurityPage />} />
             <Route path="/resources" element={<AdvancedResourcesPage />} />
-            <Route path="/about" element={<MarketingOptionPage />} />
+            <Route path="/about" element={<AboutPage />} />
             <Route path="/privacy" element={<PrivacyPolicy />} />
             <Route path="/terms" element={<TermsOfService />} />
             <Route path="/disclaimers" element={<Disclaimers />} />
             <Route path="/refund-policy" element={<RefundPolicy />} />
             <Route path="/compliance" element={<ComplianceCenterStandalone />} />
-            <Route path="/auth" element={<Auth />} />
+            <Route path="/auth" element={<AuthReal />} />
             <Route path="/auth/forgot-password" element={<ForgotPassword />} />
             <Route path="/auth/reset-password" element={<ResetPassword />} />
+            <Route path="/onboarding" element={<UserOnboardingFlow />} />
+            <Route path="/settings/account" element={<AccountSettingsPage />} />
             <Route path="/terms" element={<TermsOfService />} />
             <Route path="/privacy" element={<PrivacyPolicy />} />
             <Route path="/disclaimers" element={<Disclaimers />} />
@@ -265,6 +272,7 @@ const App = () => (
         </BrowserRouter>
       </TooltipProvider>
       </PersonaAuthProvider>
+      </EnhancedAuthProvider>
     </AuthProvider>
   </QueryClientProvider>
 );

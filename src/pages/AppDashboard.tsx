@@ -1,6 +1,7 @@
 import { useMemo, useState } from "react";
 import { useQuery } from "@tanstack/react-query";
 import { differenceInCalendarDays, format, parseISO } from "date-fns";
+import { Building2 } from "lucide-react";
 import Navbar from "@/components/layout/Navbar";
 import Footer from "@/components/layout/Footer";
 // DashboardTypeNav removed - users should only see their assigned dashboard
@@ -468,9 +469,27 @@ const AppDashboard = () => {
     <div className="min-h-screen bg-background">
       <Navbar />
 
-      <main className="pt-24 pb-16">
-        <div className="container mx-auto px-4 max-w-7xl">
+      <main className="pt-16 pb-12">
+        <div className="container mx-auto px-6 max-w-6xl">
           {/* Dashboard type navigation hidden for regular users */}
+          
+          {/* Improved Header Layout */}
+          <div className="mb-10">
+            <div className="text-center">
+              <h1 className="text-4xl font-bold text-foreground mb-3">
+                Company Dashboard
+              </h1>
+              <p className="text-lg text-muted-foreground max-w-2xl mx-auto leading-relaxed">
+                {mappedData.company.name} Compliance Management Workspace
+              </p>
+              <div className="mt-4 flex justify-center">
+                <div className="inline-flex items-center gap-2 bg-muted/50 px-4 py-2 rounded-full text-sm">
+                  <Building2 className="w-4 h-4" />
+                  {isDemoMode ? "Demo Mode" : "Live Environment"}
+                </div>
+              </div>
+            </div>
+          </div>
 
           <RuntimeErrorBoundary scopeLabel="Company Voice Agent">
             <AIVoiceBriefAgent
