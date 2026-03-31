@@ -9,7 +9,7 @@ import { supabase } from "@/integrations/supabase/client";
 import { useToast } from "@/hooks/use-toast";
 import { z } from "zod";
 import { previewBypassEnabled } from "@/lib/runtime-flags";
-import { clearLocalPreviewPersona, setLocalPreviewPersona } from "@/lib/local-preview-auth";
+import { createLocalDemoUser, loginLocalDemoUser, shouldUseLocalDemo } from "@/lib/local-demo-auth";
 import { checkRateLimit, recordAttempt, clearRateLimit } from "@/lib/rate-limit";
 
 const emailSchema = z.string().email("Please enter a valid email address");
@@ -306,38 +306,83 @@ const Auth = () => {
         toast({ title: "Welcome back", description: "Login successful. Redirecting to your workspace." });
         navigate(returnPath || "/app", { replace: true });
       } else {
-        const redirectUrl = `${window.location.origin}/auth?mode=login&role=${selectedPersona}`;
-        const { data, error } = await supabase.auth.signUp({
-          email,
-          password,
-          options: {
-            emailRedirectTo: redirectUrl,
-            data: {
-              full_name: fullName,
-              registration_role: selectedPersona,
-              verification_entity_name: entityName,
-              verification_registration_number: registrationNumber,
-              verification_license_number: licenseNumber,
-              verification_jurisdiction: jurisdiction,
+        // Registration mode
+        let registrationSuccess = false;
+        let userData = null;
+
+        try {
+          // Try Supabase registration first
+          const redirectUrl = `${window.location.origin}/auth?mode=login&role=${selectedPersona}`;
+          const { data, error } = await supabase.auth.signUp({
+            email,
+            password,
+            options: {
+              emailRedirectTo: redirectUrl,
+              data: {
+                full_name: fullName,
+                registration_role: selectedPersona,
+                verification_entity_name: entityName,
+                verification_registration_number: registrationNumber,
+                verification_license_number: licenseNumber,
+                verification_jurisdiction: jurisdiction,
+              },
             },
-          },
-        });
-
-        if (error) throw error;
-        clearLocalPreviewPersona();
-
-        // Persona is already stored in user_metadata.registration_role during signup
-        // No need to write to non-existent tables
-
-        if (data.session) {
-          toast({ title: "Account created", description: "Complete verification to unlock dashboard access." });
-          navigate("/app/verification", { replace: true });
-        } else {
-          toast({
-            title: "Confirm your email",
-            description: "We sent a verification link. After verification, login with the same selected role.",
           });
-          updateMode("login");
+
+          if (error) throw error;
+          
+          clearLocalPreviewPersona();
+          userData = data;
+          registrationSuccess = true;
+
+        } catch (supabaseError) {
+          console.log("Supabase registration failed, trying local demo mode:", supabaseError);
+          
+          // Try local demo registration if Supabase fails and demo mode enabled
+          if (shouldUseLocalDemo()) {
+            const localResult = await createLocalDemoUser(
+              email, 
+              password, 
+              fullName, 
+              selectedPersona, 
+              entityName
+            );
+            
+            if (localResult.success) {
+              // Simulate successful registration
+              setLocalPreviewPersona(selectedPersona as any);
+              registrationSuccess = true;
+              
+              toast({ 
+                title: "Demo Account Created", 
+                description: `Account created for ${selectedPersona.replace('_', ' ')}. (Demo mode - no email verification required)` 
+              });
+              
+              // Skip verification in demo mode
+              navigate("/app", { replace: true });
+              return;
+            } else {
+              throw new Error(localResult.error || "Registration failed");
+            }
+          } else {
+            throw supabaseError;
+          }
+        }
+
+        if (registrationSuccess && userData) {
+          // Persona is already stored in user_metadata.registration_role during signup
+          // No need to write to non-existent tables
+
+          if (userData.session) {
+            toast({ title: "Account created", description: "Complete verification to unlock dashboard access." });
+            navigate("/app/verification", { replace: true });
+          } else {
+            toast({
+              title: "Confirm your email",
+              description: "We sent a verification link. After verification, login with the same selected role.",
+            });
+            updateMode("login");
+          }
         }
       }
     } catch (error: any) {
