@@ -1,0 +1,77 @@
+{
+  "name": "regulon-ca-backend",
+  "version": "1.0.0",
+  "description": "REGULON Real CA Dashboard Backend - Production Ready API Server",
+  "main": "server.js",
+  "type": "module",
+  "scripts": {
+    "start": "node server.js",
+    "dev": "nodemon server.js",
+    "dev:watch": "nodemon --watch . --ext js,json --exec \"node server.js\"",
+    "setup-db": "node scripts/setup-database.js",
+    "seed-db": "node scripts/seed-database.js",
+    "migrate-db": "node scripts/migrate-database.js",
+    "test": "jest",
+    "test:watch": "jest --watch",
+    "build": "echo 'Backend build complete'",
+    "lint": "eslint . --ext .js",
+    "lint:fix": "eslint . --ext .js --fix"
+  },
+  "dependencies": {
+    "@supabase/supabase-js": "^2.39.0",
+    "express": "^4.18.2",
+    "cors": "^2.8.5",
+    "helmet": "^7.1.0",
+    "compression": "^1.7.4",
+    "express-rate-limit": "^7.1.5",
+    "dotenv": "^16.3.1",
+    "winston": "^3.11.0",
+    "bcryptjs": "^2.4.3",
+    "jsonwebtoken": "^9.0.2",
+    "uuid": "^9.0.1",
+    "axios": "^1.6.2",
+    "cheerio": "^1.0.0-rc.12",
+    "node-cron": "^3.0.3",
+    "multer": "^1.4.5-lts.1",
+    "sharp": "^0.32.6",
+    "pg": "^8.11.3",
+    "pg-pool": "^3.6.1",
+    "ioredis": "^5.3.2",
+    "openai": "^4.20.1",
+    "twilio": "^4.19.0",
+    "nodemailer": "^6.9.7",
+    "razorpay": "^2.9.2",
+    "pdf-lib": "^1.17.1",
+    "html-pdf": "^3.0.1",
+    "moment": "^2.29.4",
+    "joi": "^17.11.0",
+    "express-validator": "^7.0.1",
+    "express-winston": "^4.2.0"
+  },
+  "devDependencies": {
+    "nodemon": "^3.0.2",
+    "jest": "^29.7.0",
+    "supertest": "^6.3.3",
+    "eslint": "^8.54.0",
+    "@babel/core": "^7.23.6",
+    "@babel/preset-env": "^7.23.6"
+  },
+  "keywords": [
+    "regulon",
+    "ca-dashboard",
+    "compliance",
+    "government-api",
+    "real-data",
+    "backend"
+  ],
+  "author": "REGULON Team",
+  "license": "MIT",
+  "engines": {
+    "node": ">=18.0.0",
+    "npm": ">=8.0.0"
+  },
+  "repository": {
+    "type": "git",
+    "url": "https://github.com/regulon/ca-dashboard-backend"
+  }
+}
