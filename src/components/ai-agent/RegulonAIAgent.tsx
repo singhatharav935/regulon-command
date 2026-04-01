@@ -79,9 +79,9 @@ const RegulonAIAgent = () => {
   const [approvalRequest, setApprovalRequest] = useState<ApprovalRequest | null>(
     null
   );
-  const [activeTab, setActiveTab] = useState("tasks");
-  const [dailyBrief, setDailyBrief] = useState<string>("");
-  const [showBriefing, setShowBriefing] = useState(false);
+  const [showSiriInterface, setShowSiriInterface] = useState(false);
+  const [wakeWordDetected, setWakeWordDetected] = useState(false);
+  const [listeningText, setListeningText] = useState("");
 
   // Refs
   const recognitionRef = useRef<SpeechRecognition | null>(null);
@@ -116,7 +116,26 @@ const RegulonAIAgent = () => {
         // Check for "Hey Regulon" wake-word
         if (isFinal && (lowerTranscript.includes("hey regulon") || lowerTranscript.startsWith("hey regulon"))) {
           setIsListening(true);
-          toast.success("Regulon activated! Listening for your command...");
+          setWakeWordDetected(true);
+          setShowSiriInterface(true);
+          setListeningText("Listening...");
+          
+          // Show Siri interface for 1 second, then hide
+          setTimeout(() => {
+            setShowSiriInterface(false);
+          }, 3000);
+          
+          // Text-to-Speech: Regulon responds
+          const utterance = new SpeechSynthesisUtterance(
+            "Hey, this is Regulon AI, your compliance partner. Tell me what you need."
+          );
+          utterance.rate = 1;
+          utterance.pitch = 1;
+          utterance.volume = 1;
+          window.speechSynthesis.cancel(); // Cancel any previous speech
+          window.speechSynthesis.speak(utterance);
+          
+          toast.success("🎤 Regulon activated!");
           
           // Send wake-word event to backend
           fetch("/api/ca/voice/wake-word", {
@@ -129,6 +148,7 @@ const RegulonAIAgent = () => {
               event: "wake_word_detected",
               timestamp: new Date().toISOString(),
               ca_id: "ca-001",
+              responded_with_tts: true,
             }),
           }).catch(err => console.error("Wake-word logging failed:", err));
 
@@ -611,6 +631,100 @@ What would you like me to do next?`;
 
   return (
     <div className="space-y-6">
+      {/* Siri-like "Hey Regulon" Interface with Animated Circles */}
+      <AnimatePresence>
+        {showSiriInterface && (
+          <motion.div
+            initial={{ opacity: 0, scale: 0.8 }}
+            animate={{ opacity: 1, scale: 1 }}
+            exit={{ opacity: 0, scale: 0.8 }}
+            className="fixed inset-0 flex items-center justify-center z-50 bg-black/40 backdrop-blur-sm"
+          >
+            <motion.div className="text-center">
+              {/* Animated Circle Background with Pulsing Rings */}
+              <div className="relative w-64 h-64 flex items-center justify-center mb-8">
+                {/* Outer pulsing ring 1 */}
+                <motion.div
+                  animate={{ scale: [1, 1.3], opacity: [1, 0] }}
+                  transition={{ duration: 2, repeat: Infinity }}
+                  className="absolute w-full h-full rounded-full border-4 border-cyan-400"
+                />
+                
+                {/* Outer pulsing ring 2 */}
+                <motion.div
+                  animate={{ scale: [1, 1.2], opacity: [1, 0] }}
+                  transition={{ duration: 2, repeat: Infinity, delay: 0.4 }}
+                  className="absolute w-full h-full rounded-full border-4 border-blue-500"
+                />
+                
+                {/* Middle ring */}
+                <motion.div
+                  animate={{ scale: [1, 1.1], opacity: [0.5, 1] }}
+                  transition={{ duration: 2, repeat: Infinity }}
+                  className="absolute w-4/5 h-4/5 rounded-full border-3 border-cyan-300"
+                />
+
+                {/* Center circle */}
+                <motion.div
+                  animate={{ 
+                    boxShadow: [
+                      "0 0 20px rgba(0, 188, 212, 0.5)",
+                      "0 0 60px rgba(0, 188, 212, 1)",
+                      "0 0 20px rgba(0, 188, 212, 0.5)"
+                    ]
+                  }}
+                  transition={{ duration: 1.5, repeat: Infinity }}
+                  className="w-32 h-32 rounded-full bg-gradient-to-br from-cyan-400 to-blue-600 flex items-center justify-center shadow-2xl"
+                >
+                  <motion.div
+                    animate={{ scale: [0.8, 1.2] }}
+                    transition={{ duration: 1.5, repeat: Infinity }}
+                    className="text-white text-5xl"
+                  >
+                    🎤
+                  </motion.div>
+                </motion.div>
+
+                {/* Animated dots around the circle */}
+                {[0, 1, 2, 3, 4, 5].map((i) => (
+                  <motion.div
+                    key={i}
+                    animate={{ 
+                      rotate: 360,
+                      y: [0, -80, 0]
+                    }}
+                    transition={{ 
+                      duration: 3, 
+                      repeat: Infinity,
+                      delay: i * 0.3
+                    }}
+                    className="absolute w-4 h-4 rounded-full bg-cyan-400"
+                    style={{
+                      top: '50%',
+                      left: '50%',
+                      transform: `rotate(${(i * 60)}deg) translateY(-120px)`
+                    }}
+                  />
+                ))}
+              </div>
+
+              {/* Text display */}
+              <motion.div
+                animate={{ opacity: [0.7, 1] }}
+                transition={{ duration: 0.5, repeat: Infinity, repeatType: "mirror" }}
+                className="text-center"
+              >
+                <h2 className="text-4xl font-bold text-cyan-400 mb-2">REGULON AI</h2>
+                <p className="text-xl text-cyan-300 mb-4">Listening...</p>
+                <p className="text-gray-300 max-w-md mx-auto">
+                  "Hey, this is Regulon AI, your compliance partner. Tell me what you need."
+                </p>
+              </motion.div>
+            </motion.div>
+          </motion.div>
+        )}
+      </AnimatePresence>
+
       {/* Daily Briefing Card */}
       {dailyBrief && (
         <motion.div
