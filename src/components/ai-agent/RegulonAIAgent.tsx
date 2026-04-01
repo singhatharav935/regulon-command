@@ -199,57 +199,79 @@ const RegulonAIAgent = () => {
   // Fetch Daily Brief from Backend
   const fetchDailyBrief = async () => {
     try {
-      // Simulate fetching daily brief from backend
-      const briefTasks: Task[] = [
-        {
-          id: "1",
-          title: "GSTR-3B due for Acme Pvt. Ltd.",
-          priority: "critical",
-          status: "pending",
-          dueDate: new Date(Date.now() + 2 * 24 * 60 * 60 * 1000).toISOString(),
-          client: "Acme Pvt. Ltd.",
-          action: "File GST return",
-          timestamp: new Date().toISOString(),
+      const token = localStorage.getItem("token");
+      if (!token) {
+        console.error("No auth token found");
+        return;
+      }
+
+      // Fetch real data from backend
+      const response = await fetch("http://localhost:5000/api/ca/daily-governance", {
+        headers: {
+          Authorization: `Bearer ${token}`,
+          "Content-Type": "application/json",
         },
-        {
-          id: "2",
-          title: "Balance Sheet Review - TechCorp India",
-          priority: "high",
-          status: "pending",
-          dueDate: new Date(Date.now() + 5 * 24 * 60 * 60 * 1000).toISOString(),
-          client: "TechCorp India",
-          action: "Review financial statements",
+      });
+
+      if (!response.ok) {
+        throw new Error("Failed to fetch daily brief");
+      }
+
+      const result = await response.json();
+
+      if (!result.success || !result.data) {
+        throw new Error("Invalid response from backend");
+      }
+
+      const { pendingTasks, dueIn7Days } = result.data;
+
+      // Transform backend data to Task interface
+      const allTasks: Task[] = [
+        ...(pendingTasks || []).map((task: any, idx: number) => ({
+          id: `task-${idx}`,
+          title: task.title || task.name,
+          priority: task.priority || "medium",
+          status: task.status || "pending",
+          dueDate: task.due_date || new Date().toISOString(),
+          client: task.company_name || task.client,
+          action: task.action || "Review",
           timestamp: new Date().toISOString(),
-        },
-        {
-          id: "3",
-          title: "NEW: GST Notice received - Innovate Solutions",
-          priority: "critical",
-          status: "pending",
-          dueDate: new Date(Date.now() + 7 * 24 * 60 * 60 * 1000).toISOString(),
-          client: "Innovate Solutions",
-          action: "Draft notice response",
+        })),
+        ...(dueIn7Days || []).map((task: any, idx: number) => ({
+          id: `due-${idx}`,
+          title: task.title || task.name,
+          priority: task.priority || "high",
+          status: task.status || "pending",
+          dueDate: task.due_date || new Date().toISOString(),
+          client: task.company_name || task.client,
+          action: task.action || "Review",
           timestamp: new Date().toISOString(),
-        },
+        })),
       ];
 
-      setTasks(briefTasks);
+      setTasks(allTasks);
 
       // Add initial activity
-      addActivity("task", "Daily Governance Brief", `${briefTasks.length} critical tasks loaded. System ready.`);
+      addActivity(
+        "task",
+        "Daily Governance Brief",
+        `${allTasks.length} tasks loaded from your portfolio. System ready.`
+      );
 
-      // Generate daily brief text
-      const briefText = `Good morning! I've analyzed your compliance calendar. You have ${briefTasks.length} critical items today:
-      
-1. **GSTR-3B filing due in 2 days** for Acme Pvt. Ltd. - I can draft the return immediately.
-2. **New GST Notice** received for Innovate Solutions - I'm analyzing the legal implications.
-3. **Balance Sheet Review** for TechCorp India due in 5 days.
+      // Generate daily brief text from real data
+      const taskList = allTasks
+        .slice(0, 3)
+        .map(
+          (task, idx) =>
+            `${idx + 1}. **${task.title}** for ${task.client} - Due on ${new Date(task.dueDate).toLocaleDateString()}`
+        )
+        .join("\n");
 
-Would you like me to start drafting the GSTR-3B response?`;
+      const briefText = `Good morning! I've analyzed your compliance calendar. You have ${allTasks.length} active tasks:\n\n${taskList}\n\nWould you like me to start working on any of these?`;
       setDailyBrief(briefText);
     } catch (error) {
       console.error("Error fetching daily brief:", error);
-      toast.error("Failed to load daily brief");
+      toast.error("Failed to load daily brief from backend");
     }
   };
 
