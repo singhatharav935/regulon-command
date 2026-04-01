@@ -37,7 +37,7 @@ import { AdminDashboard as PersonaAdminDashboard } from "./pages/dashboards/Admi
 const Dashboard = lazy(() => import("./pages/Dashboard"));
 const CADashboard = lazy(() => import("./pages/CADashboard"));
 const AdminDashboard = lazy(() => import("./pages/AdminDashboard"));
-const AppDashboard = lazy(() => import("./pages/AppDashboard"));
+// const AppDashboard = lazy(() => import("./pages/AppDashboard")); // Removed - use demo dashboards
 // const AppCADashboard = lazy(() => import("./pages/AppCADashboard")); // Removed - use demo dashboards
 // const AppAdminDashboard = lazy(() => import("./pages/AppAdminDashboard")); // Removed - use demo dashboards
 // const AppLegalDashboard = lazy(() => import("./pages/AppLegalDashboard")); // Removed - use demo dashboards
@@ -122,21 +122,7 @@ const App = () => (
             <Route path="/agent-work-review" element={<AgentWorkReview />} />
 
             <Route path="/app" element={<RoleLandingRoute />} />
-            <Route
-              path="/app/dashboard"
-              element={
-                <ProtectedRoute
-                  allowRoles={["user", "manager", "admin"]}
-                  allowPersonas={["company_owner", "admin"]}
-                >
-                  <AppDashboard />
-                </ProtectedRoute>
-              }
-            />
-            {/* Removed App CA Dashboard - use demo dashboards instead */}
-            {/* Removed App Admin Dashboard - use demo dashboards instead */}
-            {/* Removed App Legal Dashboard - use demo dashboards instead */}
-            {/* Removed App CA Firm Dashboard - use demo dashboards instead */}
+            {/* Removed App Dashboard - use demo dashboards */}
             <Route
               path="/app/verification"
               element={
