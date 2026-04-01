@@ -37,7 +37,6 @@ import {
   Eye,
   X,
   MessageSquare,
-  Loader,
 } from "lucide-react";
 import { toast } from "sonner";
 
@@ -887,6 +886,212 @@ What would you like me to do next?`;
           </CardContent>
         </Card>
       </motion.div>
+          <div className="flex items-center justify-between">
+            <div className="flex items-center gap-3">
+              <div className="p-2 rounded-lg bg-cyan-600/20">
+                <Bot className="w-5 h-5 text-cyan-400" />
+              </div>
+              <div>
+                <CardTitle className="text-cyan-400">Regulon AI Voice Agent</CardTitle>
+                <CardDescription>
+                  Say <span className="text-cyan-400 font-semibold">"Hey Regulon"</span> to activate voice mode | Or type commands below
+                </CardDescription>
+              </div>
+            </div>
+            <Badge 
+              variant="outline" 
+              className={`${
+                isListening 
+                  ? "bg-blue-500/20 text-blue-400 border-blue-500/50 animate-pulse" 
+                  : "bg-green-500/10 text-green-400 border-green-500/50"
+              }`}
+            >
+              {isListening && "🎤 Listening for 'Hey Regulon'..."}
+              {!isListening && (isProcessing ? "Processing..." : "Ready")}
+            </Badge>
+          </div>
+        </CardHeader>
+
+        <CardContent className="space-y-6">
+          {/* Tabs: Tasks & Activities */}
+          <Tabs value={activeTab} onValueChange={setActiveTab} className="w-full">
+            <TabsList className="grid w-full grid-cols-2">
+              <TabsTrigger value="tasks" className="gap-2">
+                <Clock className="w-4 h-4" />
+                Task Console ({tasks.length})
+              </TabsTrigger>
+              <TabsTrigger value="activities" className="gap-2">
+                <Bot className="w-4 h-4" />
+                Activity Stream ({activities.length})
+              </TabsTrigger>
+            </TabsList>
+
+            {/* Task Console */}
+            <TabsContent value="tasks" className="space-y-4">
+              <div className="max-h-64 overflow-y-auto space-y-3">
+                {tasks.length === 0 ? (
+                  <p className="text-sm text-muted-foreground text-center py-8">
+                    No tasks. Waiting for daily governance update...
+                  </p>
+                ) : (
+                  tasks.map((task) => (
+                    <motion.div
+                      key={task.id}
+                      initial={{ opacity: 0, x: -10 }}
+                      animate={{ opacity: 1, x: 0 }}
+                      className="p-3 rounded-lg bg-card/50 border border-border/50"
+                    >
+                      <div className="flex items-start justify-between gap-3">
+                        <div className="flex-1">
+                          <p className="font-medium text-sm text-foreground">
+                            {task.title}
+                          </p>
+                          {task.client && (
+                            <p className="text-xs text-muted-foreground mt-1">
+                              Client: {task.client}
+                            </p>
+                          )}
+                          {task.action && (
+                            <p className="text-xs text-cyan-400 mt-1">
+                              Action: {task.action}
+                            </p>
+                          )}
+                        </div>
+                        <div className="flex flex-col items-end gap-2">
+                          <Badge
+                            className={`text-xs ${
+                              task.priority === "critical"
+                                ? "bg-red-500/20 text-red-400 border-red-500/30"
+                                : task.priority === "high"
+                                ? "bg-orange-500/20 text-orange-400 border-orange-500/30"
+                                : task.priority === "medium"
+                                ? "bg-yellow-500/20 text-yellow-400 border-yellow-500/30"
+                                : "bg-green-500/20 text-green-400 border-green-500/30"
+                            }`}
+                          >
+                            {task.priority}
+                          </Badge>
+                          <Badge
+                            variant="outline"
+                            className={`text-xs ${
+                              task.status === "approved"
+                                ? "bg-green-500/10 text-green-400 border-green-500/30"
+                                : task.status === "completed"
+                                ? "bg-blue-500/10 text-blue-400 border-blue-500/30"
+                                : "bg-amber-500/10 text-amber-400 border-amber-500/30"
+                            }`}
+                          >
+                            {task.status}
+                          </Badge>
+                        </div>
+                      </div>
+                    </motion.div>
+                  ))
+                )}
+              </div>
+            </TabsContent>
+
+            {/* Activity Stream */}
+            <TabsContent value="activities" className="space-y-4">
+              <div className="max-h-64 overflow-y-auto space-y-3">
+                {activities.length === 0 ? (
+                  <p className="text-sm text-muted-foreground text-center py-8">
+                    Activity log empty
+                  </p>
+                ) : (
+                  activities.map((activity) => (
+                    <motion.div
+                      key={activity.id}
+                      initial={{ opacity: 0, x: -10 }}
+                      animate={{ opacity: 1, x: 0 }}
+                      className="p-3 rounded-lg bg-card/50 border border-border/50"
+                    >
+                      <div className="flex items-start gap-3">
+                        <div className="mt-1">
+                          {activity.type === "task" && (
+                            <Zap className="w-4 h-4 text-amber-400" />
+                          )}
+                          {activity.type === "message" && (
+                            <FileText className="w-4 h-4 text-cyan-400" />
+                          )}
+                          {activity.type === "completion" && (
+                            <CheckCircle className="w-4 h-4 text-green-400" />
+                          )}
+                          {activity.type === "alert" && (
+                            <AlertCircle className="w-4 h-4 text-red-400" />
+                          )}
+                        </div>
+                        <div className="flex-1">
+                          <p className="font-medium text-sm text-foreground">
+                            {activity.title}
+                          </p>
+                          <p className="text-xs text-muted-foreground mt-1">
+                            {activity.description}
+                          </p>
+                          <p className="text-xs text-muted-foreground/50 mt-1">
+                            {new Date(activity.timestamp).toLocaleTimeString()}
+                          </p>
+                        </div>
+                      </div>
+                    </motion.div>
+                  ))
+                )}
+              </div>
+            </TabsContent>
+          </Tabs>
+
+          {/* User Input */}
+          <div className="space-y-3">
+            <label className="text-sm font-medium text-cyan-400 flex items-center gap-2">
+              <MessageSquare className="w-4 h-4" />
+              Manual Text Input (or say "Hey Regulon" for voice)
+            </label>
+            <div className="flex gap-2">
+              <Textarea
+                placeholder='Type your command here... Examples:\n• "Draft GSTR-3B response for my client"\n• "Check pending GST notices"\n• "Reconcile GST data"\n• "Verify document hash"'
+                value={userInput}
+                onChange={(e) => setUserInput(e.target.value)}
+                onKeyDown={(e) => {
+                  if (e.key === "Enter" && e.ctrlKey) {
+                    handleAgentQuery(userInput);
+                  }
+                }}
+                disabled={isProcessing}
+                className="min-h-24 resize-none bg-card border-border/50"
+              />
+            </div>
+
+            <div className="flex gap-2">
+              <Button
+                onClick={() => handleAgentQuery(userInput)}
+                disabled={isProcessing || !userInput.trim()}
+                className="flex-1 bg-cyan-600 hover:bg-cyan-700"
+              >
+                <Send className="w-4 h-4 mr-2" />
+                Execute
+              </Button>
+              <Button
+                onClick={toggleVoiceInput}
+                variant={isListening ? "destructive" : "outline"}
+                className="gap-2"
+              >
+                {isListening ? (
+                  <>
+                    <MicOff className="w-4 h-4" />
+                    Stop
+                  </>
+                ) : (
+                  <>
+                    <Mic className="w-4 h-4" />
+                    Listen
+                  </>
+                )}
+              </Button>
+            </div>
+          </div>
+        </CardContent>
+      </Card>
+
       {/* Approval Modal */}
       <AnimatePresence>
         {approvalRequest && (
