@@ -226,16 +226,16 @@ export const MultiStepRegistration: React.FC<MultiStepRegistrationProps> = ({
     // Add conditional steps based on role
     if (selectedRole?.needsCompanyInfo) {
       baseSteps.push({
-        title: 'Company Information',
-        description: 'Tell us about your company',
+        title: 'Company Information (Optional)',
+        description: 'Tell us about your company (you can skip this step)',
         component: 'company-info',
       });
     }
 
     if (selectedRole?.needsProfessionalInfo) {
       baseSteps.push({
-        title: 'Professional Information',
-        description: 'Your professional credentials and experience',
+        title: 'Professional Information (Optional)',
+        description: 'Your professional credentials and experience (you can skip this step)',
         component: 'professional-info',
       });
     }
@@ -260,9 +260,9 @@ export const MultiStepRegistration: React.FC<MultiStepRegistrationProps> = ({
       case 'security':
         return formData.password.length >= 8;
       case 'company-info':
-        return formData.companyInfo?.name?.trim();
+        return true; // Made company info optional
       case 'professional-info':
-        return formData.professionalInfo?.experience;
+        return true; // Made all professional info optional
       case 'review':
         return formData.agreeToTerms;
       default:
@@ -410,7 +410,7 @@ export const MultiStepRegistration: React.FC<MultiStepRegistrationProps> = ({
         return (
           <div className="space-y-6">
             <div>
-              <Label htmlFor="companyName">Company Name</Label>
+              <Label htmlFor="companyName">Company Name (Optional)</Label>
               <Input
                 id="companyName"
                 type="text"
@@ -418,14 +418,13 @@ export const MultiStepRegistration: React.FC<MultiStepRegistrationProps> = ({
                 onChange={(e) => updateFormData({
                   companyInfo: { ...formData.companyInfo!, name: e.target.value }
                 })}
-                placeholder="Enter your company name"
-                required
+                placeholder="Enter your company name (optional)"
               />
             </div>
 
             <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
               <div>
-                <Label htmlFor="industry">Industry</Label>
+                <Label htmlFor="industry">Industry (Optional)</Label>
                 <select
                   id="industry"
                   value={formData.companyInfo?.industry || ''}
@@ -434,7 +433,7 @@ export const MultiStepRegistration: React.FC<MultiStepRegistrationProps> = ({
                   })}
                   className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-purple-500 focus:border-transparent"
                 >
-                  <option value="">Select Industry</option>
+                  <option value="">Select Industry (Optional)</option>
                   <option value="technology">Technology</option>
                   <option value="finance">Finance</option>
                   <option value="healthcare">Healthcare</option>
@@ -445,7 +444,7 @@ export const MultiStepRegistration: React.FC<MultiStepRegistrationProps> = ({
               </div>
 
               <div>
-                <Label htmlFor="companySize">Company Size</Label>
+                <Label htmlFor="companySize">Company Size (Optional)</Label>
                 <select
                   id="companySize"
                   value={formData.companyInfo?.size || ''}
@@ -498,7 +497,7 @@ export const MultiStepRegistration: React.FC<MultiStepRegistrationProps> = ({
             )}
 
             <div>
-              <Label htmlFor="experience">Years of Experience</Label>
+              <Label htmlFor="experience">Years of Experience (Optional)</Label>
               <select
                 id="experience"
                 value={formData.professionalInfo?.experience || ''}
@@ -506,9 +505,8 @@ export const MultiStepRegistration: React.FC<MultiStepRegistrationProps> = ({
                   professionalInfo: { ...formData.professionalInfo!, experience: e.target.value }
                 })}
                 className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-purple-500 focus:border-transparent"
-                required
               >
-                <option value="">Select Experience</option>
+                <option value="">Select Experience (Optional)</option>
                 <option value="0-2">0-2 years</option>
                 <option value="3-5">3-5 years</option>
                 <option value="6-10">6-10 years</option>

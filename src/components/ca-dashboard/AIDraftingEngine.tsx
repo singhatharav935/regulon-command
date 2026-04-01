@@ -16,7 +16,9 @@ import {
   Edit3,
   Eye,
   Upload,
-  Download
+  Download,
+  Bot,
+  RefreshCw
 } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
@@ -1124,6 +1126,10 @@ type WorkflowStatus = "generated" | "under_review" | "approved" | "signed_off";
 interface AIDraftingEngineProps {
   demoMode?: boolean;
   includeLawyerReview?: boolean;
+  isRealDashboard?: boolean;
+  apiEndpoint?: string;
+  openaiIntegration?: boolean;
+  realDocumentGeneration?: boolean;
 }
 
 interface ReviewStep {
@@ -1669,7 +1675,14 @@ const advancedChecksByType: Record<string, AdvancedCheck[]> = {
   ],
 };
 
-const AIDraftingEngine = ({ demoMode = false, includeLawyerReview = true }: AIDraftingEngineProps) => {
+const AIDraftingEngine = ({ 
+  demoMode = false, 
+  includeLawyerReview = true, 
+  isRealDashboard = false, 
+  apiEndpoint = "http://localhost:3001/api/ca-dashboard",
+  openaiIntegration = false,
+  realDocumentGeneration = false
+}: AIDraftingEngineProps) => {
   const navigate = useNavigate();
   const location = useLocation();
   const initialReviewSteps = useMemo(
@@ -4172,7 +4185,15 @@ const AIDraftingEngine = ({ demoMode = false, includeLawyerReview = true }: AIDr
     const loadLiveClients = async () => {
       setIsLoadingClients(true);
       try {
-        const data = await workspaceBackendRequest<{ clients: ClientOption[] }>("/drafting/clients");
+        // Use real backend endpoint for real dashboard
+        const endpoint = isRealDashboard 
+          ? `${apiEndpoint}/clients` 
+          : "/drafting/clients";
+          
+        const data = isRealDashboard 
+          ? await fetch(endpoint).then(res => res.json())
+          : await workspaceBackendRequest<{ clients: ClientOption[] }>(endpoint);
+          
         if (!mounted) return;
 
         if ((data.clients ?? []).length === 0) {
@@ -4679,6 +4700,33 @@ const AIDraftingEngine = ({ demoMode = false, includeLawyerReview = true }: AIDr
 
   const requestDraftData = async (requestBody: Record<string, unknown>) => {
     assertLiveClientAccessOrThrow();
+    
+    // Use real OpenAI integration for real dashboard
+    if (isRealDashboard && openaiIntegration) {
+      try {
+        const response = await fetch(`${apiEndpoint}/generate-document`, {
+          method: "POST",
+          headers: {
+            "Content-Type": "application/json",
+          },
+          body: JSON.stringify({
+            ...requestBody,
+            openaiIntegration: true,
+            realGeneration: true,
+          }),
+        });
+        
+        if (!response.ok) {
+          throw new Error(`OpenAI generation failed: ${response.statusText}`);
+        }
+        
+        return await response.json();
+      } catch (error) {
+        console.error("Real OpenAI generation failed:", error);
+        // Fallback to workspace backend if real generation fails
+      }
+    }
+    
     const mergedPayload = {
       logicLevel: effectiveLogicLevel,
       logicEngine: effectiveLogicProfile.engine,

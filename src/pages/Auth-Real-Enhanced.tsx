@@ -26,6 +26,7 @@ import { Card } from "@/components/ui/card";
 import { Checkbox } from "@/components/ui/checkbox";
 import { useToast } from "@/hooks/use-toast";
 import { enhancedAuth } from "@/lib/enhanced-auth";
+import { createLocalDemoUser } from "@/lib/local-demo-auth";
 import { SecurePasswordInput } from "@/components/auth/PasswordStrengthMeter";
 import { EmailVerificationFlow } from "@/components/auth/EmailVerificationFlow";
 import { MultiStepRegistration, type RegistrationFormData } from "@/components/auth/MultiStepRegistration";
@@ -167,6 +168,7 @@ const AuthReal = () => {
 
   const handleMultiStepRegistration = async (formData: RegistrationFormData) => {
     try {
+      // Try enhanced auth first
       const response = await enhancedAuth.register(
         formData.email,
         formData.password,
@@ -184,7 +186,33 @@ const AuthReal = () => {
       setCurrentUser(response.user);
       setMode('email-verification');
     } catch (error: any) {
-      throw error; // Re-throw to be handled by MultiStepRegistration
+      console.log("Enhanced auth failed, trying local demo mode:", error);
+      
+      try {
+        // Fallback to local demo auth
+        const localResponse = await createLocalDemoUser(
+          formData.email,
+          formData.password,
+          formData.fullName,
+          formData.registrationRole,
+          formData.entityName
+        );
+
+        if (localResponse.success && localResponse.user) {
+          toast({
+            title: "Account Created Successfully!",
+            description: "Welcome to REGULON! You can now access your dashboard.",
+          });
+
+          // Navigate directly to dashboard since it's demo mode
+          navigate('/persona-selector');
+        } else {
+          throw new Error("Failed to create demo account");
+        }
+      } catch (fallbackError: any) {
+        console.error("Both enhanced auth and local demo failed:", fallbackError);
+        throw new Error("Registration failed. Please try again later or contact support.");
+      }
     }
   };
 

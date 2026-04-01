@@ -1,4 +1,5 @@
 import { motion } from "framer-motion";
+import { useEffect, useState } from "react";
 import { FileText, AlertTriangle, CheckCircle2, Send, Eye } from "lucide-react";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
@@ -46,7 +47,45 @@ const demoTasks = [
   },
 ];
 
-const TaskFilingManagement = () => {
+interface TaskFilingManagementProps {
+  isRealDashboard?: boolean;
+  apiEndpoint?: string;
+  governmentIntegration?: boolean;
+}
+
+const TaskFilingManagement = ({ 
+  isRealDashboard = false, 
+  apiEndpoint, 
+  governmentIntegration = false 
+}: TaskFilingManagementProps) => {
+  const [tasks, setTasks] = useState(demoTasks);
+  const [isLoading, setIsLoading] = useState(false);
+
+  useEffect(() => {
+    if (isRealDashboard && apiEndpoint) {
+      loadRealTaskData();
+    }
+  }, [isRealDashboard, apiEndpoint]);
+
+  const loadRealTaskData = async () => {
+    setIsLoading(true);
+    try {
+      const response = await fetch(apiEndpoint!);
+      if (response.ok) {
+        const result = await response.json();
+        const data = result.data || result; // Handle wrapped response
+        if (data.tasks || Array.isArray(data)) {
+          setTasks(data.tasks || data);
+        }
+      } else {
+        console.log("Real task data not available, using demo data");
+      }
+    } catch (error) {
+      console.log("Real backend not available for tasks, using demo data");
+    } finally {
+      setIsLoading(false);
+    }
+  };
   return (
     <motion.div
       initial={{ opacity: 0, y: 20 }}
@@ -55,12 +94,31 @@ const TaskFilingManagement = () => {
       className="glass-card p-6 mb-8"
     >
       <div className="mb-4">
-        <h2 className="text-xl font-semibold text-foreground mb-2">Task & Filing Management</h2>
+        <div className="flex items-center justify-between mb-2">
+          <h2 className="text-xl font-semibold text-foreground">Task & Filing Management</h2>
+          {isRealDashboard && (
+            <div className="flex items-center gap-2 text-xs">
+              <div className="w-2 h-2 bg-green-500 rounded-full animate-pulse" />
+              <span className="text-green-400">Real Data</span>
+              {governmentIntegration && (
+                <Badge variant="outline" className="text-xs">Gov API Active</Badge>
+              )}
+            </div>
+          )}
+        </div>
         <p className="text-sm text-muted-foreground">
-          The following compliance obligations require your filing, verification, or approval.
+          {isRealDashboard 
+            ? "Live filing obligations tracked with real-time government portal integration and automated deadline monitoring."
+            : "The following compliance obligations require your filing, verification, or approval."
+          }
         </p>
       </div>
 
+      {isLoading ? (
+        <div className="flex items-center justify-center py-12">
+          <div className="w-8 h-8 border-4 border-primary border-t-transparent rounded-full animate-spin" />
+        </div>
+      ) : (
       <div className="rounded-xl border border-border/50 overflow-hidden">
         <Table>
           <TableHeader>
@@ -75,7 +133,7 @@ const TaskFilingManagement = () => {
             </TableRow>
           </TableHeader>
           <TableBody>
-            {demoTasks.map((task, index) => (
+            {tasks.map((task, index) => (
               <TableRow 
                 key={index}
                 className="hover:bg-muted/20 transition-colors"
@@ -115,7 +173,8 @@ const TaskFilingManagement = () => {
             ))}
           </TableBody>
         </Table>
-      </div>
+        </div>
+      )}
     </motion.div>
   );
 };

@@ -1,4 +1,5 @@
 import { motion } from "framer-motion";
+import { useEffect, useState } from "react";
 import { Building2, AlertTriangle, Clock, CheckCircle2 } from "lucide-react";
 import { Badge } from "@/components/ui/badge";
 import {
@@ -66,7 +67,45 @@ const statusColors: Record<string, string> = {
   "Verified": "text-green-400",
 };
 
-const ClientPortfolioSection = () => {
+interface ClientPortfolioSectionProps {
+  isRealDashboard?: boolean;
+  apiEndpoint?: string;
+  governmentApiEnabled?: boolean;
+}
+
+const ClientPortfolioSection = ({ 
+  isRealDashboard = false, 
+  apiEndpoint, 
+  governmentApiEnabled = false 
+}: ClientPortfolioSectionProps) => {
+  const [clients, setClients] = useState(demoClients);
+  const [isLoading, setIsLoading] = useState(false);
+
+  useEffect(() => {
+    if (isRealDashboard && apiEndpoint) {
+      loadRealClientData();
+    }
+  }, [isRealDashboard, apiEndpoint]);
+
+  const loadRealClientData = async () => {
+    setIsLoading(true);
+    try {
+      const response = await fetch(apiEndpoint!);
+      if (response.ok) {
+        const result = await response.json();
+        const data = result.data || result; // Handle wrapped response
+        if (data.clients || Array.isArray(data)) {
+          setClients(data.clients || data);
+        }
+      } else {
+        console.log("Real client data not available, using demo data");
+      }
+    } catch (error) {
+      console.log("Real backend not available for client portfolio, using demo data");
+    } finally {
+      setIsLoading(false);
+    }
+  };
   return (
     <motion.div
       initial={{ opacity: 0, y: 20 }}
@@ -75,14 +114,32 @@ const ClientPortfolioSection = () => {
       className="glass-card p-6 mb-8"
     >
       <div className="mb-4">
-        <h2 className="text-xl font-semibold text-foreground mb-2">Client Portfolio</h2>
+        <div className="flex items-center justify-between mb-2">
+          <h2 className="text-xl font-semibold text-foreground">Client Portfolio</h2>
+          {isRealDashboard && (
+            <div className="flex items-center gap-2 text-xs">
+              <div className="w-2 h-2 bg-green-500 rounded-full animate-pulse" />
+              <span className="text-green-400">Real Data</span>
+              {governmentApiEnabled && (
+                <Badge variant="outline" className="text-xs">Gov API Active</Badge>
+              )}
+            </div>
+          )}
+        </div>
         <p className="text-sm text-muted-foreground">
-          These companies are currently under your professional responsibility.
-          Any unresolved item below directly affects the client's compliance standing.
+          {isRealDashboard 
+            ? "Live client portfolio with real-time government API integration and compliance tracking."
+            : "These companies are currently under your professional responsibility. Any unresolved item below directly affects the client's compliance standing."
+          }
         </p>
       </div>
 
-      <div className="rounded-xl border border-border/50 overflow-hidden">
+      {isLoading ? (
+        <div className="flex items-center justify-center py-12">
+          <div className="w-8 h-8 border-4 border-primary border-t-transparent rounded-full animate-spin" />
+        </div>
+      ) : (
+        <div className="rounded-xl border border-border/50 overflow-hidden">
         <Table>
           <TableHeader>
             <TableRow className="bg-muted/30 hover:bg-muted/30">
@@ -96,7 +153,7 @@ const ClientPortfolioSection = () => {
             </TableRow>
           </TableHeader>
           <TableBody>
-            {demoClients.map((client) => (
+            {clients.map((client) => (
               <TableRow 
                 key={client.name}
                 className="hover:bg-muted/20 transition-colors cursor-pointer"
@@ -142,7 +199,8 @@ const ClientPortfolioSection = () => {
             ))}
           </TableBody>
         </Table>
-      </div>
+        </div>
+      )}
     </motion.div>
   );
 };

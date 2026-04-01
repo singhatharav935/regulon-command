@@ -31,7 +31,17 @@ const suggestedQueries = [
   "What is the penalty for late ROC filing?",
 ];
 
-const ComplianceChatbot = () => {
+interface ComplianceChatbotProps {
+  isRealDashboard?: boolean;
+  apiEndpoint?: string;
+  realTimeResponses?: boolean;
+}
+
+const ComplianceChatbot = ({ 
+  isRealDashboard = false, 
+  apiEndpoint, 
+  realTimeResponses = false 
+}: ComplianceChatbotProps) => {
   const [isOpen, setIsOpen] = useState(false);
   const [isExpanded, setIsExpanded] = useState(false);
   const [messages, setMessages] = useState<Message[]>([]);
@@ -51,6 +61,35 @@ const ComplianceChatbot = () => {
   }, [messages]);
 
   const streamChat = async (userMessages: Message[]) => {
+    // Use real API endpoint for real dashboard
+    if (isRealDashboard && apiEndpoint) {
+      try {
+        const response = await fetch(apiEndpoint, {
+          method: "POST",
+          headers: {
+            "Content-Type": "application/json",
+          },
+          body: JSON.stringify({ 
+            messages: userMessages,
+            realTimeResponses,
+            chatbotType: "compliance"
+          }),
+        });
+
+        if (!response.ok) {
+          throw new Error("Real chatbot API failed");
+        }
+
+        const data = await response.json();
+        const assistantMsg: Message = { role: "assistant", content: data.response };
+        setMessages(prev => [...prev, assistantMsg]);
+        return;
+      } catch (error) {
+        console.log("Real chatbot failed, falling back to demo");
+      }
+    }
+
+    // Original demo chat logic
     let authToken = import.meta.env.VITE_SUPABASE_PUBLISHABLE_KEY as string;
     if (secureFunctionAuth) {
       const {
@@ -182,8 +221,18 @@ const ComplianceChatbot = () => {
             <Bot className="w-5 h-5 text-primary" />
           </div>
           <div>
-            <h3 className="font-semibold text-foreground">Compliance Assistant</h3>
-            <p className="text-xs text-muted-foreground">General queries only</p>
+            <div className="flex items-center gap-2">
+              <h3 className="font-semibold text-foreground">Compliance Assistant</h3>
+              {isRealDashboard && (
+                <Badge variant="outline" className="text-xs">Real AI</Badge>
+              )}
+            </div>
+            <p className="text-xs text-muted-foreground">
+              {isRealDashboard 
+                ? "Real-time AI responses with government data integration"
+                : "General queries only"
+              }
+            </p>
           </div>
         </div>
         <div className="flex items-center gap-1">

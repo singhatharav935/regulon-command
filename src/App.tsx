@@ -44,6 +44,7 @@ const AppLegalDashboard = lazy(() => import("./pages/AppLegalDashboard"));
 const AppVerification = lazy(() => import("./pages/AppVerification"));
 const CAFirmDashboard = lazy(() => import("./pages/CAFirmDashboard"));
 const AppCAFirmDashboard = lazy(() => import("./pages/AppCAFirmDashboard"));
+const RealCADashboard = lazy(() => import("./pages/RealCADashboard"));
 const AgentWorkReview = lazy(() => import("./pages/AgentWorkReview"));
 const LegalPolicyPage = lazy(() => import("./pages/LegalPolicyPage"));
 const ComplianceCenter = lazy(() => import("./pages/ComplianceCenter"));
@@ -117,6 +118,7 @@ const App = () => (
             <Route path="/ca-dashboard" element={<CADashboard />} />
             <Route path="/admin-dashboard" element={<AdminDashboard />} />
             <Route path="/ca-firm-dashboard" element={<CAFirmDashboard />} />
+            <Route path="/real-ca-dashboard" element={<RealCADashboard />} />
             <Route path="/agent-work-review" element={<AgentWorkReview />} />
 
             <Route path="/app" element={<RoleLandingRoute />} />
