@@ -25,7 +25,7 @@ import RoleLandingRoute from "./components/auth/RoleLandingRoute";
 import { PersonaAuthProvider } from "./lib/persona-auth-context";
 import { PersonaRoute } from "./components/auth/PersonaRoute";
 import { PersonaSelector } from "./components/auth/PersonaSelector";
-import { ExternalCADashboard } from "./pages/dashboards/ExternalCADashboard";
+// import { ExternalCADashboard } from "./pages/dashboards/ExternalCADashboard"; // Removed - using RealCADashboard
 import { ExternalCADashboardFull } from "./pages/dashboards/phases/ExternalCADashboardFull";
 // import { CAFirmDashboardFull } from "./pages/dashboards/phases/CAFirmDashboardFull";
 import { InhouseCADashboard } from "./pages/dashboards/InhouseCADashboard";
@@ -200,14 +200,7 @@ const App = () => (
             />
 
                         {/* New Persona Dashboards - Phase 1-2 */}
-            <Route
-              path="/dashboards/external-ca"
-              element={
-                <PersonaRoute allowedPersonas={["external_ca"]}>
-                  <ExternalCADashboard />
-                </PersonaRoute>
-              }
-            />
+            {/* Removed old ExternalCADashboard - now using RealCADashboard at /real-ca-dashboard */}
             {/* Phase 3: Full External CA Dashboard with all features */}
             <Route
               path="/dashboards/external-ca/full"
