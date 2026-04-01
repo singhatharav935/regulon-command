@@ -3,14 +3,21 @@
 import { useRouter } from 'next/navigation';
 import { useEffect, useState } from 'react';
 import { authFetch } from '@/lib/authFetch';
+import RegulonAIAgent from '@/components/ai-agent/RegulonAIAgent';
+import { motion } from 'framer-motion';
+import { LogOut, Settings } from 'lucide-react';
 
 export default function RealCADashboard() {
   const router = useRouter();
   const [loading, setLoading] = useState(true);
+  const [userInfo, setUserInfo] = useState<any>(null);
 
   useEffect(() => {
     const token = localStorage.getItem('token');
-    if (!token) {
+    const userRole = localStorage.getItem('userRole');
+
+    // Ensure only external CA can access
+    if (!token || userRole !== 'external_ca') {
       router.replace('/login');
       return;
     }
@@ -23,6 +30,7 @@ export default function RealCADashboard() {
           router.replace('/login');
           return;
         }
+        setUserInfo(data.user || {});
         setLoading(false);
       } catch {
         localStorage.removeItem('token');
@@ -35,100 +43,141 @@ export default function RealCADashboard() {
 
   if (loading) {
     return (
-      <div className="min-h-screen bg-black text-white flex items-center justify-center">
+      <div className="min-h-screen bg-gradient-to-br from-[#0B0E14] to-[#1a1f2e] text-white flex items-center justify-center">
         <div className="text-center">
-          <div className="animate-spin rounded-full h-12 w-12 border-b-2 border-blue-500 mx-auto mb-4"></div>
-          <p className="text-gray-400">Loading Real CA Dashboard...</p>
+          <motion.div
+            className="w-16 h-16 border-4 border-cyan-500 border-t-transparent rounded-full mx-auto mb-4"
+            animate={{ rotate: 360 }}
+            transition={{ duration: 1, repeat: Infinity, ease: 'linear' }}
+          />
+          <p className="text-gray-300">Loading Real CA Dashboard...</p>
         </div>
       </div>
     );
   }
 
   return (
-    <div className="min-h-screen bg-black text-white">
-      <header className="border-b border-zinc-800 bg-zinc-900">
-        <div className="px-6 py-4">
+    <div className="min-h-screen bg-gradient-to-br from-[#0B0E14] to-[#1a1f2e] text-white">
+      {/* Header */}
+      <header className="border-b border-cyan-500/20 bg-black/40 backdrop-blur-sm sticky top-0 z-50">
+        <div className="max-w-7xl mx-auto px-6 py-4">
           <div className="flex items-center justify-between">
-            <div>
-              <h1 className="text-2xl font-bold text-white">🎯 REAL CA Dashboard</h1>
-              <p className="text-sm text-zinc-400">
-                Welcome to your Compliance Authority Dashboard with real data
-              </p>
+            <div className="flex items-center gap-3">
+              <motion.div
+                className="w-10 h-10 rounded-full bg-gradient-to-br from-cyan-400 to-blue-600 flex items-center justify-center font-bold"
+                animate={{ rotate: [0, 360] }}
+                transition={{ duration: 20, repeat: Infinity, ease: 'linear' }}
+              >
+                ℜ
+              </motion.div>
+              <div>
+                <h1 className="text-2xl font-bold text-white">REGULON</h1>
+                <p className="text-xs text-gray-400">External CA Dashboard</p>
+              </div>
             </div>
-            <button
-              onClick={() => {
-                localStorage.removeItem('token');
-                router.push('/login');
-              }}
-              className="px-4 py-2 bg-red-600 hover:bg-red-700 text-white rounded"
-            >
-              Logout
-            </button>
+
+            <div className="flex items-center gap-4">
+              <div className="text-right">
+                <p className="text-sm font-semibold text-white">{userInfo?.name || 'CA User'}</p>
+                <p className="text-xs text-gray-400">{userInfo?.email || 'ca@regulon.com'}</p>
+              </div>
+              <div className="flex gap-2">
+                <button
+                  className="p-2 hover:bg-cyan-500/20 rounded-lg transition-colors text-gray-400 hover:text-cyan-400"
+                  title="Settings"
+                >
+                  <Settings className="w-5 h-5" />
+                </button>
+                <button
+                  onClick={() => {
+                    localStorage.removeItem('token');
+                    localStorage.removeItem('userRole');
+                    router.push('/login');
+                  }}
+                  className="p-2 hover:bg-red-500/20 rounded-lg transition-colors text-gray-400 hover:text-red-400"
+                  title="Logout"
+                >
+                  <LogOut className="w-5 h-5" />
+                </button>
+              </div>
+            </div>
           </div>
         </div>
       </header>
 
-      <div className="p-6">
-        <div className="mb-6 p-4 bg-green-900/20 border border-green-600 rounded-lg">
-          <p className="text-green-400 font-semibold">✅ Successfully registered as External CA</p>
-          <p className="text-green-300 text-sm mt-1">You now have access to real compliance data and client management tools</p>
-        </div>
-
-        <div className="grid grid-cols-1 md:grid-cols-3 gap-6 mb-8">
-          <div className="bg-zinc-900 border border-zinc-800 p-6 rounded-lg">
-            <h2 className="text-lg font-semibold text-blue-400 mb-2">Clients</h2>
-            <p className="text-3xl font-bold text-white mb-2">--</p>
-            <p className="text-sm text-gray-400">Your registered clients</p>
+      {/* Main Content */}
+      <main className="max-w-7xl mx-auto px-6 py-8">
+        {/* Welcome Banner */}
+        <motion.div
+          className="mb-8 p-6 bg-gradient-to-r from-cyan-500/10 to-blue-500/10 border border-cyan-500/30 rounded-xl"
+          initial={{ opacity: 0, y: -20 }}
+          animate={{ opacity: 1, y: 0 }}
+        >
+          <div className="flex items-center justify-between">
+            <div>
+              <h2 className="text-xl font-bold text-white mb-2">Welcome to REGULON AI Executive</h2>
+              <p className="text-sm text-gray-300">
+                Your autonomous compliance agent is ready. Use the AI Executive section below to manage your entire CA portfolio.
+              </p>
+            </div>
+            <motion.div
+              className="text-4xl"
+              animate={{ scale: [1, 1.1, 1] }}
+              transition={{ duration: 2, repeat: Infinity }}
+            >
+              🤖
+            </motion.div>
           </div>
+        </motion.div>
 
-          <div className="bg-zinc-900 border border-zinc-800 p-6 rounded-lg">
-            <h2 className="text-lg font-semibold text-blue-400 mb-2">Compliance Status</h2>
-            <p className="text-3xl font-bold text-green-400 mb-2">--</p>
-            <p className="text-sm text-gray-400">Overall compliance health</p>
-          </div>
+        {/* AI Executive Agent - Full Featured */}
+        <RegulonAIAgent />
 
-          <div className="bg-zinc-900 border border-zinc-800 p-6 rounded-lg">
-            <h2 className="text-lg font-semibold text-blue-400 mb-2">Pending Tasks</h2>
-            <p className="text-3xl font-bold text-orange-400 mb-2">--</p>
-            <p className="text-sm text-gray-400">Actions requiring attention</p>
-          </div>
-        </div>
+        {/* Placeholder Sections (Will be built incrementally) */}
+        <motion.div
+          className="space-y-8 mt-12"
+          initial={{ opacity: 0 }}
+          animate={{ opacity: 1 }}
+          transition={{ delay: 0.3 }}
+        >
+          {/* CA Control Tower - Coming Soon */}
+          <Section title="CA Control Tower" icon="🏢">
+            <p className="text-gray-400 text-sm">Comprehensive metrics for your CA practice will appear here.</p>
+          </Section>
 
-        <div className="bg-zinc-900 border border-zinc-800 p-6 rounded-lg">
-          <h2 className="text-xl font-semibold text-white mb-4">Dashboard Features</h2>
-          <ul className="space-y-2 text-gray-300">
-            <li className="flex items-center">
-              <span className="text-blue-400 mr-3">•</span>
-              Client portfolio management
-            </li>
-            <li className="flex items-center">
-              <span className="text-blue-400 mr-3">•</span>
-              Real-time compliance monitoring
-            </li>
-            <li className="flex items-center">
-              <span className="text-blue-400 mr-3">•</span>
-              Task assignment and tracking
-            </li>
-            <li className="flex items-center">
-              <span className="text-blue-400 mr-3">•</span>
-              Compliance reports and analytics
-            </li>
-            <li className="flex items-center">
-              <span className="text-blue-400 mr-3">•</span>
-              Client communication hub
-            </li>
-          </ul>
-        </div>
+          {/* Client Portfolio - Coming Soon */}
+          <Section title="Client Portfolio" icon="👥">
+            <p className="text-gray-400 text-sm">Manage and monitor all your assigned clients and their compliance status.</p>
+          </Section>
 
-        <div className="mt-6 text-center">
-          <button
-            onClick={() => router.push('/dashboards')}
-            className="px-4 py-2 bg-blue-600 hover:bg-blue-700 text-white rounded"
-          >
-            Go to Dashboard Selector
-          </button>
-        </div>
-      </div>
+          {/* AI Draft Engine - Coming Soon */}
+          <Section title="AI Draft Engine" icon="📝">
+            <p className="text-gray-400 text-sm">Automatic document drafting and compliance response generation.</p>
+          </Section>
+
+          {/* Task Management - Coming Soon */}
+          <Section title="Task & Filing Management" icon="✓">
+            <p className="text-gray-400 text-sm">Track all compliance tasks and filing deadlines in one place.</p>
+          </Section>
+        </motion.div>
+      </main>
     </div>
+  );
+}
+
+// Section Component
+function Section({ title, icon, children }: { title: string; icon: string; children: React.ReactNode }) {
+  return (
+    <motion.div
+      className="bg-gradient-to-br from-[#1a1f2e] to-[#0B0E14] border border-cyan-500/20 rounded-xl p-6"
+      whileHover={{ borderColor: 'rgba(6, 182, 212, 0.4)' }}
+      transition={{ duration: 0.3 }}
+    >
+      <h3 className="text-lg font-bold text-white mb-4 flex items-center gap-2">
+        <span className="text-2xl">{icon}</span>
+        {title}
+      </h3>
+      {children}
+    </motion.div>
   );
 }
