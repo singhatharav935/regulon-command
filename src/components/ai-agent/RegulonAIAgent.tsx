@@ -221,6 +221,55 @@ const RegulonAIAgent = () => {
 
       const result = await response.json();
 
+      // Handle direct response (new API structure)
+      if (result.aiSummary) {
+        const { pendingWork = [], assignments = [] } = result;
+
+        // Transform backend data to Task interface
+        const allTasks: Task[] = [
+          ...pendingWork.map((task: any, idx: number) => ({
+            id: `pending-${idx}`,
+            title: task.title,
+            priority: task.priority || "medium",
+            status: task.status || "pending",
+            dueDate: new Date(Date.now() + (idx + 1) * 24 * 60 * 60 * 1000).toISOString(),
+            client: task.client,
+            action: task.action || "Review",
+            timestamp: new Date().toISOString(),
+          })),
+          ...assignments.map((task: any, idx: number) => ({
+            id: `assignment-${idx}`,
+            title: task.title,
+            priority: task.priority || "medium",
+            status: task.status || "pending",
+            dueDate: new Date(Date.now() + (idx + 2) * 24 * 60 * 60 * 1000).toISOString(),
+            client: task.client,
+            action: "Review assignment",
+            timestamp: new Date().toISOString(),
+          }))
+        ];
+
+        setTasks(allTasks);
+        setDailyBrief(result.aiSummary);
+
+        // Add initial activity
+        addActivity(
+          "task",
+          "Daily Governance Brief",
+          `${allTasks.length} tasks loaded from your portfolio. System ready.`
+        );
+
+        // Auto-announce daily briefing for voice activation
+        setTimeout(() => {
+          if (result.aiSummary) {
+            addActivity("voice", "Daily Briefing", result.aiSummary);
+          }
+        }, 2000);
+
+        return;
+      }
+
+      // Handle legacy response structure
       if (!result.success || !result.data) {
         throw new Error("Invalid response from backend");
       }
