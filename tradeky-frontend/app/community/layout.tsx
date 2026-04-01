@@ -4,7 +4,9 @@ import Link from 'next/link';
 import { ReactNode } from 'react';
 import { usePathname } from 'next/navigation';
 
-const menu = [
+type MenuItem = { name: string; href: string } | { divider: true };
+
+const menu: MenuItem[] = [
   { name: 'Feed', href: '/community' },
   { name: 'Chat', href: '/community/chat' },           // 🆕
   { name: 'Groups', href: '/community/groups' },       // 🆕
@@ -36,7 +38,7 @@ export default function CommunityLayout({
         <h2 className="text-lg font-semibold mb-4">Community</h2>
 
         {menu.map((item, i) =>
-          item.divider ? (
+          'divider' in item ? (
             <hr key={i} className="border-zinc-800 my-3" />
           ) : (
             <Link

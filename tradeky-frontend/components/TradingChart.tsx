@@ -109,7 +109,7 @@ export default function TradingChart({ onPriceUpdate }: any) {
     for (let i = 0; i < 60; i++) {
       const close = price + (Math.random() - 0.5) * 50;
       candles.current.push({
-        time: t,
+        time: Math.floor(t / 60) as any,
         open: price,
         high: Math.max(price, close) + 20,
         low: Math.min(price, close) - 20,
@@ -128,7 +128,8 @@ export default function TradingChart({ onPriceUpdate }: any) {
     const t = now();
     const last = candles.current.at(-1)!;
 
-    const candleStart = Math.floor(last.time / period) * period;
+    const lastTime = (last.time as number);
+    const candleStart = Math.floor(lastTime / period) * period;
     const currentStart = Math.floor(t / period) * period;
     const newPrice = last.close + (Math.random() - 0.5) * 20;
 
@@ -139,7 +140,7 @@ export default function TradingChart({ onPriceUpdate }: any) {
       candleSeries.current.update(last);
     } else {
       const candle = {
-        time: currentStart,
+        time: currentStart as any,
         open: last.close,
         high: newPrice,
         low: newPrice,

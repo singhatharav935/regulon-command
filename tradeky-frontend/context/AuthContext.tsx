@@ -5,7 +5,8 @@ import { useRouter } from 'next/navigation';
 
 type AuthContextType = {
   token: string | null;
-  login: (token: string) => void;
+  login: (token: string, role?: string) => void;
+  loginWithRedirect: (token: string, redirectUrl?: string) => void;
   logout: () => void;
 };
 
@@ -22,10 +23,23 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
     }
   }, []);
 
-  const login = (jwt: string) => {
+  const login = (jwt: string, role?: string) => {
     localStorage.setItem('token', jwt);
+    if (role) {
+      localStorage.setItem('userRole', role);
+    }
     setToken(jwt);
     router.push('/dashboard');
+  };
+
+  const loginWithRedirect = (jwt: string, redirectUrl?: string) => {
+    localStorage.setItem('token', jwt);
+    setToken(jwt);
+    if (redirectUrl) {
+      router.push(redirectUrl);
+    } else {
+      router.push('/dashboard');
+    }
   };
 
   const logout = () => {
@@ -35,7 +49,7 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
   };
 
   return (
-    <AuthContext.Provider value={{ token, login, logout }}>
+    <AuthContext.Provider value={{ token, login, loginWithRedirect, logout }}>
       {children}
     </AuthContext.Provider>
   );
