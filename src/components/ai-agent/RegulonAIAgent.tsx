@@ -84,6 +84,7 @@ const RegulonAIAgent = () => {
   const [listeningText, setListeningText] = useState("");
   const [dailyBrief, setDailyBrief] = useState("");
   const [showBriefing, setShowBriefing] = useState(false);
+  const [activeTab, setActiveTab] = useState("brief");
 
   // Refs
   const recognitionRef = useRef<SpeechRecognition | null>(null);
