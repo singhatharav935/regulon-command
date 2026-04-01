@@ -3,6 +3,7 @@ import { useNavigate } from "react-router-dom";
 import { motion } from "framer-motion";
 import Navbar from "@/components/layout/Navbar";
 import Footer from "@/components/layout/Footer";
+import RegulonAIAgent from "@/components/ai-agent/RegulonAIAgent";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
@@ -56,10 +57,8 @@ const ExternalCADashboardReal = () => {
 
   const [companies, setCompanies] = useState<any[]>([]);
   const [newCompanyPan, setNewCompanyPan] = useState("");
-  const [aiChatInput, setAiChatInput] = useState("");
-  const [aiMessages, setAiMessages] = useState<any[]>([]);
-  const [draftText, setDraftText] = useState("");
   const [isAddingCompany, setIsAddingCompany] = useState(false);
+  const [draftText, setDraftText] = useState("");
 
   // Update stats when metrics change
   useEffect(() => {
@@ -121,19 +120,6 @@ const ExternalCADashboardReal = () => {
     } finally {
       setIsAddingCompany(false);
     }
-  };
-
-  const handleAiQuery = () => {
-    if (!aiChatInput.trim()) return;
-    
-    const userMsg = { role: "user", content: aiChatInput };
-    const aiResponse = {
-      role: "assistant",
-      content: `Based on your query about "${aiChatInput}", I would analyze your compliance data and provide insights. This AI Partner will connect to real government APIs for live data.`,
-    };
-    
-    setAiMessages([...aiMessages, userMsg, aiResponse]);
-    setAiChatInput("");
   };
 
   return (
@@ -224,50 +210,14 @@ const ExternalCADashboardReal = () => {
             )}
           </motion.div>
 
-          {/* Regulon AI Partner */}
+          {/* Regulon AI Executive Agent - AUTONOMOUS SYSTEM */}
           <motion.div
             initial={{ opacity: 0, y: 20 }}
             animate={{ opacity: 1, y: 0 }}
             transition={{ delay: 0.05 }}
-            className="mb-16 space-y-6"
+            className="mb-16"
           >
-            <div>
-              <h2 className="text-2xl font-bold text-cyan-400 flex items-center mb-4">
-                <Bot className="w-6 h-6 mr-2" />
-                Regulon AI Partner
-              </h2>
-              <p className="text-sm text-muted-foreground">Live AI assistant for compliance queries and document drafting</p>
-            </div>
-            <Card className="glass-card border-border/50">
-              <CardContent className="p-6 space-y-4">
-                <div className="bg-card/50 p-4 rounded-lg max-h-64 overflow-y-auto space-y-3 mb-4 border border-border/50">
-                  {aiMessages.length === 0 ? (
-                    <p className="text-muted-foreground text-sm">Chat with AI Partner. Ask about pending filings, client status, or request document drafts.</p>
-                  ) : (
-                    aiMessages.map((msg, idx) => (
-                      <div key={idx} className={`p-3 rounded ${msg.role === 'user' ? 'bg-cyan-600/20 ml-8' : 'bg-slate-600/20'}`}>
-                        <p className="text-xs text-muted-foreground font-semibold mb-1">
-                          {msg.role === 'user' ? 'You' : 'AI Partner'}
-                        </p>
-                        <p className="text-sm text-foreground">{msg.content}</p>
-                      </div>
-                    ))
-                  )}
-                </div>
-                <div className="flex gap-2">
-                  <Input
-                    placeholder="Ask AI: 'Show pending filings', 'Draft email to client'..."
-                    value={aiChatInput}
-                    onChange={(e) => setAiChatInput(e.target.value)}
-                    onKeyPress={(e) => e.key === 'Enter' && handleAiQuery()}
-                    className="bg-card border-border/50"
-                  />
-                  <Button onClick={handleAiQuery} className="bg-cyan-600 hover:bg-cyan-700">
-                    Send
-                  </Button>
-                </div>
-              </CardContent>
-            </Card>
+            <RegulonAIAgent />
           </motion.div>
 
           {/* AI Drafting Engine */}
