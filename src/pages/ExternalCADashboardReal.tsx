@@ -26,11 +26,15 @@ import {
   DollarSign,
   CreditCard,
   RefreshCw,
+  Loader,
 } from "lucide-react";
 import { toast } from "sonner";
+import useCAMetrics from "@/hooks/useCAMetrics";
+import { addCompany as addCompanyAPI } from "@/services/api";
 
 const ExternalCADashboardReal = () => {
   const navigate = useNavigate();
+  const { metrics, loading, refetch } = useCAMetrics();
 
   // Role-based access control
   useEffect(() => {
@@ -41,13 +45,13 @@ const ExternalCADashboardReal = () => {
     }
   }, [navigate]);
 
-  const [stats] = useState([
-    { label: "Assigned Companies", value: "0", icon: Building, color: "text-cyan-400" },
-    { label: "Pending Tasks", value: "0", icon: FileText, color: "text-yellow-400" },
-    { label: "Due in 7 Days", value: "0", icon: Clock, color: "text-orange-400" },
-    { label: "High-Risk Alerts", value: "0", icon: AlertTriangle, color: "text-red-400" },
-    { label: "Revenue This Month", value: "₹0", icon: DollarSign, color: "text-green-400" },
-    { label: "Plan Limit", value: "0/10", icon: CreditCard, color: "text-primary" },
+  const [stats, setStats] = useState([
+    { id: "companies", label: "Assigned Companies", value: "0", icon: Building, color: "text-cyan-400" },
+    { id: "tasks", label: "Pending Tasks", value: "0", icon: FileText, color: "text-yellow-400" },
+    { id: "due", label: "Due in 7 Days", value: "0", icon: Clock, color: "text-orange-400" },
+    { id: "alerts", label: "High-Risk Alerts", value: "0", icon: AlertTriangle, color: "text-red-400" },
+    { id: "revenue", label: "Revenue This Month", value: "₹0", icon: DollarSign, color: "text-green-400" },
+    { id: "plan", label: "Plan Limit", value: "0/10", icon: CreditCard, color: "text-primary" },
   ]);
 
   const [companies, setCompanies] = useState<any[]>([]);
@@ -55,14 +59,68 @@ const ExternalCADashboardReal = () => {
   const [aiChatInput, setAiChatInput] = useState("");
   const [aiMessages, setAiMessages] = useState<any[]>([]);
   const [draftText, setDraftText] = useState("");
+  const [isAddingCompany, setIsAddingCompany] = useState(false);
 
-  const addCompany = () => {
+  // Update stats when metrics change
+  useEffect(() => {
+    if (metrics) {
+      setStats((prevStats) =>
+        prevStats.map((stat) => {
+          switch (stat.id) {
+            case "companies":
+              return { ...stat, value: String(metrics.assigned_companies) };
+            case "tasks":
+              return { ...stat, value: String(metrics.active_tasks) };
+            case "due":
+              return { ...stat, value: String(metrics.pending_filings_week) };
+            case "alerts":
+              return { ...stat, value: String(metrics.high_risk_alerts) };
+            case "revenue":
+              return {
+                ...stat,
+                value: `₹${(metrics.monthly_revenue / 100000).toFixed(1)}L`,
+              };
+            case "plan":
+              return {
+                ...stat,
+                value: `${metrics.assigned_companies}/${10}`,
+              };
+            default:
+              return stat;
+          }
+        })
+      );
+    }
+  }, [metrics]);
+
+  const addCompany = async () => {
     if (!newCompanyPan.trim()) {
       toast.error("Enter valid PAN/CIN");
       return;
     }
-    toast.info(`Company added. Awaiting owner approval...`);
-    setNewCompanyPan("");
+
+    setIsAddingCompany(true);
+    try {
+      const result = await addCompanyAPI({
+        pan: newCompanyPan.toUpperCase(),
+        name: newCompanyPan,
+        industry: "Not Specified",
+      });
+
+      if (result.success) {
+        toast.success("Company added. Waiting for owner approval...");
+        setNewCompanyPan("");
+        // Refetch metrics after adding company
+        await refetch();
+      } else {
+        toast.error(result.error || "Failed to add company");
+      }
+    } catch (error) {
+      console.error("Error adding company:", error);
+      toast.error("Failed to add company. Please try again.");
+    } finally {
+      setIsAddingCompany(false);
+    }
   };
 
   const handleAiQuery = () => {
@@ -105,39 +163,65 @@ const ExternalCADashboardReal = () => {
                 <h2 className="text-2xl font-bold text-foreground">Control Tower</h2>
                 <p className="text-sm text-muted-foreground mt-1">Real-time metrics and status overview</p>
               </div>
-              <Button size="sm" variant="outline" className="gap-2">
-                <RefreshCw className="w-4 h-4" />
-                Refresh
+              <Button
+                size="sm"
+                variant="outline"
+                className="gap-2"
+                onClick={refetch}
+                disabled={loading}
+              >
+                <RefreshCw className={`w-4 h-4 ${loading ? "animate-spin" : ""}`} />
+                {loading ? "Refreshing..." : "Refresh"}
               </Button>
             </div>
 
-            <div className="grid grid-cols-2 md:grid-cols-3 lg:grid-cols-6 gap-4">
-              {stats.map((stat, index) => {
-                const Icon = stat.icon;
-                return (
-                  <motion.div
-                    key={stat.label}
-                    initial={{ opacity: 0, y: 20 }}
-                    animate={{ opacity: 1, y: 0 }}
-                    transition={{ delay: index * 0.05 }}
-                  >
-                    <Card className="glass-card border-border/50 hover:border-primary/30 transition-colors bg-cyan-500/5 border-cyan-500/20">
-                      <CardContent className="p-4">
-                        <div className="flex items-center gap-3">
-                          <div className={`p-2 rounded-lg bg-card/50 ${stat.color}`}>
-                            <Icon className="w-5 h-5" />
-                          </div>
-                          <div>
-                            <p className="text-2xl font-bold text-foreground">{stat.value}</p>
-                            <p className="text-xs text-muted-foreground">{stat.label}</p>
-                          </div>
+            {loading && stats.every((s) => s.value === "0" || s.value === "0/10") ? (
+              <div className="grid grid-cols-2 md:grid-cols-3 lg:grid-cols-6 gap-4">
+                {stats.map((stat) => (
+                  <Card key={stat.id} className="glass-card border-border/50 bg-cyan-500/5 border-cyan-500/20">
+                    <CardContent className="p-4">
+                      <div className="flex items-center gap-3">
+                        <div className={`p-2 rounded-lg bg-card/50 ${stat.color}`}>
+                          <Loader className="w-5 h-5 animate-spin" />
                         </div>
-                      </CardContent>
-                    </Card>
-                  </motion.div>
-                );
-              })}
-            </div>
+                        <div>
+                          <p className="text-2xl font-bold text-muted-foreground">--</p>
+                          <p className="text-xs text-muted-foreground">{stat.label}</p>
+                        </div>
+                      </div>
+                    </CardContent>
+                  </Card>
+                ))}
+              </div>
+            ) : (
+              <div className="grid grid-cols-2 md:grid-cols-3 lg:grid-cols-6 gap-4">
+                {stats.map((stat, index) => {
+                  const Icon = stat.icon;
+                  return (
+                    <motion.div
+                      key={stat.id}
+                      initial={{ opacity: 0, y: 20 }}
+                      animate={{ opacity: 1, y: 0 }}
+                      transition={{ delay: index * 0.05 }}
+                    >
+                      <Card className="glass-card border-border/50 hover:border-primary/30 transition-colors bg-cyan-500/5 border-cyan-500/20">
+                        <CardContent className="p-4">
+                          <div className="flex items-center gap-3">
+                            <div className={`p-2 rounded-lg bg-card/50 ${stat.color}`}>
+                              <Icon className="w-5 h-5" />
+                            </div>
+                            <div>
+                              <p className="text-2xl font-bold text-foreground">{stat.value}</p>
+                              <p className="text-xs text-muted-foreground">{stat.label}</p>
+                            </div>
+                          </div>
+                        </CardContent>
+                      </Card>
+                    </motion.div>
+                  );
+                })}
+              </div>
+            )}
           </motion.div>
 
           {/* Regulon AI Partner */}
@@ -248,8 +332,22 @@ const ExternalCADashboardReal = () => {
                     value={newCompanyPan}
                     onChange={(e) => setNewCompanyPan(e.target.value)}
                     className="bg-card border-border/50"
+                    disabled={isAddingCompany}
                   />
-                  <Button onClick={addCompany} className="bg-green-600 hover:bg-green-700">Add</Button>
+                  <Button
+                    onClick={addCompany}
+                    className="bg-green-600 hover:bg-green-700"
+                    disabled={isAddingCompany}
+                  >
+                    {isAddingCompany ? (
+                      <>
+                        <Loader className="w-4 h-4 mr-1 animate-spin" />
+                        Adding...
+                      </>
+                    ) : (
+                      "Add"
+                    )}
+                  </Button>
                 </div>
                 
                 {companies.length === 0 ? (
