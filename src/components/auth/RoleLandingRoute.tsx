@@ -34,12 +34,12 @@ export const resolveLandingPath = ({
 
   if (effectivePersona === "admin") return "/app/admin-dashboard";
   if (effectivePersona === "in_house_lawyer") return "/app/legal-dashboard";
-  if (effectivePersona === "external_ca" || effectivePersona === "in_house_ca") return "/app/ca-dashboard";
+  if (effectivePersona === "external_ca" || effectivePersona === "in_house_ca") return "/real-ca-dashboard";
   if (effectivePersona === "ca_firm") return "/app/ca-firm-dashboard";
   if (effectivePersona === "company_owner") return "/app/dashboard";
 
   if (roles.includes("admin")) return "/app/admin-dashboard";
-  if (roles.includes("manager")) return "/app/ca-dashboard";
+  if (roles.includes("manager")) return "/real-ca-dashboard";
   return "/app/dashboard";
 };
 
