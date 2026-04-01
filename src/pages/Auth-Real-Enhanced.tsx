@@ -289,6 +289,7 @@ const AuthReal = () => {
   const getDashboardRoute = (role: string): string => {
     switch (role) {
       case "external_ca":
+        return "/real-external-ca-dashboard";
       case "in_house_ca":
       case "ca_firm":
         return "/ca-dashboard";
