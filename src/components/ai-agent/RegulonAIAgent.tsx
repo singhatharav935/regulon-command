@@ -188,10 +188,10 @@ const RegulonAIAgent = () => {
         }
       };
 
-      // Start listening immediately for wake-word
-      recognitionRef.current.start();
+      // DON'T auto-start - user must click to activate
+      // This respects user privacy and matches standard voice assistant behavior
     }
-  }, [isListening]);
+  }, []);
 
   // Initialize Daily Tasks
   useEffect(() => {
@@ -588,8 +588,16 @@ What would you like me to do next?`;
     if (isListening) {
       recognitionRef.current.stop();
       setIsListening(false);
+      toast.info("Voice assistant stopped");
     } else {
-      recognitionRef.current.start();
+      try {
+        recognitionRef.current.start();
+        setIsListening(true);
+        toast.success('Voice assistant active - Say "Hey Regulon"');
+      } catch (error) {
+        console.error("Failed to start speech recognition:", error);
+        toast.error("Failed to start voice recognition");
+      }
     }
   };
 
@@ -758,7 +766,10 @@ What would you like me to do next?`;
         animate={{ opacity: 1, x: 0 }}
         className="fixed top-20 right-6 z-50"
       >
-        <Card className="glass-card border-cyan-500/30 bg-gradient-to-br from-cyan-500/10 to-blue-500/10 shadow-xl">
+        <Card 
+          className="glass-card border-cyan-500/30 bg-gradient-to-br from-cyan-500/10 to-blue-500/10 shadow-xl cursor-pointer hover:shadow-2xl transition-all duration-300 hover:scale-105"
+          onClick={toggleVoiceInput}
+        >
           <CardContent className="p-4">
             <div className="flex items-center gap-3">
               <motion.div
@@ -782,7 +793,7 @@ What would you like me to do next?`;
                   {isListening ? "Listening..." : "Regulon AI"}
                 </p>
                 <p className="text-xs text-muted-foreground">
-                  {isListening ? '🎤 Say "Hey Regulon"' : "Ready"}
+                  {isListening ? '🎤 Say "Hey Regulon"' : "Click to activate"}
                 </p>
               </div>
             </div>
