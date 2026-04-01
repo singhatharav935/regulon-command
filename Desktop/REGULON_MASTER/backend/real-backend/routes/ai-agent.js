@@ -61,7 +61,46 @@ router.post('/agent/execute-tool', async (req, res) => {
 });
 
 /**
- * POST /api/v1/ai/agent/daily-governance
+ * GET /api/ca/daily-governance
+ * Generate daily compliance brief with real data
+ */
+router.get('/daily-governance', async (req, res) => {
+  try {
+    const ca_id = req.user?.id;
+    if (!ca_id) return res.status(401).json({ success: false, error: 'Unauthorized' });
+
+    // Fetch real data from database (simulated for now)
+    const assignedCompanies = await getAssignedCompanies(ca_id);
+    const pendingTasks = await getPendingTasks(ca_id);
+    const dueIn7Days = await getDueTasksIn7Days(ca_id);
+    const highRiskAlerts = await getHighRiskAlerts(ca_id);
+    const revenueThisMonth = await getMonthlyRevenue(ca_id);
+    const planLimit = calculatePlanUsage(assignedCompanies.length);
+
+    res.json({
+      success: true,
+      data: {
+        assignedCompanies,
+        pendingTasks,
+        dueIn7Days,
+        highRiskAlerts,
+        revenueThisMonth,
+        planLimit,
+        aiSummary: generateAISummary(assignedCompanies, pendingTasks, highRiskAlerts),
+        generated_at: new Date().toISOString(),
+      },
+    });
+  } catch (error) {
+    console.error('Daily governance error:', error);
+    res.status(500).json({
+      success: false,
+      error: 'Failed to generate daily brief',
+    });
+  }
+});
+
+/**
+ * POST /api/v1/ai/agent/daily-governance (Legacy)
  * Generate daily compliance brief and task list
  */
 router.post('/agent/daily-governance', async (req, res) => {
@@ -92,10 +131,6 @@ router.post('/agent/daily-governance', async (req, res) => {
   }
 });
 
-/**
- * POST /api/v1/ai/agent/query
- * Process natural language queries with tool selection
- */
 router.post('/agent/query', async (req, res) => {
   try {
     const { query, ca_id } = req.body;
@@ -137,6 +172,93 @@ router.post('/agent/query', async (req, res) => {
     res.status(500).json({
       success: false,
       error: 'Failed to process query',
+    });
+  }
+});
+
+/**
+ * POST /api/ca/action-execute
+ * Execute direct actions (balance sheet, audit, etc.)
+ */
+router.post('/action-execute', async (req, res) => {
+  try {
+    const ca_id = req.user?.id;
+    const { action, company_id } = req.body;
+
+    if (!ca_id) return res.status(401).json({ success: false, error: 'Unauthorized' });
+    if (!action || !company_id) {
+      return res.status(400).json({ success: false, error: 'action and company_id required' });
+    }
+
+    let result;
+    const actionLog = {
+      ca_id,
+      company_id,
+      action_type: action,
+      started_at: new Date().toISOString(),
+      status: 'processing',
+    };
+
+    switch (action) {
+      case 'balance_sheet':
+        result = await generateBalanceSheet(company_id);
+        break;
+      case 'audit_financials':
+        result = await runAuditFinancials(company_id);
+        break;
+      case 'check_notices':
+        result = await checkGovernmentNotices(company_id);
+        break;
+      case 'reconcile_gst':
+        result = await reconcileGSTTool({ client_id: company_id, tax_period: 'current' });
+        break;
+      case 'verify_documents':
+        result = await verifyDocumentIntegrity(company_id);
+        break;
+      case 'generate_report':
+        result = await generateComplianceReport(company_id);
+        break;
+      default:
+        return res.status(400).json({ success: false, error: `Unknown action: ${action}` });
+    }
+
+    actionLog.status = 'completed';
+    actionLog.completed_at = new Date().toISOString();
+
+    res.json({
+      success: true,
+      data: result,
+      action_log: actionLog,
+    });
+  } catch (error) {
+    console.error('Action execution error:', error);
+    res.status(500).json({
+      success: false,
+      error: error instanceof Error ? error.message : 'Action execution failed',
+    });
+  }
+});
+
+/**
+ * GET /api/ca/clients/portfolio
+ * Fetch all assigned companies for a CA
+ */
+router.get('/clients/portfolio', async (req, res) => {
+  try {
+    const ca_id = req.user?.id;
+    if (!ca_id) return res.status(401).json({ success: false, error: 'Unauthorized' });
+
+    const companies = await getAssignedCompanies(ca_id);
+
+    res.json({
+      success: true,
+      data: companies,
+    });
+  } catch (error) {
+    console.error('Portfolio fetch error:', error);
+    res.status(500).json({
+      success: false,
+      error: 'Failed to fetch portfolio',
     });
   }
 });
@@ -461,6 +583,144 @@ async function calculateFileHash(filePath: string): Promise<string> {
 async function fetchGovernmentHash(fileName: string): Promise<string> {
   // Mock - replace with actual government API
   return 'a3f4d8e2f1b9c6a7e9f2d1c8b5a3e6f7';
+}
+
+// ========================================
+// NEW HELPER FUNCTIONS FOR REAL DATA
+// ========================================
+
+async function getAssignedCompanies(ca_id) {
+  // Mock - replace with actual DB query
+  // In production: SELECT * FROM companies WHERE assigned_ca_id = ca_id
+  return [
+    {
+      id: 'comp-001',
+      name: 'Acme Corporation Pvt. Ltd.',
+      gstin: '18AAFAM1234B1Z5',
+      health_score: 85,
+      status: 'active',
+      last_filing: new Date(Date.now() - 5 * 24 * 60 * 60 * 1000).toISOString(),
+    },
+    {
+      id: 'comp-002',
+      name: 'Innovation Solutions Inc.',
+      gstin: '27BJKPS3456C1Z0',
+      health_score: 72,
+      status: 'active',
+      last_filing: new Date(Date.now() - 10 * 24 * 60 * 60 * 1000).toISOString(),
+    },
+    {
+      id: 'comp-003',
+      name: 'Global Tech Services',
+      gstin: '33ACFPT7890D1Z2',
+      health_score: 91,
+      status: 'active',
+      last_filing: new Date(Date.now() - 3 * 24 * 60 * 60 * 1000).toISOString(),
+    },
+  ];
+}
+
+async function getPendingTasks(ca_id) {
+  // Mock - replace with DB query
+  return 5;
+}
+
+async function getDueTasksIn7Days(ca_id) {
+  // Mock - replace with DB query
+  return 3;
+}
+
+async function getHighRiskAlerts(ca_id) {
+  // Mock - replace with DB query
+  return 1;
+}
+
+async function getMonthlyRevenue(ca_id) {
+  // Mock - replace with Stripe/Razorpay API
+  return 125000; // In Rupees
+}
+
+function calculatePlanUsage(companiesCount) {
+  // Assuming max 10 companies per plan
+  return Math.round((companiesCount / 10) * 100);
+}
+
+function generateAISummary(companies, tasks, alerts) {
+  return `Good morning! You're managing ${companies.length} companies with ${tasks} pending tasks and ${alerts} high-risk alert${alerts !== 1 ? 's' : ''}. Your plan usage is at ${calculatePlanUsage(companies.length)}%. Focus on critical compliance deadlines today.`;
+}
+
+async function generateBalanceSheet(company_id) {
+  // Mock - In production, fetch from company records and generate PDF
+  return {
+    action: 'balance_sheet',
+    company_id,
+    status: 'generated',
+    pages: 12,
+    file_name: 'BalanceSheet_FY2024.pdf',
+    size_bytes: 524288,
+    generated_at: new Date().toISOString(),
+    requires_approval: true,
+  };
+}
+
+async function runAuditFinancials(company_id) {
+  // Mock - In production, run actual audit procedures
+  return {
+    action: 'audit_financials',
+    company_id,
+    status: 'completed',
+    audit_items_checked: 47,
+    anomalies_found: 2,
+    pages: 18,
+    file_name: 'AuditReport_FY2024.pdf',
+    requires_approval: true,
+  };
+}
+
+async function checkGovernmentNotices(company_id) {
+  // Mock - In production, query government APIs (GSTN, MCA, etc.)
+  return {
+    action: 'check_notices',
+    company_id,
+    status: 'completed',
+    new_notices: 0,
+    pending_notices: 1,
+    total_notices: 3,
+    notices: [
+      {
+        id: 'notice-001',
+        type: 'GST Notice',
+        issued_date: '2024-03-15',
+        action_required: true,
+      },
+    ],
+  };
+}
+
+async function verifyDocumentIntegrity(company_id) {
+  // Mock - In production, verify against government registries
+  return {
+    action: 'verify_documents',
+    company_id,
+    status: 'completed',
+    documents_verified: 23,
+    documents_tampered: 0,
+    integrity_score: 100,
+    all_safe: true,
+  };
+}
+
+async function generateComplianceReport(company_id) {
+  // Mock - In production, generate comprehensive compliance report
+  return {
+    action: 'generate_report',
+    company_id,
+    status: 'generated',
+    pages: 8,
+    file_name: 'ComplianceReport_Q1_2024.pdf',
+    includes: ['GST status', 'Filing deadlines', 'Compliance score', 'Risk assessment'],
+    requires_approval: true,
+  };
 }
 
 export default router;

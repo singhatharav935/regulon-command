@@ -126,7 +126,9 @@ app.use(`/api/${apiVersion}/auth`, authRoutes);
 app.use(`/api/${apiVersion}/company`, companyRoutes);
 app.use(`/api/${apiVersion}/ca`, caRoutes);
 app.use(`/api/${apiVersion}/ca`, caDashboardRoutes); // CA Dashboard routes
+app.use(`/api/${apiVersion}/ca`, aiAgentRoutes); // CA AI Agent routes (via /api/v1/ca/...)
 app.use(`/api/${apiVersion}/ai`, aiAgentRoutes); // Autonomous AI Agent routes
+app.use(`/api/ca`, aiAgentRoutes); // Legacy CA routes without version
 app.use(`/api/${apiVersion}/admin`, adminRoutes);
 app.use(`/api/${apiVersion}/documents`, documentRoutes);
 app.use(`/api/${apiVersion}/notifications`, notificationRoutes);
