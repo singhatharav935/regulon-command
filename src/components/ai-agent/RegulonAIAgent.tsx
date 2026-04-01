@@ -36,6 +36,7 @@ import {
   FileText,
   Eye,
   X,
+  MessageSquare,
 } from "lucide-react";
 import { toast } from "sonner";
 
@@ -793,8 +794,10 @@ What would you like me to do next?`;
                 <Bot className="w-5 h-5 text-cyan-400" />
               </div>
               <div>
-                <CardTitle className="text-cyan-400">Regulon AI Executive</CardTitle>
-                <CardDescription>Autonomous agent for compliance management</CardDescription>
+                <CardTitle className="text-cyan-400">Regulon AI Voice Agent</CardTitle>
+                <CardDescription>
+                  Say <span className="text-cyan-400 font-semibold">"Hey Regulon"</span> to activate voice mode | Or type commands below
+                </CardDescription>
               </div>
             </div>
             <Badge 
@@ -941,9 +944,13 @@ What would you like me to do next?`;
 
           {/* User Input */}
           <div className="space-y-3">
+            <label className="text-sm font-medium text-cyan-400 flex items-center gap-2">
+              <MessageSquare className="w-4 h-4" />
+              Manual Text Input (or say "Hey Regulon" for voice)
+            </label>
             <div className="flex gap-2">
               <Textarea
-                placeholder="Type command (e.g., 'Draft GSTR-3B response', 'Reconcile GST data', 'Verify document hash')"
+                placeholder='Type your command here... Examples:\n• "Draft GSTR-3B response for my client"\n• "Check pending GST notices"\n• "Reconcile GST data"\n• "Verify document hash"'
                 value={userInput}
                 onChange={(e) => setUserInput(e.target.value)}
                 onKeyDown={(e) => {
@@ -952,7 +959,7 @@ What would you like me to do next?`;
                   }
                 }}
                 disabled={isProcessing}
-                className="min-h-20 resize-none bg-card border-border/50"
+                className="min-h-24 resize-none bg-card border-border/50"
               />
             </div>
 
