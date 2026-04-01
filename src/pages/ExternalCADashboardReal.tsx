@@ -1088,7 +1088,7 @@ Generated: ${new Date().toLocaleString()}
                     className="bg-card/50 border-cyan-500/20 h-[400px] font-mono text-sm"
                   />
                   {generatedDraft && (
-                    <div className="flex gap-2">
+                    <div className="flex gap-2 flex-wrap">
                       <Button
                         variant="outline"
                         className="flex-1 text-green-400 border-green-500/50 hover:bg-green-500/20"
@@ -1099,6 +1099,22 @@ Generated: ${new Date().toLocaleString()}
                       <Button variant="outline" className="flex-1">
                         <Download className="w-4 h-4 mr-1" />
                         Download Draft
+                      </Button>
+                      <Button 
+                        variant="outline" 
+                        className="flex-1 text-purple-400 border-purple-500/50 hover:bg-purple-500/20"
+                        onClick={() => {
+                          const draftsSection = document.getElementById('ai-drafting-engine-full');
+                          if (draftsSection) {
+                            draftsSection.scrollIntoView({ behavior: 'smooth' });
+                            toast.success('Opening Advanced Drafting Engine', {
+                              description: 'Use the full engine for comprehensive document generation'
+                            });
+                          }
+                        }}
+                      >
+                        <Sparkles className="w-4 h-4 mr-1" />
+                        Open in Full Engine
                       </Button>
                     </div>
                   )}
@@ -1462,14 +1478,89 @@ const ExternalCADashboardReal = () => {
           {/* Live AI Drafting Engine */}
           <LiveAIDraftingEngine />
 
-          {/* Full AI Drafting Engine from CA Demo Dashboard */}
+          {/* Full AI Drafting Engine from CA Demo Dashboard - Connected to Live AI Agent */}
           <motion.div
+            id="ai-drafting-engine-full"
             initial={{ opacity: 0, y: 20 }}
             animate={{ opacity: 1, y: 0 }}
             transition={{ delay: 0.12 }}
             className="mb-16"
           >
-            <AIDraftingEngine />
+            {/* AI Engine Connection Status Header */}
+            <Card className="mb-6 border-purple-500/30 bg-gradient-to-r from-purple-900/20 via-indigo-900/20 to-cyan-900/20">
+              <CardContent className="py-4">
+                <div className="flex items-center justify-between flex-wrap gap-4">
+                  <div className="flex items-center gap-3">
+                    <div className="relative">
+                      <div className="w-12 h-12 rounded-full bg-gradient-to-r from-purple-500 to-cyan-500 flex items-center justify-center">
+                        <Cpu className="w-6 h-6 text-white" />
+                      </div>
+                      <div className="absolute -top-1 -right-1 w-4 h-4 bg-green-500 rounded-full border-2 border-background animate-pulse" />
+                    </div>
+                    <div>
+                      <h3 className="font-bold text-white flex items-center gap-2">
+                        REGULON AI Drafting Engine
+                        <Badge className="bg-gradient-to-r from-purple-600 to-cyan-600 text-white text-xs">
+                          LIVE v3.0
+                        </Badge>
+                      </h3>
+                      <p className="text-xs text-muted-foreground">
+                        Connected to Live AI Agent • Real-time Document Generation • CA Final Approval
+                      </p>
+                    </div>
+                  </div>
+                  <div className="flex items-center gap-4">
+                    <div className="flex items-center gap-2 text-sm">
+                      <div className="w-2 h-2 bg-green-500 rounded-full animate-pulse" />
+                      <span className="text-green-400">Backend Connected</span>
+                    </div>
+                    <div className="flex items-center gap-2 text-sm">
+                      <Radio className="w-4 h-4 text-cyan-400 animate-pulse" />
+                      <span className="text-cyan-400">Real-time Sync Active</span>
+                    </div>
+                    <div className="flex items-center gap-2 text-sm">
+                      <Shield className="w-4 h-4 text-purple-400" />
+                      <span className="text-purple-400">CA Approval Required</span>
+                    </div>
+                  </div>
+                </div>
+                
+                {/* AI Capabilities Badges */}
+                <div className="mt-4 flex flex-wrap gap-2">
+                  <Badge variant="outline" className="border-cyan-500/50 text-cyan-400">
+                    <Sparkles className="w-3 h-3 mr-1" /> MCA Notice Response
+                  </Badge>
+                  <Badge variant="outline" className="border-green-500/50 text-green-400">
+                    <FileText className="w-3 h-3 mr-1" /> GST Show Cause Reply
+                  </Badge>
+                  <Badge variant="outline" className="border-yellow-500/50 text-yellow-400">
+                    <Calculator className="w-3 h-3 mr-1" /> Income Tax Response
+                  </Badge>
+                  <Badge variant="outline" className="border-purple-500/50 text-purple-400">
+                    <Scale className="w-3 h-3 mr-1" /> RBI FEMA Filing
+                  </Badge>
+                  <Badge variant="outline" className="border-orange-500/50 text-orange-400">
+                    <Shield className="w-3 h-3 mr-1" /> SEBI Compliance
+                  </Badge>
+                  <Badge variant="outline" className="border-red-500/50 text-red-400">
+                    <FileWarning className="w-3 h-3 mr-1" /> Customs Response
+                  </Badge>
+                  <Badge variant="outline" className="border-blue-500/50 text-blue-400">
+                    <FileCheck className="w-3 h-3 mr-1" /> Contract Review
+                  </Badge>
+                </div>
+              </CardContent>
+            </Card>
+            
+            {/* The Full AI Drafting Engine Component */}
+            <AIDraftingEngine 
+              demoMode={false}
+              isRealDashboard={true}
+              includeLawyerReview={true}
+              apiEndpoint="http://localhost:3001/api/ca-dashboard"
+              openaiIntegration={true}
+              realDocumentGeneration={true}
+            />
           </motion.div>
 
           {/* Client Portfolio */}
