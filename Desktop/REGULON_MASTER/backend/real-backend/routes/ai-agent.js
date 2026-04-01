@@ -311,7 +311,7 @@ router.post('/agent/approve-document', async (req, res) => {
  * Tool: draft_response
  * Draft legal documents using OCR and LLM
  */
-async function draftResponseTool(params: any) {
+async function draftResponseTool(params) {
   const { notice_pdf, mode = 'auto', client_id } = params;
 
   try {
@@ -342,7 +342,7 @@ async function draftResponseTool(params: any) {
  * Tool: reconcile_gst
  * Compare purchase register with GSTR-2A
  */
-async function reconcileGSTTool(params: any) {
+async function reconcileGSTTool(params) {
   const { client_id, tax_period } = params;
 
   try {
@@ -385,7 +385,7 @@ async function reconcileGSTTool(params: any) {
  * Tool: fetch_document_hash
  * Verify document integrity via government registry
  */
-async function fetchDocumentHashTool(params: any) {
+async function fetchDocumentHashTool(params) {
   const { file_name, file_path, client_id } = params;
 
   try {
@@ -418,7 +418,7 @@ async function fetchDocumentHashTool(params: any) {
 // HELPER FUNCTIONS
 // ========================================
 
-async function fetchCriticalComplianceTasks(ca_id: string) {
+async function fetchCriticalComplianceTasks(ca_id) {
   // Mock implementation - replace with DB call
   return [
     {
@@ -440,7 +440,7 @@ async function fetchCriticalComplianceTasks(ca_id: string) {
   ];
 }
 
-function generateDailyBrief(tasks: any[]) {
+function generateDailyBrief(tasks) {
   const criticalTasks = tasks.filter(t => t.priority === 'critical');
   const briefLines = [
     `Good morning! I've analyzed your compliance calendar.`,
@@ -453,7 +453,7 @@ function generateDailyBrief(tasks: any[]) {
   return briefLines.join('\n');
 }
 
-async function determineIntent(query: string) {
+async function determineIntent(query) {
   // Mock implementation - replace with OpenAI function calling
   const queryLower = query.toLowerCase();
 
@@ -491,7 +491,7 @@ async function determineIntent(query: string) {
   };
 }
 
-async function generateGeneralResponse(query: string) {
+async function generateGeneralResponse(query) {
   return {
     response: `I can help with compliance tasks. I understand you're asking about: "${query}". Please be more specific (e.g., "Draft a response", "Reconcile GSTR", "Verify document").`,
     suggestions: [
@@ -502,12 +502,12 @@ async function generateGeneralResponse(query: string) {
   };
 }
 
-async function extractPDFText(pdfPath: string) {
+async function extractPDFText(pdfPath) {
   // Mock - replace with actual AWS Textract or similar
   return 'Mock extracted text from PDF. In production, use AWS Textract or Google Vision API.';
 }
 
-async function analyzeLegalDocument(text: string) {
+async function analyzeLegalDocument(text) {
   // Mock - replace with OpenAI analysis
   return {
     document_type: 'GST Notice',
@@ -517,7 +517,7 @@ async function analyzeLegalDocument(text: string) {
   };
 }
 
-function generateStructuredResponse(analysis: any) {
+function generateStructuredResponse(analysis) {
   return `RESPONSE TO GST NOTICE
   
 Based on document type: ${analysis.document_type}
@@ -531,7 +531,7 @@ ${analysis.relevant_sections.map(s => `- ${s}`).join('\n')}
 [Continue with detailed legal arguments...]`;
 }
 
-async function fetchGSTR2AData(client_id: string, tax_period: string) {
+async function fetchGSTR2AData(client_id, tax_period) {
   // Mock - replace with actual GSTR-2A API
   return {
     total: 4850000,
@@ -539,7 +539,7 @@ async function fetchGSTR2AData(client_id: string, tax_period: string) {
   };
 }
 
-async function fetchPurchaseRegister(client_id: string, tax_period: string) {
+async function fetchPurchaseRegister(client_id, tax_period) {
   // Mock - replace with DB call
   return {
     total: 5000000,
@@ -547,7 +547,7 @@ async function fetchPurchaseRegister(client_id: string, tax_period: string) {
   };
 }
 
-function identifyMismatches(register: any, gstr2a: any) {
+function identifyMismatches(register, gstr2a) {
   return [
     {
       invoice_number: 'INV-001',
@@ -559,7 +559,7 @@ function identifyMismatches(register: any, gstr2a: any) {
   ];
 }
 
-function generateReconciliationRecommendations(mismatches: any[]) {
+function generateReconciliationRecommendations(mismatches) {
   return [
     'Contact vendors for confirmation of invoice amounts',
     'Verify GSTR-1 filing status',
@@ -567,7 +567,7 @@ function generateReconciliationRecommendations(mismatches: any[]) {
   ];
 }
 
-function generateActionItems(mismatches: any[]) {
+function generateActionItems(mismatches) {
   return [
     '□ Follow up with 3 vendors',
     '□ Verify 2 invoice amounts',
@@ -575,12 +575,12 @@ function generateActionItems(mismatches: any[]) {
   ];
 }
 
-async function calculateFileHash(filePath: string): Promise<string> {
+async function calculateFileHash(filePath) {
   // Mock SHA-256 calculation
   return 'a3f4d8e2f1b9c6a7e9f2d1c8b5a3e6f7';
 }
 
-async function fetchGovernmentHash(fileName: string): Promise<string> {
+async function fetchGovernmentHash(fileName) {
   // Mock - replace with actual government API
   return 'a3f4d8e2f1b9c6a7e9f2d1c8b5a3e6f7';
 }
