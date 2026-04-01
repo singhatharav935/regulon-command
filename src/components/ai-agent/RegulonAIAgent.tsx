@@ -82,6 +82,8 @@ const RegulonAIAgent = () => {
   const [showSiriInterface, setShowSiriInterface] = useState(false);
   const [wakeWordDetected, setWakeWordDetected] = useState(false);
   const [listeningText, setListeningText] = useState("");
+  const [dailyBrief, setDailyBrief] = useState("");
+  const [showBriefing, setShowBriefing] = useState(false);
 
   // Refs
   const recognitionRef = useRef<SpeechRecognition | null>(null);
