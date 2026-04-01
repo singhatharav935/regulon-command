@@ -137,23 +137,30 @@ const AuthReal = () => {
         return;
       }
 
-      const response = await enhancedAuth.register(
+      // Use local demo mode directly
+      const localResponse = await createLocalDemoUser(
         email.trim(),
         password,
         fullName.trim(),
         registrationRole,
-        entityName.trim() || undefined,
-        rememberMe
+        entityName.trim() || undefined
       );
 
-      toast({
-        title: "Account Created!",
-        description: "Please check your email to verify your account.",
-      });
+      if (localResponse.success && localResponse.user) {
+        toast({
+          title: "✅ Account Created Successfully!",
+          description: `Welcome to REGULON, ${fullName}! Redirecting to your dashboard...`,
+        });
 
-      // Show email verification flow
-      setCurrentUser(response.user);
-      setMode('email-verification');
+        // Store user info
+        localStorage.setItem('pending_registration_role', registrationRole);
+        
+        setTimeout(() => {
+          navigate('/persona-selector');
+        }, 500);
+      } else {
+        throw new Error(localResponse.error || "Failed to create account");
+      }
     } catch (error: any) {
       console.error("Registration error:", error);
       toast({
@@ -167,52 +174,41 @@ const AuthReal = () => {
   };
 
   const handleMultiStepRegistration = async (formData: RegistrationFormData) => {
+    // Skip enhanced auth and use local demo mode directly
+    console.log("Using local demo mode for registration");
+    
     try {
-      // Try enhanced auth first
-      const response = await enhancedAuth.register(
+      const localResponse = await createLocalDemoUser(
         formData.email,
         formData.password,
         formData.fullName,
         formData.registrationRole,
-        formData.entityName,
-        false // rememberMe handled separately
+        formData.entityName
       );
 
-      toast({
-        title: "Account Created!",
-        description: "Please check your email to verify your account.",
-      });
+      if (localResponse.success && localResponse.user) {
+        toast({
+          title: "✅ Account Created Successfully!",
+          description: `Welcome to REGULON, ${formData.fullName}! Redirecting to your dashboard...`,
+        });
 
-      setCurrentUser(response.user);
-      setMode('email-verification');
-    } catch (error: any) {
-      console.log("Enhanced auth failed, trying local demo mode:", error);
-      
-      try {
-        // Fallback to local demo auth
-        const localResponse = await createLocalDemoUser(
-          formData.email,
-          formData.password,
-          formData.fullName,
-          formData.registrationRole,
-          formData.entityName
-        );
-
-        if (localResponse.success && localResponse.user) {
-          toast({
-            title: "Account Created Successfully!",
-            description: "Welcome to REGULON! You can now access your dashboard.",
-          });
-
-          // Navigate directly to dashboard since it's demo mode
+        // Store user info for persona selector
+        localStorage.setItem('pending_registration_role', formData.registrationRole);
+        
+        // Small delay for toast to show
+        setTimeout(() => {
           navigate('/persona-selector');
-        } else {
-          throw new Error("Failed to create demo account");
-        }
-      } catch (fallbackError: any) {
-        console.error("Both enhanced auth and local demo failed:", fallbackError);
-        throw new Error("Registration failed. Please try again later or contact support.");
+        }, 500);
+      } else {
+        throw new Error(localResponse.error || "Failed to create account");
       }
+    } catch (error: any) {
+      console.error("Registration error:", error);
+      toast({
+        title: "Registration Failed",
+        description: error.message || "Failed to create account. Please try again.",
+        variant: "destructive",
+      });
     }
   };
 
