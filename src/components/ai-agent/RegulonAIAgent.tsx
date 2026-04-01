@@ -87,41 +87,86 @@ const RegulonAIAgent = () => {
   const recognitionRef = useRef<SpeechRecognition | null>(null);
   const synthesisRef = useRef<SpeechSynthesisUtterance | null>(null);
 
-  // Initialize Speech Recognition
+  // Initialize Speech Recognition with "Hey Regulon" wake-word detection
   useEffect(() => {
     const SpeechRecognition =
       window.SpeechRecognition || (window as any).webkitSpeechRecognition;
     if (SpeechRecognition) {
       recognitionRef.current = new SpeechRecognition();
-      recognitionRef.current.continuous = false;
+      recognitionRef.current.continuous = true; // Always listening for wake-word
       recognitionRef.current.interimResults = true;
 
       recognitionRef.current.onstart = () => {
-        setIsListening(true);
+        // Listening for wake-word in background
       };
 
       recognitionRef.current.onresult = (event: any) => {
         let transcript = "";
+        let isFinal = false;
+
         for (let i = event.resultIndex; i < event.results.length; i++) {
           transcript += event.results[i][0].transcript;
+          if (event.results[i].isFinal) {
+            isFinal = true;
+          }
         }
-        if (event.isFinal) {
+
+        const lowerTranscript = transcript.toLowerCase().trim();
+
+        // Check for "Hey Regulon" wake-word
+        if (isFinal && (lowerTranscript.includes("hey regulon") || lowerTranscript.startsWith("hey regulon"))) {
+          setIsListening(true);
+          toast.success("Regulon activated! Listening for your command...");
+          
+          // Send wake-word event to backend
+          fetch("/api/ca/voice/wake-word", {
+            method: "POST",
+            headers: {
+              "Content-Type": "application/json",
+              "Authorization": `Bearer ${localStorage.getItem("token") || "ca-token-123"}`,
+            },
+            body: JSON.stringify({
+              event: "wake_word_detected",
+              timestamp: new Date().toISOString(),
+              ca_id: "ca-001",
+            }),
+          }).catch(err => console.error("Wake-word logging failed:", err));
+
+          // Extract command after "Hey Regulon"
+          const commandText = lowerTranscript
+            .replace(/hey regulon[\s,]*/i, "")
+            .trim();
+
+          if (commandText) {
+            setUserInput(commandText);
+            handleAgentQuery(commandText);
+          }
+        }
+        // Only process normal commands if already listening
+        else if (isListening && isFinal && transcript.length > 2) {
           setUserInput(transcript);
           handleAgentQuery(transcript);
         }
       };
 
       recognitionRef.current.onend = () => {
-        setIsListening(false);
+        // Restart listening for wake-word
+        if (recognitionRef.current && !isListening) {
+          recognitionRef.current.start();
+        }
       };
 
       recognitionRef.current.onerror = (event: any) => {
         console.error("Speech recognition error:", event.error);
-        setIsListening(false);
-        toast.error("Voice recognition failed. Try again.");
+        if (event.error !== "no-speech") {
+          setIsListening(false);
+        }
       };
+
+      // Start listening immediately for wake-word
+      recognitionRef.current.start();
     }
-  }, []);
+  }, [isListening]);
 
   // Initialize Daily Tasks
   useEffect(() => {
@@ -213,6 +258,35 @@ Would you like me to start drafting the GSTR-3B response?`;
     try {
       // Add user message to activity
       addActivity("message", "Your Request", query);
+
+      // Send voice command to backend (if spoken)
+      if (isListening) {
+        try {
+          const voiceResponse = await fetch("/api/ca/voice/command", {
+            method: "POST",
+            headers: {
+              "Content-Type": "application/json",
+              "Authorization": `Bearer ${localStorage.getItem("token") || "ca-token-123"}`,
+            },
+            body: JSON.stringify({
+              command: query,
+              ca_id: "ca-001",
+              timestamp: new Date().toISOString(),
+            }),
+          });
+
+          if (voiceResponse.ok) {
+            const voiceData = await voiceResponse.json();
+            console.log("[VOICE] Command processed:", voiceData);
+            // Add the backend response to activity log
+            if (voiceData.log_entry) {
+              addActivity(voiceData.action, "Voice Command", voiceData.response);
+            }
+          }
+        } catch (voiceError) {
+          console.error("Voice command logging failed:", voiceError);
+        }
+      }
 
       // Determine intent and execute tool
       if (
@@ -584,8 +658,16 @@ What would you like me to do next?`;
                 <CardDescription>Autonomous agent for compliance management</CardDescription>
               </div>
             </div>
-            <Badge variant="outline" className="bg-green-500/10 text-green-400 border-green-500/50">
-              {isProcessing ? "Processing..." : "Ready"}
+            <Badge 
+              variant="outline" 
+              className={`${
+                isListening 
+                  ? "bg-blue-500/20 text-blue-400 border-blue-500/50 animate-pulse" 
+                  : "bg-green-500/10 text-green-400 border-green-500/50"
+              }`}
+            >
+              {isListening && "🎤 Listening for 'Hey Regulon'..."}
+              {!isListening && (isProcessing ? "Processing..." : "Ready")}
             </Badge>
           </div>
         </CardHeader>
