@@ -537,20 +537,6 @@ What would you like me to do next?`;
 
   return (
     <div className="space-y-6">
-      {/* 🔴 PROOF OF COMPONENT LOAD */}
-      <motion.div
-        initial={{ opacity: 0, scale: 0.95 }}
-        animate={{ opacity: 1, scale: 1 }}
-        className="bg-gradient-to-r from-red-600 to-orange-600 text-white p-4 rounded-lg border-2 border-red-500 shadow-2xl shadow-red-600/50"
-      >
-        <div className="text-center font-bold text-lg">
-          🔴 REGULON AI EXECUTIVE SYSTEM LOADED ✅
-        </div>
-        <div className="text-center text-sm mt-1 opacity-90">
-          All 9 Advanced Features Active: Voice • Governance • Actions • Telemetry • Logs • Queue • Terminal • Reconciliation • Authorization
-        </div>
-      </motion.div>
-
       {/* Daily Briefing Card */}
       {dailyBrief && (
         <motion.div
