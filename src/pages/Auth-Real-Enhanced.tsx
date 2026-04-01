@@ -91,6 +91,23 @@ const AuthReal = () => {
     { value: "admin", label: "Admin", icon: Briefcase, description: "System administrator" },
   ];
 
+  // Dashboard route mapper - defined early so it can be used in handlers
+  const getDashboardRoute = (role: string): string => {
+    switch (role) {
+      case "external_ca":
+        return "/real-external-ca-dashboard";
+      case "in_house_ca":
+      case "ca_firm":
+        return "/ca-dashboard";
+      case "admin":
+        return "/admin-dashboard";
+      case "in_house_lawyer":
+        return "/lawyer-dashboard";
+      default:
+        return "/dashboard";
+    }
+  };
+
   const selectedRole = roleOptions.find(r => r.value === registrationRole);
 
   const handleLogin = async (e: React.FormEvent) => {
@@ -192,12 +209,16 @@ const AuthReal = () => {
           description: `Welcome to REGULON, ${formData.fullName}! Redirecting to your dashboard...`,
         });
 
-        // Store user info for persona selector
+        // Store user info and role
         localStorage.setItem('pending_registration_role', formData.registrationRole);
+        localStorage.setItem('current_user_role', formData.registrationRole);
         
-        // Small delay for toast to show
+        // Get the correct dashboard route based on role
+        const dashboardRoute = getDashboardRoute(formData.registrationRole);
+        
+        // Small delay for toast to show, then redirect to dashboard
         setTimeout(() => {
-          navigate('/persona-selector');
+          navigate(dashboardRoute);
         }, 500);
       } else {
         throw new Error(localResponse.error || "Failed to create account");
@@ -283,22 +304,6 @@ const AuthReal = () => {
     const user = enhancedAuth.getCurrentUser();
     if (user) {
       navigate(getDashboardRoute(user.registration_role));
-    }
-  };
-
-  const getDashboardRoute = (role: string): string => {
-    switch (role) {
-      case "external_ca":
-        return "/real-external-ca-dashboard";
-      case "in_house_ca":
-      case "ca_firm":
-        return "/ca-dashboard";
-      case "admin":
-        return "/admin-dashboard";
-      case "in_house_lawyer":
-        return "/lawyer-dashboard";
-      default:
-        return "/dashboard";
     }
   };
 
