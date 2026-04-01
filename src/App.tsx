@@ -38,13 +38,13 @@ const Dashboard = lazy(() => import("./pages/Dashboard"));
 const CADashboard = lazy(() => import("./pages/CADashboard"));
 const AdminDashboard = lazy(() => import("./pages/AdminDashboard"));
 const AppDashboard = lazy(() => import("./pages/AppDashboard"));
-const AppCADashboard = lazy(() => import("./pages/AppCADashboard"));
-const AppAdminDashboard = lazy(() => import("./pages/AppAdminDashboard"));
-const AppLegalDashboard = lazy(() => import("./pages/AppLegalDashboard"));
+// const AppCADashboard = lazy(() => import("./pages/AppCADashboard")); // Removed - use demo dashboards
+// const AppAdminDashboard = lazy(() => import("./pages/AppAdminDashboard")); // Removed - use demo dashboards
+// const AppLegalDashboard = lazy(() => import("./pages/AppLegalDashboard")); // Removed - use demo dashboards
 const AppVerification = lazy(() => import("./pages/AppVerification"));
 const CAFirmDashboard = lazy(() => import("./pages/CAFirmDashboard"));
-const AppCAFirmDashboard = lazy(() => import("./pages/AppCAFirmDashboard"));
-const RealCADashboard = lazy(() => import("./pages/RealCADashboard"));
+// const AppCAFirmDashboard = lazy(() => import("./pages/AppCAFirmDashboard")); // Removed - use demo dashboards
+// const RealCADashboard = lazy(() => import("./pages/RealCADashboard")); // Removed - use demo dashboards
 const AgentWorkReview = lazy(() => import("./pages/AgentWorkReview"));
 const LegalPolicyPage = lazy(() => import("./pages/LegalPolicyPage"));
 const ComplianceCenter = lazy(() => import("./pages/ComplianceCenter"));
@@ -118,7 +118,7 @@ const App = () => (
             <Route path="/ca-dashboard" element={<CADashboard />} />
             <Route path="/admin-dashboard" element={<AdminDashboard />} />
             <Route path="/ca-firm-dashboard" element={<CAFirmDashboard />} />
-            <Route path="/real-ca-dashboard" element={<RealCADashboard />} />
+            {/* RealCADashboard removed - using demo dashboards */}
             <Route path="/agent-work-review" element={<AgentWorkReview />} />
 
             <Route path="/app" element={<RoleLandingRoute />} />
@@ -133,47 +133,10 @@ const App = () => (
                 </ProtectedRoute>
               }
             />
-            <Route
-              path="/app/ca-dashboard"
-              element={
-                <ProtectedRoute
-                  allowRoles={["manager", "admin"]}
-                  allowPersonas={["external_ca", "in_house_ca", "admin"]}
-                >
-                  <AppCADashboard />
-                </ProtectedRoute>
-              }
-            />
-            <Route
-              path="/app/admin-dashboard"
-              element={
-                <ProtectedRoute allowRoles={["admin"]} allowPersonas={["admin"]}>
-                  <AppAdminDashboard />
-                </ProtectedRoute>
-              }
-            />
-            <Route
-              path="/app/legal-dashboard"
-              element={
-                <ProtectedRoute
-                  allowRoles={["manager", "admin"]}
-                  allowPersonas={["in_house_lawyer", "admin"]}
-                >
-                  <AppLegalDashboard />
-                </ProtectedRoute>
-              }
-            />
-            <Route
-              path="/app/ca-firm-dashboard"
-              element={
-                <ProtectedRoute
-                  allowRoles={["manager", "admin"]}
-                  allowPersonas={["ca_firm", "admin"]}
-                >
-                  <AppCAFirmDashboard />
-                </ProtectedRoute>
-              }
-            />
+            {/* Removed App CA Dashboard - use demo dashboards instead */}
+            {/* Removed App Admin Dashboard - use demo dashboards instead */}
+            {/* Removed App Legal Dashboard - use demo dashboards instead */}
+            {/* Removed App CA Firm Dashboard - use demo dashboards instead */}
             <Route
               path="/app/verification"
               element={
