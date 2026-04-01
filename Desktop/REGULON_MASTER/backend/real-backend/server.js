@@ -19,6 +19,7 @@ import { securityHeaders } from './middleware/security.js';
 import authRoutes from './routes/auth.js';
 import companyRoutes from './routes/company.js';
 import caRoutes from './routes/ca.js';
+import caDashboardRoutes from './routes/ca-dashboard.js';
 import adminRoutes from './routes/admin.js';
 import documentRoutes from './routes/documents.js';
 import notificationRoutes from './routes/notifications.js';
@@ -123,6 +124,7 @@ const apiVersion = process.env.API_VERSION || 'v1';
 app.use(`/api/${apiVersion}/auth`, authRoutes);
 app.use(`/api/${apiVersion}/company`, companyRoutes);
 app.use(`/api/${apiVersion}/ca`, caRoutes);
+app.use(`/api/${apiVersion}/ca`, caDashboardRoutes); // CA Dashboard routes (uses same /ca prefix for dashboard/stats endpoint)
 app.use(`/api/${apiVersion}/admin`, adminRoutes);
 app.use(`/api/${apiVersion}/documents`, documentRoutes);
 app.use(`/api/${apiVersion}/notifications`, notificationRoutes);
