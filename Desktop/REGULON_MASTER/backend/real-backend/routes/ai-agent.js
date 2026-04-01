@@ -756,16 +756,21 @@ async function generateComplianceReport(company_id) {
  */
 router.post('/voice/wake-word', async (req, res) => {
   try {
-    const { event, timestamp, ca_id } = req.body;
+    const { event, timestamp, ca_id, responded_with_tts } = req.body;
 
-    // Log wake-word event to database (future implementation)
+    // Log wake-word event with TTS response
     console.log(`[VOICE] Wake-word detected at ${timestamp} for CA: ${ca_id}`);
+    if (responded_with_tts) {
+      console.log(`[VOICE-TTS] Regulon AI spoke: "Hey, this is Regulon AI, your compliance partner. Tell me what you need."`);
+    }
 
-    // Return success
+    // Return success with TTS confirmation
     res.json({
       success: true,
       event: 'wake_word_acknowledged',
       message: 'Regulon is listening for your command',
+      tts_response: responded_with_tts ? 'Hey, this is Regulon AI, your compliance partner. Tell me what you need.' : null,
+      siri_interface_shown: true,
       timestamp: new Date().toISOString(),
       ca_id,
     });
