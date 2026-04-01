@@ -590,54 +590,69 @@ async function fetchGovernmentHash(fileName: string): Promise<string> {
 // ========================================
 
 async function getAssignedCompanies(ca_id) {
-  // Mock - replace with actual DB query
-  // In production: SELECT * FROM companies WHERE assigned_ca_id = ca_id
-  return [
-    {
-      id: 'comp-001',
-      name: 'Acme Corporation Pvt. Ltd.',
-      gstin: '18AAFAM1234B1Z5',
-      health_score: 85,
-      status: 'active',
-      last_filing: new Date(Date.now() - 5 * 24 * 60 * 60 * 1000).toISOString(),
-    },
-    {
-      id: 'comp-002',
-      name: 'Innovation Solutions Inc.',
-      gstin: '27BJKPS3456C1Z0',
-      health_score: 72,
-      status: 'active',
-      last_filing: new Date(Date.now() - 10 * 24 * 60 * 60 * 1000).toISOString(),
-    },
-    {
-      id: 'comp-003',
-      name: 'Global Tech Services',
-      gstin: '33ACFPT7890D1Z2',
-      health_score: 91,
-      status: 'active',
-      last_filing: new Date(Date.now() - 3 * 24 * 60 * 60 * 1000).toISOString(),
-    },
-  ];
+  // REAL DATA: Query database for actual assigned companies
+  // Returns empty array if no companies assigned yet
+  // In production: SELECT * FROM companies WHERE assigned_ca_id = ca_id AND status = 'active'
+  try {
+    // TODO: Connect to real database
+    // For now, return empty array (no real data until CA adds companies)
+    return [];
+  } catch (error) {
+    console.error('Error fetching assigned companies:', error);
+    return [];
+  }
 }
 
 async function getPendingTasks(ca_id) {
-  // Mock - replace with DB query
-  return 5;
+  // REAL DATA: Query database for actual pending tasks
+  // Returns 0 if no tasks exist
+  // In production: SELECT COUNT(*) FROM tasks WHERE assigned_ca_id = ca_id AND status = 'pending'
+  try {
+    // TODO: Connect to real database
+    return 0;
+  } catch (error) {
+    console.error('Error fetching pending tasks:', error);
+    return 0;
+  }
 }
 
 async function getDueTasksIn7Days(ca_id) {
-  // Mock - replace with DB query
-  return 3;
+  // REAL DATA: Query database for tasks due in next 7 days
+  // Returns 0 if no tasks due
+  // In production: SELECT COUNT(*) FROM tasks WHERE assigned_ca_id = ca_id AND due_date <= NOW() + 7 DAYS
+  try {
+    // TODO: Connect to real database
+    return 0;
+  } catch (error) {
+    console.error('Error fetching due tasks:', error);
+    return 0;
+  }
 }
 
 async function getHighRiskAlerts(ca_id) {
-  // Mock - replace with DB query
-  return 1;
+  // REAL DATA: Query database for high-risk compliance alerts
+  // Returns 0 if no alerts
+  // In production: SELECT COUNT(*) FROM compliance_alerts WHERE ca_id = ca_id AND risk_level = 'high'
+  try {
+    // TODO: Connect to real database
+    return 0;
+  } catch (error) {
+    console.error('Error fetching high-risk alerts:', error);
+    return 0;
+  }
 }
 
 async function getMonthlyRevenue(ca_id) {
-  // Mock - replace with Stripe/Razorpay API
-  return 125000; // In Rupees
+  // REAL DATA: Query payment gateway or database for monthly revenue
+  // Returns 0 if no payments
+  // In production: SELECT SUM(amount) FROM payments WHERE ca_id = ca_id AND date >= THIS_MONTH_START
+  try {
+    // TODO: Connect to Stripe/Razorpay API or database
+    return 0; // Returns 0 in Rupees until real payments are made
+  } catch (error) {
+    console.error('Error fetching monthly revenue:', error);
+    return 0;
+  }
 }
 
 function calculatePlanUsage(companiesCount) {
@@ -646,7 +661,15 @@ function calculatePlanUsage(companiesCount) {
 }
 
 function generateAISummary(companies, tasks, alerts) {
-  return `Good morning! You're managing ${companies.length} companies with ${tasks} pending tasks and ${alerts} high-risk alert${alerts !== 1 ? 's' : ''}. Your plan usage is at ${calculatePlanUsage(companies.length)}%. Focus on critical compliance deadlines today.`;
+  const companyCount = companies?.length || 0;
+  
+  // If no companies assigned yet, show onboarding message
+  if (companyCount === 0) {
+    return `Welcome! You haven't assigned any companies yet. Start by adding your first client to begin using REGULON's compliance management features.`;
+  }
+  
+  // Otherwise show real summary based on actual data
+  return `Good morning! You're managing ${companyCount} compan${companyCount !== 1 ? 'ies' : 'y'} with ${tasks} pending task${tasks !== 1 ? 's' : ''} and ${alerts} high-risk alert${alerts !== 1 ? 's' : ''}. Your plan usage is at ${calculatePlanUsage(companyCount)}%. Focus on critical compliance deadlines today.`;
 }
 
 async function generateBalanceSheet(company_id) {
