@@ -746,4 +746,111 @@ async function generateComplianceReport(company_id) {
   };
 }
 
+// ========================================
+// VOICE COMMAND ENDPOINTS
+// ========================================
+
+/**
+ * POST /api/ca/voice/wake-word
+ * Handle "Hey Regulon" wake-word detection
+ */
+router.post('/voice/wake-word', async (req, res) => {
+  try {
+    const { event, timestamp, ca_id } = req.body;
+
+    // Log wake-word event to database (future implementation)
+    console.log(`[VOICE] Wake-word detected at ${timestamp} for CA: ${ca_id}`);
+
+    // Return success
+    res.json({
+      success: true,
+      event: 'wake_word_acknowledged',
+      message: 'Regulon is listening for your command',
+      timestamp: new Date().toISOString(),
+      ca_id,
+    });
+  } catch (error) {
+    console.error('Voice wake-word error:', error);
+    res.status(500).json({
+      success: false,
+      error: 'Failed to process wake-word event',
+    });
+  }
+});
+
+/**
+ * POST /api/ca/voice/command
+ * Process voice commands after "Hey Regulon" activation
+ */
+router.post('/voice/command', async (req, res) => {
+  try {
+    const { command, ca_id, timestamp } = req.body;
+
+    if (!command) {
+      return res.status(400).json({
+        success: false,
+        error: 'Command text required',
+      });
+    }
+
+    // Log command
+    console.log(`[VOICE] Command received: "${command}" at ${timestamp} for CA: ${ca_id}`);
+
+    // Parse command and determine action
+    let action = 'unknown';
+    let response = '';
+
+    const lowerCommand = command.toLowerCase();
+
+    if (lowerCommand.includes('balance sheet')) {
+      action = 'generate_balance_sheet';
+      response = 'I\'m generating the balance sheet now. Give me a moment to analyze the financial records.';
+    } else if (lowerCommand.includes('audit') || lowerCommand.includes('audit finances')) {
+      action = 'audit_financials';
+      response = 'Starting financial audit. I\'ll verify all transaction records and compliance standards.';
+    } else if (lowerCommand.includes('gst') || lowerCommand.includes('reconcil')) {
+      action = 'gst_reconciliation';
+      response = 'GST reconciliation initiated. Matching government data with your company records.';
+    } else if (lowerCommand.includes('notice') || lowerCommand.includes('check notice')) {
+      action = 'check_notices';
+      response = 'Checking for any government notices or compliance alerts.';
+    } else if (lowerCommand.includes('document') || lowerCommand.includes('verify')) {
+      action = 'document_verification';
+      response = 'Starting document verification. I\'ll authenticate and analyze all submitted files.';
+    } else if (lowerCommand.includes('compliance') || lowerCommand.includes('report')) {
+      action = 'compliance_report';
+      response = 'Generating compliance report. This will show your current regulatory status.';
+    } else {
+      action = 'general_query';
+      response = `I understood your request: "${command}". Processing now...`;
+    }
+
+    // Simulate backend processing
+    const actionId = `voice-cmd-${Date.now()}`;
+
+    res.json({
+      success: true,
+      action,
+      action_id: actionId,
+      command,
+      response,
+      status: 'processing',
+      timestamp: new Date().toISOString(),
+      ca_id,
+      log_entry: {
+        timestamp: new Date().toLocaleTimeString('en-US', { hour12: true }),
+        action,
+        status: 'PROCESSING',
+        message: response,
+      },
+    });
+  } catch (error) {
+    console.error('Voice command error:', error);
+    res.status(500).json({
+      success: false,
+      error: 'Failed to process voice command',
+    });
+  }
+});
+
 export default router;
