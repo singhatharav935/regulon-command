@@ -121,7 +121,7 @@ const CADashboard = () => {
           
           <ClientPortfolioSection />
           <TaskFilingManagement />
-          <ClientDependencyTracker />
+          <ClientDependencyTracker isRealDashboard={false} />
           <CALawImpactSection />
           <ComplianceChangeLog />
           <CAAuditSupport />

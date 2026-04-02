@@ -5,6 +5,8 @@ import Navbar from "@/components/layout/Navbar";
 import Footer from "@/components/layout/Footer";
 import RegulonAIAgent from "@/components/ai-agent/RegulonAIAgent";
 import AIDraftingEngine from "@/components/ca-dashboard/AIDraftingEngine";
+import TaskFilingManagement from "@/components/ca-dashboard/TaskFilingManagement";
+import ClientDependencyTracker from "@/components/ca-dashboard/ClientDependencyTracker";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
@@ -1311,6 +1313,202 @@ const ExternalCADashboardReal = () => {
   const [newCompanyPan, setNewCompanyPan] = useState("");
   const [isAddingCompany, setIsAddingCompany] = useState(false);
   const [draftText, setDraftText] = useState("");
+  
+  // New Consent-Based Onboarding State
+  const [showOnboardModal, setShowOnboardModal] = useState(false);
+  const [onboardForm, setOnboardForm] = useState({
+    gstin: '',
+    pan: '',
+    cin: '',
+    client_name: '',
+    client_email: '',
+    client_phone: ''
+  });
+  const [pendingRequests, setPendingRequests] = useState<any[]>([]);
+  const [isOnboarding, setIsOnboarding] = useState(false);
+  const [selectedCompany, setSelectedCompany] = useState<any>(null);
+  const [showCompanyDetails, setShowCompanyDetails] = useState(false);
+
+  // Compliance Service API URL
+  const COMPLIANCE_API = 'http://localhost:8001/api/v1';
+
+  // Fetch CA's clients from compliance service
+  const fetchClients = async () => {
+    try {
+      const response = await fetch(`${COMPLIANCE_API}/ca/ca-001/clients`);
+      const data = await response.json();
+      if (data.success && data.clients) {
+        setCompanies(data.clients.map((c: any) => ({
+          ...c,
+          health: c.compliance_score,
+          status: c.legal_status || 'Active',
+          lastFiling: c.last_sync ? new Date(c.last_sync).toLocaleDateString() : 'Pending'
+        })));
+      }
+    } catch (error) {
+      console.log('Compliance service not available, using local state');
+    }
+  };
+
+  // Fetch pending consent requests
+  const fetchPendingRequests = async () => {
+    // This would fetch from your backend
+    // For now, we'll manage locally
+  };
+
+  useEffect(() => {
+    fetchClients();
+    const interval = setInterval(fetchClients, 30000); // Poll every 30 seconds
+    return () => clearInterval(interval);
+  }, []);
+
+  // Handle consent-based onboarding
+  const handleOnboardClient = async () => {
+    if (!onboardForm.gstin && !onboardForm.pan && !onboardForm.cin) {
+      toast.error('Enter at least one identifier (GSTIN, PAN, or CIN)');
+      return;
+    }
+    if (!onboardForm.client_name) {
+      toast.error('Client name is required');
+      return;
+    }
+    if (!onboardForm.client_email && !onboardForm.client_phone) {
+      toast.error('Enter client email or phone for consent notification');
+      return;
+    }
+
+    setIsOnboarding(true);
+    try {
+      const response = await fetch(`${COMPLIANCE_API}/client/onboard`, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          ca_id: 'ca-001',
+          ca_name: 'Rajesh Kumar, CA',
+          ca_email: 'ca@regulon.ai',
+          ...onboardForm
+        })
+      });
+      
+      const data = await response.json();
+      
+      if (data.success) {
+        toast.success('Consent request sent to client!', {
+          description: `Waiting for ${onboardForm.client_name} to authorize access`
+        });
+        
+        // Add to pending requests
+        setPendingRequests(prev => [...prev, {
+          ...data.data,
+          client_name: onboardForm.client_name,
+          created_at: new Date().toISOString()
+        }]);
+        
+        // Reset form
+        setOnboardForm({
+          gstin: '',
+          pan: '',
+          cin: '',
+          client_name: '',
+          client_email: '',
+          client_phone: ''
+        });
+        setShowOnboardModal(false);
+        
+        // Start polling for status
+        pollOnboardStatus(data.data.request_id);
+      } else {
+        toast.error(data.error || 'Failed to initiate onboarding');
+      }
+    } catch (error) {
+      console.error('Onboarding error:', error);
+      toast.error('Failed to connect to compliance service');
+    } finally {
+      setIsOnboarding(false);
+    }
+  };
+
+  // Poll for onboarding status
+  const pollOnboardStatus = async (requestId: string) => {
+    const checkStatus = async () => {
+      try {
+        const response = await fetch(`${COMPLIANCE_API}/onboard/${requestId}/status`);
+        const data = await response.json();
+        
+        if (data.is_complete) {
+          toast.success(`${data.company_name} onboarded successfully!`, {
+            description: `Compliance Score: ${data.health_score}%`
+          });
+          fetchClients();
+          setPendingRequests(prev => prev.filter(r => r.request_id !== requestId));
+          return true;
+        }
+        
+        if (data.consent_status === 'rejected') {
+          toast.error(`${data.company_name} rejected the consent request`);
+          setPendingRequests(prev => prev.filter(r => r.request_id !== requestId));
+          return true;
+        }
+        
+        return false;
+      } catch {
+        return false;
+      }
+    };
+
+    // Poll every 10 seconds for 10 minutes
+    const maxAttempts = 60;
+    let attempts = 0;
+    
+    const poll = setInterval(async () => {
+      attempts++;
+      const done = await checkStatus();
+      if (done || attempts >= maxAttempts) {
+        clearInterval(poll);
+      }
+    }, 10000);
+  };
+
+  // View company details
+  const handleViewCompany = async (company: any) => {
+    try {
+      const response = await fetch(`${COMPLIANCE_API}/client/${company.id}`);
+      const data = await response.json();
+      if (data.success) {
+        setSelectedCompany(data.client);
+        setShowCompanyDetails(true);
+      }
+    } catch {
+      setSelectedCompany(company);
+      setShowCompanyDetails(true);
+    }
+  };
+
+  // Refresh company data
+  const handleRefreshCompany = async (companyId: string) => {
+    try {
+      await fetch(`${COMPLIANCE_API}/client/${companyId}/refresh`, { method: 'POST' });
+      toast.success('Data refresh initiated');
+      setTimeout(fetchClients, 5000);
+    } catch {
+      toast.error('Failed to refresh data');
+    }
+  };
+
+  // Get health color
+  const getHealthColor = (score: number | undefined) => {
+    if (!score) return 'bg-gray-500';
+    if (score >= 85) return 'bg-green-500';
+    if (score >= 70) return 'bg-yellow-500';
+    return 'bg-red-500';
+  };
+
+  const getHealthLabel = (score: number | undefined) => {
+    if (!score) return 'Unknown';
+    if (score >= 85) return 'Healthy';
+    if (score >= 70) return 'Moderate';
+    return 'Critical';
+  };
 
   // Update stats when metrics change
   useEffect(() => {
@@ -1563,7 +1761,7 @@ const ExternalCADashboardReal = () => {
             />
           </motion.div>
 
-          {/* Client Portfolio */}
+          {/* Client Portfolio - Consent-Based Onboarding */}
           <motion.div
             initial={{ opacity: 0, y: 20 }}
             animate={{ opacity: 1, y: 0 }}
@@ -1575,121 +1773,590 @@ const ExternalCADashboardReal = () => {
                 <h2 className="text-2xl font-bold text-cyan-400 flex items-center mb-1">
                   <Users className="w-6 h-6 mr-2" />
                   Client Portfolio
+                  <Badge className="ml-3 bg-purple-500/20 text-purple-400 border-purple-500/50">
+                    Consent-Based
+                  </Badge>
                 </h2>
-                <p className="text-sm text-muted-foreground">Manage and monitor all assigned companies</p>
+                <p className="text-sm text-muted-foreground">Manage clients with secure consent-based data access</p>
               </div>
-              <Button className="bg-cyan-600 hover:bg-cyan-700">
+              <Button 
+                className="bg-gradient-to-r from-cyan-600 to-purple-600 hover:from-cyan-700 hover:to-purple-700"
+                onClick={() => setShowOnboardModal(true)}
+              >
                 <Plus className="w-4 h-4 mr-1" />
-                Add Company
+                Add Client
               </Button>
             </div>
+
+            {/* Pending Consent Requests */}
+            {pendingRequests.length > 0 && (
+              <Card className="border-yellow-500/30 bg-yellow-500/5">
+                <CardContent className="p-4">
+                  <h3 className="text-sm font-semibold text-yellow-400 mb-3 flex items-center">
+                    <Clock className="w-4 h-4 mr-2" />
+                    Pending Consent Requests ({pendingRequests.length})
+                  </h3>
+                  <div className="space-y-2">
+                    {pendingRequests.map((req, idx) => (
+                      <div key={idx} className="flex items-center justify-between p-3 rounded-lg bg-card/50 border border-yellow-500/20">
+                        <div className="flex items-center gap-3">
+                          <div className="w-10 h-10 rounded-full bg-yellow-500/20 flex items-center justify-center">
+                            <Clock className="w-5 h-5 text-yellow-400" />
+                          </div>
+                          <div>
+                            <p className="font-medium">{req.client_name}</p>
+                            <p className="text-xs text-muted-foreground">
+                              {req.identifiers?.gstin || req.identifiers?.pan || req.identifiers?.cin}
+                            </p>
+                          </div>
+                        </div>
+                        <div className="flex items-center gap-2">
+                          <Badge variant="outline" className="border-yellow-500/50 text-yellow-400">
+                            Awaiting Consent
+                          </Badge>
+                          <span className="text-xs text-muted-foreground">
+                            Expires: {new Date(req.expires_at).toLocaleDateString()}
+                          </span>
+                        </div>
+                      </div>
+                    ))}
+                  </div>
+                </CardContent>
+              </Card>
+            )}
+
+            {/* Client List */}
             <Card className="glass-card border-border/50">
-              <CardContent className="p-6 space-y-4">
-                <div className="flex gap-2 mb-4">
-                  <Input
-                    placeholder="Enter PAN/CIN..."
-                    value={newCompanyPan}
-                    onChange={(e) => setNewCompanyPan(e.target.value)}
-                    className="bg-card border-border/50"
-                    disabled={isAddingCompany}
-                  />
-                  <Button
-                    onClick={addCompany}
-                    className="bg-green-600 hover:bg-green-700"
-                    disabled={isAddingCompany}
-                  >
-                    {isAddingCompany ? (
-                      <>
-                        <Loader className="w-4 h-4 mr-1 animate-spin" />
-                        Adding...
-                      </>
-                    ) : (
-                      "Add"
-                    )}
-                  </Button>
-                </div>
-                
-                {companies.length === 0 ? (
+              <CardContent className="p-6">
+                {companies.length === 0 && pendingRequests.length === 0 ? (
                   <div className="text-center py-12 text-muted-foreground">
                     <Building className="w-16 h-16 mx-auto mb-4 opacity-30" />
                     <p className="text-lg font-medium">No companies added yet</p>
-                    <p className="text-sm">Add your first client to get started</p>
+                    <p className="text-sm mb-4">Add your first client using the consent-based workflow</p>
+                    <Button 
+                      variant="outline" 
+                      className="border-cyan-500/50 text-cyan-400"
+                      onClick={() => setShowOnboardModal(true)}
+                    >
+                      <Plus className="w-4 h-4 mr-1" />
+                      Onboard First Client
+                    </Button>
                   </div>
-                ) : (
-                  <Table>
-                    <TableHeader>
-                      <TableRow className="border-border/50">
-                        <TableHead>Company Name</TableHead>
-                        <TableHead>Health Score</TableHead>
-                        <TableHead>Status</TableHead>
-                        <TableHead>Last Filing</TableHead>
-                      </TableRow>
-                    </TableHeader>
-                    <TableBody>
+                ) : companies.length > 0 ? (
+                  <div className="space-y-4">
+                    {/* Search and Filter */}
+                    <div className="flex gap-2 mb-4">
+                      <Input
+                        placeholder="Search companies..."
+                        className="bg-card border-border/50 max-w-xs"
+                      />
+                      <Button variant="outline" size="sm">
+                        All
+                      </Button>
+                      <Button variant="outline" size="sm" className="text-green-400">
+                        Healthy
+                      </Button>
+                      <Button variant="outline" size="sm" className="text-yellow-400">
+                        Moderate
+                      </Button>
+                      <Button variant="outline" size="sm" className="text-red-400">
+                        Critical
+                      </Button>
+                    </div>
+
+                    {/* Company Cards */}
+                    <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
                       {companies.map((company, idx) => (
-                        <TableRow key={idx} className="border-border/50">
-                          <TableCell>{company.name}</TableCell>
-                          <TableCell>{company.health}%</TableCell>
-                          <TableCell><Badge>{company.status}</Badge></TableCell>
-                          <TableCell>{company.lastFiling}</TableCell>
-                        </TableRow>
+                        <motion.div
+                          key={company.id || idx}
+                          initial={{ opacity: 0, scale: 0.95 }}
+                          animate={{ opacity: 1, scale: 1 }}
+                          transition={{ delay: idx * 0.05 }}
+                          className="p-4 rounded-xl border border-border/50 bg-card/50 hover:bg-card/80 transition-all cursor-pointer group"
+                          onClick={() => handleViewCompany(company)}
+                        >
+                          <div className="flex items-start justify-between mb-3">
+                            <div className="flex items-center gap-3">
+                              <div className={`w-12 h-12 rounded-full ${getHealthColor(company.compliance_score || company.health)} flex items-center justify-center`}>
+                                <Building className="w-6 h-6 text-white" />
+                              </div>
+                              <div>
+                                <h4 className="font-semibold text-sm line-clamp-1">{company.company_name || company.name}</h4>
+                                <p className="text-xs text-muted-foreground">{company.gstin || company.pan || 'N/A'}</p>
+                                {company.industry && (
+                                  <Badge variant="outline" className="mt-1 text-[10px] px-1 py-0 border-cyan-500/30 text-cyan-400">
+                                    {company.industry}
+                                  </Badge>
+                                )}
+                              </div>
+                            </div>
+                            <Badge className={`${
+                              company.legal_status === 'Active' || company.status === 'Active' 
+                                ? 'bg-green-500/20 text-green-400' 
+                                : 'bg-red-500/20 text-red-400'
+                            }`}>
+                              {company.legal_status || company.status}
+                            </Badge>
+                          </div>
+                          
+                          {/* Health Score Bar */}
+                          <div className="mb-3">
+                            <div className="flex justify-between text-xs mb-1">
+                              <span className="text-muted-foreground">Compliance Health</span>
+                              <span className={`font-medium ${
+                                (company.compliance_score || company.health || 0) >= 85 ? 'text-green-400' :
+                                (company.compliance_score || company.health || 0) >= 70 ? 'text-yellow-400' : 'text-red-400'
+                              }`}>
+                                {company.compliance_score || company.health || 0}%
+                              </span>
+                            </div>
+                            <Progress 
+                              value={company.compliance_score || company.health || 0} 
+                              className="h-2"
+                            />
+                          </div>
+
+                          {/* Health Risks & Gaps */}
+                          {company.health_risks && company.health_risks.length > 0 && (
+                            <div className="mb-3 p-2 rounded-lg bg-card/30 border border-border/30">
+                              <p className="text-[10px] text-muted-foreground mb-1">Risk Overview</p>
+                              <div className="space-y-1">
+                                {company.health_risks.slice(0, 2).map((risk: any, idx: number) => (
+                                  <div key={idx} className="flex items-center gap-1 text-[10px]">
+                                    <span className={`w-1.5 h-1.5 rounded-full ${
+                                      risk.severity === 'critical' ? 'bg-red-500' :
+                                      risk.severity === 'high' ? 'bg-orange-500' :
+                                      risk.severity === 'medium' ? 'bg-yellow-500' :
+                                      risk.severity === 'low' ? 'bg-blue-500' : 'bg-green-500'
+                                    }`} />
+                                    <span className="text-muted-foreground truncate">{risk.title}</span>
+                                  </div>
+                                ))}
+                                {company.health_risks.length > 2 && (
+                                  <p className="text-[9px] text-muted-foreground/60 pl-2.5">
+                                    +{company.health_risks.length - 2} more
+                                  </p>
+                                )}
+                              </div>
+                            </div>
+                          )}
+
+                          {/* Next Deadline */}
+                          {company.next_deadline?.nearest && (
+                            <div className="mb-3 p-2 rounded-lg bg-gradient-to-r from-orange-500/10 to-red-500/10 border border-orange-500/30">
+                              <div className="flex items-center justify-between mb-1">
+                                <p className="text-[10px] text-orange-400 font-medium">Next Deadline</p>
+                                <Badge className={`text-[9px] px-1 py-0 ${
+                                  company.next_deadline.nearest.urgency === 'critical' ? 'bg-red-500/20 text-red-400' :
+                                  company.next_deadline.nearest.urgency === 'high' ? 'bg-orange-500/20 text-orange-400' :
+                                  'bg-yellow-500/20 text-yellow-400'
+                                }`}>
+                                  {company.next_deadline.nearest.urgency}
+                                </Badge>
+                              </div>
+                              <p className="text-xs font-medium">{company.next_deadline.nearest.file_type}</p>
+                              <div className="flex items-center justify-between mt-1">
+                                <p className="text-[10px] text-muted-foreground">
+                                  Due: {new Date(company.next_deadline.nearest.due_date).toLocaleDateString()}
+                                </p>
+                                <p className="text-[10px] font-medium text-orange-400">
+                                  {company.next_deadline.nearest.days_remaining} days left
+                                </p>
+                              </div>
+                            </div>
+                          )}
+
+                          {/* Quick Info */}
+                          <div className="grid grid-cols-2 gap-2 text-xs mb-3">
+                            <div className="p-2 rounded bg-card/50">
+                              <p className="text-muted-foreground">State</p>
+                              <p className="font-medium">{company.state || 'N/A'}</p>
+                            </div>
+                            <div className="p-2 rounded bg-card/50">
+                              <p className="text-muted-foreground">Last Sync</p>
+                              <p className="font-medium">{company.last_sync ? new Date(company.last_sync).toLocaleDateString() : company.lastFiling || 'Pending'}</p>
+                            </div>
+                          </div>
+
+                          {/* Action Buttons */}
+                          <div className="flex gap-2 mt-3 opacity-0 group-hover:opacity-100 transition-opacity">
+                            <Button 
+                              size="sm" 
+                              variant="outline" 
+                              className="flex-1 text-xs"
+                              onClick={(e) => {
+                                e.stopPropagation();
+                                handleRefreshCompany(company.id);
+                              }}
+                            >
+                              <RefreshCw className="w-3 h-3 mr-1" />
+                              Refresh
+                            </Button>
+                            <Button 
+                              size="sm" 
+                              variant="outline" 
+                              className="flex-1 text-xs text-cyan-400"
+                              onClick={(e) => {
+                                e.stopPropagation();
+                                handleViewCompany(company);
+                              }}
+                            >
+                              <Eye className="w-3 h-3 mr-1" />
+                              Details
+                            </Button>
+                          </div>
+                        </motion.div>
                       ))}
-                    </TableBody>
-                  </Table>
-                )}
+                    </div>
+                  </div>
+                ) : null}
               </CardContent>
             </Card>
+
+            {/* Onboard Client Modal */}
+            <AnimatePresence>
+              {showOnboardModal && (
+                <motion.div
+                  initial={{ opacity: 0 }}
+                  animate={{ opacity: 1 }}
+                  exit={{ opacity: 0 }}
+                  className="fixed inset-0 bg-black/70 backdrop-blur-sm z-50 flex items-center justify-center p-4"
+                  onClick={() => setShowOnboardModal(false)}
+                >
+                  <motion.div
+                    initial={{ scale: 0.9, opacity: 0 }}
+                    animate={{ scale: 1, opacity: 1 }}
+                    exit={{ scale: 0.9, opacity: 0 }}
+                    className="bg-card border border-border rounded-2xl p-6 w-full max-w-lg"
+                    onClick={(e) => e.stopPropagation()}
+                  >
+                    <div className="flex items-center justify-between mb-6">
+                      <div>
+                        <h3 className="text-xl font-bold">Onboard New Client</h3>
+                        <p className="text-sm text-muted-foreground">Consent-based secure data retrieval</p>
+                      </div>
+                      <Button 
+                        variant="ghost" 
+                        size="icon"
+                        onClick={() => setShowOnboardModal(false)}
+                      >
+                        <X className="w-5 h-5" />
+                      </Button>
+                    </div>
+
+                    {/* Workflow Steps */}
+                    <div className="flex items-center gap-2 mb-6 text-xs">
+                      <div className="flex items-center gap-1 text-cyan-400">
+                        <div className="w-6 h-6 rounded-full bg-cyan-500/20 flex items-center justify-center">1</div>
+                        <span>Enter Details</span>
+                      </div>
+                      <ChevronRight className="w-4 h-4 text-muted-foreground" />
+                      <div className="flex items-center gap-1 text-muted-foreground">
+                        <div className="w-6 h-6 rounded-full bg-muted/20 flex items-center justify-center">2</div>
+                        <span>Client Consent</span>
+                      </div>
+                      <ChevronRight className="w-4 h-4 text-muted-foreground" />
+                      <div className="flex items-center gap-1 text-muted-foreground">
+                        <div className="w-6 h-6 rounded-full bg-muted/20 flex items-center justify-center">3</div>
+                        <span>Data Fetch</span>
+                      </div>
+                      <ChevronRight className="w-4 h-4 text-muted-foreground" />
+                      <div className="flex items-center gap-1 text-muted-foreground">
+                        <div className="w-6 h-6 rounded-full bg-muted/20 flex items-center justify-center">4</div>
+                        <span>Health Score</span>
+                      </div>
+                    </div>
+
+                    <div className="space-y-4">
+                      {/* Identifiers */}
+                      <div className="p-4 rounded-lg bg-cyan-500/5 border border-cyan-500/20">
+                        <h4 className="text-sm font-semibold text-cyan-400 mb-3">Company Identifiers (at least one)</h4>
+                        <div className="grid grid-cols-1 gap-3">
+                          <div>
+                            <label className="text-xs text-muted-foreground mb-1 block">GSTIN</label>
+                            <Input
+                              placeholder="e.g., 27AABCA1234C1ZS"
+                              value={onboardForm.gstin}
+                              onChange={(e) => setOnboardForm(prev => ({ ...prev, gstin: e.target.value.toUpperCase() }))}
+                              className="bg-card border-border/50"
+                            />
+                          </div>
+                          <div className="grid grid-cols-2 gap-3">
+                            <div>
+                              <label className="text-xs text-muted-foreground mb-1 block">PAN</label>
+                              <Input
+                                placeholder="e.g., AABCA1234C"
+                                value={onboardForm.pan}
+                                onChange={(e) => setOnboardForm(prev => ({ ...prev, pan: e.target.value.toUpperCase() }))}
+                                className="bg-card border-border/50"
+                              />
+                            </div>
+                            <div>
+                              <label className="text-xs text-muted-foreground mb-1 block">CIN</label>
+                              <Input
+                                placeholder="e.g., U74999KA2020PTC..."
+                                value={onboardForm.cin}
+                                onChange={(e) => setOnboardForm(prev => ({ ...prev, cin: e.target.value.toUpperCase() }))}
+                                className="bg-card border-border/50"
+                              />
+                            </div>
+                          </div>
+                        </div>
+                      </div>
+
+                      {/* Client Info */}
+                      <div className="p-4 rounded-lg bg-purple-500/5 border border-purple-500/20">
+                        <h4 className="text-sm font-semibold text-purple-400 mb-3">Client Contact (for consent notification)</h4>
+                        <div className="space-y-3">
+                          <div>
+                            <label className="text-xs text-muted-foreground mb-1 block">Company Name *</label>
+                            <Input
+                              placeholder="e.g., Acme Technologies Pvt. Ltd."
+                              value={onboardForm.client_name}
+                              onChange={(e) => setOnboardForm(prev => ({ ...prev, client_name: e.target.value }))}
+                              className="bg-card border-border/50"
+                            />
+                          </div>
+                          <div className="grid grid-cols-2 gap-3">
+                            <div>
+                              <label className="text-xs text-muted-foreground mb-1 block">Email</label>
+                              <Input
+                                placeholder="finance@company.com"
+                                type="email"
+                                value={onboardForm.client_email}
+                                onChange={(e) => setOnboardForm(prev => ({ ...prev, client_email: e.target.value }))}
+                                className="bg-card border-border/50"
+                              />
+                            </div>
+                            <div>
+                              <label className="text-xs text-muted-foreground mb-1 block">Phone (WhatsApp)</label>
+                              <Input
+                                placeholder="+91 98765 43210"
+                                value={onboardForm.client_phone}
+                                onChange={(e) => setOnboardForm(prev => ({ ...prev, client_phone: e.target.value }))}
+                                className="bg-card border-border/50"
+                              />
+                            </div>
+                          </div>
+                        </div>
+                      </div>
+
+                      {/* Info Box */}
+                      <div className="p-3 rounded-lg bg-blue-500/10 border border-blue-500/20 text-xs text-blue-300">
+                        <p className="flex items-start gap-2">
+                          <Shield className="w-4 h-4 mt-0.5 flex-shrink-0" />
+                          <span>
+                            A secure consent link will be sent via WhatsApp & Email. 
+                            Data will only be fetched after client authorization.
+                          </span>
+                        </p>
+                      </div>
+
+                      {/* Action Buttons */}
+                      <div className="flex gap-3 pt-2">
+                        <Button 
+                          variant="outline" 
+                          className="flex-1"
+                          onClick={() => setShowOnboardModal(false)}
+                        >
+                          Cancel
+                        </Button>
+                        <Button 
+                          className="flex-1 bg-gradient-to-r from-cyan-600 to-purple-600"
+                          onClick={handleOnboardClient}
+                          disabled={isOnboarding}
+                        >
+                          {isOnboarding ? (
+                            <>
+                              <Loader className="w-4 h-4 mr-2 animate-spin" />
+                              Sending...
+                            </>
+                          ) : (
+                            <>
+                              <Send className="w-4 h-4 mr-2" />
+                              Send Consent Request
+                            </>
+                          )}
+                        </Button>
+                      </div>
+                    </div>
+                  </motion.div>
+                </motion.div>
+              )}
+            </AnimatePresence>
+
+            {/* Company Details Modal */}
+            <AnimatePresence>
+              {showCompanyDetails && selectedCompany && (
+                <motion.div
+                  initial={{ opacity: 0 }}
+                  animate={{ opacity: 1 }}
+                  exit={{ opacity: 0 }}
+                  className="fixed inset-0 bg-black/70 backdrop-blur-sm z-50 flex items-center justify-center p-4"
+                  onClick={() => setShowCompanyDetails(false)}
+                >
+                  <motion.div
+                    initial={{ scale: 0.9, opacity: 0 }}
+                    animate={{ scale: 1, opacity: 1 }}
+                    exit={{ scale: 0.9, opacity: 0 }}
+                    className="bg-card border border-border rounded-2xl p-6 w-full max-w-2xl max-h-[90vh] overflow-y-auto"
+                    onClick={(e) => e.stopPropagation()}
+                  >
+                    <div className="flex items-center justify-between mb-6">
+                      <div className="flex items-center gap-4">
+                        <div className={`w-14 h-14 rounded-full ${getHealthColor(selectedCompany.compliance_score)} flex items-center justify-center`}>
+                          <Building className="w-7 h-7 text-white" />
+                        </div>
+                        <div>
+                          <h3 className="text-xl font-bold">{selectedCompany.company_name}</h3>
+                          <p className="text-sm text-muted-foreground">{selectedCompany.trade_name || selectedCompany.company_type}</p>
+                        </div>
+                      </div>
+                      <Button variant="ghost" size="icon" onClick={() => setShowCompanyDetails(false)}>
+                        <X className="w-5 h-5" />
+                      </Button>
+                    </div>
+
+                    {/* Health Score */}
+                    <div className="p-4 rounded-xl bg-gradient-to-r from-cyan-500/10 to-purple-500/10 border border-cyan-500/20 mb-6">
+                      <div className="flex items-center justify-between mb-2">
+                        <span className="font-medium">Compliance Health Score</span>
+                        <span className={`text-2xl font-bold ${
+                          selectedCompany.compliance_score >= 85 ? 'text-green-400' :
+                          selectedCompany.compliance_score >= 70 ? 'text-yellow-400' : 'text-red-400'
+                        }`}>
+                          {selectedCompany.compliance_score || 0}%
+                        </span>
+                      </div>
+                      <Progress value={selectedCompany.compliance_score || 0} className="h-3" />
+                      <p className="text-xs text-muted-foreground mt-2">
+                        Status: {getHealthLabel(selectedCompany.compliance_score)}
+                      </p>
+                    </div>
+
+                    {/* Company Details Grid */}
+                    <div className="grid grid-cols-2 gap-4 mb-6">
+                      <div className="p-3 rounded-lg bg-card/50 border border-border/50">
+                        <p className="text-xs text-muted-foreground">GSTIN</p>
+                        <p className="font-mono">{selectedCompany.gstin || 'N/A'}</p>
+                      </div>
+                      <div className="p-3 rounded-lg bg-card/50 border border-border/50">
+                        <p className="text-xs text-muted-foreground">PAN</p>
+                        <p className="font-mono">{selectedCompany.pan || 'N/A'}</p>
+                      </div>
+                      <div className="p-3 rounded-lg bg-card/50 border border-border/50">
+                        <p className="text-xs text-muted-foreground">CIN</p>
+                        <p className="font-mono text-sm">{selectedCompany.cin || 'N/A'}</p>
+                      </div>
+                      <div className="p-3 rounded-lg bg-card/50 border border-border/50">
+                        <p className="text-xs text-muted-foreground">Status</p>
+                        <Badge className={selectedCompany.legal_status === 'Active' ? 'bg-green-500/20 text-green-400' : 'bg-red-500/20 text-red-400'}>
+                          {selectedCompany.legal_status}
+                        </Badge>
+                      </div>
+                      <div className="p-3 rounded-lg bg-card/50 border border-border/50">
+                        <p className="text-xs text-muted-foreground">State</p>
+                        <p>{selectedCompany.state || 'N/A'}</p>
+                      </div>
+                      <div className="p-3 rounded-lg bg-card/50 border border-border/50">
+                        <p className="text-xs text-muted-foreground">Company Type</p>
+                        <p>{selectedCompany.company_type || 'N/A'}</p>
+                      </div>
+                    </div>
+
+                    {/* Health Details */}
+                    {selectedCompany.health_details && (
+                      <div className="space-y-4 mb-6">
+                        <h4 className="font-semibold">Compliance Breakdown</h4>
+                        <div className="grid grid-cols-2 gap-4">
+                          {selectedCompany.health_details.gst && (
+                            <div className="p-4 rounded-lg bg-card/50 border border-border/50">
+                              <div className="flex items-center justify-between mb-2">
+                                <span className="text-sm font-medium">GST Compliance</span>
+                                <span className={`font-bold ${
+                                  selectedCompany.health_details.gst.score >= 85 ? 'text-green-400' : 'text-yellow-400'
+                                }`}>
+                                  {selectedCompany.health_details.gst.score}%
+                                </span>
+                              </div>
+                              <Progress value={selectedCompany.health_details.gst.score} className="h-2 mb-2" />
+                              <p className="text-xs text-muted-foreground">
+                                {selectedCompany.health_details.gst.on_time}/{selectedCompany.health_details.gst.total} returns on time
+                              </p>
+                            </div>
+                          )}
+                          {selectedCompany.health_details.mca && (
+                            <div className="p-4 rounded-lg bg-card/50 border border-border/50">
+                              <div className="flex items-center justify-between mb-2">
+                                <span className="text-sm font-medium">MCA Compliance</span>
+                                <span className={`font-bold ${
+                                  selectedCompany.health_details.mca.score >= 85 ? 'text-green-400' : 'text-yellow-400'
+                                }`}>
+                                  {selectedCompany.health_details.mca.score}%
+                                </span>
+                              </div>
+                              <Progress value={selectedCompany.health_details.mca.score} className="h-2 mb-2" />
+                              <p className="text-xs text-muted-foreground">
+                                {selectedCompany.health_details.mca.filed}/{selectedCompany.health_details.mca.total} filings complete
+                              </p>
+                            </div>
+                          )}
+                        </div>
+                      </div>
+                    )}
+
+                    {/* Directors */}
+                    {selectedCompany.directors && selectedCompany.directors.length > 0 && (
+                      <div className="mb-6">
+                        <h4 className="font-semibold mb-3">Directors ({selectedCompany.directors.length})</h4>
+                        <div className="space-y-2">
+                          {selectedCompany.directors.map((dir: any, idx: number) => (
+                            <div key={idx} className="flex items-center justify-between p-3 rounded-lg bg-card/50 border border-border/50">
+                              <div>
+                                <p className="font-medium">{dir.name}</p>
+                                <p className="text-xs text-muted-foreground">DIN: {dir.din}</p>
+                              </div>
+                              <Badge variant="outline">{dir.designation}</Badge>
+                            </div>
+                          ))}
+                        </div>
+                      </div>
+                    )}
+
+                    {/* Action Buttons */}
+                    <div className="flex gap-3">
+                      <Button 
+                        variant="outline" 
+                        className="flex-1"
+                        onClick={() => handleRefreshCompany(selectedCompany.id)}
+                      >
+                        <RefreshCw className="w-4 h-4 mr-2" />
+                        Refresh Data
+                      </Button>
+                      <Button className="flex-1 bg-cyan-600 hover:bg-cyan-700">
+                        <FileText className="w-4 h-4 mr-2" />
+                        Generate Report
+                      </Button>
+                    </div>
+                  </motion.div>
+                </motion.div>
+              )}
+            </AnimatePresence>
           </motion.div>
 
-          {/* Task & Filing Management */}
-          <motion.div
-            initial={{ opacity: 0, y: 20 }}
-            animate={{ opacity: 1, y: 0 }}
-            transition={{ delay: 0.2 }}
-            className="mb-16 space-y-6"
-          >
-            <div>
-              <h2 className="text-2xl font-bold text-cyan-400 flex items-center mb-4">
-                <Clock className="w-6 h-6 mr-2" />
-                Task & Filing Management
-              </h2>
-              <p className="text-sm text-muted-foreground">Track and manage compliance filing deadlines</p>
-            </div>
-            <Card className="glass-card border-border/50">
-              <CardContent className="p-6">
-                <div className="text-center py-16 text-muted-foreground">
-                  <Clock className="w-16 h-16 mx-auto mb-4 opacity-30" />
-                  <p className="text-lg font-medium">Data will appear here</p>
-                  <p className="text-sm">Once you add companies, tasks will be synced automatically</p>
-                </div>
-              </CardContent>
-            </Card>
-          </motion.div>
+          {/* Task & Filing Management - Auto-synced from Client Portfolio */}
+          <TaskFilingManagement 
+            isRealDashboard={true}
+            apiEndpoint="http://localhost:8001/api/v1/ca/ca-001/tasks"
+            governmentIntegration={true}
+          />
 
-          {/* Document Tracker */}
-          <motion.div
-            initial={{ opacity: 0, y: 20 }}
-            animate={{ opacity: 1, y: 0 }}
-            transition={{ delay: 0.25 }}
-            className="mb-16 space-y-6"
-          >
-            <div>
-              <h2 className="text-2xl font-bold text-cyan-400 flex items-center mb-4">
-                <Search className="w-6 h-6 mr-2" />
-                Document Tracker
-              </h2>
-              <p className="text-sm text-muted-foreground">Track document submission status from clients</p>
-            </div>
-            <Card className="glass-card border-border/50">
-              <CardContent className="p-6">
-                <div className="text-center py-16 text-muted-foreground">
-                  <Search className="w-16 h-16 mx-auto mb-4 opacity-30" />
-                  <p className="text-lg font-medium">Data will appear here</p>
-                  <p className="text-sm">Once you add companies, documents will be tracked automatically</p>
-                </div>
-              </CardContent>
-            </Card>
-          </motion.div>
+          {/* Client Dependency Tracker - Document & Data Tracking */}
+          <ClientDependencyTracker 
+            isRealDashboard={true}
+            apiEndpoint="http://localhost:8001/api/v1/ca/ca-001/dependencies"
+            aiEnabled={true}
+          />
 
           {/* Regulatory News */}
           <motion.div
