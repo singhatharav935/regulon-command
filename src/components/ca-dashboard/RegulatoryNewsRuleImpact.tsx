@@ -487,6 +487,7 @@ export default function RegulatoryNewsRuleImpact({
   const [lastSync, setLastSync] = useState<Date | null>(null);
   const [isAutoSyncing, setIsAutoSyncing] = useState(false);
   const [aiFetchingStatus, setAiFetchingStatus] = useState<'idle' | 'scanning' | 'analyzing' | 'complete'>('idle');
+  const [showAllNews, setShowAllNews] = useState(false); // Dropdown state for news list
   const [filters, setFilters] = useState({
     authority: 'all',
     impactLevel: 'all',
@@ -855,23 +856,68 @@ export default function RegulatoryNewsRuleImpact({
         </CardContent>
       </Card>
 
-      {/* News Cards */}
-      <div className="space-y-3">
+      {/* News Cards - Collapsible Dropdown Section */}
+      <Card className="bg-card/50 border-border/50">
+        <CardHeader className="pb-2">
+          <div 
+            className="flex items-center justify-between cursor-pointer"
+            onClick={() => setShowAllNews(!showAllNews)}
+          >
+            <div className="flex items-center gap-3">
+              <div className="p-2 rounded-lg bg-blue-500/20">
+                <FileText className="w-5 h-5 text-blue-400" />
+              </div>
+              <div>
+                <CardTitle className="text-lg flex items-center gap-2">
+                  📋 Regulatory Updates List
+                  <Badge variant="outline" className="text-xs">
+                    {filteredNews.length} {filteredNews.length === 1 ? 'Update' : 'Updates'}
+                  </Badge>
+                  {filteredNews.filter(n => getDaysUntilEffective(n.effectiveDate) <= 30).length > 0 && (
+                    <Badge className="bg-red-500/20 text-red-400 text-xs">
+                      🚨 {filteredNews.filter(n => getDaysUntilEffective(n.effectiveDate) <= 30).length} Urgent
+                    </Badge>
+                  )}
+                </CardTitle>
+                <p className="text-xs text-muted-foreground mt-1">
+                  {showAllNews ? 'Click to collapse' : 'Click to expand and view all regulatory updates'}
+                </p>
+              </div>
+            </div>
+            <Button variant="ghost" size="sm" className="h-8 w-8 p-0">
+              {showAllNews ? (
+                <ChevronUp className="w-5 h-5" />
+              ) : (
+                <ChevronDown className="w-5 h-5" />
+              )}
+            </Button>
+          </div>
+        </CardHeader>
+        
         <AnimatePresence>
-          {filteredNews.length > 0 ? (
-            filteredNews.map((item, index) => {
-              const daysUntil = getDaysUntilEffective(item.effectiveDate);
-              const isExpanded = expandedId === item.id;
-              const isUrgent = daysUntil <= 30;
+          {showAllNews && (
+            <motion.div
+              initial={{ opacity: 0, height: 0 }}
+              animate={{ opacity: 1, height: 'auto' }}
+              exit={{ opacity: 0, height: 0 }}
+              transition={{ duration: 0.3 }}
+            >
+              <CardContent className="pt-2">
+                <div className="space-y-3 max-h-[600px] overflow-y-auto pr-2">
+                  {filteredNews.length > 0 ? (
+                    filteredNews.map((item, index) => {
+                      const daysUntil = getDaysUntilEffective(item.effectiveDate);
+                      const isExpanded = expandedId === item.id;
+                      const isUrgent = daysUntil <= 30;
 
-              return (
-                <motion.div
-                  key={item.id}
-                  layout
-                  initial={{ opacity: 0, y: 10 }}
-                  animate={{ opacity: 1, y: 0 }}
-                  exit={{ opacity: 0, y: -10 }}
-                  transition={{ delay: index * 0.03 }}
+                      return (
+                        <motion.div
+                          key={item.id}
+                          layout
+                          initial={{ opacity: 0, y: 10 }}
+                          animate={{ opacity: 1, y: 0 }}
+                          exit={{ opacity: 0, y: -10 }}
+                          transition={{ delay: index * 0.03 }}
                 >
                   <Card
                     className={`bg-card/50 border transition-all ${
@@ -1094,35 +1140,75 @@ export default function RegulatoryNewsRuleImpact({
                     </CardContent>
                   </Card>
                 </motion.div>
-              );
-            })
-          ) : (
-            <motion.div initial={{ opacity: 0 }} animate={{ opacity: 1 }}>
-              <Card className="bg-card/30 border-border/50">
-                <CardContent className="p-12 text-center">
-                  <Scale className="w-16 h-16 mx-auto text-muted-foreground/30 mb-4" />
-                  <p className="text-lg font-medium text-muted-foreground">
-                    {isRealDashboard
-                      ? 'No regulatory updates yet'
-                      : 'No regulations matching your criteria'}
-                  </p>
-                  <p className="text-sm text-muted-foreground mt-2">
-                    {isRealDashboard
-                      ? 'AI agents are continuously scanning government portals. Updates will appear here automatically.'
-                      : 'Try adjusting your filters or search terms.'}
-                  </p>
-                  {isRealDashboard && (
-                    <Button variant="outline" size="sm" className="mt-4" onClick={fetchRegulatoryNews}>
-                      <RefreshCw className="w-3 h-3 mr-1" />
-                      Scan Now
-                    </Button>
+                      );
+                    })
+                  ) : (
+                    <div className="p-8 text-center">
+                      <Scale className="w-12 h-12 mx-auto text-muted-foreground/30 mb-3" />
+                      <p className="text-sm font-medium text-muted-foreground">
+                        {isRealDashboard
+                          ? 'No regulatory updates yet'
+                          : 'No regulations matching your criteria'}
+                      </p>
+                      <p className="text-xs text-muted-foreground mt-1">
+                        {isRealDashboard
+                          ? 'AI agents are scanning government portals.'
+                          : 'Try adjusting your filters.'}
+                      </p>
+                      {isRealDashboard && (
+                        <Button variant="outline" size="sm" className="mt-3" onClick={fetchRegulatoryNews}>
+                          <RefreshCw className="w-3 h-3 mr-1" />
+                          Scan Now
+                        </Button>
+                      )}
+                    </div>
                   )}
-                </CardContent>
-              </Card>
+                </div>
+              </CardContent>
             </motion.div>
           )}
         </AnimatePresence>
-      </div>
+        
+        {/* Preview when collapsed - show first 2 critical/high items */}
+        {!showAllNews && filteredNews.length > 0 && (
+          <CardContent className="pt-0 pb-3">
+            <div className="space-y-2">
+              {filteredNews
+                .filter(n => n.impactLevel === 'critical' || n.impactLevel === 'high')
+                .slice(0, 2)
+                .map((item) => {
+                  const daysUntil = getDaysUntilEffective(item.effectiveDate);
+                  return (
+                    <div 
+                      key={item.id}
+                      className="flex items-center justify-between p-2 rounded-lg bg-card/30 border border-border/30"
+                    >
+                      <div className="flex items-center gap-2 flex-1 min-w-0">
+                        <div className={`w-1.5 h-6 rounded-full flex-shrink-0 ${
+                          item.impactLevel === 'critical' ? 'bg-red-500' : 'bg-orange-500'
+                        }`} />
+                        <span className="text-xs font-medium truncate">{item.title}</span>
+                      </div>
+                      <div className="flex items-center gap-2 flex-shrink-0">
+                        <Badge variant="outline" className="text-xs py-0">
+                          {item.authorityCode}
+                        </Badge>
+                        <span className={`text-xs ${daysUntil <= 7 ? 'text-red-400' : 'text-orange-400'}`}>
+                          {daysUntil}d
+                        </span>
+                      </div>
+                    </div>
+                  );
+                })}
+              {filteredNews.filter(n => n.impactLevel === 'critical' || n.impactLevel === 'high').length > 2 && (
+                <p className="text-xs text-center text-muted-foreground">
+                  +{filteredNews.filter(n => n.impactLevel === 'critical' || n.impactLevel === 'high').length - 2} more urgent updates...
+                </p>
+              )}
+            </div>
+          </CardContent>
+        )}
+      </Card>
     </div>
   );
 }
