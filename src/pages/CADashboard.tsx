@@ -7,7 +7,7 @@ import CAHomeSection from "@/components/ca-dashboard/CAHomeSection";
 import ClientPortfolioSection from "@/components/ca-dashboard/ClientPortfolioSection";
 import TaskFilingManagement from "@/components/ca-dashboard/TaskFilingManagement";
 import ClientDependencyTracker from "@/components/ca-dashboard/ClientDependencyTracker";
-import CALawImpactSection from "@/components/ca-dashboard/CALawImpactSection";
+import RegulatoryNewsRuleImpact from "@/components/ca-dashboard/RegulatoryNewsRuleImpact";
 import ComplianceChangeLog from "@/components/ca-dashboard/ComplianceChangeLog";
 import CAAuditSupport from "@/components/ca-dashboard/CAAuditSupport";
 import CACommunicationLogs from "@/components/ca-dashboard/CACommunicationLogs";
@@ -122,7 +122,7 @@ const CADashboard = () => {
           <ClientPortfolioSection />
           <TaskFilingManagement />
           <ClientDependencyTracker isRealDashboard={false} />
-          <CALawImpactSection />
+          <RegulatoryNewsRuleImpact isRealDashboard={false} />
           <ComplianceChangeLog />
           <CAAuditSupport />
           <CACommunicationLogs />

@@ -7,6 +7,7 @@ import RegulonAIAgent from "@/components/ai-agent/RegulonAIAgent";
 import AIDraftingEngine from "@/components/ca-dashboard/AIDraftingEngine";
 import TaskFilingManagement from "@/components/ca-dashboard/TaskFilingManagement";
 import ClientDependencyTracker from "@/components/ca-dashboard/ClientDependencyTracker";
+import RegulatoryNewsRuleImpact from "@/components/ca-dashboard/RegulatoryNewsRuleImpact";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
@@ -2358,29 +2359,19 @@ const ExternalCADashboardReal = () => {
             aiEnabled={true}
           />
 
-          {/* Regulatory News */}
+          {/* Regulatory News & Rule Impact - Live Section */}
           <motion.div
             initial={{ opacity: 0, y: 20 }}
             animate={{ opacity: 1, y: 0 }}
             transition={{ delay: 0.3 }}
-            className="mb-16 space-y-6"
+            className="mb-16"
           >
-            <div>
-              <h2 className="text-2xl font-bold text-cyan-400 flex items-center mb-4">
-                <AlertTriangle className="w-6 h-6 mr-2" />
-                Regulatory News & Rule Impact
-              </h2>
-              <p className="text-sm text-muted-foreground">Latest compliance updates and regulatory changes</p>
-            </div>
-            <Card className="glass-card border-border/50">
-              <CardContent className="p-6">
-                <div className="text-center py-16 text-muted-foreground">
-                  <AlertTriangle className="w-16 h-16 mx-auto mb-4 opacity-30" />
-                  <p className="text-lg font-medium">Data will appear here</p>
-                  <p className="text-sm">Regulatory news will be populated from government sources</p>
-                </div>
-              </CardContent>
-            </Card>
+            <RegulatoryNewsRuleImpact
+              isRealDashboard={true}
+              apiEndpoint="http://localhost:8001/api/v1/regulatory/news"
+              aiEnabled={true}
+              caId="ca-001"
+            />
           </motion.div>
 
           {/* Compliance Health Log */}
