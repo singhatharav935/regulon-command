@@ -2386,7 +2386,7 @@ const ExternalCADashboardReal = () => {
             <ComplianceHealthChangeLog
               isRealDashboard={true}
               apiEndpoint="http://localhost:8001/api/v1/ca"
-              caId={caProfile?.id || 'ca-001'}
+              caId={'ca-001'}
             />
           </motion.div>
 
