@@ -8,6 +8,7 @@ import AIDraftingEngine from "@/components/ca-dashboard/AIDraftingEngine";
 import TaskFilingManagement from "@/components/ca-dashboard/TaskFilingManagement";
 import ClientDependencyTracker from "@/components/ca-dashboard/ClientDependencyTracker";
 import RegulatoryNewsRuleImpact from "@/components/ca-dashboard/RegulatoryNewsRuleImpact";
+import ComplianceHealthChangeLog from "@/components/ca-dashboard/ComplianceHealthChangeLog";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
@@ -2381,22 +2382,12 @@ const ExternalCADashboardReal = () => {
             transition={{ delay: 0.35 }}
             className="mb-16 space-y-6"
           >
-            <div>
-              <h2 className="text-2xl font-bold text-cyan-400 flex items-center mb-4">
-                <TrendingUp className="w-6 h-6 mr-2" />
-                Compliance Health Change Log
-              </h2>
-              <p className="text-sm text-muted-foreground">Historical tracking of compliance score changes</p>
-            </div>
-            <Card className="glass-card border-border/50">
-              <CardContent className="p-6">
-                <div className="text-center py-16 text-muted-foreground">
-                  <TrendingUp className="w-16 h-16 mx-auto mb-4 opacity-30" />
-                  <p className="text-lg font-medium">Data will appear here</p>
-                  <p className="text-sm">Health changes will be logged automatically</p>
-                </div>
-              </CardContent>
-            </Card>
+            {/* Live Compliance Health Change Log Component */}
+            <ComplianceHealthChangeLog
+              isRealDashboard={true}
+              apiEndpoint="http://localhost:8001/api/v1/ca"
+              caId={caProfile?.id || 'ca-001'}
+            />
           </motion.div>
 
           {/* Audit Support */}
