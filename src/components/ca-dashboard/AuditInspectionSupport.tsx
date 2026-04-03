@@ -473,68 +473,103 @@ export default function AuditInspectionSupport({
                       <TableHeader>
                         <TableRow className="bg-muted/30 hover:bg-muted/30">
                           <TableHead className="text-muted-foreground font-semibold">Company</TableHead>
-                          <TableHead className="text-muted-foreground font-semibold">Authority</TableHead>
+                          <TableHead className="text-muted-foreground font-semibold">Authority / Auditor</TableHead>
                           <TableHead className="text-muted-foreground font-semibold">Scope</TableHead>
                           <TableHead className="text-muted-foreground font-semibold">Documents</TableHead>
                           <TableHead className="text-muted-foreground font-semibold">Status</TableHead>
-                          <TableHead className="text-muted-foreground font-semibold">Priority</TableHead>
-                          <TableHead className="text-muted-foreground font-semibold">Deadline</TableHead>
                           <TableHead className="text-muted-foreground font-semibold">Actions</TableHead>
                         </TableRow>
                       </TableHeader>
                       <TableBody>
                         {filteredAudits.map((audit) => {
-                          const daysUntil = getDaysUntilDeadline(audit.deadline);
                           const docsProgress = audit.documents_required.length > 0
                             ? Math.round((audit.documents_submitted.length / audit.documents_required.length) * 100)
                             : 0;
 
                           return (
                             <TableRow key={audit.id} className="hover:bg-muted/20 transition-colors">
+                              {/* Company */}
                               <TableCell>
                                 <div className="flex items-center gap-2">
                                   <Building2 className="w-4 h-4 text-muted-foreground" />
-                                  <span className="font-medium text-foreground text-sm">{audit.company_name}</span>
-                                </div>
-                              </TableCell>
-                              <TableCell>
-                                <div className="flex items-center gap-1">
-                                  <span>{getAuthorityIcon(audit.authority_type)}</span>
-                                  <span className="text-sm">{audit.authority}</span>
-                                </div>
-                              </TableCell>
-                              <TableCell className="text-sm text-muted-foreground max-w-[150px] truncate">
-                                {audit.scope}
-                              </TableCell>
-                              <TableCell>
-                                <div className="flex items-center gap-2">
-                                  <div className="w-16 h-2 bg-muted rounded-full overflow-hidden">
-                                    <div
-                                      className={`h-full ${docsProgress === 100 ? 'bg-green-500' : 'bg-blue-500'}`}
-                                      style={{ width: `${docsProgress}%` }}
-                                    />
+                                  <div>
+                                    <span className="font-medium text-foreground text-sm block">{audit.company_name}</span>
+                                    {audit.priority === 'critical' && (
+                                      <Badge className="text-xs bg-red-500/20 text-red-400 mt-1">🚨 Critical</Badge>
+                                    )}
                                   </div>
-                                  <span className="text-xs text-muted-foreground">
-                                    {audit.documents_submitted.length}/{audit.documents_required.length}
-                                  </span>
                                 </div>
                               </TableCell>
-                              <TableCell>{getStatusBadge(audit.status)}</TableCell>
-                              <TableCell>{getPriorityBadge(audit.priority)}</TableCell>
+                              
+                              {/* Authority / Auditor */}
                               <TableCell>
-                                {audit.deadline && (
-                                  <span className={`text-xs ${
-                                    daysUntil !== null && daysUntil <= 7 ? 'text-red-400 font-bold' : 
-                                    daysUntil !== null && daysUntil <= 14 ? 'text-orange-400' : 'text-muted-foreground'
-                                  }`}>
-                                    {daysUntil !== null && daysUntil > 0 ? `${daysUntil}d left` : daysUntil === 0 ? 'Today' : 'Overdue'}
-                                  </span>
-                                )}
+                                <div className="flex flex-col">
+                                  <div className="flex items-center gap-1">
+                                    <span>{getAuthorityIcon(audit.authority_type)}</span>
+                                    <span className="text-sm font-medium">{audit.authority}</span>
+                                  </div>
+                                  {audit.assigned_ca && (
+                                    <span className="text-xs text-muted-foreground mt-1">
+                                      👤 Assigned: {audit.assigned_ca}
+                                    </span>
+                                  )}
+                                </div>
                               </TableCell>
+                              
+                              {/* Scope */}
+                              <TableCell>
+                                <div className="max-w-[200px]">
+                                  <span className="text-sm text-foreground">{audit.scope}</span>
+                                  {audit.deadline && (
+                                    <div className="text-xs text-muted-foreground mt-1">
+                                      📅 Due: {new Date(audit.deadline).toLocaleDateString('en-IN', { day: 'numeric', month: 'short', year: 'numeric' })}
+                                    </div>
+                                  )}
+                                </div>
+                              </TableCell>
+                              
+                              {/* Documents */}
+                              <TableCell>
+                                <div className="space-y-2">
+                                  <div className="flex items-center gap-2">
+                                    <div className="w-20 h-2 bg-muted rounded-full overflow-hidden">
+                                      <div
+                                        className={`h-full ${docsProgress === 100 ? 'bg-green-500' : docsProgress >= 50 ? 'bg-blue-500' : 'bg-yellow-500'}`}
+                                        style={{ width: `${docsProgress}%` }}
+                                      />
+                                    </div>
+                                    <span className="text-xs font-medium">
+                                      {audit.documents_submitted.length}/{audit.documents_required.length}
+                                    </span>
+                                  </div>
+                                  <div className="text-xs text-muted-foreground">
+                                    {docsProgress === 100 ? (
+                                      <span className="text-green-400">✅ All submitted</span>
+                                    ) : (
+                                      <span className="text-yellow-400">📋 {audit.documents_required.length - audit.documents_submitted.length} pending</span>
+                                    )}
+                                  </div>
+                                </div>
+                              </TableCell>
+                              
+                              {/* Status */}
+                              <TableCell>
+                                <div className="space-y-1">
+                                  {getStatusBadge(audit.status)}
+                                  {audit.notes && (
+                                    <p className="text-xs text-muted-foreground mt-1 max-w-[120px] truncate" title={audit.notes}>
+                                      {audit.notes}
+                                    </p>
+                                  )}
+                                </div>
+                              </TableCell>
+                              
+                              {/* Actions */}
                               <TableCell>
                                 <div className="flex items-center gap-1">
-                                  <Button size="sm" variant="ghost" className="h-7 px-2" title="Upload Documents">
-                                    <Upload className="w-3 h-3" />
+                                  <Button size="sm" variant="outline" className="h-7 px-2 text-xs" title="Upload Documents">
+                                    <Upload className="w-3 h-3 mr-1" />
+                                    Upload
                                   </Button>
                                   <Button size="sm" variant="ghost" className="h-7 px-2" title="View Details">
                                     <Eye className="w-3 h-3" />
