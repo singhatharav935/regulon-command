@@ -9,6 +9,9 @@ import TaskFilingManagement from "@/components/ca-dashboard/TaskFilingManagement
 import ClientDependencyTracker from "@/components/ca-dashboard/ClientDependencyTracker";
 import RegulatoryNewsRuleImpact from "@/components/ca-dashboard/RegulatoryNewsRuleImpact";
 import ComplianceHealthChangeLog from "@/components/ca-dashboard/ComplianceHealthChangeLog";
+import AuditInspectionSupport from "@/components/ca-dashboard/AuditInspectionSupport";
+import CommunicationLogsLive from "@/components/ca-dashboard/CommunicationLogsLive";
+import CAAnalyticsPerformance from "@/components/ca-dashboard/CAAnalyticsPerformance";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
@@ -2397,22 +2400,7 @@ const ExternalCADashboardReal = () => {
             transition={{ delay: 0.4 }}
             className="mb-16 space-y-6"
           >
-            <div>
-              <h2 className="text-2xl font-bold text-cyan-400 flex items-center mb-4">
-                <Check className="w-6 h-6 mr-2" />
-                Audit, Inspection & Due Diligence Support
-              </h2>
-              <p className="text-sm text-muted-foreground">Support for government audits and inspections</p>
-            </div>
-            <Card className="glass-card border-border/50">
-              <CardContent className="p-6">
-                <div className="text-center py-16 text-muted-foreground">
-                  <Check className="w-16 h-16 mx-auto mb-4 opacity-30" />
-                  <p className="text-lg font-medium">Data will appear here</p>
-                  <p className="text-sm">Audit records will be populated as they occur</p>
-                </div>
-              </CardContent>
-            </Card>
+            <AuditInspectionSupport isRealDashboard={true} caId="ca-001" />
           </motion.div>
 
           {/* Communication & Logs */}
@@ -2422,22 +2410,7 @@ const ExternalCADashboardReal = () => {
             transition={{ delay: 0.45 }}
             className="mb-16 space-y-6"
           >
-            <div>
-              <h2 className="text-2xl font-bold text-cyan-400 flex items-center mb-4">
-                <MessageSquare className="w-6 h-6 mr-2" />
-                Communication & Logs
-              </h2>
-              <p className="text-sm text-muted-foreground">All client communications and system logs</p>
-            </div>
-            <Card className="glass-card border-border/50">
-              <CardContent className="p-6">
-                <div className="text-center py-16 text-muted-foreground">
-                  <MessageSquare className="w-16 h-16 mx-auto mb-4 opacity-30" />
-                  <p className="text-lg font-medium">Data will appear here</p>
-                  <p className="text-sm">Communications will be logged automatically</p>
-                </div>
-              </CardContent>
-            </Card>
+            <CommunicationLogsLive isRealDashboard={true} caId="ca-001" />
           </motion.div>
 
           {/* CA Analytics & Performance */}
@@ -2447,22 +2420,7 @@ const ExternalCADashboardReal = () => {
             transition={{ delay: 0.5 }}
             className="mb-16 space-y-6"
           >
-            <div>
-              <h2 className="text-2xl font-bold text-cyan-400 flex items-center mb-4">
-                <BarChart3 className="w-6 h-6 mr-2" />
-                CA Analytics & Performance
-              </h2>
-              <p className="text-sm text-muted-foreground">Your performance metrics and analytics dashboard</p>
-            </div>
-            <Card className="glass-card border-border/50">
-              <CardContent className="p-6">
-                <div className="text-center py-16 text-muted-foreground">
-                  <BarChart3 className="w-16 h-16 mx-auto mb-4 opacity-30" />
-                  <p className="text-lg font-medium">Data will appear here</p>
-                  <p className="text-sm">Analytics will be calculated as data is collected</p>
-                </div>
-              </CardContent>
-            </Card>
+            <CAAnalyticsPerformance isRealDashboard={true} caId="ca-001" />
           </motion.div>
         </div>
       </main>
