@@ -40,7 +40,7 @@ const OnboardingStep: React.FC<OnboardingStepProps> = ({
       exit={{ opacity: 0, x: -50 }}
       className="max-w-2xl mx-auto"
     >
-      <Card className="p-8">
+      <Card className="p-8 bg-white/10 backdrop-blur-lg border border-white/20 shadow-2xl">
         <div className="mb-8">
           <div className="flex items-center justify-between mb-4">
             <div className="flex space-x-2">
@@ -52,18 +52,18 @@ const OnboardingStep: React.FC<OnboardingStepProps> = ({
                       ? 'bg-green-500'
                       : i === currentStep
                       ? 'bg-purple-500'
-                      : 'bg-gray-200'
+                      : 'bg-gray-600'
                   }`}
                 />
               ))}
             </div>
-            <span className="text-sm text-gray-500">
+            <span className="text-sm text-gray-300">
               Step {currentStep + 1} of {totalSteps}
             </span>
           </div>
           
-          <h2 className="text-2xl font-bold text-gray-900 mb-2">{title}</h2>
-          <p className="text-gray-600">{description}</p>
+          <h2 className="text-2xl font-bold text-white mb-2">{title}</h2>
+          <p className="text-gray-300">{description}</p>
         </div>
 
         <div className="mb-8">{children}</div>
@@ -73,7 +73,7 @@ const OnboardingStep: React.FC<OnboardingStepProps> = ({
             variant="outline"
             onClick={onPrevious}
             disabled={currentStep === 0}
-            className="flex items-center"
+            className="flex items-center bg-white/10 border-white/20 text-white hover:bg-white/20"
           >
             <ChevronLeft className="w-4 h-4 mr-1" />
             Back
@@ -82,7 +82,7 @@ const OnboardingStep: React.FC<OnboardingStepProps> = ({
           <Button
             onClick={onNext}
             disabled={!canProceed || isLoading}
-            className="flex items-center"
+            className="flex items-center bg-purple-600 hover:bg-purple-700 text-white"
           >
             {isLoading ? (
               'Processing...'
@@ -315,24 +315,24 @@ export const MultiStepRegistration: React.FC<MultiStepRegistrationProps> = ({
                   onClick={() => updateFormData({ registrationRole: role.value })}
                   className={`w-full p-4 rounded-lg border text-left transition-all ${
                     formData.registrationRole === role.value
-                      ? "bg-purple-50 border-purple-500 ring-2 ring-purple-200"
-                      : "bg-white border-gray-200 hover:border-gray-300"
+                      ? "bg-purple-600/30 border-purple-400 ring-2 ring-purple-400/50"
+                      : "bg-white/5 border-white/20 hover:border-white/40 hover:bg-white/10"
                   }`}
                 >
                   <div className="flex items-center space-x-4">
                     <div className={`p-2 rounded-lg ${
                       formData.registrationRole === role.value 
-                        ? "bg-purple-100 text-purple-600" 
-                        : "bg-gray-100 text-gray-600"
+                        ? "bg-purple-500/30 text-purple-300" 
+                        : "bg-white/10 text-gray-300"
                     }`}>
                       <Icon className="w-6 h-6" />
                     </div>
                     <div className="flex-1">
-                      <h3 className="font-medium text-gray-900">{role.label}</h3>
-                      <p className="text-sm text-gray-500">{role.description}</p>
+                      <h3 className="font-medium text-white">{role.label}</h3>
+                      <p className="text-sm text-gray-400">{role.description}</p>
                     </div>
                     {formData.registrationRole === role.value && (
-                      <Check className="w-5 h-5 text-purple-600" />
+                      <Check className="w-5 h-5 text-purple-400" />
                     )}
                   </div>
                 </button>
@@ -345,7 +345,7 @@ export const MultiStepRegistration: React.FC<MultiStepRegistrationProps> = ({
         return (
           <div className="space-y-6">
             <div>
-              <Label htmlFor="fullName">Full Name</Label>
+              <Label htmlFor="fullName" className="text-white">Full Name</Label>
               <div className="relative mt-1">
                 <User className="absolute left-3 top-1/2 transform -translate-y-1/2 text-gray-400 w-5 h-5" />
                 <Input
@@ -353,7 +353,7 @@ export const MultiStepRegistration: React.FC<MultiStepRegistrationProps> = ({
                   type="text"
                   value={formData.fullName}
                   onChange={(e) => updateFormData({ fullName: e.target.value })}
-                  className="pl-10"
+                  className="pl-10 bg-white/10 border-white/20 text-white placeholder:text-gray-400"
                   placeholder="Enter your full name"
                   required
                 />
@@ -361,7 +361,7 @@ export const MultiStepRegistration: React.FC<MultiStepRegistrationProps> = ({
             </div>
 
             <div>
-              <Label htmlFor="email">Email Address</Label>
+              <Label htmlFor="email" className="text-white">Email Address</Label>
               <div className="relative mt-1">
                 <Mail className="absolute left-3 top-1/2 transform -translate-y-1/2 text-gray-400 w-5 h-5" />
                 <Input
@@ -369,7 +369,7 @@ export const MultiStepRegistration: React.FC<MultiStepRegistrationProps> = ({
                   type="email"
                   value={formData.email}
                   onChange={(e) => updateFormData({ email: e.target.value })}
-                  className="pl-10"
+                  className="pl-10 bg-white/10 border-white/20 text-white placeholder:text-gray-400"
                   placeholder="Enter your email address"
                   required
                 />
@@ -378,7 +378,7 @@ export const MultiStepRegistration: React.FC<MultiStepRegistrationProps> = ({
 
             {(formData.registrationRole === "external_ca" || formData.registrationRole === "ca_firm") && (
               <div>
-                <Label htmlFor="entityName">
+                <Label htmlFor="entityName" className="text-white">
                   {formData.registrationRole === "ca_firm" ? "Firm Name" : "Practice Name"}
                 </Label>
                 <Input
@@ -386,6 +386,7 @@ export const MultiStepRegistration: React.FC<MultiStepRegistrationProps> = ({
                   type="text"
                   value={formData.entityName || ''}
                   onChange={(e) => updateFormData({ entityName: e.target.value })}
+                  className="bg-white/10 border-white/20 text-white placeholder:text-gray-400"
                   placeholder="Enter your firm/practice name"
                 />
               </div>
@@ -410,7 +411,7 @@ export const MultiStepRegistration: React.FC<MultiStepRegistrationProps> = ({
         return (
           <div className="space-y-6">
             <div>
-              <Label htmlFor="companyName">Company Name (Optional)</Label>
+              <Label htmlFor="companyName" className="text-white">Company Name (Optional)</Label>
               <Input
                 id="companyName"
                 type="text"
@@ -418,53 +419,54 @@ export const MultiStepRegistration: React.FC<MultiStepRegistrationProps> = ({
                 onChange={(e) => updateFormData({
                   companyInfo: { ...formData.companyInfo!, name: e.target.value }
                 })}
+                className="bg-white/10 border-white/20 text-white placeholder:text-gray-400"
                 placeholder="Enter your company name (optional)"
               />
             </div>
 
             <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
               <div>
-                <Label htmlFor="industry">Industry (Optional)</Label>
+                <Label htmlFor="industry" className="text-white">Industry (Optional)</Label>
                 <select
                   id="industry"
                   value={formData.companyInfo?.industry || ''}
                   onChange={(e) => updateFormData({
                     companyInfo: { ...formData.companyInfo!, industry: e.target.value }
                   })}
-                  className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-purple-500 focus:border-transparent"
+                  className="w-full px-3 py-2 bg-white/10 border border-white/20 text-white rounded-lg focus:ring-2 focus:ring-purple-500 focus:border-transparent"
                 >
-                  <option value="">Select Industry (Optional)</option>
-                  <option value="technology">Technology</option>
-                  <option value="finance">Finance</option>
-                  <option value="healthcare">Healthcare</option>
-                  <option value="manufacturing">Manufacturing</option>
-                  <option value="retail">Retail</option>
-                  <option value="other">Other</option>
+                  <option value="" className="bg-slate-800">Select Industry (Optional)</option>
+                  <option value="technology" className="bg-slate-800">Technology</option>
+                  <option value="finance" className="bg-slate-800">Finance</option>
+                  <option value="healthcare" className="bg-slate-800">Healthcare</option>
+                  <option value="manufacturing" className="bg-slate-800">Manufacturing</option>
+                  <option value="retail" className="bg-slate-800">Retail</option>
+                  <option value="other" className="bg-slate-800">Other</option>
                 </select>
               </div>
 
               <div>
-                <Label htmlFor="companySize">Company Size (Optional)</Label>
+                <Label htmlFor="companySize" className="text-white">Company Size (Optional)</Label>
                 <select
                   id="companySize"
                   value={formData.companyInfo?.size || ''}
                   onChange={(e) => updateFormData({
                     companyInfo: { ...formData.companyInfo!, size: e.target.value }
                   })}
-                  className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-purple-500 focus:border-transparent"
+                  className="w-full px-3 py-2 bg-white/10 border border-white/20 text-white rounded-lg focus:ring-2 focus:ring-purple-500 focus:border-transparent"
                 >
-                  <option value="">Select Size</option>
-                  <option value="1-10">1-10 employees</option>
-                  <option value="11-50">11-50 employees</option>
-                  <option value="51-200">51-200 employees</option>
-                  <option value="201-1000">201-1000 employees</option>
-                  <option value="1000+">1000+ employees</option>
+                  <option value="" className="bg-slate-800">Select Size</option>
+                  <option value="1-10" className="bg-slate-800">1-10 employees</option>
+                  <option value="11-50" className="bg-slate-800">11-50 employees</option>
+                  <option value="51-200" className="bg-slate-800">51-200 employees</option>
+                  <option value="201-1000" className="bg-slate-800">201-1000 employees</option>
+                  <option value="1000+" className="bg-slate-800">1000+ employees</option>
                 </select>
               </div>
             </div>
 
             <div>
-              <Label htmlFor="location">Location</Label>
+              <Label htmlFor="location" className="text-white">Location</Label>
               <Input
                 id="location"
                 type="text"
@@ -472,6 +474,7 @@ export const MultiStepRegistration: React.FC<MultiStepRegistrationProps> = ({
                 onChange={(e) => updateFormData({
                   companyInfo: { ...formData.companyInfo!, location: e.target.value }
                 })}
+                className="bg-white/10 border-white/20 text-white placeholder:text-gray-400"
                 placeholder="City, Country"
               />
             </div>
@@ -483,7 +486,7 @@ export const MultiStepRegistration: React.FC<MultiStepRegistrationProps> = ({
           <div className="space-y-6">
             {(formData.registrationRole === "external_ca" || formData.registrationRole === "in_house_ca") && (
               <div>
-                <Label htmlFor="licenseNumber">CA License Number (Optional)</Label>
+                <Label htmlFor="licenseNumber" className="text-white">CA License Number (Optional)</Label>
                 <Input
                   id="licenseNumber"
                   type="text"
@@ -491,27 +494,28 @@ export const MultiStepRegistration: React.FC<MultiStepRegistrationProps> = ({
                   onChange={(e) => updateFormData({
                     professionalInfo: { ...formData.professionalInfo!, licenseNumber: e.target.value }
                   })}
+                  className="bg-white/10 border-white/20 text-white placeholder:text-gray-400"
                   placeholder="Enter your CA license number"
                 />
               </div>
             )}
 
             <div>
-              <Label htmlFor="experience">Years of Experience (Optional)</Label>
+              <Label htmlFor="experience" className="text-white">Years of Experience (Optional)</Label>
               <select
                 id="experience"
                 value={formData.professionalInfo?.experience || ''}
                 onChange={(e) => updateFormData({
                   professionalInfo: { ...formData.professionalInfo!, experience: e.target.value }
                 })}
-                className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-purple-500 focus:border-transparent"
+                className="w-full px-3 py-2 bg-white/10 border border-white/20 text-white rounded-lg focus:ring-2 focus:ring-purple-500 focus:border-transparent"
               >
-                <option value="">Select Experience (Optional)</option>
-                <option value="0-2">0-2 years</option>
-                <option value="3-5">3-5 years</option>
-                <option value="6-10">6-10 years</option>
-                <option value="11-15">11-15 years</option>
-                <option value="15+">15+ years</option>
+                <option value="" className="bg-slate-800">Select Experience (Optional)</option>
+                <option value="0-2" className="bg-slate-800">0-2 years</option>
+                <option value="3-5" className="bg-slate-800">3-5 years</option>
+                <option value="6-10" className="bg-slate-800">6-10 years</option>
+                <option value="11-15" className="bg-slate-800">11-15 years</option>
+                <option value="15+" className="bg-slate-800">15+ years</option>
               </select>
             </div>
           </div>
@@ -520,26 +524,26 @@ export const MultiStepRegistration: React.FC<MultiStepRegistrationProps> = ({
       case 'review':
         return (
           <div className="space-y-6">
-            <div className="bg-gray-50 rounded-lg p-6 space-y-4">
-              <h3 className="font-medium text-gray-900">Review Your Information</h3>
+            <div className="bg-white/10 rounded-lg p-6 space-y-4 border border-white/20">
+              <h3 className="font-medium text-white">Review Your Information</h3>
               
               <div className="grid grid-cols-1 md:grid-cols-2 gap-4 text-sm">
                 <div>
-                  <span className="font-medium text-gray-700">Name:</span>
-                  <span className="ml-2 text-gray-600">{formData.fullName}</span>
+                  <span className="font-medium text-gray-300">Name:</span>
+                  <span className="ml-2 text-white">{formData.fullName}</span>
                 </div>
                 <div>
-                  <span className="font-medium text-gray-700">Email:</span>
-                  <span className="ml-2 text-gray-600">{formData.email}</span>
+                  <span className="font-medium text-gray-300">Email:</span>
+                  <span className="ml-2 text-white">{formData.email}</span>
                 </div>
                 <div>
-                  <span className="font-medium text-gray-700">Role:</span>
-                  <span className="ml-2 text-gray-600">{selectedRole?.label}</span>
+                  <span className="font-medium text-gray-300">Role:</span>
+                  <span className="ml-2 text-white">{selectedRole?.label}</span>
                 </div>
                 {formData.entityName && (
                   <div>
-                    <span className="font-medium text-gray-700">Organization:</span>
-                    <span className="ml-2 text-gray-600">{formData.entityName}</span>
+                    <span className="font-medium text-gray-300">Organization:</span>
+                    <span className="ml-2 text-white">{formData.entityName}</span>
                   </div>
                 )}
               </div>
@@ -551,12 +555,12 @@ export const MultiStepRegistration: React.FC<MultiStepRegistrationProps> = ({
                   type="checkbox"
                   checked={formData.agreeToTerms}
                   onChange={(e) => updateFormData({ agreeToTerms: e.target.checked })}
-                  className="mt-1 w-4 h-4 text-purple-600 border-gray-300 rounded focus:ring-purple-500"
+                  className="mt-1 w-4 h-4 text-purple-600 bg-white/10 border-white/20 rounded focus:ring-purple-500"
                   required
                 />
-                <span className="text-sm text-gray-700">
-                  I agree to the <a href="/terms" className="text-purple-600 hover:underline">Terms of Service</a> and{' '}
-                  <a href="/privacy" className="text-purple-600 hover:underline">Privacy Policy</a>
+                <span className="text-sm text-gray-300">
+                  I agree to the <a href="/terms" className="text-purple-400 hover:underline">Terms of Service</a> and{' '}
+                  <a href="/privacy" className="text-purple-400 hover:underline">Privacy Policy</a>
                 </span>
               </label>
 
@@ -565,9 +569,9 @@ export const MultiStepRegistration: React.FC<MultiStepRegistrationProps> = ({
                   type="checkbox"
                   checked={formData.agreeToNewsletter}
                   onChange={(e) => updateFormData({ agreeToNewsletter: e.target.checked })}
-                  className="mt-1 w-4 h-4 text-purple-600 border-gray-300 rounded focus:ring-purple-500"
+                  className="mt-1 w-4 h-4 text-purple-600 bg-white/10 border-white/20 rounded focus:ring-purple-500"
                 />
-                <span className="text-sm text-gray-700">
+                <span className="text-sm text-gray-300">
                   I'd like to receive product updates and regulatory news (optional)
                 </span>
               </label>
@@ -581,7 +585,7 @@ export const MultiStepRegistration: React.FC<MultiStepRegistrationProps> = ({
   };
 
   return (
-    <div className="min-h-screen bg-gradient-to-br from-slate-50 to-purple-50 py-12 px-4">
+    <div className="min-h-screen bg-gradient-to-br from-slate-900 via-purple-900 to-slate-900 py-12 px-4">
       <AnimatePresence mode="wait">
         <OnboardingStep
           key={currentStep}
