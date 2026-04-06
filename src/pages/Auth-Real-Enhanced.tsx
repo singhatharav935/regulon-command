@@ -103,8 +103,10 @@ const AuthReal = () => {
         return "/admin-dashboard";
       case "in_house_lawyer":
         return "/lawyer-dashboard";
+      case "company_owner":
+        return "/real-company-dashboard";  // REAL Company Dashboard - separate from demo
       default:
-        return "/dashboard";
+        return "/real-company-dashboard";  // Default to real company dashboard
     }
   };
 
@@ -191,8 +193,7 @@ const AuthReal = () => {
   };
 
   const handleMultiStepRegistration = async (formData: RegistrationFormData) => {
-    // Skip enhanced auth and use local demo mode directly
-    console.log("Using local demo mode for registration");
+    console.log("Processing registration for:", formData.registrationRole);
     
     try {
       const localResponse = await createLocalDemoUser(
@@ -204,6 +205,54 @@ const AuthReal = () => {
       );
 
       if (localResponse.success && localResponse.user) {
+        // For company_owner role, register with backend API to get isolated dashboard
+        if (formData.registrationRole === 'company_owner') {
+          try {
+            const API_BASE = import.meta.env.VITE_API_URL || 'http://localhost:8001/api/v1';
+            const companyResponse = await fetch(`${API_BASE}/company/register`, {
+              method: 'POST',
+              headers: { 'Content-Type': 'application/json' },
+              body: JSON.stringify({
+                company_name: formData.companyInfo?.name || formData.entityName || formData.fullName + "'s Company",
+                industry: formData.companyInfo?.industry || null,
+                email: formData.email,
+                phone: null,
+                gstin: null,  // Optional - user can add later
+                pan: null,    // Optional - user can add later
+                cin: null,    // Optional - user can add later
+                company_type: null,
+                state: formData.companyInfo?.location || null,
+                password: formData.password
+              })
+            });
+            
+            if (companyResponse.ok) {
+              const companyData = await companyResponse.json();
+              // Store company ID for Real Company Dashboard
+              localStorage.setItem('regulon_company_id', companyData.company_id);
+              localStorage.setItem('regulon_company_data', JSON.stringify({
+                id: companyData.company_id,
+                company_name: companyData.company_name,
+                compliance_score: 0,
+                health_status: 'unknown'
+              }));
+              console.log('Company registered with backend:', companyData.company_id);
+            }
+          } catch (apiError) {
+            console.warn('Backend registration failed, using local storage:', apiError);
+            // Fallback: create local company ID
+            const localCompanyId = `local-${Date.now()}-${Math.random().toString(36).substr(2, 9)}`;
+            localStorage.setItem('regulon_company_id', localCompanyId);
+            localStorage.setItem('regulon_company_data', JSON.stringify({
+              id: localCompanyId,
+              company_name: formData.companyInfo?.name || formData.entityName || formData.fullName + "'s Company",
+              industry: formData.companyInfo?.industry || null,
+              compliance_score: 0,
+              health_status: 'unknown'
+            }));
+          }
+        }
+
         toast({
           title: "✅ Account Created Successfully!",
           description: `Welcome to REGULON, ${formData.fullName}! Redirecting to your dashboard...`,
