@@ -34,8 +34,21 @@ import { MultiStepRegistration, type RegistrationFormData } from "@/components/a
 type AuthMode = 'login' | 'register' | 'forgot-password' | 'reset-password' | 'multi-step-register' | 'email-verification';
 
 const AuthReal = () => {
-  const [mode, setMode] = useState<AuthMode>('login');
   const [searchParams] = useSearchParams();
+  
+  // Initialize mode from URL params IMMEDIATELY (not in useEffect)
+  const getInitialMode = (): AuthMode => {
+    const urlMode = searchParams.get("mode");
+    if (urlMode === "register" || urlMode === "signup" || urlMode === "multi-step") {
+      return "multi-step-register";
+    }
+    if (urlMode === "forgot-password") return "forgot-password";
+    if (urlMode === "reset-password") return "reset-password";
+    if (urlMode === "verify-email") return "email-verification";
+    return "login";
+  };
+  
+  const [mode, setMode] = useState<AuthMode>(getInitialMode);
   const navigate = useNavigate();
   const location = useLocation();
   const { toast } = useToast();
