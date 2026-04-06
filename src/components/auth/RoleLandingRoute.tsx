@@ -32,15 +32,16 @@ export const resolveLandingPath = ({
 }) => {
   const effectivePersona = persona ?? metadataPersona;
 
-  if (effectivePersona === "admin") return "/app/admin-dashboard";
-  if (effectivePersona === "in_house_lawyer") return "/app/legal-dashboard";
-  if (effectivePersona === "external_ca" || effectivePersona === "in_house_ca") return "/real-ca-dashboard";
-  if (effectivePersona === "ca_firm") return "/app/ca-firm-dashboard";
-  if (effectivePersona === "company_owner") return "/app/dashboard";
+  if (effectivePersona === "admin") return "/admin-dashboard";
+  if (effectivePersona === "in_house_lawyer") return "/lawyer-dashboard";
+  if (effectivePersona === "external_ca") return "/real-external-ca-dashboard";
+  if (effectivePersona === "in_house_ca") return "/ca-dashboard";
+  if (effectivePersona === "ca_firm") return "/ca-dashboard";
+  if (effectivePersona === "company_owner") return "/real-company-dashboard";
 
-  if (roles.includes("admin")) return "/app/admin-dashboard";
-  if (roles.includes("manager")) return "/real-ca-dashboard";
-  return "/app/dashboard";
+  if (roles.includes("admin")) return "/admin-dashboard";
+  if (roles.includes("manager")) return "/real-external-ca-dashboard";
+  return "/real-company-dashboard";
 };
 
 const RoleLandingRoute = () => {
