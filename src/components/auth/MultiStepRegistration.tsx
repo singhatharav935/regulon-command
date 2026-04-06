@@ -1,12 +1,13 @@
 import React from 'react';
 import { motion, AnimatePresence } from 'framer-motion';
-import { ChevronLeft, ChevronRight, Check, Building2, UserCheck, Users, Shield, Gavel, Briefcase, Mail, Lock, User, Eye, EyeOff } from 'lucide-react';
+import { ChevronLeft, ChevronRight, Check, Building2, UserCheck, Users, Shield, Gavel, Briefcase, Mail, Lock, User, Eye, EyeOff, ArrowLeft } from 'lucide-react';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
 import { Card } from '@/components/ui/card';
 import { SecurePasswordInput } from './PasswordStrengthMeter';
 import { useToast } from '@/hooks/use-toast';
+import BackgroundEffects from '@/components/BackgroundEffects';
 
 interface OnboardingStepProps {
   currentStep: number;
@@ -51,7 +52,7 @@ const OnboardingStep: React.FC<OnboardingStepProps> = ({
                     i < currentStep
                       ? 'bg-green-500'
                       : i === currentStep
-                      ? 'bg-purple-500'
+                      ? 'bg-primary'
                       : 'bg-gray-600'
                   }`}
                 />
@@ -82,7 +83,7 @@ const OnboardingStep: React.FC<OnboardingStepProps> = ({
           <Button
             onClick={onNext}
             disabled={!canProceed || isLoading}
-            className="flex items-center bg-purple-600 hover:bg-purple-700 text-white"
+            className="flex items-center bg-gradient-to-r from-primary to-cyan-500 hover:from-primary/90 hover:to-cyan-600 text-white"
           >
             {isLoading ? (
               'Processing...'
@@ -315,14 +316,14 @@ export const MultiStepRegistration: React.FC<MultiStepRegistrationProps> = ({
                   onClick={() => updateFormData({ registrationRole: role.value })}
                   className={`w-full p-4 rounded-lg border text-left transition-all ${
                     formData.registrationRole === role.value
-                      ? "bg-purple-600/30 border-purple-400 ring-2 ring-purple-400/50"
+                      ? "bg-primary/30 border-primary ring-2 ring-primary/50"
                       : "bg-white/5 border-white/20 hover:border-white/40 hover:bg-white/10"
                   }`}
                 >
                   <div className="flex items-center space-x-4">
                     <div className={`p-2 rounded-lg ${
                       formData.registrationRole === role.value 
-                        ? "bg-purple-500/30 text-purple-300" 
+                        ? "bg-primary/30 text-primary" 
                         : "bg-white/10 text-gray-300"
                     }`}>
                       <Icon className="w-6 h-6" />
@@ -332,7 +333,7 @@ export const MultiStepRegistration: React.FC<MultiStepRegistrationProps> = ({
                       <p className="text-sm text-gray-400">{role.description}</p>
                     </div>
                     {formData.registrationRole === role.value && (
-                      <Check className="w-5 h-5 text-purple-400" />
+                      <Check className="w-5 h-5 text-primary" />
                     )}
                   </div>
                 </button>
@@ -433,7 +434,7 @@ export const MultiStepRegistration: React.FC<MultiStepRegistrationProps> = ({
                   onChange={(e) => updateFormData({
                     companyInfo: { ...formData.companyInfo!, industry: e.target.value }
                   })}
-                  className="w-full px-3 py-2 bg-white/10 border border-white/20 text-white rounded-lg focus:ring-2 focus:ring-purple-500 focus:border-transparent"
+                  className="w-full px-3 py-2 bg-white/10 border border-white/20 text-white rounded-lg focus:ring-2 focus:ring-primary focus:border-transparent"
                 >
                   <option value="" className="bg-slate-800">Select Industry (Optional)</option>
                   <option value="technology" className="bg-slate-800">Technology</option>
@@ -453,7 +454,7 @@ export const MultiStepRegistration: React.FC<MultiStepRegistrationProps> = ({
                   onChange={(e) => updateFormData({
                     companyInfo: { ...formData.companyInfo!, size: e.target.value }
                   })}
-                  className="w-full px-3 py-2 bg-white/10 border border-white/20 text-white rounded-lg focus:ring-2 focus:ring-purple-500 focus:border-transparent"
+                  className="w-full px-3 py-2 bg-white/10 border border-white/20 text-white rounded-lg focus:ring-2 focus:ring-primary focus:border-transparent"
                 >
                   <option value="" className="bg-slate-800">Select Size</option>
                   <option value="1-10" className="bg-slate-800">1-10 employees</option>
@@ -508,7 +509,7 @@ export const MultiStepRegistration: React.FC<MultiStepRegistrationProps> = ({
                 onChange={(e) => updateFormData({
                   professionalInfo: { ...formData.professionalInfo!, experience: e.target.value }
                 })}
-                className="w-full px-3 py-2 bg-white/10 border border-white/20 text-white rounded-lg focus:ring-2 focus:ring-purple-500 focus:border-transparent"
+                className="w-full px-3 py-2 bg-white/10 border border-white/20 text-white rounded-lg focus:ring-2 focus:ring-primary focus:border-transparent"
               >
                 <option value="" className="bg-slate-800">Select Experience (Optional)</option>
                 <option value="0-2" className="bg-slate-800">0-2 years</option>
@@ -555,12 +556,12 @@ export const MultiStepRegistration: React.FC<MultiStepRegistrationProps> = ({
                   type="checkbox"
                   checked={formData.agreeToTerms}
                   onChange={(e) => updateFormData({ agreeToTerms: e.target.checked })}
-                  className="mt-1 w-4 h-4 text-purple-600 bg-white/10 border-white/20 rounded focus:ring-purple-500"
+                  className="mt-1 w-4 h-4 text-primary bg-white/10 border-white/20 rounded focus:ring-primary"
                   required
                 />
                 <span className="text-sm text-gray-300">
-                  I agree to the <a href="/terms" className="text-purple-400 hover:underline">Terms of Service</a> and{' '}
-                  <a href="/privacy" className="text-purple-400 hover:underline">Privacy Policy</a>
+                  I agree to the <a href="/terms" className="text-primary hover:underline">Terms of Service</a> and{' '}
+                  <a href="/privacy" className="text-primary hover:underline">Privacy Policy</a>
                 </span>
               </label>
 
@@ -569,7 +570,7 @@ export const MultiStepRegistration: React.FC<MultiStepRegistrationProps> = ({
                   type="checkbox"
                   checked={formData.agreeToNewsletter}
                   onChange={(e) => updateFormData({ agreeToNewsletter: e.target.checked })}
-                  className="mt-1 w-4 h-4 text-purple-600 bg-white/10 border-white/20 rounded focus:ring-purple-500"
+                  className="mt-1 w-4 h-4 text-primary bg-white/10 border-white/20 rounded focus:ring-primary"
                 />
                 <span className="text-sm text-gray-300">
                   I'd like to receive product updates and regulatory news (optional)
@@ -585,8 +586,22 @@ export const MultiStepRegistration: React.FC<MultiStepRegistrationProps> = ({
   };
 
   return (
-    <div className="min-h-screen bg-gradient-to-br from-slate-900 via-purple-900 to-slate-900 py-12 px-4">
-      <AnimatePresence mode="wait">
+    <div className="min-h-screen bg-background relative py-12 px-4">
+      <BackgroundEffects />
+      
+      {/* Back to Home Link */}
+      <div className="absolute top-8 left-8 z-20">
+        <a 
+          href="/" 
+          className="flex items-center space-x-2 text-primary hover:text-primary/80 transition-colors"
+        >
+          <ArrowLeft className="w-5 h-5" />
+          <span className="text-sm font-medium">Back to Home</span>
+        </a>
+      </div>
+
+      <div className="relative z-10">
+        <AnimatePresence mode="wait">
         <OnboardingStep
           key={currentStep}
           currentStep={currentStep}
@@ -602,6 +617,7 @@ export const MultiStepRegistration: React.FC<MultiStepRegistrationProps> = ({
           {renderStepContent()}
         </OnboardingStep>
       </AnimatePresence>
+      </div>
     </div>
   );
 };

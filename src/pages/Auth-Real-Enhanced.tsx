@@ -30,8 +30,9 @@ import { createLocalDemoUser } from "@/lib/local-demo-auth";
 import { SecurePasswordInput } from "@/components/auth/PasswordStrengthMeter";
 import { EmailVerificationFlow } from "@/components/auth/EmailVerificationFlow";
 import { MultiStepRegistration, type RegistrationFormData } from "@/components/auth/MultiStepRegistration";
-
-type AuthMode = 'login' | 'register' | 'forgot-password' | 'reset-password' | 'multi-step-register' | 'email-verification';
+import BackgroundEffects from "@/components/BackgroundEffects";
+
+type AuthMode = 'login' | 'forgot-password' | 'reset-password' | 'multi-step-register' | 'email-verification';
 
 const AuthReal = () => {
   const [searchParams] = useSearchParams();
@@ -422,8 +423,21 @@ const AuthReal = () => {
   // Email verification mode
   if (mode === 'email-verification' && currentUser) {
     return (
-      <div className="min-h-screen bg-gradient-to-br from-slate-900 via-purple-900 to-slate-900 flex items-center justify-center p-4">
-        <div className="w-full max-w-md">
+      <div className="min-h-screen bg-background relative flex items-center justify-center p-4">
+        <BackgroundEffects />
+        
+        {/* Back to Home Link */}
+        <div className="absolute top-8 left-8 z-20">
+          <a 
+            href="/" 
+            className="flex items-center space-x-2 text-primary hover:text-primary/80 transition-colors"
+          >
+            <ArrowLeft className="w-5 h-5" />
+            <span className="text-sm font-medium">Back to Home</span>
+          </a>
+        </div>
+
+        <div className="w-full max-w-md relative z-10">
           <motion.div
             initial={{ opacity: 0, y: 20 }}
             animate={{ opacity: 1, y: 0 }}
@@ -453,7 +467,7 @@ const AuthReal = () => {
                 setMode('login');
                 setCurrentUser(null);
               }}
-              className="text-purple-300 hover:text-purple-200"
+              className="text-primary hover:text-primary/80"
             >
               Use Different Account
             </Button>
@@ -466,11 +480,24 @@ const AuthReal = () => {
   }
 
   return (
-    <div className="min-h-screen bg-gradient-to-br from-slate-900 via-purple-900 to-slate-900 flex items-center justify-center p-4">
+    <div className="min-h-screen bg-background relative flex items-center justify-center p-4">
+      <BackgroundEffects />
+      
+      {/* Back to Home Link */}
+      <div className="absolute top-8 left-8 z-20">
+        <a 
+          href="/" 
+          className="flex items-center space-x-2 text-primary hover:text-primary/80 transition-colors"
+        >
+          <ArrowLeft className="w-5 h-5" />
+          <span className="text-sm font-medium">Back to Home</span>
+        </a>
+      </div>
+
       <motion.div
         initial={{ opacity: 0, y: 20 }}
         animate={{ opacity: 1, y: 0 }}
-        className="w-full max-w-md"
+        className="w-full max-w-md relative z-10"
       >
         <Card className="bg-white/10 backdrop-blur-lg border border-white/20 shadow-2xl">
           <div className="p-8">
@@ -479,21 +506,19 @@ const AuthReal = () => {
                 initial={{ scale: 0 }}
                 animate={{ scale: 1 }}
                 transition={{ type: "spring", stiffness: 260, damping: 20 }}
-                className="mx-auto w-16 h-16 bg-gradient-to-r from-purple-600 to-blue-600 rounded-full flex items-center justify-center mb-4"
+                className="mx-auto w-16 h-16 bg-gradient-to-r from-primary/80 to-cyan-500 rounded-full flex items-center justify-center mb-4"
               >
                 <Shield className="w-8 h-8 text-white" />
               </motion.div>
               
               <h1 className="text-3xl font-bold text-white mb-2">
                 {mode === 'login' && 'Welcome Back'}
-                {mode === 'register' && 'Join REGULON'}
                 {mode === 'forgot-password' && 'Reset Password'}
                 {mode === 'reset-password' && 'New Password'}
               </h1>
               
               <p className="text-gray-300">
                 {mode === 'login' && 'Sign in to your compliance workspace'}
-                {mode === 'register' && 'Create your professional account'}
                 {mode === 'forgot-password' && 'Enter your email to reset your password'}
                 {mode === 'reset-password' && 'Create a new secure password'}
               </p>
@@ -554,7 +579,7 @@ const AuthReal = () => {
                         id="remember"
                         checked={rememberMe}
                         onCheckedChange={setRememberMe}
-                        className="border-white/30 data-[state=checked]:bg-purple-600"
+                        className="border-white/30 data-[state=checked]:bg-primary"
                       />
                       <Label htmlFor="remember" className="text-sm text-gray-300">
                         Remember me
@@ -564,7 +589,7 @@ const AuthReal = () => {
                     <button
                       type="button"
                       onClick={() => setMode('forgot-password')}
-                      className="text-sm text-purple-300 hover:text-purple-200"
+                      className="text-sm text-primary hover:text-primary/80"
                     >
                       Forgot password?
                     </button>
@@ -575,7 +600,7 @@ const AuthReal = () => {
                       id="trust-device"
                       checked={trustDevice}
                       onCheckedChange={setTrustDevice}
-                      className="border-white/30 data-[state=checked]:bg-purple-600"
+                      className="border-white/30 data-[state=checked]:bg-primary"
                     />
                     <Label htmlFor="trust-device" className="text-sm text-gray-300">
                       Trust this device
@@ -585,7 +610,7 @@ const AuthReal = () => {
                   <Button
                     type="submit"
                     disabled={isLoading}
-                    className="w-full bg-gradient-to-r from-purple-600 to-blue-600 hover:from-purple-700 hover:to-blue-700 text-white font-medium py-3"
+                    className="w-full bg-gradient-to-r from-primary to-cyan-500 hover:from-primary/90 hover:to-cyan-600 text-white font-medium py-3"
                   >
                     {isLoading ? (
                       <>
@@ -600,154 +625,11 @@ const AuthReal = () => {
                   <div className="text-center">
                     <button
                       type="button"
-                      onClick={() => setMode('register')}
-                      className="text-purple-300 hover:text-purple-200 text-sm"
+                      onClick={() => setMode('multi-step-register')}
+                      className="text-primary hover:text-primary/80 text-sm"
                     >
                       Don't have an account? <span className="font-medium">Sign up</span>
                     </button>
-                  </div>
-
-                  <div className="text-center">
-                    <Button
-                      type="button"
-                      variant="outline"
-                      onClick={() => setMode('multi-step-register')}
-                      className="text-purple-300 border-purple-300 hover:bg-purple-600/20"
-                    >
-                      Professional Registration
-                    </Button>
-                  </div>
-                </motion.form>
-              )}
-
-              {mode === 'register' && (
-                <motion.form
-                  key="register"
-                  initial={{ opacity: 0, x: 20 }}
-                  animate={{ opacity: 1, x: 0 }}
-                  exit={{ opacity: 0, x: -20 }}
-                  onSubmit={handleRegister}
-                  className="space-y-6"
-                >
-                  <div>
-                    <Label htmlFor="fullName" className="text-white">Full Name</Label>
-                    <div className="relative mt-1">
-                      <User className="absolute left-3 top-1/2 transform -translate-y-1/2 text-gray-400 w-5 h-5" />
-                      <Input
-                        id="fullName"
-                        type="text"
-                        value={fullName}
-                        onChange={(e) => setFullName(e.target.value)}
-                        className="pl-10 bg-white/10 border-white/20 text-white placeholder:text-gray-400"
-                        placeholder="Enter your full name"
-                        required
-                      />
-                    </div>
-                  </div>
-
-                  <div>
-                    <Label className="text-white">Professional Role</Label>
-                    <div className="mt-2 space-y-2 max-h-48 overflow-y-auto">
-                      {roleOptions.map((role) => {
-                        const Icon = role.icon;
-                        return (
-                          <button
-                            key={role.value}
-                            type="button"
-                            onClick={() => setRegistrationRole(role.value)}
-                            className={`w-full p-3 rounded-lg border text-left transition-all ${
-                              registrationRole === role.value
-                                ? "bg-purple-600/30 border-purple-400 text-white"
-                                : "bg-white/5 border-white/20 text-gray-300 hover:bg-white/10"
-                            }`}
-                          >
-                            <div className="flex items-center space-x-3">
-                              <Icon className="w-5 h-5" />
-                              <div>
-                                <div className="font-medium">{role.label}</div>
-                                <div className="text-sm opacity-70">{role.description}</div>
-                              </div>
-                            </div>
-                          </button>
-                        );
-                      })}
-                    </div>
-                  </div>
-
-                  {(registrationRole === "external_ca" || registrationRole === "ca_firm") && (
-                    <div>
-                      <Label htmlFor="entityName" className="text-white">
-                        {registrationRole === "ca_firm" ? "Firm Name" : "Practice Name"}
-                      </Label>
-                      <Input
-                        id="entityName"
-                        type="text"
-                        value={entityName}
-                        onChange={(e) => setEntityName(e.target.value)}
-                        className="bg-white/10 border-white/20 text-white placeholder:text-gray-400 mt-1"
-                        placeholder="Enter your firm/practice name"
-                      />
-                    </div>
-                  )}
-
-                  <div>
-                    <Label htmlFor="email" className="text-white">Email Address</Label>
-                    <div className="relative mt-1">
-                      <Mail className="absolute left-3 top-1/2 transform -translate-y-1/2 text-gray-400 w-5 h-5" />
-                      <Input
-                        id="email"
-                        type="email"
-                        value={email}
-                        onChange={(e) => setEmail(e.target.value)}
-                        className="pl-10 bg-white/10 border-white/20 text-white placeholder:text-gray-400"
-                        placeholder="Enter your email"
-                        required
-                      />
-                    </div>
-                  </div>
-
-                  <SecurePasswordInput
-                    label="Password"
-                    value={password}
-                    onValueChange={setPassword}
-                    placeholder="Create a secure password"
-                    className="bg-white/10 border-white/20 text-white placeholder:text-gray-400"
-                  />
-
-                  <Button
-                    type="submit"
-                    disabled={isLoading}
-                    className="w-full bg-gradient-to-r from-purple-600 to-blue-600 hover:from-purple-700 hover:to-blue-700 text-white font-medium py-3"
-                  >
-                    {isLoading ? (
-                      <>
-                        <Loader2 className="w-4 h-4 animate-spin mr-2" />
-                        Creating account...
-                      </>
-                    ) : (
-                      'Create Account'
-                    )}
-                  </Button>
-
-                  <div className="text-center space-y-2">
-                    <button
-                      type="button"
-                      onClick={() => setMode('login')}
-                      className="text-purple-300 hover:text-purple-200 text-sm"
-                    >
-                      Already have an account? <span className="font-medium">Sign in</span>
-                    </button>
-                    
-                    <div>
-                      <Button
-                        type="button"
-                        variant="ghost"
-                        onClick={() => setMode('multi-step-register')}
-                        className="text-purple-300 hover:text-purple-200 text-sm"
-                      >
-                        Prefer guided setup?
-                      </Button>
-                    </div>
                   </div>
                 </motion.form>
               )}
@@ -785,7 +667,7 @@ const AuthReal = () => {
                   <Button
                     type="submit"
                     disabled={isLoading}
-                    className="w-full bg-gradient-to-r from-purple-600 to-blue-600 hover:from-purple-700 hover:to-blue-700 text-white font-medium py-3"
+                    className="w-full bg-gradient-to-r from-primary to-cyan-500 hover:from-primary/90 hover:to-cyan-600 text-white font-medium py-3"
                   >
                     {isLoading ? (
                       <>
@@ -801,7 +683,7 @@ const AuthReal = () => {
                     <button
                       type="button"
                       onClick={() => setMode('login')}
-                      className="text-purple-300 hover:text-purple-200 text-sm flex items-center justify-center"
+                      className="text-primary hover:text-primary/80 text-sm flex items-center justify-center"
                     >
                       <ArrowLeft className="w-4 h-4 mr-1" />
                       Back to Sign In
@@ -835,7 +717,7 @@ const AuthReal = () => {
                   <Button
                     type="submit"
                     disabled={isLoading}
-                    className="w-full bg-gradient-to-r from-purple-600 to-blue-600 hover:from-purple-700 hover:to-blue-700 text-white font-medium py-3"
+                    className="w-full bg-gradient-to-r from-primary to-cyan-500 hover:from-primary/90 hover:to-cyan-600 text-white font-medium py-3"
                   >
                     {isLoading ? (
                       <>
@@ -851,7 +733,7 @@ const AuthReal = () => {
                     <button
                       type="button"
                       onClick={() => setMode('login')}
-                      className="text-purple-300 hover:text-purple-200 text-sm flex items-center justify-center"
+                      className="text-primary hover:text-primary/80 text-sm flex items-center justify-center"
                     >
                       <ArrowLeft className="w-4 h-4 mr-1" />
                       Back to Sign In
