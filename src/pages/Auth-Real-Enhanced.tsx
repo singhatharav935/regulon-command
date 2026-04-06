@@ -281,10 +281,12 @@ const AuthReal = () => {
         
         // Get the correct dashboard route based on role
         const dashboardRoute = getDashboardRoute(formData.registrationRole);
+        console.log('REDIRECT DEBUG: Role =', formData.registrationRole, '-> Route =', dashboardRoute);
         
-        // Small delay for toast to show, then redirect to dashboard
+        // Force redirect using window.location for reliability
         setTimeout(() => {
-          navigate(dashboardRoute);
+          console.log('REDIRECTING TO:', dashboardRoute);
+          window.location.href = dashboardRoute;
         }, 500);
       } else {
         throw new Error(localResponse.error || "Failed to create account");
