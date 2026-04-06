@@ -61,7 +61,8 @@ const AuthReal = () => {
     const role = searchParams.get("role");
     const token = searchParams.get("token");
     
-    if (urlMode === "register") setMode("register");
+    // Support both 'register' and 'signup' modes - go directly to multi-step
+    if (urlMode === "register" || urlMode === "signup") setMode("multi-step-register");
     if (urlMode === "forgot-password") setMode("forgot-password");
     if (urlMode === "reset-password" && token) {
       setMode("reset-password");
