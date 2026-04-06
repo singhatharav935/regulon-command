@@ -379,6 +379,25 @@ export const UserOnboardingFlow: React.FC = () => {
     }
   };
 
+  // Get dashboard route based on role
+  const getDashboardRoute = (role: string): string => {
+    switch (role) {
+      case 'external_ca':
+        return '/real-external-ca-dashboard';
+      case 'in_house_ca':
+      case 'ca_firm':
+        return '/ca-dashboard';
+      case 'admin':
+        return '/admin-dashboard';
+      case 'in_house_lawyer':
+        return '/lawyer-dashboard';
+      case 'company_owner':
+        return '/real-company-dashboard';
+      default:
+        return '/real-company-dashboard';
+    }
+  };
+
   const handleFinishOnboarding = async () => {
     try {
       await updateProfile({ profile_completed: true });
@@ -386,7 +405,9 @@ export const UserOnboardingFlow: React.FC = () => {
         title: 'Welcome to REGULON!',
         description: 'Your onboarding is complete. Let\'s get started!',
       });
-      navigate(`/dashboard`);
+      // Navigate to role-appropriate dashboard
+      const dashboardRoute = getDashboardRoute(user?.registration_role || 'company_owner');
+      navigate(dashboardRoute);
     } catch (error) {
       console.error('Failed to complete onboarding:', error);
     }

@@ -56,7 +56,7 @@ export const PERSONA_CONFIG: Record<PersonaType, PersonaConfig> = {
     description: 'Executive - High-level compliance overview',
     icon: '👔',
     color: 'bg-amber-500',
-    dashboardRoute: '/dashboards/company-owner',
+    dashboardRoute: '/real-company-dashboard',
   },
   admin: {
     id: 'admin',

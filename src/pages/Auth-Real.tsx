@@ -96,6 +96,7 @@ const Auth = () => {
   const getDashboardRoute = (role: string): string => {
     switch (role) {
       case "external_ca":
+        return "/real-external-ca-dashboard";
       case "in_house_ca":
       case "ca_firm":
         return "/ca-dashboard";
@@ -103,8 +104,10 @@ const Auth = () => {
         return "/admin-dashboard";
       case "in_house_lawyer":
         return "/lawyer-dashboard";
+      case "company_owner":
+        return "/real-company-dashboard";
       default:
-        return "/dashboard";
+        return "/real-company-dashboard";
     }
   };
 
