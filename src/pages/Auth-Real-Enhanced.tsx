@@ -173,9 +173,25 @@ const AuthReal = () => {
 
         // Store user info
         localStorage.setItem('pending_registration_role', registrationRole);
+        localStorage.setItem('current_user_role', registrationRole);
         
+        // For company_owner, store company ID for real dashboard
+        if (registrationRole === 'company_owner') {
+          const localCompanyId = `company-${Date.now()}-${Math.random().toString(36).substr(2, 9)}`;
+          localStorage.setItem('regulon_company_id', localCompanyId);
+          localStorage.setItem('regulon_company_data', JSON.stringify({
+            id: localCompanyId,
+            company_name: entityName || fullName + "'s Company",
+            industry: 'General',
+            compliance_score: 0,
+            health_status: 'unknown'
+          }));
+        }
+        
+        // Navigate to appropriate dashboard based on role
+        const dashboardRoute = getDashboardRoute(registrationRole);
         setTimeout(() => {
-          navigate('/persona-selector');
+          navigate(dashboardRoute);
         }, 500);
       } else {
         throw new Error(localResponse.error || "Failed to create account");
