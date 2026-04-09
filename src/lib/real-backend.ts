@@ -3,7 +3,7 @@
  * Replaces workspace-backend.ts to use real backend
  */
 
-const BACKEND_BASE_URL = 'http://localhost:3001/api/v1';
+const BACKEND_BASE_URL = '/api/v1';
 
 export interface BackendResponse<T> {
   data?: T;

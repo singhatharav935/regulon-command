@@ -306,7 +306,7 @@ const Index = () => {
                 try {
                   await workspacePublicRequest("/public/regulatory-announcements/sync-now", { method: "POST" });
                 } catch {
-                  await fetch("http://localhost:8787/sync-now", { method: "POST" });
+                  await fetch("/agent/sync-now", { method: "POST" });
                 }
                 await refetchPublicAnnouncements();
               }}

@@ -91,7 +91,7 @@ const ProtectedRoute = ({ children, allowRoles, allowPersonas, requireVerified =
     const hasAllowedRole = allowRoles.some((role) => effectiveRoles.includes(role));
 
     if (!hasAllowedRole && (!allowPersonas || allowPersonas.length === 0)) {
-      return <Navigate to="/real-company-dashboard" replace />;
+      return <Navigate to="/dashboard" replace />;
     }
   }
 

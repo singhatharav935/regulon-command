@@ -63,6 +63,7 @@ import {
   LineChart
 } from "lucide-react";
 import { toast } from "@/hooks/use-toast";
+import { AgentStatusPanel } from "@/components/agents/AgentStatusPanel";
 
 // ========================================
 // TYPES
@@ -1834,6 +1835,16 @@ const CompanyDashboardReal = () => {
               <strong>Live Dashboard</strong> — Your real-time compliance command center.
               <span className="text-muted-foreground ml-2">All data is synchronized with government portals.</span>
             </p>
+          </motion.div>
+
+          {/* AI Agent Status Panel */}
+          <motion.div
+            initial={{ opacity: 0, y: 10 }}
+            animate={{ opacity: 1, y: 0 }}
+            transition={{ delay: 0.1 }}
+            className="mb-6"
+          >
+            <AgentStatusPanel companyId={companyId || ''} />
           </motion.div>
 
           <div className="space-y-6">

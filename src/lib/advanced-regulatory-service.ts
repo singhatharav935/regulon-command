@@ -7,7 +7,7 @@ import axios from 'axios';
 
 const API_BASE = process.env.NODE_ENV === 'production' 
   ? 'https://api.regulon.ai/api'
-  : 'http://localhost:3001/api';
+  : '/api';
 
 export interface RegulatoryAlert {
   id: string;

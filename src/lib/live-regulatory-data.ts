@@ -525,7 +525,7 @@ const LIVE_FALLBACK_RULES = [
 export async function fetchLiveRegulatoryNews(): Promise<NewsItem[]> {
   try {
     // Try to fetch from the regulatory agent first
-    const response = await axios.get('http://localhost:8787/status', {
+    const response = await axios.get('/agent/status', {
       timeout: 5000,
     });
 

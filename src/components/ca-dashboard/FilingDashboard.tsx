@@ -30,7 +30,7 @@ import {
 import { motion } from 'framer-motion';
 
 // API Integration
-const API_BASE = import.meta.env.VITE_API_URL || 'http://localhost:3001/api';
+const API_BASE = import.meta.env.VITE_API_URL || '/api';
 
 class FilingAPI {
   static async request(endpoint: string, options: RequestInit = {}) {

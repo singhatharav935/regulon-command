@@ -56,6 +56,7 @@ import {
   Sparkles,
   ChevronRight,
   ChevronDown,
+  ChevronUp,
   ArrowRight,
   X,
   Upload,
@@ -1333,6 +1334,7 @@ const ExternalCADashboardReal = () => {
   const [isOnboarding, setIsOnboarding] = useState(false);
   const [selectedCompany, setSelectedCompany] = useState<any>(null);
   const [showCompanyDetails, setShowCompanyDetails] = useState(false);
+  const [isDrawerOpen, setIsDrawerOpen] = useState(false);
 
   // Compliance Service API URL
   const COMPLIANCE_API = 'http://localhost:8001/api/v1';
@@ -1681,7 +1683,7 @@ const ExternalCADashboardReal = () => {
           {/* Live AI Drafting Engine */}
           <LiveAIDraftingEngine />
 
-          {/* Full AI Drafting Engine from CA Demo Dashboard - Connected to Live AI Agent */}
+          {/* Full AI Drafting Engine — Inline trigger button */}
           <motion.div
             id="ai-drafting-engine-full"
             initial={{ opacity: 0, y: 20 }}
@@ -1689,82 +1691,132 @@ const ExternalCADashboardReal = () => {
             transition={{ delay: 0.12 }}
             className="mb-16"
           >
-            {/* AI Engine Connection Status Header */}
-            <Card className="mb-6 border-purple-500/30 bg-gradient-to-r from-purple-900/20 via-indigo-900/20 to-cyan-900/20">
-              <CardContent className="py-4">
-                <div className="flex items-center justify-between flex-wrap gap-4">
-                  <div className="flex items-center gap-3">
-                    <div className="relative">
-                      <div className="w-12 h-12 rounded-full bg-gradient-to-r from-purple-500 to-cyan-500 flex items-center justify-center">
-                        <Cpu className="w-6 h-6 text-white" />
-                      </div>
-                      <div className="absolute -top-1 -right-1 w-4 h-4 bg-green-500 rounded-full border-2 border-background animate-pulse" />
+            <button
+              onClick={() => setIsDrawerOpen(true)}
+              className="w-full group relative overflow-hidden rounded-2xl border border-purple-500/30 bg-gradient-to-r from-purple-900/20 via-indigo-900/20 to-cyan-900/20 p-6 hover:border-purple-500/60 hover:from-purple-900/30 hover:to-cyan-900/30 transition-all duration-300"
+            >
+              <div className="flex items-center justify-between flex-wrap gap-4">
+                <div className="flex items-center gap-4">
+                  <div className="relative">
+                    <div className="w-14 h-14 rounded-full bg-gradient-to-r from-purple-500 to-cyan-500 flex items-center justify-center shadow-[0_0_20px_rgba(139,92,246,0.4)]">
+                      <Cpu className="w-7 h-7 text-white" />
                     </div>
-                    <div>
-                      <h3 className="font-bold text-white flex items-center gap-2">
-                        REGULON AI Drafting Engine
-                        <Badge className="bg-gradient-to-r from-purple-600 to-cyan-600 text-white text-xs">
-                          LIVE v3.0
-                        </Badge>
-                      </h3>
-                      <p className="text-xs text-muted-foreground">
-                        Connected to Live AI Agent • Real-time Document Generation • CA Final Approval
-                      </p>
-                    </div>
+                    <div className="absolute -top-1 -right-1 w-4 h-4 bg-green-500 rounded-full border-2 border-background animate-pulse" />
                   </div>
-                  <div className="flex items-center gap-4">
-                    <div className="flex items-center gap-2 text-sm">
-                      <div className="w-2 h-2 bg-green-500 rounded-full animate-pulse" />
-                      <span className="text-green-400">Backend Connected</span>
+                  <div className="text-left">
+                    <div className="flex items-center gap-2 mb-1">
+                      <h3 className="font-bold text-white text-lg">REGULON AI Drafting Engine</h3>
+                      <Badge className="bg-gradient-to-r from-purple-600 to-cyan-600 text-white text-xs">LIVE v3.0</Badge>
                     </div>
-                    <div className="flex items-center gap-2 text-sm">
-                      <Radio className="w-4 h-4 text-cyan-400 animate-pulse" />
-                      <span className="text-cyan-400">Real-time Sync Active</span>
-                    </div>
-                    <div className="flex items-center gap-2 text-sm">
-                      <Shield className="w-4 h-4 text-purple-400" />
-                      <span className="text-purple-400">CA Approval Required</span>
+                    <p className="text-xs text-muted-foreground">Connected to Live AI Agent • Real-time Document Generation • CA Final Approval</p>
+                    <div className="flex flex-wrap gap-2 mt-3">
+                      <Badge variant="outline" className="border-cyan-500/50 text-cyan-400 text-[10px]"><Sparkles className="w-2.5 h-2.5 mr-1" />MCA Notice</Badge>
+                      <Badge variant="outline" className="border-green-500/50 text-green-400 text-[10px]"><FileText className="w-2.5 h-2.5 mr-1" />GST Reply</Badge>
+                      <Badge variant="outline" className="border-yellow-500/50 text-yellow-400 text-[10px]"><Calculator className="w-2.5 h-2.5 mr-1" />Income Tax</Badge>
+                      <Badge variant="outline" className="border-purple-500/50 text-purple-400 text-[10px]"><Scale className="w-2.5 h-2.5 mr-1" />RBI FEMA</Badge>
+                      <Badge variant="outline" className="border-orange-500/50 text-orange-400 text-[10px]"><Shield className="w-2.5 h-2.5 mr-1" />SEBI</Badge>
+                      <Badge variant="outline" className="border-blue-500/50 text-blue-400 text-[10px]"><FileCheck className="w-2.5 h-2.5 mr-1" />Contracts</Badge>
                     </div>
                   </div>
                 </div>
-                
-                {/* AI Capabilities Badges */}
-                <div className="mt-4 flex flex-wrap gap-2">
-                  <Badge variant="outline" className="border-cyan-500/50 text-cyan-400">
-                    <Sparkles className="w-3 h-3 mr-1" /> MCA Notice Response
-                  </Badge>
-                  <Badge variant="outline" className="border-green-500/50 text-green-400">
-                    <FileText className="w-3 h-3 mr-1" /> GST Show Cause Reply
-                  </Badge>
-                  <Badge variant="outline" className="border-yellow-500/50 text-yellow-400">
-                    <Calculator className="w-3 h-3 mr-1" /> Income Tax Response
-                  </Badge>
-                  <Badge variant="outline" className="border-purple-500/50 text-purple-400">
-                    <Scale className="w-3 h-3 mr-1" /> RBI FEMA Filing
-                  </Badge>
-                  <Badge variant="outline" className="border-orange-500/50 text-orange-400">
-                    <Shield className="w-3 h-3 mr-1" /> SEBI Compliance
-                  </Badge>
-                  <Badge variant="outline" className="border-red-500/50 text-red-400">
-                    <FileWarning className="w-3 h-3 mr-1" /> Customs Response
-                  </Badge>
-                  <Badge variant="outline" className="border-blue-500/50 text-blue-400">
-                    <FileCheck className="w-3 h-3 mr-1" /> Contract Review
-                  </Badge>
+                <div className="flex items-center gap-3">
+                  <div className="hidden sm:flex flex-col gap-1 text-xs">
+                    <span className="flex items-center gap-1.5 text-green-400"><div className="w-1.5 h-1.5 bg-green-400 rounded-full animate-pulse" />Backend Connected</span>
+                    <span className="flex items-center gap-1.5 text-cyan-400"><Radio className="w-3 h-3 animate-pulse" />Real-time Sync Active</span>
+                    <span className="flex items-center gap-1.5 text-purple-400"><Shield className="w-3 h-3" />CA Approval Required</span>
+                  </div>
+                  <div className="flex items-center gap-2 px-5 py-3 rounded-xl bg-gradient-to-r from-purple-600 to-cyan-600 text-white font-semibold text-sm shadow-[0_4px_20px_rgba(139,92,246,0.4)] group-hover:shadow-[0_4px_30px_rgba(139,92,246,0.6)] transition-all duration-300">
+                    <Zap className="w-4 h-4" />
+                    Open Engine
+                    <ChevronUp className="w-4 h-4" />
+                  </div>
                 </div>
-              </CardContent>
-            </Card>
-            
-            {/* The Full AI Drafting Engine Component */}
-            <AIDraftingEngine 
-              demoMode={false}
-              isRealDashboard={true}
-              includeLawyerReview={true}
-              apiEndpoint="http://localhost:3001/api/ca-dashboard"
-              openaiIntegration={true}
-              realDocumentGeneration={true}
-            />
+              </div>
+            </button>
           </motion.div>
+
+          {/* AI Drafting Engine Slide-up Overlay */}
+          <AnimatePresence>
+            {isDrawerOpen && (
+              <>
+                {/* Backdrop */}
+                <motion.div
+                  key="ai-drawer-backdrop"
+                  initial={{ opacity: 0 }}
+                  animate={{ opacity: 1 }}
+                  exit={{ opacity: 0 }}
+                  transition={{ duration: 0.25 }}
+                  className="fixed inset-0 bg-black/60 backdrop-blur-sm z-40"
+                  onClick={() => setIsDrawerOpen(false)}
+                />
+
+                {/* Slide-up panel */}
+                <motion.div
+                  key="ai-drawer-panel"
+                  initial={{ y: "100%" }}
+                  animate={{ y: 0 }}
+                  exit={{ y: "100%" }}
+                  transition={{ type: "spring", damping: 28, stiffness: 280 }}
+                  className="fixed bottom-0 left-0 right-0 z-50 bg-background border-t border-purple-500/30 rounded-t-2xl shadow-[0_-20px_60px_rgba(139,92,246,0.2)] max-h-[88vh] overflow-y-auto"
+                >
+                  {/* Sticky header */}
+                  <div className="flex items-center justify-between px-6 py-4 border-b border-border/50 sticky top-0 bg-background/95 backdrop-blur-md z-10">
+                    <div className="flex items-center gap-3">
+                      <div className="relative">
+                        <div className="w-10 h-10 rounded-full bg-gradient-to-r from-purple-500 to-cyan-500 flex items-center justify-center">
+                          <Cpu className="w-5 h-5 text-white" />
+                        </div>
+                        <div className="absolute -top-1 -right-1 w-3 h-3 bg-green-500 rounded-full border-2 border-background animate-pulse" />
+                      </div>
+                      <div>
+                        <h3 className="font-bold text-white flex items-center gap-2">
+                          REGULON AI Drafting Engine
+                          <Badge className="bg-gradient-to-r from-purple-600 to-cyan-600 text-white text-xs">LIVE v3.0</Badge>
+                        </h3>
+                        <p className="text-xs text-muted-foreground">Connected to Live AI Agent • Real-time Document Generation • CA Final Approval</p>
+                      </div>
+                    </div>
+                    <div className="flex items-center gap-3">
+                      <div className="hidden md:flex items-center gap-4 text-xs">
+                        <span className="flex items-center gap-1.5 text-green-400"><div className="w-1.5 h-1.5 bg-green-400 rounded-full animate-pulse" />Backend Connected</span>
+                        <span className="flex items-center gap-1.5 text-cyan-400"><Radio className="w-3 h-3 animate-pulse" />Real-time Sync Active</span>
+                        <span className="flex items-center gap-1.5 text-purple-400"><Shield className="w-3 h-3" />CA Approval Required</span>
+                      </div>
+                      <button
+                        onClick={() => setIsDrawerOpen(false)}
+                        className="p-2 rounded-lg hover:bg-card transition-colors text-muted-foreground hover:text-white"
+                      >
+                        <X className="w-5 h-5" />
+                      </button>
+                    </div>
+                  </div>
+
+                  {/* Capabilities badges strip */}
+                  <div className="px-6 py-3 flex flex-wrap gap-2 border-b border-border/30 bg-gradient-to-r from-purple-900/10 via-indigo-900/10 to-cyan-900/10">
+                    <Badge variant="outline" className="border-cyan-500/50 text-cyan-400"><Sparkles className="w-3 h-3 mr-1" />MCA Notice Response</Badge>
+                    <Badge variant="outline" className="border-green-500/50 text-green-400"><FileText className="w-3 h-3 mr-1" />GST Show Cause Reply</Badge>
+                    <Badge variant="outline" className="border-yellow-500/50 text-yellow-400"><Calculator className="w-3 h-3 mr-1" />Income Tax Response</Badge>
+                    <Badge variant="outline" className="border-purple-500/50 text-purple-400"><Scale className="w-3 h-3 mr-1" />RBI FEMA Filing</Badge>
+                    <Badge variant="outline" className="border-orange-500/50 text-orange-400"><Shield className="w-3 h-3 mr-1" />SEBI Compliance</Badge>
+                    <Badge variant="outline" className="border-red-500/50 text-red-400"><FileWarning className="w-3 h-3 mr-1" />Customs Response</Badge>
+                    <Badge variant="outline" className="border-blue-500/50 text-blue-400"><FileCheck className="w-3 h-3 mr-1" />Contract Review</Badge>
+                  </div>
+
+                  {/* Engine body */}
+                  <div className="p-6">
+                    <AIDraftingEngine
+                      demoMode={false}
+                      isRealDashboard={true}
+                      includeLawyerReview={true}
+                      apiEndpoint="http://localhost:3001/api/ca-dashboard"
+                      openaiIntegration={true}
+                      realDocumentGeneration={true}
+                    />
+                  </div>
+                </motion.div>
+              </>
+            )}
+          </AnimatePresence>
 
           {/* Client Portfolio - Consent-Based Onboarding */}
           <motion.div

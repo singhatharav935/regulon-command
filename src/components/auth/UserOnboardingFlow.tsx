@@ -392,9 +392,9 @@ export const UserOnboardingFlow: React.FC = () => {
       case 'in_house_lawyer':
         return '/lawyer-dashboard';
       case 'company_owner':
-        return '/real-company-dashboard';
+        return '/dashboard';  // TEMP: use demo dashboard
       default:
-        return '/real-company-dashboard';
+        return '/dashboard';  // TEMP: default to demo dashboard
     }
   };
 

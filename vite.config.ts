@@ -15,16 +15,29 @@ export default defineConfig(({ mode }) => {
       hmr: {
         overlay: false,
       },
-      proxy: supabaseUrl
-        ? {
-            "/api/ai-draft": {
-              target: supabaseUrl,
-              changeOrigin: true,
-              secure: true,
-              rewrite: () => "/functions/v1/ai-draft",
-            },
-          }
-        : undefined,
+      proxy: {
+        "/api": {
+          target: "http://localhost:3000",
+          changeOrigin: true,
+          secure: false,
+        },
+        "/agent": {
+          target: "http://localhost:8787",
+          changeOrigin: true,
+          secure: false,
+          rewrite: (path) => path.replace(/^\/agent/, ""),
+        },
+        ...(supabaseUrl
+          ? {
+              "/api/ai-draft": {
+                target: supabaseUrl,
+                changeOrigin: true,
+                secure: true,
+                rewrite: () => "/functions/v1/ai-draft",
+              },
+            }
+          : {}),
+      },
     },
     plugins: [react(), mode === "development" && componentTagger()].filter(Boolean),
     resolve: {

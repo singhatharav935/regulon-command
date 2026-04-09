@@ -208,7 +208,7 @@ const RegulonAIAgent = () => {
       }
 
       // Fetch real data from backend
-      const response = await fetch("http://localhost:3001/api/ca/daily-governance", {
+      const response = await fetch("/api/ca/daily-governance", {
         headers: {
           Authorization: `Bearer ${token}`,
           "Content-Type": "application/json",
