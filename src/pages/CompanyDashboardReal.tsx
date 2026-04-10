@@ -13,6 +13,7 @@ import { motion, AnimatePresence } from "framer-motion";
 import { useNavigate } from "react-router-dom";
 import Navbar from "@/components/layout/Navbar";
 import Footer from "@/components/layout/Footer";
+import RegulonAIAgent from "@/components/ai-agent/RegulonAIAgent";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
@@ -60,12 +61,14 @@ import {
   Briefcase,
   Globe,
   PieChart,
-  LineChart
+  LineChart,
+  X
 } from "lucide-react";
 import { toast } from "@/hooks/use-toast";
 import { AgentOrchestratorProvider, AGENT_SECTION_MAP } from "@/components/agents/CompanyAgentOrchestrator";
 import { CommandCenterHeader } from "@/components/agents/CommandCenterHeader";
-import { AgentNetworkPanel } from "@/components/agents/AgentNetworkPanel";
+
+import { CompanyActionInbox } from "@/components/agents/CompanyActionInbox";
 import { SectionAgentBadge } from "@/components/agents/SectionAgentBadge";
 import { AgentInsightDrawer } from "@/components/agents/AgentInsightDrawer";
 
@@ -1726,6 +1729,7 @@ const CompanyDashboardReal = () => {
   const navigate = useNavigate();
   const [isLoading, setIsLoading] = useState(true);
   const [companyId, setCompanyId] = useState<string | null>(null);
+  const [chatDrawerOpen, setChatDrawerOpen] = useState(false);
   
   // Data states
   const [company, setCompany] = useState<CompanyData | null>(null);
@@ -1871,10 +1875,8 @@ const CompanyDashboardReal = () => {
             healthStatus={company?.health_status || 'unknown'}
           />
 
-          {/* AI Agent Network Panel */}
-          <div className="mb-6">
-            <AgentNetworkPanel />
-          </div>
+          {/* AI Action Inbox — Clean results from background agents */}
+          <CompanyActionInbox />
 
           <div className="space-y-6">
             {/* Section 1: Regulon AI Compliance Partner */}
@@ -1926,6 +1928,84 @@ const CompanyDashboardReal = () => {
       </main>
       
       <Footer />
+
+      {/* Regulon AI Chat Slide-in Drawer — triggered by fixed side button */}
+      <AnimatePresence>
+        {chatDrawerOpen && (
+          <>
+            {/* Backdrop */}
+            <motion.div
+              initial={{ opacity: 0 }}
+              animate={{ opacity: 1 }}
+              exit={{ opacity: 0 }}
+              className="fixed inset-0 bg-black/40 backdrop-blur-sm z-[70]"
+              onClick={() => setChatDrawerOpen(false)}
+            />
+            {/* Slide-in Panel */}
+            <motion.div
+              initial={{ x: '100%' }}
+              animate={{ x: 0 }}
+              exit={{ x: '100%' }}
+              transition={{ type: 'spring', damping: 25, stiffness: 300 }}
+              className="fixed top-0 right-0 h-full w-full max-w-[520px] bg-background border-l border-border/50 shadow-2xl z-[80] flex flex-col"
+            >
+              {/* Drawer Header */}
+              <div className="flex items-center justify-between px-5 py-4 border-b border-border/30 bg-gradient-to-r from-purple-500/5 to-cyan-500/5">
+                <div className="flex items-center gap-3">
+                  <div className="p-2 rounded-xl bg-purple-500/15 border border-purple-500/20">
+                    <Bot className="w-5 h-5 text-purple-400" />
+                  </div>
+                  <div>
+                    <h3 className="text-sm font-bold text-foreground">Regulon AI Agent</h3>
+                    <p className="text-[11px] text-muted-foreground">Your Compliance Intelligence Partner</p>
+                  </div>
+                </div>
+                <Button
+                  size="sm" variant="ghost"
+                  className="h-8 w-8 p-0 hover:bg-red-500/10 text-muted-foreground hover:text-red-400"
+                  onClick={() => setChatDrawerOpen(false)}
+                >
+                  <X className="w-4 h-4" />
+                </Button>
+              </div>
+
+              {/* Drawer Content — RegulonAIAgent */}
+              <div className="flex-1 overflow-y-auto">
+                <RegulonAIAgent />
+              </div>
+            </motion.div>
+          </>
+        )}
+      </AnimatePresence>
+
+      {/* Fixed Side Button — Chat Trigger */}
+      {!chatDrawerOpen && (
+        <motion.button
+          initial={{ opacity: 0, x: 20 }}
+          animate={{ opacity: 1, x: 0 }}
+          transition={{ delay: 1 }}
+          onClick={() => setChatDrawerOpen(true)}
+          className="fixed right-0 top-1/2 -translate-y-1/2 z-[65] flex items-center gap-2 px-3 py-3 rounded-l-xl border border-r-0 border-purple-500/25 transition-all hover:px-4 group"
+          style={{
+            background: 'linear-gradient(135deg, rgba(139,92,246,0.15) 0%, rgba(6,182,212,0.12) 100%)',
+            backdropFilter: 'blur(12px)',
+            boxShadow: '0 4px 20px rgba(139,92,246,0.15), 0 0 8px rgba(139,92,246,0.1)',
+            writingMode: 'vertical-rl' as const,
+            textOrientation: 'mixed' as const,
+          }}
+          title="Open Regulon AI Agent Chat"
+        >
+          <Bot className="w-4 h-4 text-purple-400 rotate-90" />
+          <span className="text-[11px] font-bold tracking-wider text-purple-300 group-hover:text-purple-200">
+            AI Agent
+          </span>
+          <motion.span
+            className="absolute top-2 right-2 w-2 h-2 rounded-full bg-purple-400"
+            animate={{ scale: [1, 1.4, 1], opacity: [1, 0.5, 1] }}
+            transition={{ duration: 2, repeat: Infinity }}
+          />
+        </motion.button>
+      )}
     </div>
     </AgentOrchestratorProvider>
   );

@@ -1,9 +1,10 @@
 /**
  * COMMAND CENTER HEADER
  * =====================
- * Premium dashboard header replacing the basic "Live Dashboard" banner.
+ * Premium dashboard header for the Real Company Dashboard.
  * Features: animated compliance score ring, agent swarm status, 
- * real-time sync indicator, and agent control buttons.
+ * real-time sync indicator, Regulon Auto-Pilot indicator,
+ * and agent control buttons.
  */
 
 import { useMemo } from 'react';
@@ -31,6 +32,7 @@ export const CommandCenterHeader = ({ companyName, complianceScore, healthStatus
   ).length;
 
   const alertCount = state.agents.filter(a => a.status === 'alert').length;
+  const isOnline = state.isRunning && activeAgentCount > 0;
 
   const timeSinceSync = useMemo(() => {
     const diff = Date.now() - new Date(state.lastSyncTime).getTime();
@@ -127,16 +129,36 @@ export const CommandCenterHeader = ({ companyName, complianceScore, healthStatus
               <Shield className="w-3 h-3 text-primary" />
               Compliance Command Center
             </p>
-            <div className="flex items-center gap-2 mt-2">
-              <Badge className={`text-[10px] ${
-                state.isRunning ? 'bg-green-500/20 text-green-400 border-green-500/30' : 'bg-red-500/20 text-red-400 border-red-500/30'
-              } border`}>
-                <span className="relative flex h-1.5 w-1.5 mr-1">
-                  {state.isRunning && <span className="animate-ping absolute inline-flex h-full w-full rounded-full bg-green-400 opacity-75" />}
-                  <span className={`relative inline-flex rounded-full h-1.5 w-1.5 ${state.isRunning ? 'bg-green-400' : 'bg-red-400'}`} />
+            <div className="flex items-center gap-2 mt-2 flex-wrap">
+              {/* Regulon Auto-Pilot ON/OFF Indicator */}
+              <motion.div
+                initial={{ opacity: 0, scale: 0.9 }}
+                animate={{ opacity: 1, scale: 1 }}
+                className="flex items-center gap-1.5 px-2.5 py-0.5 rounded-full border cursor-default"
+                style={{
+                  background: isOnline
+                    ? 'linear-gradient(135deg, rgba(139,92,246,0.18) 0%, rgba(34,197,94,0.12) 100%)'
+                    : 'rgba(239,68,68,0.12)',
+                  borderColor: isOnline ? 'rgba(139,92,246,0.35)' : 'rgba(239,68,68,0.35)',
+                  boxShadow: isOnline ? '0 0 14px rgba(139,92,246,0.2), 0 0 5px rgba(139,92,246,0.12)' : 'none',
+                }}
+                title={isOnline ? `Regulon Auto-Pilot: ${activeAgentCount}/10 agents active` : 'Auto-Pilot is OFF'}
+              >
+                <span className="relative flex h-2 w-2">
+                  {isOnline && (
+                    <motion.span
+                      className="absolute inline-flex h-full w-full rounded-full bg-violet-400 opacity-60"
+                      animate={{ scale: [1, 1.8, 1], opacity: [0.6, 0, 0.6] }}
+                      transition={{ duration: 2, repeat: Infinity }}
+                    />
+                  )}
+                  <span className={`relative inline-flex rounded-full h-2 w-2 ${isOnline ? 'bg-violet-400' : 'bg-red-400'}`} />
                 </span>
-                {state.isRunning ? 'LIVE' : 'STOPPED'}
-              </Badge>
+                <span className={`text-[10px] font-bold tracking-wider ${isOnline ? 'text-violet-300' : 'text-red-400'}`}>
+                  Regulon Auto-Pilot: {isOnline ? 'ON' : 'OFF'}
+                </span>
+              </motion.div>
+
               <Badge variant="outline" className="text-[10px]">
                 <Clock className="w-2.5 h-2.5 mr-1" />
                 Synced {timeSinceSync}
@@ -195,9 +217,9 @@ export const CommandCenterHeader = ({ companyName, complianceScore, healthStatus
             >
               <Wifi className="w-3 h-3 text-primary" />
             </motion.div>
-            <span>{state.totalMessagesExchanged} cross-wire messages</span>
+            <span>{state.totalMessagesExchanged} cross-wire msgs</span>
             <span className="text-border">•</span>
-            <span>{state.totalTasksCompleted} tasks completed</span>
+            <span>{state.totalTasksCompleted} tasks done</span>
             <span className="text-border">•</span>
             <span>{state.systemUptime}% uptime</span>
           </div>

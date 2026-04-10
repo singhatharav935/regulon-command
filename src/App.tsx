@@ -47,7 +47,8 @@ const CAFirmDashboard = lazy(() => import("./pages/CAFirmDashboard"));
 // const RealCADashboard = lazy(() => import("./pages/RealCADashboard")); // Removed - use demo dashboards
 const ExternalCADashboardReal = lazy(() => import("./pages/ExternalCADashboardReal")); // REAL External CA Dashboard
 const CompanyDashboardReal = lazy(() => import("./pages/CompanyDashboardReal")); // REAL Company Owner Dashboard
-const AgentControlCenter = lazy(() => import("./pages/AgentControlCenter")); // Agent Control Center Settings
+const AgentControlCenter = lazy(() => import("./pages/AgentControlCenter")); // CA Agent Control Center Settings
+const CompanyAgentControlCenter = lazy(() => import("./pages/CompanyAgentControlCenter")); // Company Agent Control Center Settings
 const AgentWorkReview = lazy(() => import("./pages/AgentWorkReview"));
 const LegalPolicyPage = lazy(() => import("./pages/LegalPolicyPage"));
 const ComplianceCenter = lazy(() => import("./pages/ComplianceCenter"));
@@ -114,6 +115,7 @@ const App = () => (
             <Route path="/onboarding" element={<UserOnboardingFlow />} />
             <Route path="/settings/account" element={<AccountSettingsPage />} />
             <Route path="/settings/agent-control-center" element={<AgentControlCenter />} />
+            <Route path="/settings/company-agent-control-center" element={<CompanyAgentControlCenter />} />
             <Route path="/terms" element={<TermsOfService />} />
             <Route path="/privacy" element={<PrivacyPolicy />} />
             <Route path="/disclaimers" element={<Disclaimers />} />
