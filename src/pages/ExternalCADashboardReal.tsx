@@ -66,9 +66,49 @@ import {
 import { toast } from "sonner";
 import useCAMetrics from "@/hooks/useCAMetrics";
 import { addCompany as addCompanyAPI } from "@/services/api";
-import { CAAgentOrchestratorProvider } from "@/components/agents/CAAgentOrchestrator";
+import { CAAgentOrchestratorProvider, useCAAgentOrchestrator } from "@/components/agents/CAAgentOrchestrator";
 import { CACommandCenterHeader } from "@/components/agents/CACommandCenterHeader";
-import { CAAgentNetworkPanel } from "@/components/agents/CAAgentNetworkPanel";
+import { CAActionInbox } from "@/components/agents/CAActionInbox";
+
+// Floating Auto-Pilot indicator near the Navbar
+const RegulonAutoPilot = () => {
+  const { state } = useCAAgentOrchestrator();
+  const activeCount = state.agents.filter(a => 
+    a.status === 'active' || a.status === 'working' || a.status === 'analyzing'
+  ).length;
+  const isOnline = state.isRunning && activeCount > 0;
+
+  return (
+    <motion.div
+      initial={{ opacity: 0, y: -10 }}
+      animate={{ opacity: 1, y: 0 }}
+      className="fixed top-[1.35rem] right-[calc(50%-47.5%+13rem)] z-[60] flex items-center gap-1.5 px-3 py-1.5 rounded-full border transition-all cursor-default"
+      style={{
+        background: isOnline
+          ? 'linear-gradient(135deg, rgba(6,182,212,0.15) 0%, rgba(34,197,94,0.10) 100%)'
+          : 'rgba(239,68,68,0.10)',
+        borderColor: isOnline ? 'rgba(6,182,212,0.30)' : 'rgba(239,68,68,0.30)',
+        boxShadow: isOnline ? '0 0 16px rgba(6,182,212,0.2), 0 0 6px rgba(6,182,212,0.15)' : 'none',
+        backdropFilter: 'blur(12px)',
+      }}
+      title={isOnline ? `Regulon Auto-Pilot: ${activeCount}/12 agents active` : 'Auto-Pilot: Agents offline'}
+    >
+      <span className="relative flex h-2 w-2">
+        {isOnline && (
+          <motion.span
+            className="absolute inline-flex h-full w-full rounded-full bg-cyan-400 opacity-60"
+            animate={{ scale: [1, 1.8, 1], opacity: [0.6, 0, 0.6] }}
+            transition={{ duration: 2, repeat: Infinity }}
+          />
+        )}
+        <span className={`relative inline-flex rounded-full h-2 w-2 ${isOnline ? 'bg-cyan-400' : 'bg-red-400'}`} />
+      </span>
+      <span className={`text-[10px] font-bold tracking-wider ${isOnline ? 'text-cyan-300' : 'text-red-400'}`}>
+        Regulon Auto-Pilot: {isOnline ? 'ON' : 'OFF'}
+      </span>
+    </motion.div>
+  );
+};
 
 // Daily Governance Brief Component
 const DailyGovernanceBrief = () => {
@@ -1533,14 +1573,15 @@ const ExternalCADashboardReal = () => {
     <CAAgentOrchestratorProvider>
     <div className="min-h-screen bg-background">
       <Navbar />
+      <RegulonAutoPilot />
       
       <main className="pt-24 pb-16">
         <div className="container mx-auto px-4 max-w-7xl">
           {/* CA Command Center Header */}
           <CACommandCenterHeader />
 
-          {/* CA AI Agent Network Panel */}
-          <CAAgentNetworkPanel />
+          {/* CA AI Action Inbox — Clean results from background agents */}
+          <CAActionInbox />
 
           {/* Control Tower - Metrics */}
           <motion.div
