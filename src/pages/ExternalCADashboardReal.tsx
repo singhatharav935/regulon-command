@@ -66,6 +66,9 @@ import {
 import { toast } from "sonner";
 import useCAMetrics from "@/hooks/useCAMetrics";
 import { addCompany as addCompanyAPI } from "@/services/api";
+import { CAAgentOrchestratorProvider } from "@/components/agents/CAAgentOrchestrator";
+import { CACommandCenterHeader } from "@/components/agents/CACommandCenterHeader";
+import { CAAgentNetworkPanel } from "@/components/agents/CAAgentNetworkPanel";
 
 // Daily Governance Brief Component
 const DailyGovernanceBrief = () => {
@@ -445,37 +448,9 @@ const LiveAIDraftingEngine = () => {
         addAgentLog('📰 Fetched latest regulatory news and circulars');
       }
     } catch (error) {
-      // Use demo data if backend not available
-      setRegulatoryNews([
-        {
-          id: 'news-1',
-          title: 'GST Council Meeting: New ITC Rules Announced',
-          source: 'Ministry of Finance',
-          category: 'GST',
-          date: new Date().toISOString(),
-          impact: 'high',
-          summary: 'New Input Tax Credit claiming procedures announced effective from next quarter.'
-        },
-        {
-          id: 'news-2',
-          title: 'Income Tax Department Issues New TDS Guidelines',
-          source: 'CBDT',
-          category: 'Income Tax',
-          date: new Date(Date.now() - 24 * 60 * 60 * 1000).toISOString(),
-          impact: 'medium',
-          summary: 'Updated TDS rates and filing requirements for FY 2026-27.'
-        },
-        {
-          id: 'news-3',
-          title: 'MCA Compliance Calendar Update',
-          source: 'Ministry of Corporate Affairs',
-          category: 'MCA',
-          date: new Date(Date.now() - 2 * 24 * 60 * 60 * 1000).toISOString(),
-          impact: 'high',
-          summary: 'Annual return filing deadline extended by 15 days for all companies.'
-        }
-      ]);
-      addAgentLog('📰 Loaded regulatory news from cache');
+      console.error('Failed to fetch regulatory news:', error);
+      setRegulatoryNews([]);
+      addAgentLog('⚠️ Unable to fetch regulatory news — backend unavailable');
     }
   };
 
@@ -489,34 +464,9 @@ const LiveAIDraftingEngine = () => {
         addAgentLog('📅 Scanned all client deadlines and compliance calendars');
       }
     } catch (error) {
-      // Use demo data
-      setClientDeadlines([
-        {
-          id: 'dl-1',
-          client: 'TechVenture Private Limited',
-          type: 'GSTR-3B Filing',
-          deadline: new Date(Date.now() + 2 * 24 * 60 * 60 * 1000).toISOString(),
-          daysRemaining: 2,
-          status: 'urgent'
-        },
-        {
-          id: 'dl-2',
-          client: 'Digital Solutions India',
-          type: 'Quarterly TDS Return',
-          deadline: new Date(Date.now() + 5 * 24 * 60 * 60 * 1000).toISOString(),
-          daysRemaining: 5,
-          status: 'upcoming'
-        },
-        {
-          id: 'dl-3',
-          client: 'Global Exports Pvt Ltd',
-          type: 'Annual Audit Submission',
-          deadline: new Date(Date.now() + 1 * 24 * 60 * 60 * 1000).toISOString(),
-          daysRemaining: 1,
-          status: 'urgent'
-        }
-      ]);
-      addAgentLog('📅 Loaded client deadlines from portfolio data');
+      console.error('Failed to fetch client deadlines:', error);
+      setClientDeadlines([]);
+      addAgentLog('⚠️ Unable to fetch client deadlines — backend unavailable');
     }
   };
 
@@ -1580,20 +1530,17 @@ const ExternalCADashboardReal = () => {
   };
 
   return (
+    <CAAgentOrchestratorProvider>
     <div className="min-h-screen bg-background">
       <Navbar />
       
       <main className="pt-24 pb-16">
         <div className="container mx-auto px-4 max-w-7xl">
-          {/* Header */}
-          <motion.div
-            initial={{ opacity: 0, y: -10 }}
-            animate={{ opacity: 1, y: 0 }}
-            className="mb-12"
-          >
-            <h1 className="text-4xl font-bold text-foreground">External CA Dashboard</h1>
-            <p className="text-muted-foreground mt-2">Manage all assigned companies and compliance tasks from one control center.</p>
-          </motion.div>
+          {/* CA Command Center Header */}
+          <CACommandCenterHeader />
+
+          {/* CA AI Agent Network Panel */}
+          <CAAgentNetworkPanel />
 
           {/* Control Tower - Metrics */}
           <motion.div
@@ -2474,11 +2421,12 @@ const ExternalCADashboardReal = () => {
           >
             <CAAnalyticsPerformance isRealDashboard={true} caId="ca-001" />
           </motion.div>
-        </div>
+      </div>
       </main>
       
       <Footer />
     </div>
+    </CAAgentOrchestratorProvider>
   );
 };
 

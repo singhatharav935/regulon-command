@@ -63,7 +63,11 @@ import {
   LineChart
 } from "lucide-react";
 import { toast } from "@/hooks/use-toast";
-import { AgentStatusPanel } from "@/components/agents/AgentStatusPanel";
+import { AgentOrchestratorProvider, AGENT_SECTION_MAP } from "@/components/agents/CompanyAgentOrchestrator";
+import { CommandCenterHeader } from "@/components/agents/CommandCenterHeader";
+import { AgentNetworkPanel } from "@/components/agents/AgentNetworkPanel";
+import { SectionAgentBadge } from "@/components/agents/SectionAgentBadge";
+import { AgentInsightDrawer } from "@/components/agents/AgentInsightDrawer";
 
 // ========================================
 // TYPES
@@ -474,7 +478,10 @@ const RegulonAIPartnerSection = ({
                   Regulon Compliance Partner
                   <Sparkles className="w-4 h-4 text-primary animate-pulse" />
                 </CardTitle>
-                <CardDescription>Your AI-powered compliance assistant</CardDescription>
+                <CardDescription className="flex items-center justify-between">
+                  <span>Your AI-powered compliance assistant</span>
+                  <SectionAgentBadge agentId="ARIA" />
+                </CardDescription>
               </div>
             </div>
             <div className="flex items-center gap-2">
@@ -557,6 +564,9 @@ const RegulonAIPartnerSection = ({
                     </div>
                   )}
                 </div>
+
+                {/* ARIA Agent Insights */}
+                <AgentInsightDrawer agentId="ARIA" />
 
                 {/* Send Message to CA */}
                 <div className="pt-4 border-t border-border">
@@ -650,7 +660,10 @@ const CompanyProfileSection = ({ company, isLoading }: { company: CompanyData | 
                 <Building2 className="w-8 h-8 text-primary" />
               </div>
               <div>
-                <h2 className="text-2xl font-bold text-foreground">{company.company_name}</h2>
+                <div className="flex items-center gap-3">
+                  <h2 className="text-2xl font-bold text-foreground">{company.company_name}</h2>
+                  <SectionAgentBadge agentId="ATLAS" compact />
+                </div>
                 <p className="text-muted-foreground flex items-center gap-2">
                   <span>{company.industry || 'Industry not specified'}</span>
                   {company.company_type && (
@@ -750,6 +763,7 @@ const RegulatoryExposureSection = ({
             <div className="flex items-center gap-2">
               <Shield className="w-5 h-5 text-primary" />
               <CardTitle>Regulatory Exposure</CardTitle>
+              <SectionAgentBadge agentId="SENTINEL" compact />
             </div>
             <Button variant="ghost" size="sm" onClick={() => setExpanded(!expanded)}>
               {expanded ? <ChevronUp className="w-4 h-4" /> : <ChevronDown className="w-4 h-4" />}
@@ -805,6 +819,9 @@ const RegulatoryExposureSection = ({
                     icon={Shield}
                   />
                 )}
+
+                {/* SENTINEL Agent Insights */}
+                <AgentInsightDrawer agentId="SENTINEL" />
               </CardContent>
             </motion.div>
           )}
@@ -856,6 +873,7 @@ const AIBusinessIntelligenceSection = ({
                 <CardTitle className="flex items-center gap-2">
                   AI Business Intelligence
                   <Badge className="bg-blue-500/20 text-blue-400 border-blue-500/30">LIVE</Badge>
+                  <SectionAgentBadge agentId="CORTEX" compact />
                 </CardTitle>
                 <CardDescription>Strategic insights for {companyName}</CardDescription>
               </div>
@@ -951,6 +969,9 @@ const AIBusinessIntelligenceSection = ({
                     icon={Sparkles}
                   />
                 )}
+
+                {/* CORTEX Agent Insights */}
+                <AgentInsightDrawer agentId="CORTEX" />
               </CardContent>
             </motion.div>
           )}
@@ -987,6 +1008,7 @@ const ComplianceGapsSection = ({
             <div className="flex items-center gap-2">
               <FileWarning className="w-5 h-5 text-orange-400" />
               <CardTitle>Why Is Your Compliance Incomplete?</CardTitle>
+              <SectionAgentBadge agentId="GUARDIAN" compact />
               {gaps.length > 0 && (
                 <Badge className="bg-orange-500/20 text-orange-400 border-orange-500/30">
                   {gaps.length} Gap{gaps.length > 1 ? 's' : ''}
@@ -1071,6 +1093,9 @@ const ComplianceGapsSection = ({
                     <p className="text-muted-foreground text-sm">Great job! Your compliance posture looks healthy.</p>
                   </div>
                 )}
+
+                {/* GUARDIAN Agent Insights */}
+                <AgentInsightDrawer agentId="GUARDIAN" />
               </CardContent>
             </motion.div>
           )}
@@ -1102,6 +1127,7 @@ const RegulatoryImpactSection = ({
             <div className="flex items-center gap-2">
               <Globe className="w-5 h-5 text-blue-400" />
               <CardTitle>Upcoming Regulatory Impact</CardTitle>
+              <SectionAgentBadge agentId="NEXUS" compact />
               {impacts.length > 0 && (
                 <Badge className="bg-blue-500/20 text-blue-400 border-blue-500/30">
                   {impacts.length} Update{impacts.length > 1 ? 's' : ''}
@@ -1189,6 +1215,9 @@ const RegulatoryImpactSection = ({
                     icon={Globe}
                   />
                 )}
+
+                {/* NEXUS Agent Insights */}
+                <AgentInsightDrawer agentId="NEXUS" />
               </CardContent>
             </motion.div>
           )}
@@ -1220,6 +1249,7 @@ const AuditReadySection = ({
             <div className="flex items-center gap-2">
               <Eye className="w-5 h-5 text-purple-400" />
               <CardTitle>Audit & Inspection Ready Record</CardTitle>
+              <SectionAgentBadge agentId="VANGUARD" compact />
             </div>
             <Button variant="ghost" size="sm" onClick={() => setExpanded(!expanded)}>
               {expanded ? <ChevronUp className="w-4 h-4" /> : <ChevronDown className="w-4 h-4" />}
@@ -1296,6 +1326,9 @@ const AuditReadySection = ({
                     icon={Eye}
                   />
                 )}
+
+                {/* VANGUARD Agent Insights */}
+                <AgentInsightDrawer agentId="VANGUARD" />
               </CardContent>
             </motion.div>
           )}
@@ -1327,6 +1360,7 @@ const QuickActionsSection = ({ companyId }: { companyId: string }) => {
           <div className="flex items-center gap-2">
             <Zap className="w-5 h-5 text-yellow-400" />
             <CardTitle>Quick Actions</CardTitle>
+            <SectionAgentBadge agentId="FORGE" compact />
           </div>
           <CardDescription>Frequently used actions for your compliance management</CardDescription>
         </CardHeader>
@@ -1384,6 +1418,7 @@ const ComplianceTasksSection = ({
             <div className="flex items-center gap-2">
               <CheckCircle2 className="w-5 h-5 text-green-400" />
               <CardTitle>Active Compliance Tasks</CardTitle>
+              <SectionAgentBadge agentId="NEXTSTEP" compact />
               {tasks.length > 0 && (
                 <Badge className="bg-primary/20 text-primary border-primary/30">
                   {tasks.filter(t => t.status !== 'completed').length} Active
@@ -1482,6 +1517,9 @@ const ComplianceTasksSection = ({
                     icon={CheckCircle2}
                   />
                 )}
+
+                {/* NEXTSTEP Agent Insights */}
+                <AgentInsightDrawer agentId="NEXTSTEP" />
               </CardContent>
             </motion.div>
           )}
@@ -1557,6 +1595,7 @@ const DocumentVaultSection = ({
             <div className="flex items-center gap-2">
               <Folder className="w-5 h-5 text-yellow-400" />
               <CardTitle>Document Vault</CardTitle>
+              <SectionAgentBadge agentId="VAULT" compact />
               {documents.length > 0 && (
                 <Badge className="bg-yellow-500/20 text-yellow-400 border-yellow-500/30">
                   {documents.length} Document{documents.length > 1 ? 's' : ''}
@@ -1667,6 +1706,9 @@ const DocumentVaultSection = ({
                     icon={Folder}
                   />
                 )}
+
+                {/* VAULT Agent Insights */}
+                <AgentInsightDrawer agentId="VAULT" />
               </CardContent>
             </motion.div>
           )}
@@ -1816,36 +1858,23 @@ const CompanyDashboardReal = () => {
   }
 
   return (
+    <AgentOrchestratorProvider>
     <div className="min-h-screen bg-background">
       <Navbar />
       
       <main className="pt-24 pb-16">
         <div className="container mx-auto px-4 max-w-7xl">
-          {/* Live Dashboard Banner */}
-          <motion.div
-            initial={{ opacity: 0, y: -10 }}
-            animate={{ opacity: 1, y: 0 }}
-            className="mb-6 p-4 rounded-xl bg-green-500/10 border border-green-500/20 text-center"
-          >
-            <p className="text-sm text-green-400 flex items-center justify-center gap-2">
-              <span className="relative flex h-2 w-2">
-                <span className="animate-ping absolute inline-flex h-full w-full rounded-full bg-green-400 opacity-75"></span>
-                <span className="relative inline-flex rounded-full h-2 w-2 bg-green-500"></span>
-              </span>
-              <strong>Live Dashboard</strong> — Your real-time compliance command center.
-              <span className="text-muted-foreground ml-2">All data is synchronized with government portals.</span>
-            </p>
-          </motion.div>
+          {/* Advanced Command Center Header */}
+          <CommandCenterHeader 
+            companyName={company?.company_name || 'Company'}
+            complianceScore={company?.compliance_score || 0}
+            healthStatus={company?.health_status || 'unknown'}
+          />
 
-          {/* AI Agent Status Panel */}
-          <motion.div
-            initial={{ opacity: 0, y: 10 }}
-            animate={{ opacity: 1, y: 0 }}
-            transition={{ delay: 0.1 }}
-            className="mb-6"
-          >
-            <AgentStatusPanel companyId={companyId || ''} />
-          </motion.div>
+          {/* AI Agent Network Panel */}
+          <div className="mb-6">
+            <AgentNetworkPanel />
+          </div>
 
           <div className="space-y-6">
             {/* Section 1: Regulon AI Compliance Partner */}
@@ -1898,6 +1927,7 @@ const CompanyDashboardReal = () => {
       
       <Footer />
     </div>
+    </AgentOrchestratorProvider>
   );
 };
 
