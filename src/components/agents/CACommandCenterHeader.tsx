@@ -3,7 +3,7 @@
  * ========================
  * Premium header for the External CA Dashboard.
  * Shows practice metrics ring, agent swarm status, client count,
- * and agent control buttons.
+ * agent control buttons, and Regulon Auto-Pilot ON/OFF indicator.
  */
 
 import { useMemo } from 'react';
@@ -24,6 +24,7 @@ export const CACommandCenterHeader = () => {
   ).length;
 
   const alertCount = state.agents.filter(a => a.status === 'alert').length;
+  const isOnline = state.isRunning && activeAgentCount > 0;
 
   const timeSinceSync = useMemo(() => {
     const diff = Date.now() - new Date(state.lastSyncTime).getTime();
@@ -102,16 +103,36 @@ export const CACommandCenterHeader = () => {
               <Briefcase className="w-3 h-3 text-cyan-400" />
               External CA — AI-Powered Practice Management
             </p>
-            <div className="flex items-center gap-2 mt-2">
-              <Badge className={`text-[10px] ${
-                state.isRunning ? 'bg-green-500/20 text-green-400 border-green-500/30' : 'bg-red-500/20 text-red-400 border-red-500/30'
-              } border`}>
-                <span className="relative flex h-1.5 w-1.5 mr-1">
-                  {state.isRunning && <span className="animate-ping absolute inline-flex h-full w-full rounded-full bg-green-400 opacity-75" />}
-                  <span className={`relative inline-flex rounded-full h-1.5 w-1.5 ${state.isRunning ? 'bg-green-400' : 'bg-red-400'}`} />
+            <div className="flex items-center gap-2 mt-2 flex-wrap">
+              {/* Auto-Pilot ON/OFF Indicator — inside the header */}
+              <motion.div
+                initial={{ opacity: 0, scale: 0.9 }}
+                animate={{ opacity: 1, scale: 1 }}
+                className="flex items-center gap-1.5 px-2.5 py-0.5 rounded-full border cursor-default"
+                style={{
+                  background: isOnline
+                    ? 'linear-gradient(135deg, rgba(6,182,212,0.18) 0%, rgba(34,197,94,0.12) 100%)'
+                    : 'rgba(239,68,68,0.12)',
+                  borderColor: isOnline ? 'rgba(6,182,212,0.35)' : 'rgba(239,68,68,0.35)',
+                  boxShadow: isOnline ? '0 0 14px rgba(6,182,212,0.2), 0 0 5px rgba(6,182,212,0.12)' : 'none',
+                }}
+                title={isOnline ? `Regulon Auto-Pilot: ${activeAgentCount}/12 agents active` : 'Auto-Pilot is OFF'}
+              >
+                <span className="relative flex h-2 w-2">
+                  {isOnline && (
+                    <motion.span
+                      className="absolute inline-flex h-full w-full rounded-full bg-cyan-400 opacity-60"
+                      animate={{ scale: [1, 1.8, 1], opacity: [0.6, 0, 0.6] }}
+                      transition={{ duration: 2, repeat: Infinity }}
+                    />
+                  )}
+                  <span className={`relative inline-flex rounded-full h-2 w-2 ${isOnline ? 'bg-cyan-400' : 'bg-red-400'}`} />
                 </span>
-                {state.isRunning ? 'LIVE' : 'STOPPED'}
-              </Badge>
+                <span className={`text-[10px] font-bold tracking-wider ${isOnline ? 'text-cyan-300' : 'text-red-400'}`}>
+                  Regulon Auto-Pilot: {isOnline ? 'ON' : 'OFF'}
+                </span>
+              </motion.div>
+
               <Badge variant="outline" className="text-[10px]">
                 <Building className="w-2.5 h-2.5 mr-1" />
                 {state.totalClientsManaged} Clients

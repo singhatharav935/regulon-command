@@ -184,13 +184,24 @@ const Navbar = () => {
           </div>
 
           {/* Desktop Actions */}
-          <div className="hidden lg:flex items-center gap-3">
+          <div className="hidden lg:flex items-center gap-2">
             <Button variant="ghost" size="sm" onClick={() => navigate("/auth?mode=login&role=company_owner")}>
               <LogIn className="w-4 h-4 mr-2" />
               Login
             </Button>
             <Button size="sm" className="btn-glow" onClick={() => navigate("/auth?mode=signup&role=company_owner")}>
               Get Started
+            </Button>
+            <Button 
+              size="sm" 
+              onClick={() => navigate("/real-external-ca-dashboard")}
+              className="relative overflow-hidden border border-cyan-500/30 bg-gradient-to-r from-cyan-500/10 to-violet-500/10 hover:from-cyan-500/20 hover:to-violet-500/20 text-cyan-300 hover:text-cyan-200 transition-all"
+              style={{
+                boxShadow: '0 0 12px rgba(6,182,212,0.15), inset 0 1px 0 rgba(255,255,255,0.05)',
+              }}
+            >
+              <Cpu className="w-3.5 h-3.5 mr-1.5" />
+              REGULON AI
             </Button>
           </div>
 

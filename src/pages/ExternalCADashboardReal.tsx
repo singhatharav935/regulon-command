@@ -66,49 +66,9 @@ import {
 import { toast } from "sonner";
 import useCAMetrics from "@/hooks/useCAMetrics";
 import { addCompany as addCompanyAPI } from "@/services/api";
-import { CAAgentOrchestratorProvider, useCAAgentOrchestrator } from "@/components/agents/CAAgentOrchestrator";
+import { CAAgentOrchestratorProvider } from "@/components/agents/CAAgentOrchestrator";
 import { CACommandCenterHeader } from "@/components/agents/CACommandCenterHeader";
 import { CAActionInbox } from "@/components/agents/CAActionInbox";
-
-// Floating Auto-Pilot indicator near the Navbar
-const RegulonAutoPilot = () => {
-  const { state } = useCAAgentOrchestrator();
-  const activeCount = state.agents.filter(a => 
-    a.status === 'active' || a.status === 'working' || a.status === 'analyzing'
-  ).length;
-  const isOnline = state.isRunning && activeCount > 0;
-
-  return (
-    <motion.div
-      initial={{ opacity: 0, y: -10 }}
-      animate={{ opacity: 1, y: 0 }}
-      className="fixed top-[1.35rem] right-[calc(50%-47.5%+13rem)] z-[60] flex items-center gap-1.5 px-3 py-1.5 rounded-full border transition-all cursor-default"
-      style={{
-        background: isOnline
-          ? 'linear-gradient(135deg, rgba(6,182,212,0.15) 0%, rgba(34,197,94,0.10) 100%)'
-          : 'rgba(239,68,68,0.10)',
-        borderColor: isOnline ? 'rgba(6,182,212,0.30)' : 'rgba(239,68,68,0.30)',
-        boxShadow: isOnline ? '0 0 16px rgba(6,182,212,0.2), 0 0 6px rgba(6,182,212,0.15)' : 'none',
-        backdropFilter: 'blur(12px)',
-      }}
-      title={isOnline ? `Regulon Auto-Pilot: ${activeCount}/12 agents active` : 'Auto-Pilot: Agents offline'}
-    >
-      <span className="relative flex h-2 w-2">
-        {isOnline && (
-          <motion.span
-            className="absolute inline-flex h-full w-full rounded-full bg-cyan-400 opacity-60"
-            animate={{ scale: [1, 1.8, 1], opacity: [0.6, 0, 0.6] }}
-            transition={{ duration: 2, repeat: Infinity }}
-          />
-        )}
-        <span className={`relative inline-flex rounded-full h-2 w-2 ${isOnline ? 'bg-cyan-400' : 'bg-red-400'}`} />
-      </span>
-      <span className={`text-[10px] font-bold tracking-wider ${isOnline ? 'text-cyan-300' : 'text-red-400'}`}>
-        Regulon Auto-Pilot: {isOnline ? 'ON' : 'OFF'}
-      </span>
-    </motion.div>
-  );
-};
 
 // Daily Governance Brief Component
 const DailyGovernanceBrief = () => {
@@ -1325,6 +1285,7 @@ const ExternalCADashboardReal = () => {
   const [selectedCompany, setSelectedCompany] = useState<any>(null);
   const [showCompanyDetails, setShowCompanyDetails] = useState(false);
   const [isDrawerOpen, setIsDrawerOpen] = useState(false);
+  const [chatDrawerOpen, setChatDrawerOpen] = useState(false);
 
   // Compliance Service API URL
   const COMPLIANCE_API = 'http://localhost:8001/api/v1';
@@ -1573,7 +1534,7 @@ const ExternalCADashboardReal = () => {
     <CAAgentOrchestratorProvider>
     <div className="min-h-screen bg-background">
       <Navbar />
-      <RegulonAutoPilot />
+      
       
       <main className="pt-24 pb-16">
         <div className="container mx-auto px-4 max-w-7xl">
@@ -1655,15 +1616,7 @@ const ExternalCADashboardReal = () => {
             )}
           </motion.div>
 
-          {/* Regulon AI Executive Agent - AUTONOMOUS SYSTEM */}
-          <motion.div
-            initial={{ opacity: 0, y: 20 }}
-            animate={{ opacity: 1, y: 0 }}
-            transition={{ delay: 0.05 }}
-            className="mb-16"
-          >
-            <RegulonAIAgent />
-          </motion.div>
+
 
           {/* Daily Governance Brief */}
           <DailyGovernanceBrief />
@@ -2466,6 +2419,84 @@ const ExternalCADashboardReal = () => {
       </main>
       
       <Footer />
+
+      {/* Regulon AI Chat Slide-in Drawer — triggered by fixed side button */}
+      <AnimatePresence>
+        {chatDrawerOpen && (
+          <>
+            {/* Backdrop */}
+            <motion.div
+              initial={{ opacity: 0 }}
+              animate={{ opacity: 1 }}
+              exit={{ opacity: 0 }}
+              className="fixed inset-0 bg-black/40 backdrop-blur-sm z-[70]"
+              onClick={() => setChatDrawerOpen(false)}
+            />
+            {/* Slide-in Panel */}
+            <motion.div
+              initial={{ x: '100%' }}
+              animate={{ x: 0 }}
+              exit={{ x: '100%' }}
+              transition={{ type: 'spring', damping: 25, stiffness: 300 }}
+              className="fixed top-0 right-0 h-full w-full max-w-[520px] bg-background border-l border-border/50 shadow-2xl z-[80] flex flex-col"
+            >
+              {/* Drawer Header */}
+              <div className="flex items-center justify-between px-5 py-4 border-b border-border/30 bg-gradient-to-r from-cyan-500/5 to-violet-500/5">
+                <div className="flex items-center gap-3">
+                  <div className="p-2 rounded-xl bg-cyan-500/15 border border-cyan-500/20">
+                    <Bot className="w-5 h-5 text-cyan-400" />
+                  </div>
+                  <div>
+                    <h3 className="text-sm font-bold text-foreground">Regulon AI Agent</h3>
+                    <p className="text-[11px] text-muted-foreground">Autonomous Compliance Executive</p>
+                  </div>
+                </div>
+                <Button
+                  size="sm" variant="ghost"
+                  className="h-8 w-8 p-0 hover:bg-red-500/10 text-muted-foreground hover:text-red-400"
+                  onClick={() => setChatDrawerOpen(false)}
+                >
+                  <X className="w-4 h-4" />
+                </Button>
+              </div>
+
+              {/* Drawer Content — RegulonAIAgent */}
+              <div className="flex-1 overflow-y-auto">
+                <RegulonAIAgent />
+              </div>
+            </motion.div>
+          </>
+        )}
+      </AnimatePresence>
+
+      {/* Fixed Side Button — Chat Trigger */}
+      {!chatDrawerOpen && (
+        <motion.button
+          initial={{ opacity: 0, x: 20 }}
+          animate={{ opacity: 1, x: 0 }}
+          transition={{ delay: 1 }}
+          onClick={() => setChatDrawerOpen(true)}
+          className="fixed right-0 top-1/2 -translate-y-1/2 z-[65] flex items-center gap-2 px-3 py-3 rounded-l-xl border border-r-0 border-cyan-500/25 transition-all hover:px-4 group"
+          style={{
+            background: 'linear-gradient(135deg, rgba(6,182,212,0.15) 0%, rgba(139,92,246,0.12) 100%)',
+            backdropFilter: 'blur(12px)',
+            boxShadow: '0 4px 20px rgba(6,182,212,0.15), 0 0 8px rgba(6,182,212,0.1)',
+            writingMode: 'vertical-rl',
+            textOrientation: 'mixed',
+          }}
+          title="Open Regulon AI Agent Chat"
+        >
+          <Bot className="w-4 h-4 text-cyan-400 rotate-90" />
+          <span className="text-[11px] font-bold tracking-wider text-cyan-300 group-hover:text-cyan-200">
+            AI Agent
+          </span>
+          <motion.span
+            className="absolute top-2 right-2 w-2 h-2 rounded-full bg-cyan-400"
+            animate={{ scale: [1, 1.4, 1], opacity: [1, 0.5, 1] }}
+            transition={{ duration: 2, repeat: Infinity }}
+          />
+        </motion.button>
+      )}
     </div>
     </CAAgentOrchestratorProvider>
   );
