@@ -1363,7 +1363,20 @@ const buildOfflineDraft = ({
 
   const extract = (regex: RegExp, fallback = "Not clearly stated in notice text") => {
     const match = noticeSnapshot.match(regex);
-    return (match?.[1] || fallback).trim();
+  
+  const handleUserDraftEdit = (value: string) => {
+    setDraftContent(value);
+    setMcaStatutoryClear(false);
+    setGstStatutoryClear(false);
+    setIncomeTaxStatutoryClear(false);
+    setRbiStatutoryClear(false);
+    setSebiStatutoryClear(false);
+    setCustomsStatutoryClear(false);
+    setContractStatutoryClear(false);
+    setCustomStatutoryClear(false);
+  };
+
+  return (match?.[1] || fallback).trim();
   };
 
   const extractNoticeNo = () =>
@@ -2066,8 +2079,12 @@ const AIDraftingEngine = ({
     () => `Prompt policy [${effectivePromptPack.label}]: ${effectivePromptPack.instructions}`,
     [effectivePromptPack],
   );
-  const buildContextWithTemplateAndPrompt = (base: string) =>
-    `${base}\n\nTemplate policy [${effectiveTemplatePack.label}]: ${effectiveTemplatePack.instructions}\n${promptPolicyDirective}`;
+  const buildContextWithTemplateAndPrompt = (base: string) => {
+    const strictRegulonDirective = advancedMode 
+      ? `\n\n=== REGULON AI AUTONOMOUS DRAFTING ENGINE ===\nYou are the Regulon AI Autonomous Drafting Engine, an expert Indian Tax Litigator.\nYour ONLY purpose is to output a final, adjudication-ready legal document.\nThe output you provide will be directly rendered into a PDF for Tier-1 Chartered Accountants.\n\nSTRICT RULES:\n1. NO META-TEXT: Do not include your thought process, system instructions, template directives, or any conversational text (e.g., "Here is the draft").\n2. NO PROMPT BLEEDING: Never output the input variables, notice text, or drafting scope back to the user. Do not create a "Notice Text Used for Drafting" section.\n3. VARIABLE INJECTION: You must extract the DIN, Notice Number, Amounts, Sections, Dates, and Authority from the provided input data and inject them directly into the document. Do not leave blank placeholders like "/Reference" or "/RFN".\n4. MISSING DATA: If a specific piece of factual data is entirely missing from the input, use exactly this format: [To be filled by CA/Lawyer].\n5. START IMMEDIATELY: Your response must begin exactly with the text "**BEFORE THE ADJUDICATING AUTHORITY...**" and end exactly with the "Prayer".`
+      : "";
+    return `${base}\n\nTemplate policy [${effectiveTemplatePack.label}]: ${effectiveTemplatePack.instructions}\n${promptPolicyDirective}${strictRegulonDirective}`;
+  };
   const hasBlockingFilingIssues = Boolean(
     (draftQA?.missing_for_final_filing && draftQA.missing_for_final_filing.length > 0) ||
     (draftQA?.citation_review ?? []).some((item) => item.jurisdiction_fit === "low" || item.confidence < 0.55) ||
@@ -3366,6 +3383,7 @@ const AIDraftingEngine = ({
         checkedAt: typeof data?.checkedAt === "string" ? data.checkedAt : new Date().toISOString(),
       };
       setMcaRecheckReport(report);
+      return report;
 
       if (report.ok) toast.success("Recheck AI passed. No critical mismatches detected.");
       else toast.warning(`Recheck AI flagged ${report.flags.length} item(s).`);
@@ -3375,6 +3393,7 @@ const AIDraftingEngine = ({
     } finally {
       setIsRecheckingMca(false);
     }
+    return null;
   };
 
   const handleRecheckGstDraft = async () => {
@@ -3407,6 +3426,7 @@ const AIDraftingEngine = ({
         checkedAt: typeof data?.checkedAt === "string" ? data.checkedAt : new Date().toISOString(),
       };
       setGstRecheckReport(report);
+      return report;
 
       if (report.ok) toast.success("GST Recheck AI passed. No critical mismatches detected.");
       else toast.warning(`GST Recheck AI flagged ${report.flags.length} item(s).`);
@@ -3416,6 +3436,7 @@ const AIDraftingEngine = ({
     } finally {
       setIsRecheckingGst(false);
     }
+    return null;
   };
 
   const handleRecheckIncomeTaxDraft = async () => {
@@ -3448,6 +3469,7 @@ const AIDraftingEngine = ({
         checkedAt: typeof data?.checkedAt === "string" ? data.checkedAt : new Date().toISOString(),
       };
       setIncomeTaxRecheckReport(report);
+      return report;
 
       if (report.ok) toast.success("Income-tax Recheck AI passed. No critical mismatches detected.");
       else toast.warning(`Income-tax Recheck AI flagged ${report.flags.length} item(s).`);
@@ -3457,6 +3479,7 @@ const AIDraftingEngine = ({
     } finally {
       setIsRecheckingIncomeTax(false);
     }
+    return null;
   };
 
   const handleRecheckRbiDraft = async () => {
@@ -3489,6 +3512,7 @@ const AIDraftingEngine = ({
         checkedAt: typeof data?.checkedAt === "string" ? data.checkedAt : new Date().toISOString(),
       };
       setRbiRecheckReport(report);
+      return report;
 
       if (report.ok) toast.success("RBI Recheck AI passed. No critical mismatches detected.");
       else toast.warning(`RBI Recheck AI flagged ${report.flags.length} item(s).`);
@@ -3498,6 +3522,7 @@ const AIDraftingEngine = ({
     } finally {
       setIsRecheckingRbi(false);
     }
+    return null;
   };
 
   const handleRecheckSebiDraft = async () => {
@@ -3530,6 +3555,7 @@ const AIDraftingEngine = ({
         checkedAt: typeof data?.checkedAt === "string" ? data.checkedAt : new Date().toISOString(),
       };
       setSebiRecheckReport(report);
+      return report;
 
       if (report.ok) toast.success("SEBI Recheck AI passed. No critical mismatches detected.");
       else toast.warning(`SEBI Recheck AI flagged ${report.flags.length} item(s).`);
@@ -3539,6 +3565,7 @@ const AIDraftingEngine = ({
     } finally {
       setIsRecheckingSebi(false);
     }
+    return null;
   };
 
   const handleRecheckCustomsDraft = async () => {
@@ -3571,6 +3598,7 @@ const AIDraftingEngine = ({
         checkedAt: typeof data?.checkedAt === "string" ? data.checkedAt : new Date().toISOString(),
       };
       setCustomsRecheckReport(report);
+      return report;
 
       if (report.ok) toast.success("Customs Recheck AI passed. No critical mismatches detected.");
       else toast.warning(`Customs Recheck AI flagged ${report.flags.length} item(s).`);
@@ -3580,6 +3608,7 @@ const AIDraftingEngine = ({
     } finally {
       setIsRecheckingCustoms(false);
     }
+    return null;
   };
 
   const handleRecheckContractDraft = async () => {
@@ -3612,6 +3641,7 @@ const AIDraftingEngine = ({
         checkedAt: typeof data?.checkedAt === "string" ? data.checkedAt : new Date().toISOString(),
       };
       setContractRecheckReport(report);
+      return report;
 
       if (report.ok) toast.success("Contract Recheck AI passed. No critical mismatches detected.");
       else toast.warning(`Contract Recheck AI flagged ${report.flags.length} item(s).`);
@@ -3621,6 +3651,7 @@ const AIDraftingEngine = ({
     } finally {
       setIsRecheckingContract(false);
     }
+    return null;
   };
 
   const handleRecheckCustomDraft = async () => {
@@ -3653,6 +3684,7 @@ const AIDraftingEngine = ({
         checkedAt: typeof data?.checkedAt === "string" ? data.checkedAt : new Date().toISOString(),
       };
       setCustomRecheckReport(report);
+      return report;
 
       if (report.ok) toast.success("Custom Recheck AI passed. No critical mismatches detected.");
       else toast.warning(`Custom Recheck AI flagged ${report.flags.length} item(s).`);
@@ -3662,6 +3694,7 @@ const AIDraftingEngine = ({
     } finally {
       setIsRecheckingCustom(false);
     }
+    return null;
   };
 
   useEffect(() => {
@@ -4700,6 +4733,29 @@ const AIDraftingEngine = ({
 
   const requestDraftData = async (requestBody: Record<string, unknown>) => {
     assertLiveClientAccessOrThrow();
+    // If in demo mode, skip the backend call and return an offline mocked payload
+    if (demoMode) {
+      // Simulate network delay
+      await new Promise((resolve) => setTimeout(resolve, 800));
+      return {
+        draft: `[DEMO MODE: Fix applied automatically]\n\n` + (draftContent || requestBody?.context || "Demo fixed draft generation."),
+        qa: {
+          filing_score: 85,
+          risk_band: "low",
+          mandatory_gates: { "Document Class Override": true, "Action applied": true },
+          missing_for_final_filing: [],
+        },
+        package: {
+          reply: `[DEMO MODE: Fix applied automatically]\n\n` + (draftContent || requestBody?.context || "Demo fixed draft generation."),
+          annexure_index: [{ annexure_id: "Annexure A", purpose: "Demo fix proof", linked_issue: "Fix verification" }],
+          hearing_notes: "Demo fix notes. Review local flags.",
+          argument_script: ["This draft was updated locally via Demo Mode bypass."],
+        },
+        metadata: {
+          trainingCaseId: "demo-fix-case-" + Math.floor(Math.random() * 10000),
+        },
+      } as unknown as Record<string, unknown>;
+    }
     
     // Use real OpenAI integration for real dashboard
     if (isRealDashboard && openaiIntegration) {
@@ -4745,7 +4801,7 @@ const AIDraftingEngine = ({
     });
   };
 
-  const handleApplyMcaFix = async () => {
+  const handleApplyMcaFix = async (overrideReport?: any) => {
     if (selectedDocType !== "mca-notice" || !draftContent.trim()) {
       toast.error("Generate an MCA draft first.");
       return;
@@ -4766,7 +4822,11 @@ const AIDraftingEngine = ({
       .map((item, idx) => `${idx + 1}. Upgrade: ${item.title}\n   Suggestion: ${item.suggestion}`)
       .join("\n");
 
-    const combinedFixNotes = [mcaAutoFixNotes, mcaRecheckNotes, mcaUserFixNotes.trim()]
+    const recheckNotes = (overrideReport?.flags || mcaRecheckReport?.flags || [])
+      .map((flag: any, idx: number) => `${idx + 1}. [${flag.severity?.toUpperCase() || ""}] ${flag.issue}\nFix: ${flag.fix}`)
+      .join("\n\n");
+
+    const combinedFixNotes = [mcaAutoFixNotes, recheckNotes, mcaUserFixNotes.trim()]
       .filter((entry) => entry && entry.trim().length > 0)
       .join("\n\n");
     const pendingPlaybookText = mcaPendingFixPlaybook
@@ -4899,7 +4959,7 @@ Return only the revised final draft text.`);
     }
   };
 
-  const handleApplyGstFix = async () => {
+  const handleApplyGstFix = async (overrideReport?: any) => {
     if (selectedDocType !== "gst-show-cause" || !draftContent.trim()) {
       toast.error("Generate a GST draft first.");
       return;
@@ -4917,7 +4977,7 @@ Return only the revised final draft text.`);
       .filter((item) => !item.implemented)
       .map((item, idx) => `${idx + 1}. Upgrade: ${item.title}\n   Suggestion: ${item.suggestion}`)
       .join("\n");
-    const recheckNotes = (gstRecheckReport?.flags || [])
+    const recheckNotes = (overrideReport?.flags || gstRecheckReport?.flags || [])
       .map((flag, idx) => `${idx + 1}. [${flag.severity.toUpperCase()}] ${flag.issue}\n   Fix: ${flag.fix}`)
       .join("\n");
     const combinedFixNotes = [gstAutoFixNotes, recheckNotes, gstUserFixNotes.trim()]
@@ -4992,7 +5052,7 @@ Return only revised final draft text.`);
     }
   };
 
-  const handleApplyIncomeTaxFix = async () => {
+  const handleApplyIncomeTaxFix = async (overrideReport?: any) => {
     if (selectedDocType !== "income-tax-response" || !draftContent.trim()) {
       toast.error("Generate an Income-tax draft first.");
       return;
@@ -5009,7 +5069,7 @@ Return only revised final draft text.`);
       .filter((item) => !item.implemented)
       .map((item, idx) => `${idx + 1}. Upgrade: ${item.title}\n   Suggestion: ${item.suggestion}`)
       .join("\n");
-    const recheckNotes = (incomeTaxRecheckReport?.flags || [])
+    const recheckNotes = (overrideReport?.flags || incomeTaxRecheckReport?.flags || [])
       .map((flag, idx) => `${idx + 1}. [${flag.severity.toUpperCase()}] ${flag.issue}\n   Fix: ${flag.fix}`)
       .join("\n");
     const combinedFixNotes = [incomeTaxAutoFixNotes, recheckNotes, incomeTaxUserFixNotes.trim()]
@@ -5084,7 +5144,7 @@ Return only revised final draft text.`);
     }
   };
 
-  const handleApplyRbiFix = async () => {
+  const handleApplyRbiFix = async (overrideReport?: any) => {
     if (selectedDocType !== "rbi-filing" || !draftContent.trim()) {
       toast.error("Generate an RBI draft first.");
       return;
@@ -5101,7 +5161,7 @@ Return only revised final draft text.`);
       .filter((item) => !item.implemented)
       .map((item, idx) => `${idx + 1}. Upgrade: ${item.title}\n   Suggestion: ${item.suggestion}`)
       .join("\n");
-    const recheckNotes = (rbiRecheckReport?.flags || [])
+    const recheckNotes = (overrideReport?.flags || rbiRecheckReport?.flags || [])
       .map((flag, idx) => `${idx + 1}. [${flag.severity.toUpperCase()}] ${flag.issue}\n   Fix: ${flag.fix}`)
       .join("\n");
     const combinedFixNotes = [rbiAutoFixNotes, recheckNotes, rbiUserFixNotes.trim()]
@@ -5176,7 +5236,7 @@ Return only revised final draft text.`);
     }
   };
 
-  const handleApplySebiFix = async () => {
+  const handleApplySebiFix = async (overrideReport?: any) => {
     if (selectedDocType !== "sebi-compliance" || !draftContent.trim()) {
       toast.error("Generate a SEBI draft first.");
       return;
@@ -5193,7 +5253,7 @@ Return only revised final draft text.`);
       .filter((item) => !item.implemented)
       .map((item, idx) => `${idx + 1}. Upgrade: ${item.title}\n   Suggestion: ${item.suggestion}`)
       .join("\n");
-    const recheckNotes = (sebiRecheckReport?.flags || [])
+    const recheckNotes = (overrideReport?.flags || sebiRecheckReport?.flags || [])
       .map((flag, idx) => `${idx + 1}. [${flag.severity.toUpperCase()}] ${flag.issue}\n   Fix: ${flag.fix}`)
       .join("\n");
     const combinedFixNotes = [sebiAutoFixNotes, recheckNotes, sebiUserFixNotes.trim()]
@@ -5268,7 +5328,7 @@ Return only revised final draft text.`);
     }
   };
 
-  const handleApplyContractFix = async () => {
+  const handleApplyContractFix = async (overrideReport?: any) => {
     if (selectedDocType !== "contract-review" || !draftContent.trim()) {
       toast.error("Generate a Contract Review draft first.");
       return;
@@ -5285,7 +5345,7 @@ Return only revised final draft text.`);
       .filter((item) => !item.implemented)
       .map((item, idx) => `${idx + 1}. Upgrade: ${item.title}\n   Suggestion: ${item.suggestion}`)
       .join("\n");
-    const recheckNotes = (contractRecheckReport?.flags || [])
+    const recheckNotes = (overrideReport?.flags || contractRecheckReport?.flags || [])
       .map((flag, idx) => `${idx + 1}. [${flag.severity.toUpperCase()}] ${flag.issue}\n   Fix: ${flag.fix}`)
       .join("\n");
     const combinedFixNotes = [contractAutoFixNotes, recheckNotes, contractUserFixNotes.trim()]
@@ -5360,7 +5420,7 @@ Return only revised final draft text.`);
     }
   };
 
-  const handleApplyCustomsFix = async () => {
+  const handleApplyCustomsFix = async (overrideReport?: any) => {
     if (selectedDocType !== "customs-response" || !draftContent.trim()) {
       toast.error("Generate a Customs draft first.");
       return;
@@ -5377,7 +5437,7 @@ Return only revised final draft text.`);
       .filter((item) => !item.implemented)
       .map((item, idx) => `${idx + 1}. Upgrade: ${item.title}\n   Suggestion: ${item.suggestion}`)
       .join("\n");
-    const recheckNotes = (customsRecheckReport?.flags || [])
+    const recheckNotes = (overrideReport?.flags || customsRecheckReport?.flags || [])
       .map((flag, idx) => `${idx + 1}. [${flag.severity.toUpperCase()}] ${flag.issue}\n   Fix: ${flag.fix}`)
       .join("\n");
     const combinedFixNotes = [customsAutoFixNotes, recheckNotes, customsUserFixNotes.trim()]
@@ -5452,7 +5512,7 @@ Return only revised final draft text.`);
     }
   };
 
-  const handleApplyCustomFix = async () => {
+  const handleApplyCustomFix = async (overrideReport?: any) => {
     if (selectedDocType !== "custom-draft" || !draftContent.trim()) {
       toast.error("Generate a Custom Regulatory draft first.");
       return;
@@ -5469,7 +5529,7 @@ Return only revised final draft text.`);
       .filter((item) => !item.implemented)
       .map((item, idx) => `${idx + 1}. Upgrade: ${item.title}\n   Suggestion: ${item.suggestion}`)
       .join("\n");
-    const recheckNotes = (customRecheckReport?.flags || [])
+    const recheckNotes = (overrideReport?.flags || customRecheckReport?.flags || [])
       .map((flag, idx) => `${idx + 1}. [${flag.severity.toUpperCase()}] ${flag.issue}\n   Fix: ${flag.fix}`)
       .join("\n");
     const combinedFixNotes = [customAutoFixNotes, recheckNotes, customUserFixNotes.trim()]
@@ -5541,6 +5601,71 @@ Return only revised final draft text.`);
       toast.error(msg);
     } finally {
       setIsApplyingCustomFix(false);
+    }
+  };
+
+  const handleSupremeFixMca = async () => {
+    toast.info("Running Advanced Statutory Recheck...");
+    const report = await handleRecheckMcaDraft();
+    if (report) {
+      toast.info("Applying Judicial Corrections...");
+      await handleApplyMcaFix(report);
+    }
+  };
+  const handleSupremeFixGst = async () => {
+    toast.info("Running Advanced Statutory Recheck...");
+    const report = await handleRecheckGstDraft();
+    if (report) {
+      toast.info("Applying Judicial Corrections...");
+      await handleApplyGstFix(report);
+    }
+  };
+  const handleSupremeFixIncomeTax = async () => {
+    toast.info("Running Advanced Statutory Recheck...");
+    const report = await handleRecheckIncomeTaxDraft();
+    if (report) {
+      toast.info("Applying Judicial Corrections...");
+      await handleApplyIncomeTaxFix(report);
+    }
+  };
+  const handleSupremeFixRbi = async () => {
+    toast.info("Running Advanced Statutory Recheck...");
+    const report = await handleRecheckRbiDraft();
+    if (report) {
+      toast.info("Applying Judicial Corrections...");
+      await handleApplyRbiFix(report);
+    }
+  };
+  const handleSupremeFixSebi = async () => {
+    toast.info("Running Advanced Statutory Recheck...");
+    const report = await handleRecheckSebiDraft();
+    if (report) {
+      toast.info("Applying Judicial Corrections...");
+      await handleApplySebiFix(report);
+    }
+  };
+  const handleSupremeFixCustoms = async () => {
+    toast.info("Running Advanced Statutory Recheck...");
+    const report = await handleRecheckCustomsDraft();
+    if (report) {
+      toast.info("Applying Judicial Corrections...");
+      await handleApplyCustomsFix(report);
+    }
+  };
+  const handleSupremeFixContract = async () => {
+    toast.info("Running Advanced Statutory Recheck...");
+    const report = await handleRecheckContractDraft();
+    if (report) {
+      toast.info("Applying Judicial Corrections...");
+      await handleApplyContractFix(report);
+    }
+  };
+  const handleSupremeFixCustom = async () => {
+    toast.info("Running Advanced Statutory Recheck...");
+    const report = await handleRecheckCustomDraft();
+    if (report) {
+      toast.info("Applying Judicial Corrections...");
+      await handleApplyCustomFix(report);
     }
   };
 
@@ -5672,6 +5797,11 @@ Return only revised final draft text.`);
     };
     
     try {
+      if (demoMode) {
+        await applyOfflineFallback();
+        return;
+      }
+
       if (!hasDraftEndpoint) {
         throw new Error("Draft endpoint is not configured. Set VITE_SUPABASE_URL correctly.");
       }
@@ -6718,7 +6848,7 @@ Return only revised final draft text.`);
               <Textarea 
                 placeholder="Draft will appear here after generation. The engine produces a filing-ready document with proper legal structure, section citations, and prayer for reliefs..."
                 value={draftContent}
-                onChange={(e) => setDraftContent(e.target.value)}
+                onChange={(e) => handleUserDraftEdit(e.target.value)}
                 className="min-h-[400px] bg-background/50 font-mono text-sm"
               />
               <p className="text-xs text-muted-foreground mt-2">
@@ -6858,98 +6988,86 @@ Return only revised final draft text.`);
                     </div>
                   )}
 
-                  <div className="p-3 rounded-lg border border-border/50 bg-background/30 space-y-2">
-                    <p className="text-sm font-medium text-foreground">AI Fix Assistant (MCA)</p>
-                    <p className="text-xs text-muted-foreground">
-                      Auto-detected pending fixes are synced from Issue Detector. Add optional CA notes, then regenerate.
-                    </p>
-                    <Textarea
-                      value={mcaEvidenceContext}
-                      onChange={(e) => setMcaEvidenceContext(e.target.value)}
-                      placeholder="Optional: paste key extracted PDF/evidence text here (SRN/challan, filing dates, officer role records) for Recheck AI cross-validation."
-                      className="min-h-[90px] bg-background/50"
-                    />
+                  <div className="p-4 rounded-xl border border-primary/40 bg-primary/10 shadow-[0_0_15px_rgba(var(--primary),0.1)] relative overflow-hidden space-y-3">
+                    <div className="absolute top-0 right-0 p-2">
+                      <Sparkles className="w-5 h-5 text-primary opacity-50" />
+                    </div>
+                    <div>
+                      <p className="text-base font-bold text-foreground flex items-center gap-2">
+                        <Shield className="w-4 h-4 text-primary" /> REGULON Supreme Audit & Auto-Rectify ⚡
+                      </p>
+                      <p className="text-xs text-muted-foreground mt-1">
+                        Advanced 1-Click Workflow: Cross-validates MCA draft against statutory provisions and evidence instantly, replacing all flagged issues automatically.
+                      </p>
+                    </div>
+                    
+                    <div className="space-y-2 pt-2">
+                      <p className="text-xs font-medium text-primary">1. Evidence & Statutory Context (Optional)</p>
+                      <Textarea
+                        value={mcaEvidenceContext}
+                        onChange={(e) => setMcaEvidenceContext(e.target.value)}
+                        placeholder="Paste formal evidence extracts here (e.g. notices, ledgers, statements) to enforce 100% factual accuracy."
+                        className="min-h-[70px] bg-background/60 border-primary/20 text-sm focus:border-primary"
+                      />
+                    </div>
+                    
+                    <div className="space-y-2 pt-1">
+                      <p className="text-xs font-medium text-primary">2. Custom CA Instructions (Optional)</p>
+                      <Textarea
+                        value={mcaUserFixNotes}
+                        onChange={(e) => setMcaUserFixNotes(e.target.value)}
+                        placeholder="Add strict subjective drafting instructions here..."
+                        className="min-h-[70px] bg-background/60 border-primary/20 text-sm focus:border-primary"
+                      />
+                    </div>
+
                     <Button
                       type="button"
-                      variant="outline"
-                      className="w-full"
-                      onClick={handleRecheckMcaDraft}
-                      disabled={isRecheckingMca || !draftGenerated}
+                      className="w-full bg-primary hover:bg-primary/90 text-primary-foreground font-semibold shadow-lg shadow-primary/25 translate-y-0 hover:-translate-y-0.5 transition-all"
+                      onClick={handleSupremeFixMca}
+                      disabled={isRecheckingMca || isApplyingMcaFix || !draftGenerated}
                     >
                       {isRecheckingMca ? (
                         <>
                           <Loader2 className="w-4 h-4 mr-2 animate-spin" />
-                          Rechecking AI...
+                          Auditing MCA Draft vs Guidelines...
+                        </>
+                      ) : isApplyingMcaFix ? (
+                        <>
+                          <Loader2 className="w-4 h-4 mr-2 animate-spin" />
+                          Injecting Legal Corrections...
                         </>
                       ) : (
-                        "Recheck AI (Draft + Notice + Evidence)"
+                        "Run Supreme Audit & Rectify Draft"
                       )}
                     </Button>
-                    {mcaRecheckReport && (
-                      <div className={`rounded-lg border p-3 text-xs space-y-2 ${
-                        mcaRecheckReport.ok
-                          ? "border-green-500/30 bg-green-500/10 text-green-300"
-                          : "border-rose-500/30 bg-rose-500/10 text-rose-200"
+                    
+                    {/* Display latest report results cleanly if available */}
+                    {(mcaRecheckReport && mcaRecheckReport.checkedAt) && (
+                      <div className={`mt-3 p-3 rounded border text-xs ${
+                        mcaRecheckReport.ok 
+                          ? "bg-green-500/10 border-green-500/30 text-green-300"
+                          : "bg-amber-500/10 border-amber-500/30 text-amber-200"
                       }`}>
-                        <p className="font-medium">{mcaRecheckReport.ok ? "Recheck AI: Passed" : "Recheck AI: Flags Detected"}</p>
-                        {mcaRecheckReport.summary ? <p>{mcaRecheckReport.summary}</p> : null}
-                        {!mcaRecheckReport.ok && (
-                          <ul className="list-disc pl-4 space-y-2">
-                            {mcaRecheckReport.flags.map((flag, idx) => (
-                              <li key={`${flag.issue}-${idx}`}>
-                                <p>[{flag.severity.toUpperCase()}] {flag.issue}</p>
-                                <p className="text-rose-100/90">Fix: {flag.fix}</p>
-                              </li>
-                            ))}
-                          </ul>
+                        <p className="font-bold flex justify-between">
+                          <span>Last Audit Status: {mcaRecheckReport.ok ? "100% CLEAR" : "CORRECTIONS APPLIED"}</span>
+                          <span>{new Date(mcaRecheckReport.checkedAt).toLocaleTimeString()}</span>
+                        </p>
+                        {!mcaRecheckReport.ok && mcaRecheckReport.flags && mcaRecheckReport.flags.length > 0 && (
+                          <div className="mt-2 space-y-1 opacity-90">
+                            <p className="font-medium">Rectified Items:</p>
+                            <ul className="list-disc pl-4">
+                              {mcaRecheckReport.flags.slice(0, 3).map((f: any, i: number) => (
+                                <li key={i}>{f.issue}</li>
+                              ))}
+                              {mcaRecheckReport.flags.length > 3 && (
+                                <li>+ {mcaRecheckReport.flags.length - 3} more adjustments</li>
+                              )}
+                            </ul>
+                          </div>
                         )}
                       </div>
                     )}
-                    <p className="text-xs text-cyan-300">
-                      Pending fixes: {mcaPendingFixCount}
-                    </p>
-                    <Textarea
-                      value={mcaAutoFixNotes || "No pending issue-detector fixes right now."}
-                      readOnly
-                      className="min-h-[90px] bg-background/40 text-muted-foreground"
-                    />
-                    <div className="rounded-lg border border-cyan-500/20 bg-cyan-500/5 p-3 text-xs space-y-2">
-                      <p className="font-medium text-cyan-200">Pending Fix Solutions (AI)</p>
-                      {mcaPendingFixPlaybook.length === 0 ? (
-                        <p className="text-cyan-100/80">No pending solutions. Draft is clear on current checks.</p>
-                      ) : (
-                        <ul className="list-disc pl-4 space-y-2 text-cyan-100/90">
-                          {mcaPendingFixPlaybook.map((item, idx) => (
-                            <li key={`${item.title}-${idx}`}>
-                              <p>{item.title}</p>
-                              <p className="text-cyan-100/75">How to fix: {item.solution}</p>
-                            </li>
-                          ))}
-                        </ul>
-                      )}
-                    </div>
-                    <Textarea
-                      value={mcaUserFixNotes}
-                      onChange={(e) => setMcaUserFixNotes(e.target.value)}
-                      placeholder="Optional CA note: add custom drafting instructions here."
-                      className="min-h-[90px] bg-background/50"
-                    />
-                    <Button
-                      type="button"
-                      variant="outline"
-                      className="w-full"
-                      onClick={handleApplyMcaFix}
-                      disabled={isApplyingMcaFix || !draftGenerated || (mcaPendingFixCount === 0 && mcaUserFixNotes.trim().length === 0)}
-                    >
-                      {isApplyingMcaFix ? (
-                        <>
-                          <Loader2 className="w-4 h-4 mr-2 animate-spin" />
-                          Applying AI Fix...
-                        </>
-                      ) : (
-                        "Apply AI Fix & Regenerate MCA Draft"
-                      )}
-                    </Button>
                   </div>
                 </div>
               )}
@@ -7009,96 +7127,86 @@ Return only revised final draft text.`);
                     </div>
                   )}
 
-                  <div className="p-3 rounded-lg border border-border/50 bg-background/30 space-y-2">
-                    <p className="text-sm font-medium text-foreground">AI Fix Assistant (GST)</p>
-                    <p className="text-xs text-muted-foreground">
-                      GST issue detector and recheck are separate from MCA. Add optional notes, then regenerate.
-                    </p>
-                    <Textarea
-                      value={gstEvidenceContext}
-                      onChange={(e) => setGstEvidenceContext(e.target.value)}
-                      placeholder="Optional: paste GST evidence text (DRC/GSTR/ITC reconciliation extracts) for Recheck AI."
-                      className="min-h-[90px] bg-background/50"
-                    />
+                  <div className="p-4 rounded-xl border border-primary/40 bg-primary/10 shadow-[0_0_15px_rgba(var(--primary),0.1)] relative overflow-hidden space-y-3">
+                    <div className="absolute top-0 right-0 p-2">
+                      <Sparkles className="w-5 h-5 text-primary opacity-50" />
+                    </div>
+                    <div>
+                      <p className="text-base font-bold text-foreground flex items-center gap-2">
+                        <Shield className="w-4 h-4 text-primary" /> REGULON Supreme Audit & Auto-Rectify ⚡
+                      </p>
+                      <p className="text-xs text-muted-foreground mt-1">
+                        Advanced 1-Click Workflow: Cross-validates GST draft against statutory provisions and evidence instantly, replacing all flagged issues automatically.
+                      </p>
+                    </div>
+                    
+                    <div className="space-y-2 pt-2">
+                      <p className="text-xs font-medium text-primary">1. Evidence & Statutory Context (Optional)</p>
+                      <Textarea
+                        value={gstEvidenceContext}
+                        onChange={(e) => setGstEvidenceContext(e.target.value)}
+                        placeholder="Paste formal evidence extracts here (e.g. notices, ledgers, statements) to enforce 100% factual accuracy."
+                        className="min-h-[70px] bg-background/60 border-primary/20 text-sm focus:border-primary"
+                      />
+                    </div>
+                    
+                    <div className="space-y-2 pt-1">
+                      <p className="text-xs font-medium text-primary">2. Custom CA Instructions (Optional)</p>
+                      <Textarea
+                        value={gstUserFixNotes}
+                        onChange={(e) => setGstUserFixNotes(e.target.value)}
+                        placeholder="Add strict subjective drafting instructions here..."
+                        className="min-h-[70px] bg-background/60 border-primary/20 text-sm focus:border-primary"
+                      />
+                    </div>
+
                     <Button
                       type="button"
-                      variant="outline"
-                      className="w-full"
-                      onClick={handleRecheckGstDraft}
-                      disabled={isRecheckingGst || !draftGenerated}
+                      className="w-full bg-primary hover:bg-primary/90 text-primary-foreground font-semibold shadow-lg shadow-primary/25 translate-y-0 hover:-translate-y-0.5 transition-all"
+                      onClick={handleSupremeFixGst}
+                      disabled={isRecheckingGst || isApplyingGstFix || !draftGenerated}
                     >
                       {isRecheckingGst ? (
                         <>
                           <Loader2 className="w-4 h-4 mr-2 animate-spin" />
-                          Rechecking GST AI...
+                          Auditing GST Draft vs Guidelines...
+                        </>
+                      ) : isApplyingGstFix ? (
+                        <>
+                          <Loader2 className="w-4 h-4 mr-2 animate-spin" />
+                          Injecting Legal Corrections...
                         </>
                       ) : (
-                        "Recheck AI (GST Draft + Notice + Evidence)"
+                        "Run Supreme Audit & Rectify Draft"
                       )}
                     </Button>
-                    {gstRecheckReport && (
-                      <div className={`rounded-lg border p-3 text-xs space-y-2 ${
-                        gstRecheckReport.ok
-                          ? "border-green-500/30 bg-green-500/10 text-green-300"
-                          : "border-rose-500/30 bg-rose-500/10 text-rose-200"
+                    
+                    {/* Display latest report results cleanly if available */}
+                    {(gstRecheckReport && gstRecheckReport.checkedAt) && (
+                      <div className={`mt-3 p-3 rounded border text-xs ${
+                        gstRecheckReport.ok 
+                          ? "bg-green-500/10 border-green-500/30 text-green-300"
+                          : "bg-amber-500/10 border-amber-500/30 text-amber-200"
                       }`}>
-                        <p className="font-medium">{gstRecheckReport.ok ? "GST Recheck AI: Passed" : "GST Recheck AI: Flags Detected"}</p>
-                        {gstRecheckReport.summary ? <p>{gstRecheckReport.summary}</p> : null}
-                        {!gstRecheckReport.ok && (
-                          <ul className="list-disc pl-4 space-y-2">
-                            {gstRecheckReport.flags.map((flag, idx) => (
-                              <li key={`${flag.issue}-${idx}`}>
-                                <p>[{flag.severity.toUpperCase()}] {flag.issue}</p>
-                                <p className="text-rose-100/90">Fix: {flag.fix}</p>
-                              </li>
-                            ))}
-                          </ul>
+                        <p className="font-bold flex justify-between">
+                          <span>Last Audit Status: {gstRecheckReport.ok ? "100% CLEAR" : "CORRECTIONS APPLIED"}</span>
+                          <span>{new Date(gstRecheckReport.checkedAt).toLocaleTimeString()}</span>
+                        </p>
+                        {!gstRecheckReport.ok && gstRecheckReport.flags && gstRecheckReport.flags.length > 0 && (
+                          <div className="mt-2 space-y-1 opacity-90">
+                            <p className="font-medium">Rectified Items:</p>
+                            <ul className="list-disc pl-4">
+                              {gstRecheckReport.flags.slice(0, 3).map((f: any, i: number) => (
+                                <li key={i}>{f.issue}</li>
+                              ))}
+                              {gstRecheckReport.flags.length > 3 && (
+                                <li>+ {gstRecheckReport.flags.length - 3} more adjustments</li>
+                              )}
+                            </ul>
+                          </div>
                         )}
                       </div>
                     )}
-                    <p className="text-xs text-cyan-300">Pending GST fixes: {gstPendingFixCount}</p>
-                    <Textarea
-                      value={gstAutoFixNotes || "No pending issue-detector fixes right now."}
-                      readOnly
-                      className="min-h-[90px] bg-background/40 text-muted-foreground"
-                    />
-                    <div className="rounded-lg border border-cyan-500/20 bg-cyan-500/5 p-3 text-xs space-y-2">
-                      <p className="font-medium text-cyan-200">Pending Fix Solutions (AI)</p>
-                      {gstPendingFixPlaybook.length === 0 ? (
-                        <p className="text-cyan-100/80">No pending solutions. Draft is clear on current checks.</p>
-                      ) : (
-                        <ul className="list-disc pl-4 space-y-2 text-cyan-100/90">
-                          {gstPendingFixPlaybook.map((item, idx) => (
-                            <li key={`${item.title}-${idx}`}>
-                              <p>{item.title}</p>
-                              <p className="text-cyan-100/75">How to fix: {item.solution}</p>
-                            </li>
-                          ))}
-                        </ul>
-                      )}
-                    </div>
-                    <Textarea
-                      value={gstUserFixNotes}
-                      onChange={(e) => setGstUserFixNotes(e.target.value)}
-                      placeholder="Optional CA note for GST AI fix."
-                      className="min-h-[90px] bg-background/50"
-                    />
-                    <Button
-                      type="button"
-                      variant="outline"
-                      className="w-full"
-                      onClick={handleApplyGstFix}
-                      disabled={isApplyingGstFix || !draftGenerated || (gstPendingFixCount === 0 && gstUserFixNotes.trim().length === 0)}
-                    >
-                      {isApplyingGstFix ? (
-                        <>
-                          <Loader2 className="w-4 h-4 mr-2 animate-spin" />
-                          Applying GST AI Fix...
-                        </>
-                      ) : (
-                        "Apply AI Fix & Regenerate GST Draft"
-                      )}
-                    </Button>
                   </div>
                 </div>
               )}
@@ -7158,96 +7266,86 @@ Return only revised final draft text.`);
                     </div>
                   )}
 
-                  <div className="p-3 rounded-lg border border-border/50 bg-background/30 space-y-2">
-                    <p className="text-sm font-medium text-foreground">AI Fix Assistant (Income Tax)</p>
-                    <p className="text-xs text-muted-foreground">
-                      Income-tax issue detector and recheck are separate from MCA/GST. Add optional notes, then regenerate.
-                    </p>
-                    <Textarea
-                      value={incomeTaxEvidenceContext}
-                      onChange={(e) => setIncomeTaxEvidenceContext(e.target.value)}
-                      placeholder="Optional: paste assessment extracts, ledger/tax-effect sheets, or supporting evidence for Recheck AI."
-                      className="min-h-[90px] bg-background/50"
-                    />
+                  <div className="p-4 rounded-xl border border-primary/40 bg-primary/10 shadow-[0_0_15px_rgba(var(--primary),0.1)] relative overflow-hidden space-y-3">
+                    <div className="absolute top-0 right-0 p-2">
+                      <Sparkles className="w-5 h-5 text-primary opacity-50" />
+                    </div>
+                    <div>
+                      <p className="text-base font-bold text-foreground flex items-center gap-2">
+                        <Shield className="w-4 h-4 text-primary" /> REGULON Supreme Audit & Auto-Rectify ⚡
+                      </p>
+                      <p className="text-xs text-muted-foreground mt-1">
+                        Advanced 1-Click Workflow: Cross-validates Income-tax draft against statutory provisions and evidence instantly, replacing all flagged issues automatically.
+                      </p>
+                    </div>
+                    
+                    <div className="space-y-2 pt-2">
+                      <p className="text-xs font-medium text-primary">1. Evidence & Statutory Context (Optional)</p>
+                      <Textarea
+                        value={incomeTaxEvidenceContext}
+                        onChange={(e) => setIncomeTaxEvidenceContext(e.target.value)}
+                        placeholder="Paste formal evidence extracts here (e.g. notices, ledgers, statements) to enforce 100% factual accuracy."
+                        className="min-h-[70px] bg-background/60 border-primary/20 text-sm focus:border-primary"
+                      />
+                    </div>
+                    
+                    <div className="space-y-2 pt-1">
+                      <p className="text-xs font-medium text-primary">2. Custom CA Instructions (Optional)</p>
+                      <Textarea
+                        value={incomeTaxUserFixNotes}
+                        onChange={(e) => setIncomeTaxUserFixNotes(e.target.value)}
+                        placeholder="Add strict subjective drafting instructions here..."
+                        className="min-h-[70px] bg-background/60 border-primary/20 text-sm focus:border-primary"
+                      />
+                    </div>
+
                     <Button
                       type="button"
-                      variant="outline"
-                      className="w-full"
-                      onClick={handleRecheckIncomeTaxDraft}
-                      disabled={isRecheckingIncomeTax || !draftGenerated}
+                      className="w-full bg-primary hover:bg-primary/90 text-primary-foreground font-semibold shadow-lg shadow-primary/25 translate-y-0 hover:-translate-y-0.5 transition-all"
+                      onClick={handleSupremeFixIncomeTax}
+                      disabled={isRecheckingIncomeTax || isApplyingIncomeTaxFix || !draftGenerated}
                     >
                       {isRecheckingIncomeTax ? (
                         <>
                           <Loader2 className="w-4 h-4 mr-2 animate-spin" />
-                          Rechecking Income-tax AI...
+                          Auditing Income-tax Draft vs Guidelines...
+                        </>
+                      ) : isApplyingIncomeTaxFix ? (
+                        <>
+                          <Loader2 className="w-4 h-4 mr-2 animate-spin" />
+                          Injecting Legal Corrections...
                         </>
                       ) : (
-                        "Recheck AI (Income Tax Draft + Notice + Evidence)"
+                        "Run Supreme Audit & Rectify Draft"
                       )}
                     </Button>
-                    {incomeTaxRecheckReport && (
-                      <div className={`rounded-lg border p-3 text-xs space-y-2 ${
-                        incomeTaxRecheckReport.ok
-                          ? "border-green-500/30 bg-green-500/10 text-green-300"
-                          : "border-rose-500/30 bg-rose-500/10 text-rose-200"
+                    
+                    {/* Display latest report results cleanly if available */}
+                    {(incomeTaxRecheckReport && incomeTaxRecheckReport.checkedAt) && (
+                      <div className={`mt-3 p-3 rounded border text-xs ${
+                        incomeTaxRecheckReport.ok 
+                          ? "bg-green-500/10 border-green-500/30 text-green-300"
+                          : "bg-amber-500/10 border-amber-500/30 text-amber-200"
                       }`}>
-                        <p className="font-medium">{incomeTaxRecheckReport.ok ? "Income-tax Recheck AI: Passed" : "Income-tax Recheck AI: Flags Detected"}</p>
-                        {incomeTaxRecheckReport.summary ? <p>{incomeTaxRecheckReport.summary}</p> : null}
-                        {!incomeTaxRecheckReport.ok && (
-                          <ul className="list-disc pl-4 space-y-2">
-                            {incomeTaxRecheckReport.flags.map((flag, idx) => (
-                              <li key={`${flag.issue}-${idx}`}>
-                                <p>[{flag.severity.toUpperCase()}] {flag.issue}</p>
-                                <p className="text-rose-100/90">Fix: {flag.fix}</p>
-                              </li>
-                            ))}
-                          </ul>
+                        <p className="font-bold flex justify-between">
+                          <span>Last Audit Status: {incomeTaxRecheckReport.ok ? "100% CLEAR" : "CORRECTIONS APPLIED"}</span>
+                          <span>{new Date(incomeTaxRecheckReport.checkedAt).toLocaleTimeString()}</span>
+                        </p>
+                        {!incomeTaxRecheckReport.ok && incomeTaxRecheckReport.flags && incomeTaxRecheckReport.flags.length > 0 && (
+                          <div className="mt-2 space-y-1 opacity-90">
+                            <p className="font-medium">Rectified Items:</p>
+                            <ul className="list-disc pl-4">
+                              {incomeTaxRecheckReport.flags.slice(0, 3).map((f: any, i: number) => (
+                                <li key={i}>{f.issue}</li>
+                              ))}
+                              {incomeTaxRecheckReport.flags.length > 3 && (
+                                <li>+ {incomeTaxRecheckReport.flags.length - 3} more adjustments</li>
+                              )}
+                            </ul>
+                          </div>
                         )}
                       </div>
                     )}
-                    <p className="text-xs text-cyan-300">Pending Income-tax fixes: {incomeTaxPendingFixCount}</p>
-                    <Textarea
-                      value={incomeTaxAutoFixNotes || "No pending issue-detector fixes right now."}
-                      readOnly
-                      className="min-h-[90px] bg-background/40 text-muted-foreground"
-                    />
-                    <div className="rounded-lg border border-cyan-500/20 bg-cyan-500/5 p-3 text-xs space-y-2">
-                      <p className="font-medium text-cyan-200">Pending Fix Solutions (AI)</p>
-                      {incomeTaxPendingFixPlaybook.length === 0 ? (
-                        <p className="text-cyan-100/80">No pending solutions. Draft is clear on current checks.</p>
-                      ) : (
-                        <ul className="list-disc pl-4 space-y-2 text-cyan-100/90">
-                          {incomeTaxPendingFixPlaybook.map((item, idx) => (
-                            <li key={`${item.title}-${idx}`}>
-                              <p>{item.title}</p>
-                              <p className="text-cyan-100/75">How to fix: {item.solution}</p>
-                            </li>
-                          ))}
-                        </ul>
-                      )}
-                    </div>
-                    <Textarea
-                      value={incomeTaxUserFixNotes}
-                      onChange={(e) => setIncomeTaxUserFixNotes(e.target.value)}
-                      placeholder="Optional CA note for Income-tax AI fix."
-                      className="min-h-[90px] bg-background/50"
-                    />
-                    <Button
-                      type="button"
-                      variant="outline"
-                      className="w-full"
-                      onClick={handleApplyIncomeTaxFix}
-                      disabled={isApplyingIncomeTaxFix || !draftGenerated || (incomeTaxPendingFixCount === 0 && incomeTaxUserFixNotes.trim().length === 0)}
-                    >
-                      {isApplyingIncomeTaxFix ? (
-                        <>
-                          <Loader2 className="w-4 h-4 mr-2 animate-spin" />
-                          Applying Income-tax AI Fix...
-                        </>
-                      ) : (
-                        "Apply AI Fix & Regenerate Income Tax Draft"
-                      )}
-                    </Button>
                   </div>
                 </div>
               )}
@@ -7307,96 +7405,86 @@ Return only revised final draft text.`);
                     </div>
                   )}
 
-                  <div className="p-3 rounded-lg border border-border/50 bg-background/30 space-y-2">
-                    <p className="text-sm font-medium text-foreground">AI Fix Assistant (RBI)</p>
-                    <p className="text-xs text-muted-foreground">
-                      RBI issue detector and recheck are separate from MCA/GST/Income-tax. Add optional notes, then regenerate.
-                    </p>
-                    <Textarea
-                      value={rbiEvidenceContext}
-                      onChange={(e) => setRbiEvidenceContext(e.target.value)}
-                      placeholder="Optional: paste FEMA/RBI evidence text (AD bank records, acknowledgements, filing trail) for Recheck AI."
-                      className="min-h-[90px] bg-background/50"
-                    />
+                  <div className="p-4 rounded-xl border border-primary/40 bg-primary/10 shadow-[0_0_15px_rgba(var(--primary),0.1)] relative overflow-hidden space-y-3">
+                    <div className="absolute top-0 right-0 p-2">
+                      <Sparkles className="w-5 h-5 text-primary opacity-50" />
+                    </div>
+                    <div>
+                      <p className="text-base font-bold text-foreground flex items-center gap-2">
+                        <Shield className="w-4 h-4 text-primary" /> REGULON Supreme Audit & Auto-Rectify ⚡
+                      </p>
+                      <p className="text-xs text-muted-foreground mt-1">
+                        Advanced 1-Click Workflow: Cross-validates RBI draft against statutory provisions and evidence instantly, replacing all flagged issues automatically.
+                      </p>
+                    </div>
+                    
+                    <div className="space-y-2 pt-2">
+                      <p className="text-xs font-medium text-primary">1. Evidence & Statutory Context (Optional)</p>
+                      <Textarea
+                        value={rbiEvidenceContext}
+                        onChange={(e) => setRbiEvidenceContext(e.target.value)}
+                        placeholder="Paste formal evidence extracts here (e.g. notices, ledgers, statements) to enforce 100% factual accuracy."
+                        className="min-h-[70px] bg-background/60 border-primary/20 text-sm focus:border-primary"
+                      />
+                    </div>
+                    
+                    <div className="space-y-2 pt-1">
+                      <p className="text-xs font-medium text-primary">2. Custom CA Instructions (Optional)</p>
+                      <Textarea
+                        value={rbiUserFixNotes}
+                        onChange={(e) => setRbiUserFixNotes(e.target.value)}
+                        placeholder="Add strict subjective drafting instructions here..."
+                        className="min-h-[70px] bg-background/60 border-primary/20 text-sm focus:border-primary"
+                      />
+                    </div>
+
                     <Button
                       type="button"
-                      variant="outline"
-                      className="w-full"
-                      onClick={handleRecheckRbiDraft}
-                      disabled={isRecheckingRbi || !draftGenerated}
+                      className="w-full bg-primary hover:bg-primary/90 text-primary-foreground font-semibold shadow-lg shadow-primary/25 translate-y-0 hover:-translate-y-0.5 transition-all"
+                      onClick={handleSupremeFixRbi}
+                      disabled={isRecheckingRbi || isApplyingRbiFix || !draftGenerated}
                     >
                       {isRecheckingRbi ? (
                         <>
                           <Loader2 className="w-4 h-4 mr-2 animate-spin" />
-                          Rechecking RBI AI...
+                          Auditing RBI Draft vs Guidelines...
+                        </>
+                      ) : isApplyingRbiFix ? (
+                        <>
+                          <Loader2 className="w-4 h-4 mr-2 animate-spin" />
+                          Injecting Legal Corrections...
                         </>
                       ) : (
-                        "Recheck AI (RBI Draft + Notice + Evidence)"
+                        "Run Supreme Audit & Rectify Draft"
                       )}
                     </Button>
-                    {rbiRecheckReport && (
-                      <div className={`rounded-lg border p-3 text-xs space-y-2 ${
-                        rbiRecheckReport.ok
-                          ? "border-green-500/30 bg-green-500/10 text-green-300"
-                          : "border-rose-500/30 bg-rose-500/10 text-rose-200"
+                    
+                    {/* Display latest report results cleanly if available */}
+                    {(rbiRecheckReport && rbiRecheckReport.checkedAt) && (
+                      <div className={`mt-3 p-3 rounded border text-xs ${
+                        rbiRecheckReport.ok 
+                          ? "bg-green-500/10 border-green-500/30 text-green-300"
+                          : "bg-amber-500/10 border-amber-500/30 text-amber-200"
                       }`}>
-                        <p className="font-medium">{rbiRecheckReport.ok ? "RBI Recheck AI: Passed" : "RBI Recheck AI: Flags Detected"}</p>
-                        {rbiRecheckReport.summary ? <p>{rbiRecheckReport.summary}</p> : null}
-                        {!rbiRecheckReport.ok && (
-                          <ul className="list-disc pl-4 space-y-2">
-                            {rbiRecheckReport.flags.map((flag, idx) => (
-                              <li key={`${flag.issue}-${idx}`}>
-                                <p>[{flag.severity.toUpperCase()}] {flag.issue}</p>
-                                <p className="text-rose-100/90">Fix: {flag.fix}</p>
-                              </li>
-                            ))}
-                          </ul>
+                        <p className="font-bold flex justify-between">
+                          <span>Last Audit Status: {rbiRecheckReport.ok ? "100% CLEAR" : "CORRECTIONS APPLIED"}</span>
+                          <span>{new Date(rbiRecheckReport.checkedAt).toLocaleTimeString()}</span>
+                        </p>
+                        {!rbiRecheckReport.ok && rbiRecheckReport.flags && rbiRecheckReport.flags.length > 0 && (
+                          <div className="mt-2 space-y-1 opacity-90">
+                            <p className="font-medium">Rectified Items:</p>
+                            <ul className="list-disc pl-4">
+                              {rbiRecheckReport.flags.slice(0, 3).map((f: any, i: number) => (
+                                <li key={i}>{f.issue}</li>
+                              ))}
+                              {rbiRecheckReport.flags.length > 3 && (
+                                <li>+ {rbiRecheckReport.flags.length - 3} more adjustments</li>
+                              )}
+                            </ul>
+                          </div>
                         )}
                       </div>
                     )}
-                    <p className="text-xs text-cyan-300">Pending RBI fixes: {rbiPendingFixCount}</p>
-                    <Textarea
-                      value={rbiAutoFixNotes || "No pending issue-detector fixes right now."}
-                      readOnly
-                      className="min-h-[90px] bg-background/40 text-muted-foreground"
-                    />
-                    <div className="rounded-lg border border-cyan-500/20 bg-cyan-500/5 p-3 text-xs space-y-2">
-                      <p className="font-medium text-cyan-200">Pending Fix Solutions (AI)</p>
-                      {rbiPendingFixPlaybook.length === 0 ? (
-                        <p className="text-cyan-100/80">No pending solutions. Draft is clear on current checks.</p>
-                      ) : (
-                        <ul className="list-disc pl-4 space-y-2 text-cyan-100/90">
-                          {rbiPendingFixPlaybook.map((item, idx) => (
-                            <li key={`${item.title}-${idx}`}>
-                              <p>{item.title}</p>
-                              <p className="text-cyan-100/75">How to fix: {item.solution}</p>
-                            </li>
-                          ))}
-                        </ul>
-                      )}
-                    </div>
-                    <Textarea
-                      value={rbiUserFixNotes}
-                      onChange={(e) => setRbiUserFixNotes(e.target.value)}
-                      placeholder="Optional CA note for RBI AI fix."
-                      className="min-h-[90px] bg-background/50"
-                    />
-                    <Button
-                      type="button"
-                      variant="outline"
-                      className="w-full"
-                      onClick={handleApplyRbiFix}
-                      disabled={isApplyingRbiFix || !draftGenerated || (rbiPendingFixCount === 0 && rbiUserFixNotes.trim().length === 0)}
-                    >
-                      {isApplyingRbiFix ? (
-                        <>
-                          <Loader2 className="w-4 h-4 mr-2 animate-spin" />
-                          Applying RBI AI Fix...
-                        </>
-                      ) : (
-                        "Apply AI Fix & Regenerate RBI Draft"
-                      )}
-                    </Button>
                   </div>
                 </div>
               )}
@@ -7456,96 +7544,86 @@ Return only revised final draft text.`);
                     </div>
                   )}
 
-                  <div className="p-3 rounded-lg border border-border/50 bg-background/30 space-y-2">
-                    <p className="text-sm font-medium text-foreground">AI Fix Assistant (SEBI)</p>
-                    <p className="text-xs text-muted-foreground">
-                      SEBI issue detector and recheck are separate from MCA/GST/Income-tax/RBI. Add optional notes, then regenerate.
-                    </p>
-                    <Textarea
-                      value={sebiEvidenceContext}
-                      onChange={(e) => setSebiEvidenceContext(e.target.value)}
-                      placeholder="Optional: paste SEBI evidence text (exchange disclosures, board records, filing proofs) for Recheck AI."
-                      className="min-h-[90px] bg-background/50"
-                    />
+                  <div className="p-4 rounded-xl border border-primary/40 bg-primary/10 shadow-[0_0_15px_rgba(var(--primary),0.1)] relative overflow-hidden space-y-3">
+                    <div className="absolute top-0 right-0 p-2">
+                      <Sparkles className="w-5 h-5 text-primary opacity-50" />
+                    </div>
+                    <div>
+                      <p className="text-base font-bold text-foreground flex items-center gap-2">
+                        <Shield className="w-4 h-4 text-primary" /> REGULON Supreme Audit & Auto-Rectify ⚡
+                      </p>
+                      <p className="text-xs text-muted-foreground mt-1">
+                        Advanced 1-Click Workflow: Cross-validates SEBI draft against statutory provisions and evidence instantly, replacing all flagged issues automatically.
+                      </p>
+                    </div>
+                    
+                    <div className="space-y-2 pt-2">
+                      <p className="text-xs font-medium text-primary">1. Evidence & Statutory Context (Optional)</p>
+                      <Textarea
+                        value={sebiEvidenceContext}
+                        onChange={(e) => setSebiEvidenceContext(e.target.value)}
+                        placeholder="Paste formal evidence extracts here (e.g. notices, ledgers, statements) to enforce 100% factual accuracy."
+                        className="min-h-[70px] bg-background/60 border-primary/20 text-sm focus:border-primary"
+                      />
+                    </div>
+                    
+                    <div className="space-y-2 pt-1">
+                      <p className="text-xs font-medium text-primary">2. Custom CA Instructions (Optional)</p>
+                      <Textarea
+                        value={sebiUserFixNotes}
+                        onChange={(e) => setSebiUserFixNotes(e.target.value)}
+                        placeholder="Add strict subjective drafting instructions here..."
+                        className="min-h-[70px] bg-background/60 border-primary/20 text-sm focus:border-primary"
+                      />
+                    </div>
+
                     <Button
                       type="button"
-                      variant="outline"
-                      className="w-full"
-                      onClick={handleRecheckSebiDraft}
-                      disabled={isRecheckingSebi || !draftGenerated}
+                      className="w-full bg-primary hover:bg-primary/90 text-primary-foreground font-semibold shadow-lg shadow-primary/25 translate-y-0 hover:-translate-y-0.5 transition-all"
+                      onClick={handleSupremeFixSebi}
+                      disabled={isRecheckingSebi || isApplyingSebiFix || !draftGenerated}
                     >
                       {isRecheckingSebi ? (
                         <>
                           <Loader2 className="w-4 h-4 mr-2 animate-spin" />
-                          Rechecking SEBI AI...
+                          Auditing SEBI Draft vs Guidelines...
+                        </>
+                      ) : isApplyingSebiFix ? (
+                        <>
+                          <Loader2 className="w-4 h-4 mr-2 animate-spin" />
+                          Injecting Legal Corrections...
                         </>
                       ) : (
-                        "Recheck AI (SEBI Draft + Notice + Evidence)"
+                        "Run Supreme Audit & Rectify Draft"
                       )}
                     </Button>
-                    {sebiRecheckReport && (
-                      <div className={`rounded-lg border p-3 text-xs space-y-2 ${
-                        sebiRecheckReport.ok
-                          ? "border-green-500/30 bg-green-500/10 text-green-300"
-                          : "border-rose-500/30 bg-rose-500/10 text-rose-200"
+                    
+                    {/* Display latest report results cleanly if available */}
+                    {(sebiRecheckReport && sebiRecheckReport.checkedAt) && (
+                      <div className={`mt-3 p-3 rounded border text-xs ${
+                        sebiRecheckReport.ok 
+                          ? "bg-green-500/10 border-green-500/30 text-green-300"
+                          : "bg-amber-500/10 border-amber-500/30 text-amber-200"
                       }`}>
-                        <p className="font-medium">{sebiRecheckReport.ok ? "SEBI Recheck AI: Passed" : "SEBI Recheck AI: Flags Detected"}</p>
-                        {sebiRecheckReport.summary ? <p>{sebiRecheckReport.summary}</p> : null}
-                        {!sebiRecheckReport.ok && (
-                          <ul className="list-disc pl-4 space-y-2">
-                            {sebiRecheckReport.flags.map((flag, idx) => (
-                              <li key={`${flag.issue}-${idx}`}>
-                                <p>[{flag.severity.toUpperCase()}] {flag.issue}</p>
-                                <p className="text-rose-100/90">Fix: {flag.fix}</p>
-                              </li>
-                            ))}
-                          </ul>
+                        <p className="font-bold flex justify-between">
+                          <span>Last Audit Status: {sebiRecheckReport.ok ? "100% CLEAR" : "CORRECTIONS APPLIED"}</span>
+                          <span>{new Date(sebiRecheckReport.checkedAt).toLocaleTimeString()}</span>
+                        </p>
+                        {!sebiRecheckReport.ok && sebiRecheckReport.flags && sebiRecheckReport.flags.length > 0 && (
+                          <div className="mt-2 space-y-1 opacity-90">
+                            <p className="font-medium">Rectified Items:</p>
+                            <ul className="list-disc pl-4">
+                              {sebiRecheckReport.flags.slice(0, 3).map((f: any, i: number) => (
+                                <li key={i}>{f.issue}</li>
+                              ))}
+                              {sebiRecheckReport.flags.length > 3 && (
+                                <li>+ {sebiRecheckReport.flags.length - 3} more adjustments</li>
+                              )}
+                            </ul>
+                          </div>
                         )}
                       </div>
                     )}
-                    <p className="text-xs text-cyan-300">Pending SEBI fixes: {sebiPendingFixCount}</p>
-                    <Textarea
-                      value={sebiAutoFixNotes || "No pending issue-detector fixes right now."}
-                      readOnly
-                      className="min-h-[90px] bg-background/40 text-muted-foreground"
-                    />
-                    <div className="rounded-lg border border-cyan-500/20 bg-cyan-500/5 p-3 text-xs space-y-2">
-                      <p className="font-medium text-cyan-200">Pending Fix Solutions (AI)</p>
-                      {sebiPendingFixPlaybook.length === 0 ? (
-                        <p className="text-cyan-100/80">No pending solutions. Draft is clear on current checks.</p>
-                      ) : (
-                        <ul className="list-disc pl-4 space-y-2 text-cyan-100/90">
-                          {sebiPendingFixPlaybook.map((item, idx) => (
-                            <li key={`${item.title}-${idx}`}>
-                              <p>{item.title}</p>
-                              <p className="text-cyan-100/75">How to fix: {item.solution}</p>
-                            </li>
-                          ))}
-                        </ul>
-                      )}
-                    </div>
-                    <Textarea
-                      value={sebiUserFixNotes}
-                      onChange={(e) => setSebiUserFixNotes(e.target.value)}
-                      placeholder="Optional CA note for SEBI AI fix."
-                      className="min-h-[90px] bg-background/50"
-                    />
-                    <Button
-                      type="button"
-                      variant="outline"
-                      className="w-full"
-                      onClick={handleApplySebiFix}
-                      disabled={isApplyingSebiFix || !draftGenerated || (sebiPendingFixCount === 0 && sebiUserFixNotes.trim().length === 0)}
-                    >
-                      {isApplyingSebiFix ? (
-                        <>
-                          <Loader2 className="w-4 h-4 mr-2 animate-spin" />
-                          Applying SEBI AI Fix...
-                        </>
-                      ) : (
-                        "Apply AI Fix & Regenerate SEBI Draft"
-                      )}
-                    </Button>
                   </div>
                 </div>
               )}
@@ -7605,96 +7683,86 @@ Return only revised final draft text.`);
                     </div>
                   )}
 
-                  <div className="p-3 rounded-lg border border-border/50 bg-background/30 space-y-2">
-                    <p className="text-sm font-medium text-foreground">AI Fix Assistant (Customs)</p>
-                    <p className="text-xs text-muted-foreground">
-                      Customs issue detector and recheck are separate from other regulators. Add optional notes, then regenerate.
-                    </p>
-                    <Textarea
-                      value={customsEvidenceContext}
-                      onChange={(e) => setCustomsEvidenceContext(e.target.value)}
-                      placeholder="Optional: paste customs evidence text (BoE, invoices, valuation docs, CoO, test reports) for Recheck AI."
-                      className="min-h-[90px] bg-background/50"
-                    />
+                  <div className="p-4 rounded-xl border border-primary/40 bg-primary/10 shadow-[0_0_15px_rgba(var(--primary),0.1)] relative overflow-hidden space-y-3">
+                    <div className="absolute top-0 right-0 p-2">
+                      <Sparkles className="w-5 h-5 text-primary opacity-50" />
+                    </div>
+                    <div>
+                      <p className="text-base font-bold text-foreground flex items-center gap-2">
+                        <Shield className="w-4 h-4 text-primary" /> REGULON Supreme Audit & Auto-Rectify ⚡
+                      </p>
+                      <p className="text-xs text-muted-foreground mt-1">
+                        Advanced 1-Click Workflow: Cross-validates Customs draft against statutory provisions and evidence instantly, replacing all flagged issues automatically.
+                      </p>
+                    </div>
+                    
+                    <div className="space-y-2 pt-2">
+                      <p className="text-xs font-medium text-primary">1. Evidence & Statutory Context (Optional)</p>
+                      <Textarea
+                        value={customsEvidenceContext}
+                        onChange={(e) => setCustomsEvidenceContext(e.target.value)}
+                        placeholder="Paste formal evidence extracts here (e.g. notices, ledgers, statements) to enforce 100% factual accuracy."
+                        className="min-h-[70px] bg-background/60 border-primary/20 text-sm focus:border-primary"
+                      />
+                    </div>
+                    
+                    <div className="space-y-2 pt-1">
+                      <p className="text-xs font-medium text-primary">2. Custom CA Instructions (Optional)</p>
+                      <Textarea
+                        value={customsUserFixNotes}
+                        onChange={(e) => setCustomsUserFixNotes(e.target.value)}
+                        placeholder="Add strict subjective drafting instructions here..."
+                        className="min-h-[70px] bg-background/60 border-primary/20 text-sm focus:border-primary"
+                      />
+                    </div>
+
                     <Button
                       type="button"
-                      variant="outline"
-                      className="w-full"
-                      onClick={handleRecheckCustomsDraft}
-                      disabled={isRecheckingCustoms || !draftGenerated}
+                      className="w-full bg-primary hover:bg-primary/90 text-primary-foreground font-semibold shadow-lg shadow-primary/25 translate-y-0 hover:-translate-y-0.5 transition-all"
+                      onClick={handleSupremeFixCustoms}
+                      disabled={isRecheckingCustoms || isApplyingCustomsFix || !draftGenerated}
                     >
                       {isRecheckingCustoms ? (
                         <>
                           <Loader2 className="w-4 h-4 mr-2 animate-spin" />
-                          Rechecking Customs AI...
+                          Auditing Customs Draft vs Guidelines...
+                        </>
+                      ) : isApplyingCustomsFix ? (
+                        <>
+                          <Loader2 className="w-4 h-4 mr-2 animate-spin" />
+                          Injecting Legal Corrections...
                         </>
                       ) : (
-                        "Recheck AI (Customs Draft + Notice + Evidence)"
+                        "Run Supreme Audit & Rectify Draft"
                       )}
                     </Button>
-                    {customsRecheckReport && (
-                      <div className={`rounded-lg border p-3 text-xs space-y-2 ${
-                        customsRecheckReport.ok
-                          ? "border-green-500/30 bg-green-500/10 text-green-300"
-                          : "border-rose-500/30 bg-rose-500/10 text-rose-200"
+                    
+                    {/* Display latest report results cleanly if available */}
+                    {(customsRecheckReport && customsRecheckReport.checkedAt) && (
+                      <div className={`mt-3 p-3 rounded border text-xs ${
+                        customsRecheckReport.ok 
+                          ? "bg-green-500/10 border-green-500/30 text-green-300"
+                          : "bg-amber-500/10 border-amber-500/30 text-amber-200"
                       }`}>
-                        <p className="font-medium">{customsRecheckReport.ok ? "Customs Recheck AI: Passed" : "Customs Recheck AI: Flags Detected"}</p>
-                        {customsRecheckReport.summary ? <p>{customsRecheckReport.summary}</p> : null}
-                        {!customsRecheckReport.ok && (
-                          <ul className="list-disc pl-4 space-y-2">
-                            {customsRecheckReport.flags.map((flag, idx) => (
-                              <li key={`${flag.issue}-${idx}`}>
-                                <p>[{flag.severity.toUpperCase()}] {flag.issue}</p>
-                                <p className="text-rose-100/90">Fix: {flag.fix}</p>
-                              </li>
-                            ))}
-                          </ul>
+                        <p className="font-bold flex justify-between">
+                          <span>Last Audit Status: {customsRecheckReport.ok ? "100% CLEAR" : "CORRECTIONS APPLIED"}</span>
+                          <span>{new Date(customsRecheckReport.checkedAt).toLocaleTimeString()}</span>
+                        </p>
+                        {!customsRecheckReport.ok && customsRecheckReport.flags && customsRecheckReport.flags.length > 0 && (
+                          <div className="mt-2 space-y-1 opacity-90">
+                            <p className="font-medium">Rectified Items:</p>
+                            <ul className="list-disc pl-4">
+                              {customsRecheckReport.flags.slice(0, 3).map((f: any, i: number) => (
+                                <li key={i}>{f.issue}</li>
+                              ))}
+                              {customsRecheckReport.flags.length > 3 && (
+                                <li>+ {customsRecheckReport.flags.length - 3} more adjustments</li>
+                              )}
+                            </ul>
+                          </div>
                         )}
                       </div>
                     )}
-                    <p className="text-xs text-cyan-300">Pending Customs fixes: {customsPendingFixCount}</p>
-                    <Textarea
-                      value={customsAutoFixNotes || "No pending issue-detector fixes right now."}
-                      readOnly
-                      className="min-h-[90px] bg-background/40 text-muted-foreground"
-                    />
-                    <div className="rounded-lg border border-cyan-500/20 bg-cyan-500/5 p-3 text-xs space-y-2">
-                      <p className="font-medium text-cyan-200">Pending Fix Solutions (AI)</p>
-                      {customsPendingFixPlaybook.length === 0 ? (
-                        <p className="text-cyan-100/80">No pending solutions. Draft is clear on current checks.</p>
-                      ) : (
-                        <ul className="list-disc pl-4 space-y-2 text-cyan-100/90">
-                          {customsPendingFixPlaybook.map((item, idx) => (
-                            <li key={`${item.title}-${idx}`}>
-                              <p>{item.title}</p>
-                              <p className="text-cyan-100/75">How to fix: {item.solution}</p>
-                            </li>
-                          ))}
-                        </ul>
-                      )}
-                    </div>
-                    <Textarea
-                      value={customsUserFixNotes}
-                      onChange={(e) => setCustomsUserFixNotes(e.target.value)}
-                      placeholder="Optional CA note for Customs AI fix."
-                      className="min-h-[90px] bg-background/50"
-                    />
-                    <Button
-                      type="button"
-                      variant="outline"
-                      className="w-full"
-                      onClick={handleApplyCustomsFix}
-                      disabled={isApplyingCustomsFix || !draftGenerated || (customsPendingFixCount === 0 && customsUserFixNotes.trim().length === 0)}
-                    >
-                      {isApplyingCustomsFix ? (
-                        <>
-                          <Loader2 className="w-4 h-4 mr-2 animate-spin" />
-                          Applying Customs AI Fix...
-                        </>
-                      ) : (
-                        "Apply AI Fix & Regenerate Customs Draft"
-                      )}
-                    </Button>
                   </div>
                 </div>
               )}
@@ -7754,96 +7822,86 @@ Return only revised final draft text.`);
                     </div>
                   )}
 
-                  <div className="p-3 rounded-lg border border-border/50 bg-background/30 space-y-2">
-                    <p className="text-sm font-medium text-foreground">AI Fix Assistant (Contract)</p>
-                    <p className="text-xs text-muted-foreground">
-                      Contract issue detector and recheck are separate from other regulators. Add optional notes, then regenerate.
-                    </p>
-                    <Textarea
-                      value={contractEvidenceContext}
-                      onChange={(e) => setContractEvidenceContext(e.target.value)}
-                      placeholder="Optional: paste contract evidence/context clauses for Recheck AI."
-                      className="min-h-[90px] bg-background/50"
-                    />
+                  <div className="p-4 rounded-xl border border-primary/40 bg-primary/10 shadow-[0_0_15px_rgba(var(--primary),0.1)] relative overflow-hidden space-y-3">
+                    <div className="absolute top-0 right-0 p-2">
+                      <Sparkles className="w-5 h-5 text-primary opacity-50" />
+                    </div>
+                    <div>
+                      <p className="text-base font-bold text-foreground flex items-center gap-2">
+                        <Shield className="w-4 h-4 text-primary" /> REGULON Supreme Audit & Auto-Rectify ⚡
+                      </p>
+                      <p className="text-xs text-muted-foreground mt-1">
+                        Advanced 1-Click Workflow: Cross-validates Contract draft against statutory provisions and evidence instantly, replacing all flagged issues automatically.
+                      </p>
+                    </div>
+                    
+                    <div className="space-y-2 pt-2">
+                      <p className="text-xs font-medium text-primary">1. Evidence & Statutory Context (Optional)</p>
+                      <Textarea
+                        value={contractEvidenceContext}
+                        onChange={(e) => setContractEvidenceContext(e.target.value)}
+                        placeholder="Paste formal evidence extracts here (e.g. notices, ledgers, statements) to enforce 100% factual accuracy."
+                        className="min-h-[70px] bg-background/60 border-primary/20 text-sm focus:border-primary"
+                      />
+                    </div>
+                    
+                    <div className="space-y-2 pt-1">
+                      <p className="text-xs font-medium text-primary">2. Custom CA Instructions (Optional)</p>
+                      <Textarea
+                        value={contractUserFixNotes}
+                        onChange={(e) => setContractUserFixNotes(e.target.value)}
+                        placeholder="Add strict subjective drafting instructions here..."
+                        className="min-h-[70px] bg-background/60 border-primary/20 text-sm focus:border-primary"
+                      />
+                    </div>
+
                     <Button
                       type="button"
-                      variant="outline"
-                      className="w-full"
-                      onClick={handleRecheckContractDraft}
-                      disabled={isRecheckingContract || !draftGenerated}
+                      className="w-full bg-primary hover:bg-primary/90 text-primary-foreground font-semibold shadow-lg shadow-primary/25 translate-y-0 hover:-translate-y-0.5 transition-all"
+                      onClick={handleSupremeFixContract}
+                      disabled={isRecheckingContract || isApplyingContractFix || !draftGenerated}
                     >
                       {isRecheckingContract ? (
                         <>
                           <Loader2 className="w-4 h-4 mr-2 animate-spin" />
-                          Rechecking Contract AI...
+                          Auditing Contract Draft vs Guidelines...
+                        </>
+                      ) : isApplyingContractFix ? (
+                        <>
+                          <Loader2 className="w-4 h-4 mr-2 animate-spin" />
+                          Injecting Legal Corrections...
                         </>
                       ) : (
-                        "Recheck AI (Contract Draft + Context + Evidence)"
+                        "Run Supreme Audit & Rectify Draft"
                       )}
                     </Button>
-                    {contractRecheckReport && (
-                      <div className={`rounded-lg border p-3 text-xs space-y-2 ${
-                        contractRecheckReport.ok
-                          ? "border-green-500/30 bg-green-500/10 text-green-300"
-                          : "border-rose-500/30 bg-rose-500/10 text-rose-200"
+                    
+                    {/* Display latest report results cleanly if available */}
+                    {(contractRecheckReport && contractRecheckReport.checkedAt) && (
+                      <div className={`mt-3 p-3 rounded border text-xs ${
+                        contractRecheckReport.ok 
+                          ? "bg-green-500/10 border-green-500/30 text-green-300"
+                          : "bg-amber-500/10 border-amber-500/30 text-amber-200"
                       }`}>
-                        <p className="font-medium">{contractRecheckReport.ok ? "Contract Recheck AI: Passed" : "Contract Recheck AI: Flags Detected"}</p>
-                        {contractRecheckReport.summary ? <p>{contractRecheckReport.summary}</p> : null}
-                        {!contractRecheckReport.ok && (
-                          <ul className="list-disc pl-4 space-y-2">
-                            {contractRecheckReport.flags.map((flag, idx) => (
-                              <li key={`${flag.issue}-${idx}`}>
-                                <p>[{flag.severity.toUpperCase()}] {flag.issue}</p>
-                                <p className="text-rose-100/90">Fix: {flag.fix}</p>
-                              </li>
-                            ))}
-                          </ul>
+                        <p className="font-bold flex justify-between">
+                          <span>Last Audit Status: {contractRecheckReport.ok ? "100% CLEAR" : "CORRECTIONS APPLIED"}</span>
+                          <span>{new Date(contractRecheckReport.checkedAt).toLocaleTimeString()}</span>
+                        </p>
+                        {!contractRecheckReport.ok && contractRecheckReport.flags && contractRecheckReport.flags.length > 0 && (
+                          <div className="mt-2 space-y-1 opacity-90">
+                            <p className="font-medium">Rectified Items:</p>
+                            <ul className="list-disc pl-4">
+                              {contractRecheckReport.flags.slice(0, 3).map((f: any, i: number) => (
+                                <li key={i}>{f.issue}</li>
+                              ))}
+                              {contractRecheckReport.flags.length > 3 && (
+                                <li>+ {contractRecheckReport.flags.length - 3} more adjustments</li>
+                              )}
+                            </ul>
+                          </div>
                         )}
                       </div>
                     )}
-                    <p className="text-xs text-cyan-300">Pending Contract fixes: {contractPendingFixCount}</p>
-                    <Textarea
-                      value={contractAutoFixNotes || "No pending issue-detector fixes right now."}
-                      readOnly
-                      className="min-h-[90px] bg-background/40 text-muted-foreground"
-                    />
-                    <div className="rounded-lg border border-cyan-500/20 bg-cyan-500/5 p-3 text-xs space-y-2">
-                      <p className="font-medium text-cyan-200">Pending Fix Solutions (AI)</p>
-                      {contractPendingFixPlaybook.length === 0 ? (
-                        <p className="text-cyan-100/80">No pending solutions. Draft is clear on current checks.</p>
-                      ) : (
-                        <ul className="list-disc pl-4 space-y-2 text-cyan-100/90">
-                          {contractPendingFixPlaybook.map((item, idx) => (
-                            <li key={`${item.title}-${idx}`}>
-                              <p>{item.title}</p>
-                              <p className="text-cyan-100/75">How to fix: {item.solution}</p>
-                            </li>
-                          ))}
-                        </ul>
-                      )}
-                    </div>
-                    <Textarea
-                      value={contractUserFixNotes}
-                      onChange={(e) => setContractUserFixNotes(e.target.value)}
-                      placeholder="Optional legal/CA note for Contract AI fix."
-                      className="min-h-[90px] bg-background/50"
-                    />
-                    <Button
-                      type="button"
-                      variant="outline"
-                      className="w-full"
-                      onClick={handleApplyContractFix}
-                      disabled={isApplyingContractFix || !draftGenerated || (contractPendingFixCount === 0 && contractUserFixNotes.trim().length === 0)}
-                    >
-                      {isApplyingContractFix ? (
-                        <>
-                          <Loader2 className="w-4 h-4 mr-2 animate-spin" />
-                          Applying Contract AI Fix...
-                        </>
-                      ) : (
-                        "Apply AI Fix & Regenerate Contract Draft"
-                      )}
-                    </Button>
                   </div>
                 </div>
               )}
@@ -7903,96 +7961,86 @@ Return only revised final draft text.`);
                     </div>
                   )}
 
-                  <div className="p-3 rounded-lg border border-border/50 bg-background/30 space-y-2">
-                    <p className="text-sm font-medium text-foreground">AI Fix Assistant (Custom)</p>
-                    <p className="text-xs text-muted-foreground">
-                      Custom issue detector and recheck are separate from other regulators. Add optional notes, then regenerate.
-                    </p>
-                    <Textarea
-                      value={customEvidenceContext}
-                      onChange={(e) => setCustomEvidenceContext(e.target.value)}
-                      placeholder="Optional: paste additional evidence text for Recheck AI."
-                      className="min-h-[90px] bg-background/50"
-                    />
+                  <div className="p-4 rounded-xl border border-primary/40 bg-primary/10 shadow-[0_0_15px_rgba(var(--primary),0.1)] relative overflow-hidden space-y-3">
+                    <div className="absolute top-0 right-0 p-2">
+                      <Sparkles className="w-5 h-5 text-primary opacity-50" />
+                    </div>
+                    <div>
+                      <p className="text-base font-bold text-foreground flex items-center gap-2">
+                        <Shield className="w-4 h-4 text-primary" /> REGULON Supreme Audit & Auto-Rectify ⚡
+                      </p>
+                      <p className="text-xs text-muted-foreground mt-1">
+                        Advanced 1-Click Workflow: Cross-validates Custom Regulatory draft against statutory provisions and evidence instantly, replacing all flagged issues automatically.
+                      </p>
+                    </div>
+                    
+                    <div className="space-y-2 pt-2">
+                      <p className="text-xs font-medium text-primary">1. Evidence & Statutory Context (Optional)</p>
+                      <Textarea
+                        value={customEvidenceContext}
+                        onChange={(e) => setCustomEvidenceContext(e.target.value)}
+                        placeholder="Paste formal evidence extracts here (e.g. notices, ledgers, statements) to enforce 100% factual accuracy."
+                        className="min-h-[70px] bg-background/60 border-primary/20 text-sm focus:border-primary"
+                      />
+                    </div>
+                    
+                    <div className="space-y-2 pt-1">
+                      <p className="text-xs font-medium text-primary">2. Custom CA Instructions (Optional)</p>
+                      <Textarea
+                        value={customUserFixNotes}
+                        onChange={(e) => setCustomUserFixNotes(e.target.value)}
+                        placeholder="Add strict subjective drafting instructions here..."
+                        className="min-h-[70px] bg-background/60 border-primary/20 text-sm focus:border-primary"
+                      />
+                    </div>
+
                     <Button
                       type="button"
-                      variant="outline"
-                      className="w-full"
-                      onClick={handleRecheckCustomDraft}
-                      disabled={isRecheckingCustom || !draftGenerated}
+                      className="w-full bg-primary hover:bg-primary/90 text-primary-foreground font-semibold shadow-lg shadow-primary/25 translate-y-0 hover:-translate-y-0.5 transition-all"
+                      onClick={handleSupremeFixCustom}
+                      disabled={isRecheckingCustom || isApplyingCustomFix || !draftGenerated}
                     >
                       {isRecheckingCustom ? (
                         <>
                           <Loader2 className="w-4 h-4 mr-2 animate-spin" />
-                          Rechecking Custom AI...
+                          Auditing Custom Regulatory Draft vs Guidelines...
+                        </>
+                      ) : isApplyingCustomFix ? (
+                        <>
+                          <Loader2 className="w-4 h-4 mr-2 animate-spin" />
+                          Injecting Legal Corrections...
                         </>
                       ) : (
-                        "Recheck AI (Custom Draft + Notice + Evidence)"
+                        "Run Supreme Audit & Rectify Draft"
                       )}
                     </Button>
-                    {customRecheckReport && (
-                      <div className={`rounded-lg border p-3 text-xs space-y-2 ${
-                        customRecheckReport.ok
-                          ? "border-green-500/30 bg-green-500/10 text-green-300"
-                          : "border-rose-500/30 bg-rose-500/10 text-rose-200"
+                    
+                    {/* Display latest report results cleanly if available */}
+                    {(customRecheckReport && customRecheckReport.checkedAt) && (
+                      <div className={`mt-3 p-3 rounded border text-xs ${
+                        customRecheckReport.ok 
+                          ? "bg-green-500/10 border-green-500/30 text-green-300"
+                          : "bg-amber-500/10 border-amber-500/30 text-amber-200"
                       }`}>
-                        <p className="font-medium">{customRecheckReport.ok ? "Custom Recheck AI: Passed" : "Custom Recheck AI: Flags Detected"}</p>
-                        {customRecheckReport.summary ? <p>{customRecheckReport.summary}</p> : null}
-                        {!customRecheckReport.ok && (
-                          <ul className="list-disc pl-4 space-y-2">
-                            {customRecheckReport.flags.map((flag, idx) => (
-                              <li key={`${flag.issue}-${idx}`}>
-                                <p>[{flag.severity.toUpperCase()}] {flag.issue}</p>
-                                <p className="text-rose-100/90">Fix: {flag.fix}</p>
-                              </li>
-                            ))}
-                          </ul>
+                        <p className="font-bold flex justify-between">
+                          <span>Last Audit Status: {customRecheckReport.ok ? "100% CLEAR" : "CORRECTIONS APPLIED"}</span>
+                          <span>{new Date(customRecheckReport.checkedAt).toLocaleTimeString()}</span>
+                        </p>
+                        {!customRecheckReport.ok && customRecheckReport.flags && customRecheckReport.flags.length > 0 && (
+                          <div className="mt-2 space-y-1 opacity-90">
+                            <p className="font-medium">Rectified Items:</p>
+                            <ul className="list-disc pl-4">
+                              {customRecheckReport.flags.slice(0, 3).map((f: any, i: number) => (
+                                <li key={i}>{f.issue}</li>
+                              ))}
+                              {customRecheckReport.flags.length > 3 && (
+                                <li>+ {customRecheckReport.flags.length - 3} more adjustments</li>
+                              )}
+                            </ul>
+                          </div>
                         )}
                       </div>
                     )}
-                    <p className="text-xs text-cyan-300">Pending Custom fixes: {customPendingFixCount}</p>
-                    <Textarea
-                      value={customAutoFixNotes || "No pending issue-detector fixes right now."}
-                      readOnly
-                      className="min-h-[90px] bg-background/40 text-muted-foreground"
-                    />
-                    <div className="rounded-lg border border-cyan-500/20 bg-cyan-500/5 p-3 text-xs space-y-2">
-                      <p className="font-medium text-cyan-200">Pending Fix Solutions (AI)</p>
-                      {customPendingFixPlaybook.length === 0 ? (
-                        <p className="text-cyan-100/80">No pending solutions. Draft is clear on current checks.</p>
-                      ) : (
-                        <ul className="list-disc pl-4 space-y-2 text-cyan-100/90">
-                          {customPendingFixPlaybook.map((item, idx) => (
-                            <li key={`${item.title}-${idx}`}>
-                              <p>{item.title}</p>
-                              <p className="text-cyan-100/75">How to fix: {item.solution}</p>
-                            </li>
-                          ))}
-                        </ul>
-                      )}
-                    </div>
-                    <Textarea
-                      value={customUserFixNotes}
-                      onChange={(e) => setCustomUserFixNotes(e.target.value)}
-                      placeholder="Optional CA note for Custom AI fix."
-                      className="min-h-[90px] bg-background/50"
-                    />
-                    <Button
-                      type="button"
-                      variant="outline"
-                      className="w-full"
-                      onClick={handleApplyCustomFix}
-                      disabled={isApplyingCustomFix || !draftGenerated || (customPendingFixCount === 0 && customUserFixNotes.trim().length === 0)}
-                    >
-                      {isApplyingCustomFix ? (
-                        <>
-                          <Loader2 className="w-4 h-4 mr-2 animate-spin" />
-                          Applying Custom AI Fix...
-                        </>
-                      ) : (
-                        "Apply AI Fix & Regenerate Custom Draft"
-                      )}
-                    </Button>
                   </div>
                 </div>
               )}

@@ -16,7 +16,12 @@ import {
 } from 'lucide-react';
 import { useCAAgentOrchestrator, type CAAgentStatus } from './CAAgentOrchestrator';
 
-export const CACommandCenterHeader = () => {
+interface CACommandCenterHeaderProps {
+  title?: string;
+  subtitle?: string;
+}
+
+export const CACommandCenterHeader = ({ title, subtitle }: CACommandCenterHeaderProps) => {
   const { state, actions } = useCAAgentOrchestrator();
 
   const activeAgentCount = state.agents.filter(a => 
@@ -98,10 +103,10 @@ export const CACommandCenterHeader = () => {
           </div>
 
           <div>
-            <h1 className="text-xl font-bold text-foreground tracking-tight">CA Practice Command Center</h1>
+            <h1 className="text-xl font-bold text-foreground tracking-tight">{title || 'CA Practice Command Center'}</h1>
             <p className="text-xs text-muted-foreground flex items-center gap-1.5 mt-0.5">
               <Briefcase className="w-3 h-3 text-cyan-400" />
-              External CA — AI-Powered Practice Management
+              {subtitle || 'External CA — AI-Powered Practice Management'}
             </p>
             <div className="flex items-center gap-2 mt-2 flex-wrap">
               {/* Auto-Pilot ON/OFF Indicator — inside the header */}

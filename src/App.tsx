@@ -47,6 +47,7 @@ const CAFirmDashboard = lazy(() => import("./pages/CAFirmDashboard"));
 // const RealCADashboard = lazy(() => import("./pages/RealCADashboard")); // Removed - use demo dashboards
 const ExternalCADashboardReal = lazy(() => import("./pages/ExternalCADashboardReal")); // REAL External CA Dashboard
 const CompanyDashboardReal = lazy(() => import("./pages/CompanyDashboardReal")); // REAL Company Owner Dashboard
+const InhouseCADashboardReal = lazy(() => import("./pages/InhouseCADashboardReal")); // REAL In-House CA Dashboard
 const AgentControlCenter = lazy(() => import("./pages/AgentControlCenter")); // CA Agent Control Center Settings
 const CompanyAgentControlCenter = lazy(() => import("./pages/CompanyAgentControlCenter")); // Company Agent Control Center Settings
 const AgentWorkReview = lazy(() => import("./pages/AgentWorkReview"));
@@ -126,6 +127,7 @@ const App = () => (
             <Route path="/ca-firm-dashboard" element={<CAFirmDashboard />} />
             <Route path="/real-external-ca-dashboard" element={<ExternalCADashboardReal />} />
             <Route path="/real-company-dashboard" element={<CompanyDashboardReal />} />
+            <Route path="/real-inhouse-ca-dashboard" element={<InhouseCADashboardReal />} />
             {/* RealCADashboard removed - using demo dashboards */}
             <Route path="/agent-work-review" element={<AgentWorkReview />} />
 
