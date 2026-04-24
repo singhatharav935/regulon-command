@@ -30,13 +30,15 @@ export const resolveLandingPath = ({
   roles: string[];
   metadataPersona: AppPersona | null;
 }) => {
-  const effectivePersona = persona ?? metadataPersona;
+  // Ultra-resilient local fallback
+  const localRole = localStorage.getItem("current_user_role") || localStorage.getItem("pending_registration_role") || "company_owner";
+  const effectivePersona = persona ?? metadataPersona ?? (localRole as AppPersona);
 
   if (effectivePersona === "admin") return "/admin-dashboard";
   if (effectivePersona === "in_house_lawyer") return "/lawyer-dashboard";
   if (effectivePersona === "external_ca") return "/real-external-ca-dashboard";
-  if (effectivePersona === "in_house_ca") return "/ca-dashboard";
-  if (effectivePersona === "ca_firm") return "/ca-dashboard";
+  if (effectivePersona === "in_house_ca") return "/real-inhouse-ca-dashboard";
+  if (effectivePersona === "ca_firm") return "/ca-firm-dashboard";
   if (effectivePersona === "company_owner") return "/real-company-dashboard";
 
   if (roles.includes("admin")) return "/admin-dashboard";
@@ -49,12 +51,14 @@ const RoleLandingRoute = () => {
   const [forceResolve, setForceResolve] = useState(false);
   const metadataPersona = inferPersonaFromMetadata(user?.user_metadata?.registration_role);
   const previewPersona = VERIFICATION_OPTIONAL_FOR_NOW ? getLocalPreviewPersona() : null;
-  const effectivePersona = persona ?? metadataPersona ?? previewPersona;
+  // localRole (registration form) takes priority over previewPersona (demo PersonaSelector)
+  const localRole = (localStorage.getItem("current_user_role") || localStorage.getItem("pending_registration_role")) as AppPersona | null;
+  const effectivePersona = persona ?? metadataPersona ?? localRole ?? previewPersona;
   const effectiveRoles = roles.length > 0
     ? roles
     : previewPersona
       ? [personaToFallbackRole(previewPersona)]
-      : [];
+      : localRole ? [personaToFallbackRole(localRole)] : [];
 
   useEffect(() => {
     if (!loading) return;

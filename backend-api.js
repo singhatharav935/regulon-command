@@ -8,7 +8,8 @@ import express from 'express';
 import cors from 'cors';
 import dotenv from 'dotenv';
 import crypto from 'crypto';
-
+import fs from 'fs';
+import path from 'path';
 dotenv.config();
 
 const app = express();
@@ -33,18 +34,96 @@ app.use((req, res, next) => {
 // IN-MEMORY DATABASE (Replace with PostgreSQL/Supabase in production)
 // ============================================================================
 
+const DB_FILE = path.join(process.cwd(), 'database.json');
+
+// Real-Time Autobackup Interceptor
+function createPersistentMap(name) {
+  const map = new Map();
+  // We use immediate timeouts to prevent block-locking on mass inserts
+  let saveTimeout = null;
+
+  const triggerSave = () => {
+    if (saveTimeout) clearTimeout(saveTimeout);
+    saveTimeout = setTimeout(() => {
+      saveDatabase();
+    }, 100);
+  };
+
+  const originalSet = map.set.bind(map);
+  const originalDelete = map.delete.bind(map);
+  const originalClear = map.clear.bind(map);
+  
+  map.set = function(key, value) {
+    const result = originalSet(key, value);
+    triggerSave();
+    return result;
+  };
+  
+  map.delete = function(key) {
+    const result = originalDelete(key);
+    triggerSave();
+    return result;
+  };
+
+  map.clear = function() {
+    originalClear();
+    triggerSave();
+  };
+  
+  return map;
+}
+
 const db = {
-  users: new Map(),
-  workspaces: new Map(),
-  alerts: new Map(),
-  tasks: new Map(),
-  documents: new Map(),
-  auditLogs: new Map(),
-  sessions: new Map(),
+  users: createPersistentMap('users'),
+  workspaces: createPersistentMap('workspaces'),
+  alerts: createPersistentMap('alerts'),
+  tasks: createPersistentMap('tasks'),
+  documents: createPersistentMap('documents'),
+  auditLogs: createPersistentMap('auditLogs'),
+  sessions: createPersistentMap('sessions'),
 };
+
+function saveDatabase() {
+  try {
+    const store = {};
+    for (const [key, map] of Object.entries(db)) {
+      store[key] = Array.from(map.entries());
+    }
+    fs.writeFileSync(DB_FILE, JSON.stringify(store, null, 2));
+    // console.log(`[Database] File saved successfully (${Object.keys(store).length} tables)`);
+  } catch(e) {
+    console.error("[Database] Auto-save error:", e);
+  }
+}
+
+function loadDatabase() {
+  if (fs.existsSync(DB_FILE)) {
+    try {
+      const data = JSON.parse(fs.readFileSync(DB_FILE, 'utf8'));
+      for (const [key, entries] of Object.entries(data)) {
+        if (db[key]) {
+          for (const [k, v] of entries) {
+            // Bypass setter specifically during init so we don't recursive trigger
+            Map.prototype.set.call(db[key], k, v);
+          }
+        }
+      }
+      return true;
+    } catch (e) {
+      console.error("[Database] Corrupt load file:", e);
+    }
+  }
+  return false;
+}
 
 // Sample data initialization
 function initializeSampleData() {
+  if (loadDatabase()) {
+    console.log("[Data Soul] Success: Local persistent schema loaded from disk.");
+    return;
+  }
+  console.log("[Data Soul] Empty Database. Writing initial system state...");
+
   // Sample admin user
   const adminId = 'user-001';
   db.users.set(adminId, {

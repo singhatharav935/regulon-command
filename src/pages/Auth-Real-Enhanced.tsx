@@ -87,14 +87,18 @@ const AuthReal = () => {
     if (role) setRegistrationRole(role);
   }, [searchParams]);
 
-  // Check if user needs email verification
+  // Check if user needs email verification — but NEVER hijack a fresh signup/register URL
   useEffect(() => {
+    const urlMode = searchParams.get("mode");
+    // If the user is explicitly trying to register/sign up, don't interrupt them
+    // with a verification screen for a stale old user from a previous session.
+    if (urlMode === "signup" || urlMode === "register" || urlMode === "multi-step") return;
     const user = enhancedAuth.getCurrentUser();
     if (user && !user.email_verified && mode !== 'email-verification') {
       setMode('email-verification');
       setCurrentUser(user);
     }
-  }, [mode]);
+  }, [mode, searchParams]);
 
   const roleOptions = [
     { value: "company_owner", label: "Company Owner", icon: Building2, description: "Business owner needing compliance management" },
@@ -110,12 +114,11 @@ const AuthReal = () => {
     console.log('getDashboardRoute called with role:', role);
     switch (role) {
       case "external_ca":
-        console.log('  -> returning /real-external-ca-dashboard');
         return "/real-external-ca-dashboard";
       case "in_house_ca":
+        return "/real-inhouse-ca-dashboard";
       case "ca_firm":
-        console.log('  -> returning /ca-dashboard');
-        return "/ca-dashboard";
+        return "/ca-firm-dashboard";
       case "admin":
         console.log('  -> returning /admin-dashboard');
         return "/admin-dashboard";
@@ -145,15 +148,25 @@ const AuthReal = () => {
         description: "You've been logged in successfully",
       });
 
+      // Determine the effective role:
+      // If localStorage has a freshly-set role (from a recent registration),
+      // prefer it over what the backend might have stored for an old account.
+      const freshLocalRole = localStorage.getItem('current_user_role');
+      const effectiveRole = freshLocalRole || response.user.registration_role;
+
+      // Keep localStorage in sync with the real role
+      localStorage.setItem('current_user_role', effectiveRole);
+      localStorage.setItem('pending_registration_role', effectiveRole);
+
       // Check if user needs email verification
       if (!response.user.email_verified) {
-        setCurrentUser(response.user);
+        setCurrentUser({...response.user, registration_role: effectiveRole});
         setMode('email-verification');
         return;
       }
 
       // Navigate to appropriate dashboard
-      const redirectTo = (location.state as any)?.from || getDashboardRoute(response.user.registration_role);
+      const redirectTo = (location.state as any)?.from || getDashboardRoute(effectiveRole);
       navigate(redirectTo);
     } catch (error: any) {
       console.error("Login error:", error);
@@ -195,7 +208,13 @@ const AuthReal = () => {
         // Store user info
         localStorage.setItem('pending_registration_role', registrationRole);
         localStorage.setItem('current_user_role', registrationRole);
+        // Clear ALL stale auth keys that could contaminate the new role
+        localStorage.removeItem('regulon:local-preview-auth');
+        localStorage.removeItem('regulon_user');         // clears enhancedAuth stale user
+        localStorage.removeItem('regulon_auth_token');   // clears any old backend session
+        localStorage.removeItem('regulon_session');
         
+
         // For company_owner, store company ID for real dashboard
         if (registrationRole === 'company_owner') {
           const localCompanyId = `company-${Date.now()}-${Math.random().toString(36).substr(2, 9)}`;
@@ -313,7 +332,13 @@ const AuthReal = () => {
         console.log("14. Storing role in localStorage:", formData.registrationRole);
         localStorage.setItem('pending_registration_role', formData.registrationRole);
         localStorage.setItem('current_user_role', formData.registrationRole);
+        // Clear ALL stale auth keys that could contaminate the new role
+        localStorage.removeItem('regulon:local-preview-auth');
+        localStorage.removeItem('regulon_user');         // clears enhancedAuth stale user
+        localStorage.removeItem('regulon_auth_token');   // clears any old backend session
+        localStorage.removeItem('regulon_session');
         
+
         // Get the correct dashboard route based on role
         const dashboardRoute = getDashboardRoute(formData.registrationRole);
         console.log('15a. formData.registrationRole is:', JSON.stringify(formData.registrationRole));

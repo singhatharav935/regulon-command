@@ -1,4 +1,5 @@
 import { useState, useEffect, useCallback } from 'react';
+import { CASectionAgentBadge } from '../agents/CASectionAgentBadge';
 import { motion, AnimatePresence } from 'framer-motion';
 import {
   BarChart3,
@@ -89,6 +90,7 @@ interface CAAnalyticsProps {
   caId?: string;
 }
 
+
 // Demo data for CA Demo Dashboard
 const DEMO_ANALYTICS: CAAnalytics = {
   tasks_completed: 42,
@@ -131,6 +133,7 @@ const DEMO_ANALYTICS: CAAnalytics = {
 
 // Helper functions
 const formatCurrency = (amount: number) => {
+
   if (amount >= 100000) return `₹${(amount / 100000).toFixed(1)}L`;
   if (amount >= 1000) return `₹${(amount / 1000).toFixed(1)}K`;
   return `₹${amount}`;
@@ -144,7 +147,7 @@ const getPerformanceColor = (score: number, threshold: { good: number; medium: n
 
 export default function CAAnalyticsPerformance({
   isRealDashboard = false,
-  apiEndpoint = 'http://localhost:8001/api/v1/ca',
+  apiEndpoint = `${(import.meta.env.VITE_CA_API_BASE_URL as string) || 'http://localhost:3001'}/api/v1/ca`,
   caId = 'ca-001',
 }: CAAnalyticsProps) {
   const [analytics, setAnalytics] = useState<CAAnalytics | null>(null);
@@ -185,6 +188,7 @@ export default function CAAnalyticsPerformance({
       setAnalytics(DEMO_ANALYTICS);
     }
   }, [isRealDashboard, fetchAnalytics]);
+
 
   // Build performance chart data
   const buildPerformanceData = (data: CAAnalytics): PerformanceChartData[] => [
@@ -228,10 +232,13 @@ export default function CAAnalyticsPerformance({
                 <CardTitle className="text-xl flex items-center gap-2">
                   📊 CA Analytics & Performance
                   {isRealDashboard && (
-                    <Badge className="bg-green-500/20 text-green-400 text-xs">
-                      <Zap className="w-3 h-3 mr-1" />
-                      Live System
-                    </Badge>
+                    <>
+                      <CASectionAgentBadge agentId="A3_AUDIT" />
+                      <Badge className="bg-green-500/20 text-green-400 text-xs">
+                        <Zap className="w-3 h-3 mr-1" />
+                        Live System
+                      </Badge>
+                    </>
                   )}
                 </CardTitle>
                 <p className="text-sm text-muted-foreground mt-1">

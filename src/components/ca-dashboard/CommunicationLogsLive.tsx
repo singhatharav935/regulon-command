@@ -1,4 +1,5 @@
 import { useState, useEffect, useCallback } from 'react';
+import { CASectionAgentBadge } from '../agents/CASectionAgentBadge';
 import { motion, AnimatePresence } from 'framer-motion';
 import {
   MessageSquare,
@@ -65,78 +66,7 @@ interface CommunicationLogsProps {
   caId?: string;
 }
 
-// Demo data for CA Demo Dashboard
-const DEMO_LOGS: CommunicationLog[] = [
-  {
-    id: 'log-demo-1',
-    type: 'message',
-    direction: 'incoming',
-    company_id: 'acme-001',
-    company_name: 'Acme Technologies Pvt Ltd',
-    subject: 'MGT-7 Filing Clarification',
-    content: 'Requested clarification on MGT-7 filing requirements for the current year. Need to know about the new format.',
-    sender: 'Director - Acme',
-    status: 'unread',
-    priority: 'high',
-    category: 'query',
-    timestamp: new Date(Date.now() - 2 * 60 * 60 * 1000).toISOString(),
-  },
-  {
-    id: 'log-demo-2',
-    type: 'email',
-    direction: 'outgoing',
-    company_id: 'data-001',
-    company_name: 'DataSync Analytics',
-    subject: 'Filing Confirmation: GST-3B',
-    content: 'GST-3B for DataSync Analytics submitted successfully. ARN: GSTN2026040112345',
-    recipient: 'accounts@datasync.com',
-    status: 'read',
-    priority: 'medium',
-    category: 'filing',
-    timestamp: new Date(Date.now() - 5 * 60 * 60 * 1000).toISOString(),
-  },
-  {
-    id: 'log-demo-3',
-    type: 'reminder',
-    direction: 'outgoing',
-    company_id: 'global-001',
-    company_name: 'GlobalTrade India Ltd',
-    subject: 'Pending Bank Statements',
-    content: 'Reminder sent to GlobalTrade India for pending bank statements required for reconciliation.',
-    recipient: 'finance@globaltrade.in',
-    status: 'read',
-    priority: 'medium',
-    category: 'reminder',
-    timestamp: new Date(Date.now() - 24 * 60 * 60 * 1000).toISOString(),
-  },
-  {
-    id: 'log-demo-4',
-    type: 'escalation',
-    direction: 'system',
-    company_id: 'data-001',
-    company_name: 'DataSync Analytics',
-    subject: 'Director KYC Delay Escalation',
-    content: 'Director KYC delay for DataSync Analytics escalated to admin. Pending for 15 days.',
-    status: 'read',
-    priority: 'high',
-    category: 'alert',
-    timestamp: new Date(Date.now() - 2 * 24 * 60 * 60 * 1000).toISOString(),
-  },
-  {
-    id: 'log-demo-5',
-    type: 'message',
-    direction: 'incoming',
-    company_id: 'secure-001',
-    company_name: 'SecurePay Solutions',
-    subject: 'RBI Compliance Certificate',
-    content: 'Approved RBI compliance certificate draft. Please proceed with final submission.',
-    sender: 'CEO - SecurePay',
-    status: 'replied',
-    priority: 'low',
-    category: 'compliance',
-    timestamp: new Date(Date.now() - 3 * 24 * 60 * 60 * 1000).toISOString(),
-  },
-];
+
 
 // Type icons and colors
 const getTypeConfig = (type: string) => {
@@ -179,9 +109,11 @@ const getPriorityIndicator = (priority: string) => {
 
 export default function CommunicationLogs({
   isRealDashboard = false,
-  apiEndpoint = 'http://localhost:8001/api/v1/ca',
   caId = 'ca-001',
 }: CommunicationLogsProps) {
+  const apiEndpoint = (import.meta.env.VITE_CA_API_BASE_URL as string) || 'http://localhost:3001';
+  const CA_API = `${apiEndpoint}/api/v1/ca`;
+  
   const [logs, setLogs] = useState<CommunicationLog[]>([]);
   const [filteredLogs, setFilteredLogs] = useState<CommunicationLog[]>([]);
   const [loading, setLoading] = useState(false);
@@ -214,12 +146,12 @@ export default function CommunicationLogs({
     setLoading(true);
     setAiAnalyzing(true);
     try {
-      const response = await fetch(`${apiEndpoint}/${caId}/communication-logs`);
+      const response = await fetch(`${CA_API}/communications/logs?client_id=${caId}`);
       if (response.ok) {
-        const data = await response.json();
-        if (data.logs && data.logs.length > 0) {
-          setLogs(data.logs);
-          setFilteredLogs(data.logs);
+        const json = await response.json();
+        if (json.data && json.data.length > 0) {
+          setLogs(json.data);
+          setFilteredLogs(json.data);
         }
       }
     } catch (error) {
@@ -229,16 +161,11 @@ export default function CommunicationLogs({
       setLastSync(new Date());
       setTimeout(() => setAiAnalyzing(false), 1500);
     }
-  }, [isRealDashboard, apiEndpoint, caId]);
+  }, [isRealDashboard, CA_API, caId]);
 
-  // Load initial data
+  // Load initial data — always fetch from real API
   useEffect(() => {
-    if (isRealDashboard) {
-      fetchLogs();
-    } else {
-      setLogs(DEMO_LOGS);
-      setFilteredLogs(DEMO_LOGS);
-    }
+    fetchLogs();
   }, [isRealDashboard, fetchLogs]);
 
   // Apply filters
@@ -305,6 +232,7 @@ export default function CommunicationLogs({
               <div>
                 <CardTitle className="text-xl flex items-center gap-2">
                   💬 Communication & Logs
+                  <CASectionAgentBadge agentId="M2_TRACKER" />
                   {isRealDashboard && (
                     <Badge className="bg-green-500/20 text-green-400 text-xs">
                       <Zap className="w-3 h-3 mr-1" />

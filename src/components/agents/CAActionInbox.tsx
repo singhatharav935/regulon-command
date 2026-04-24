@@ -17,12 +17,12 @@ import { Button } from '@/components/ui/button';
 import { 
   Inbox, FileText, AlertTriangle, CheckCircle, Scale, Bell,
   ChevronRight, Settings2, Eye, Sparkles, Shield, ExternalLink,
-  Clock, Building, RefreshCw, Filter, Archive
+  Clock, Building, RefreshCw, Filter, Archive, Activity
 } from 'lucide-react';
 import { useCAAgentOrchestrator } from './CAAgentOrchestrator';
 import { useNavigate } from 'react-router-dom';
 
-type ActionType = 'draft_ready' | 'risk_alert' | 'reconciliation' | 'filing_ready' | 'dependency' | 'regulatory';
+type ActionType = 'draft_ready' | 'risk_alert' | 'reconciliation' | 'filing_ready' | 'dependency' | 'regulatory' | 'consensus_check' | 'issue_ticket' | 'consensus_failure';
 
 interface ActionItem {
   id: string;
@@ -44,26 +44,29 @@ const ACTION_TYPE_CONFIG: Record<ActionType, { icon: React.ComponentType<any>; c
   filing_ready:   { icon: CheckCircle, color: 'text-green-400', bgColor: 'bg-green-500/10', label: 'Filing Ready' },
   dependency:     { icon: Clock, color: 'text-orange-400', bgColor: 'bg-orange-500/10', label: 'Dependency' },
   regulatory:     { icon: Shield, color: 'text-cyan-400', bgColor: 'bg-cyan-500/10', label: 'Regulatory' },
+  consensus_check: { icon: CheckCircle, color: 'text-emerald-400', bgColor: 'bg-emerald-500/10', label: 'Consensus Reached' },
+  issue_ticket:   { icon: Activity, color: 'text-amber-400', bgColor: 'bg-amber-500/10', label: 'Issue Ticket' },
+  consensus_failure: { icon: AlertTriangle, color: 'text-red-500', bgColor: 'bg-red-500/10', label: 'Consensus Failed' },
 };
 
 const PRIORITY_STYLES: Record<string, string> = {
   critical: 'border-l-red-500 bg-red-500/5',
   high: 'border-l-orange-500 bg-orange-500/5',
   medium: 'border-l-yellow-500',
-  low: 'border-l-slate-500',
+  low: 'border-l-cyan-500/50',
 };
 
 export const CAActionInbox = () => {
   const navigate = useNavigate();
-  const { state } = useCAAgentOrchestrator();
+  const { agents, messages, isRunning, systemStatus } = useCAAgentOrchestrator();
   const [filter, setFilter] = useState<'all' | ActionType>('all');
 
-  const activeAgentCount = state.agents.filter(a => 
+  const activeAgentCount = agents.filter(a => 
     a.status === 'active' || a.status === 'working' || a.status === 'analyzing'
   ).length;
 
   // Convert agent messages into actionable inbox items
-  const actionItems: ActionItem[] = state.messages
+  const actionItems: ActionItem[] = messages
     .filter(m => !m.acknowledged)
     .map((msg): ActionItem => {
       let type: ActionType = 'regulatory';
@@ -73,6 +76,9 @@ export const CAActionInbox = () => {
       else if (msg.type === 'CLIENT_UPDATE') type = 'dependency';
       else if (msg.type === 'DEADLINE_WARNING') type = 'risk_alert';
       else if (msg.type === 'INSIGHT_SHARE') type = 'reconciliation';
+      else if (msg.type === 'CONSENSUS_REACHED') type = 'consensus_check';
+      else if (msg.type === 'CONSENSUS_FAILED') type = 'consensus_failure';
+      else if (msg.type === 'ISSUE_TICKET_GENERATED') type = 'issue_ticket';
 
       return {
         id: msg.id,
@@ -82,7 +88,7 @@ export const CAActionInbox = () => {
         description: msg.content,
         priority: msg.priority,
         timestamp: msg.timestamp,
-        actionLabel: type === 'draft_ready' ? 'Review Draft' : type === 'risk_alert' ? 'View Alert' : 'Take Action',
+        actionLabel: type === 'consensus_failure' ? 'Review Ticket' : type === 'draft_ready' ? 'Review Draft' : 'View Logs',
         read: msg.acknowledged,
       };
     });
@@ -90,9 +96,9 @@ export const CAActionInbox = () => {
   const filteredItems = filter === 'all' ? actionItems : actionItems.filter(i => i.type === filter);
   const unreadCount = actionItems.filter(i => !i.read).length;
 
-  const emptyStateMessage = state.isRunning 
+  const emptyStateMessage = isRunning
     ? 'All 12 agents are actively monitoring. Results will appear here as they are generated.'
-    : 'Agents are paused. Start the Auto-Pilot to begin monitoring.';
+    : 'Agents are paused. Press Start All to begin the swarm consensus engine.';
 
   return (
     <motion.div

@@ -1,4 +1,5 @@
 import React, { useState, useEffect } from 'react';
+import { CASectionAgentBadge } from '../agents/CASectionAgentBadge';
 import { motion } from 'framer-motion';
 import {
   Building2,
@@ -15,9 +16,11 @@ import {
   Zap,
   Bot,
   Activity,
+  MessageSquareWarning
 } from 'lucide-react';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
+import { useAICommunication } from '@/store/useAICommunication';
 import {
   Select,
   SelectContent,
@@ -46,54 +49,17 @@ interface ClientDependencyTrackerProps {
   aiEnabled?: boolean;
 }
 
-// Demo data for CA Demo Dashboard
-const DEMO_DEPENDENCIES: Dependency[] = [
-  {
-    id: 'dep-001',
-    document_name: '📋 PAN Card Copy',
-    client_name: 'ABC Corporation',
-    contact_person: 'Rajesh Kumar',
-    contact_phone: '+91-9876543210',
-    request_date: new Date(Date.now() - 15 * 24 * 60 * 60 * 1000).toISOString(),
-    status: 'pending',
-    description: 'Required for opening bank account and compliance filing',
-    last_reminder_sent: new Date(Date.now() - 5 * 24 * 60 * 60 * 1000).toISOString(),
-    last_reminder_type: 'email',
-    urgency: 'high',
-  },
-  {
-    id: 'dep-002',
-    document_name: '🏢 Registration Certificate',
-    client_name: 'XYZ Pvt Ltd',
-    contact_person: 'Priya Sharma',
-    contact_phone: '+91-8765432109',
-    request_date: new Date(Date.now() - 20 * 24 * 60 * 60 * 1000).toISOString(),
-    status: 'in_progress',
-    description: 'Awaiting certified copy from registrar office',
-    last_reminder_sent: new Date(Date.now() - 2 * 24 * 60 * 60 * 1000).toISOString(),
-    last_reminder_type: 'sms',
-    urgency: 'critical',
-  },
-  {
-    id: 'dep-003',
-    document_name: '📊 Balance Sheet (FY 2023-24)',
-    client_name: 'Tech Solutions Inc',
-    contact_person: 'Amit Patel',
-    contact_phone: '+91-7654321098',
-    request_date: new Date(Date.now() - 30 * 24 * 60 * 60 * 1000).toISOString(),
-    status: 'received',
-    description: 'Final audited balance sheet with audit report',
-    last_reminder_sent: new Date(Date.now() - 10 * 24 * 60 * 60 * 1000).toISOString(),
-    last_reminder_type: 'call',
-    urgency: 'medium',
-  },
-];
+const CA_API = (import.meta.env.VITE_CA_API_BASE_URL as string) || 'http://localhost:3001';
+
+// Demo data for fallback
+const DEMO_DEPENDENCIES: Dependency[] = [];
 
 export default function ClientDependencyTracker({
   isRealDashboard = false,
-  apiEndpoint = 'http://localhost:8001/api/v1/ca/ca-001/dependencies',
+  apiEndpoint = `${CA_API}/api/v1/ca/dependencies/pending`,
   aiEnabled = true,
 }: ClientDependencyTrackerProps) {
+
   const [dependencies, setDependencies] = useState<Dependency[]>([]);
   const [filteredDependencies, setFilteredDependencies] = useState<Dependency[]>([]);
   const [loading, setLoading] = useState(false);
@@ -105,6 +71,7 @@ export default function ClientDependencyTracker({
   });
   const [lastSync, setLastSync] = useState<Date | null>(null);
   const [isAutoSyncing, setIsAutoSyncing] = useState(false);
+  const { setActivePrompt, setDrawerOpen } = useAICommunication();
 
   // Load initial data
   useEffect(() => {
@@ -241,6 +208,28 @@ export default function ClientDependencyTracker({
     }
   };
 
+  const handleAIWhatsAppDraft = (dependency: Dependency) => {
+    // Generate AI context and open slider for WhatsApp link generation
+    const context = `
+SYSTEM DIRECTIVE:
+You are assisting a Senior CA in drafting a WhatsApp document request to a client.
+
+CLIENT DATA:
+- Client: ${dependency.client_name}
+- Person: ${dependency.contact_person}
+- Phone: ${dependency.contact_phone}
+- Missing Document: ${dependency.document_name}
+- Urgency Level: ${getDaysOverdue(dependency.request_date)} days overdue
+- Internal Notes: ${dependency.description || 'Standard compliance filing request'}
+
+ACTION REQUIRED:
+1. Draft a polite but firm WhatsApp message in English (and Hinglish if appropriate) demanding the document.
+2. Produce a URL-encoded \`https://wa.me/${dependency.contact_phone.replace(/\D/g, '')}?text=[ENCODED_MESSAGE]\` deep link that the CA can click to instantly launch WhatsApp Web/App.
+    `;
+    setActivePrompt(context);
+    setDrawerOpen(true);
+  };
+
   const stats = [
     {
       label: 'Total Pending',
@@ -277,16 +266,11 @@ export default function ClientDependencyTracker({
             <h2 className="text-2xl font-bold text-foreground">📦 Client Dependency Tracker</h2>
             {isRealDashboard && (
               <>
+                <CASectionAgentBadge agentId="R1_TAX" />
                 <div className="flex items-center gap-1 px-2 py-1 rounded-full bg-green-500/10 text-green-600 text-xs font-semibold">
                   <Zap className="w-3 h-3" />
                   Live System
                 </div>
-                {aiEnabled && (
-                  <div className="flex items-center gap-1 px-2 py-1 rounded-full bg-purple-500/10 text-purple-600 text-xs font-semibold">
-                    <Bot className="w-3 h-3" />
-                    AI Powered
-                  </div>
-                )}
               </>
             )}
           </div>
@@ -497,20 +481,20 @@ export default function ClientDependencyTracker({
                       </div>
                     </div>
 
-                    <div className="flex gap-2 flex-wrap">
-                      <Button size="sm" variant="outline">
-                        <Send className="w-3 h-3 mr-1" />
-                        Send SMS Reminder
-                      </Button>
-                      <Button size="sm" variant="outline">
-                        <Phone className="w-3 h-3 mr-1" />
-                        Call Client
-                      </Button>
-                      <Button size="sm" variant="outline">
-                        Mark as Received
-                      </Button>
-                    </div>
-                  </motion.div>
+                    <div className="flex gap-2 flex-wrap mt-2">
+                       <Button size="sm" variant="outline" onClick={(e) => { e.stopPropagation(); handleAIWhatsAppDraft(dependency); }} className="border-green-500/30 text-green-500 hover:bg-green-500/10">
+                         <MessageSquareWarning className="w-3 h-3 mr-1" />
+                         Ask AI to Draft WhatsApp
+                       </Button>
+                       <Button size="sm" variant="outline">
+                         <Phone className="w-3 h-3 mr-1" />
+                         Call Client
+                       </Button>
+                       <Button size="sm" variant="outline" className="border-blue-500/30 text-blue-500 hover:bg-blue-500/10">
+                         Mark as Received
+                       </Button>
+                     </div>
+                   </motion.div>
                 )}
               </motion.div>
             );

@@ -40,6 +40,7 @@ import {
   Loader,
 } from "lucide-react";
 import { toast } from "sonner";
+import { useAICommunication } from "@/store/useAICommunication";
 
 interface Task {
   id: string;
@@ -85,8 +86,8 @@ const RegulonAIAgent = () => {
   const [wakeWordDetected, setWakeWordDetected] = useState(false);
   const [listeningText, setListeningText] = useState("");
   const [dailyBrief, setDailyBrief] = useState("");
-  const [showBriefing, setShowBriefing] = useState(false);
   const [activeTab, setActiveTab] = useState("brief");
+  const { activePrompt, activeContext, isDrawerOpen } = useAICommunication();
 
   // Refs
   const recognitionRef = useRef<SpeechRecognition | null>(null);
@@ -197,6 +198,17 @@ const RegulonAIAgent = () => {
   useEffect(() => {
     fetchDailyBrief();
   }, []);
+
+  // Sync with global AI Store Context
+  useEffect(() => {
+    if (activePrompt && isDrawerOpen) {
+      setUserInput(activePrompt);
+      if (activeContext) {
+        addActivity("task", "Context Linked", `Analyzing payload: ${activeContext}`);
+      }
+      handleAgentQuery(activePrompt);
+    }
+  }, [activePrompt, activeContext, isDrawerOpen]);
 
   // Fetch Daily Brief from Backend
   const fetchDailyBrief = async () => {

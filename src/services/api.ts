@@ -3,7 +3,7 @@
  * Connects to Real Backend for CA Dashboard and other features
  */
 
-const API_BASE_URL = import.meta.env.VITE_API_URL || '/api';
+const API_BASE_URL = import.meta.env.VITE_API_URL ? `${import.meta.env.VITE_API_URL}/v1` : '/api/v1';
 
 // Get auth token from localStorage
 const getAuthToken = () => {

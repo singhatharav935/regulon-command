@@ -1,4 +1,5 @@
 import { motion } from "framer-motion";
+import { CASectionAgentBadge } from '../agents/CASectionAgentBadge';
 import { useEffect, useState } from "react";
 import { 
   FileText, 
@@ -31,60 +32,8 @@ import {
   TableRow,
 } from "@/components/ui/table";
 
-const demoTasks = [
-  { 
-    id: "demo_1",
-    company: "Acme Technologies Pvt Ltd", 
-    task: "Annual Return Filing (MGT-7)",
-    authority: "MCA",
-    dueDate: "Feb 15, 2026",
-    penalty: "₹1,00,000 + ₹100/day",
-    dependency: "Complete",
-    status: "pending",
-    urgency: "high",
-    days_remaining: 13,
-    filing_type: "MGT-7"
-  },
-  { 
-    id: "demo_2",
-    company: "GlobalTrade India Ltd", 
-    task: "GST-3B January Filing",
-    authority: "GST",
-    dueDate: "Feb 20, 2026",
-    penalty: "₹10,000/day + ₹50/day",
-    dependency: "Awaiting Data",
-    status: "pending",
-    urgency: "high",
-    days_remaining: 18,
-    filing_type: "GSTR-3B"
-  },
-  { 
-    id: "demo_3",
-    company: "SecurePay Solutions Pvt Ltd", 
-    task: "RBI Annual Certificate Renewal",
-    authority: "RBI",
-    dueDate: "Mar 31, 2026",
-    penalty: "License Suspension Risk",
-    dependency: "Complete",
-    status: "pending",
-    urgency: "medium",
-    days_remaining: 57,
-    filing_type: "RBI-AC"
-  },
-  { 
-    id: "demo_4",
-    company: "DataSync Analytics", 
-    task: "TDS Return Q4 FY 2025-26",
-    authority: "Income Tax",
-    dueDate: "Jan 31, 2026",
-    penalty: "₹200/day (Overdue)",
-    dependency: "Pending Verification",
-    status: "overdue",
-    urgency: "critical",
-    days_remaining: -1,
-    filing_type: "TDS Return"
-  }
-];
+
+const CA_API = (import.meta.env.VITE_CA_API_BASE_URL as string) || 'http://localhost:3001';
 
 interface TaskFilingManagementProps {
   isRealDashboard?: boolean;
@@ -94,12 +43,11 @@ interface TaskFilingManagementProps {
 
 const TaskFilingManagement = ({ 
   isRealDashboard = false, 
-  apiEndpoint, 
+  apiEndpoint = `${CA_API}/api/v1/ca/filings/dashboard`, 
   governmentIntegration = false 
 }: TaskFilingManagementProps) => {
-  // Start with empty tasks for real dashboard, demo data for demo dashboard
-  const [tasks, setTasks] = useState(isRealDashboard ? [] : demoTasks);
-  const [filteredTasks, setFilteredTasks] = useState(isRealDashboard ? [] : demoTasks);
+  const [tasks, setTasks] = useState<any[]>([]);
+  const [filteredTasks, setFilteredTasks] = useState<any[]>([]);
   const [isLoading, setIsLoading] = useState(false);
   const [filterAuthority, setFilterAuthority] = useState("all");
   const [filterUrgency, setFilterUrgency] = useState("all");
@@ -223,12 +171,9 @@ const TaskFilingManagement = ({
             <h2 className="text-xl font-semibold text-foreground">Task & Filing Management</h2>
             {isRealDashboard && (
               <>
+                <CASectionAgentBadge agentId="D2_REFINER" />
                 <Badge className="bg-green-500/10 text-green-400 border-green-500/30">
                   Advanced Live System
-                </Badge>
-                <Badge className="bg-purple-500/10 text-purple-400 border-purple-500/30">
-                  <Bot className="w-3 h-3 mr-1" />
-                  AI Auto-Detection
                 </Badge>
               </>
             )}

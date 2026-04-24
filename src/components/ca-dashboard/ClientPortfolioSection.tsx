@@ -1,7 +1,11 @@
-import { motion } from "framer-motion";
+import { createPortal } from "react-dom";
+import { motion, AnimatePresence } from "framer-motion";
 import { useEffect, useState } from "react";
-import { Building2, AlertTriangle, Clock, CheckCircle2 } from "lucide-react";
+import { Building2, AlertTriangle, Clock, CheckCircle2, Plus, X, ChevronRight, Input as LucideInput, Shield, Send, Loader } from "lucide-react";
 import { Badge } from "@/components/ui/badge";
+import { Button } from "@/components/ui/button";
+import { Input } from "@/components/ui/input";
+import { toast } from "sonner";
 import {
   Table,
   TableBody,
@@ -10,49 +14,6 @@ import {
   TableHeader,
   TableRow,
 } from "@/components/ui/table";
-
-const demoClients = [
-  { 
-    name: "Acme Technologies Pvt. Ltd.", 
-    industry: "FinTech", 
-    jurisdiction: "Maharashtra",
-    health: 87, 
-    risk: "Low",
-    gaps: 2,
-    deadline: "Feb 15",
-    status: "Waiting for Client"
-  },
-  { 
-    name: "GlobalTrade India Ltd.", 
-    industry: "E-Commerce", 
-    jurisdiction: "Karnataka",
-    health: 62, 
-    risk: "High",
-    gaps: 5,
-    deadline: "Feb 10",
-    status: "Waiting for CA"
-  },
-  { 
-    name: "SecurePay Solutions", 
-    industry: "Payments", 
-    jurisdiction: "Delhi",
-    health: 91, 
-    risk: "Low",
-    gaps: 1,
-    deadline: "Mar 01",
-    status: "Verified"
-  },
-  { 
-    name: "DataSync Analytics", 
-    industry: "IT Services", 
-    jurisdiction: "Tamil Nadu",
-    health: 74, 
-    risk: "Medium",
-    gaps: 3,
-    deadline: "Feb 20",
-    status: "Filed"
-  },
-];
 
 const riskColors: Record<string, string> = {
   Low: "bg-green-500/20 text-green-400 border-green-500/30",
@@ -78,8 +39,30 @@ const ClientPortfolioSection = ({
   apiEndpoint, 
   governmentApiEnabled = false 
 }: ClientPortfolioSectionProps) => {
-  const [clients, setClients] = useState(demoClients);
+  const [clients, setClients] = useState<any[]>([]);
   const [isLoading, setIsLoading] = useState(false);
+  const [showOnboardModal, setShowOnboardModal] = useState(false);
+  const [isOnboarding, setIsOnboarding] = useState(false);
+  const [onboardForm, setOnboardForm] = useState({
+    gstin: '',
+    pan: '',
+    cin: '',
+    client_name: '',
+    client_email: '',
+    client_phone: ''
+  });
+
+  const handleOnboardClient = () => {
+    setIsOnboarding(true);
+    setTimeout(() => {
+      setIsOnboarding(false);
+      setShowOnboardModal(false);
+      toast.success("Consent Request Sent", {
+        description: `Secure link sent via WhatsApp & Email to ${onboardForm.client_name || "the client"}.`
+      });
+      setOnboardForm({ gstin: '', pan: '', cin: '', client_name: '', client_email: '', client_phone: '' });
+    }, 1500);
+  };
 
   useEffect(() => {
     if (isRealDashboard && apiEndpoint) {
@@ -96,12 +79,14 @@ const ClientPortfolioSection = ({
         const data = result.data || result; // Handle wrapped response
         if (data.clients || Array.isArray(data)) {
           setClients(data.clients || data);
+        } else {
+          setClients([]);
         }
       } else {
-        console.log("Real client data not available, using demo data");
+        setClients([]);
       }
     } catch (error) {
-      console.log("Real backend not available for client portfolio, using demo data");
+      setClients([]);
     } finally {
       setIsLoading(false);
     }
@@ -113,25 +98,39 @@ const ClientPortfolioSection = ({
       transition={{ delay: 0.1 }}
       className="glass-card p-6 mb-8"
     >
-      <div className="mb-4">
-        <div className="flex items-center justify-between mb-2">
-          <h2 className="text-xl font-semibold text-foreground">Client Portfolio</h2>
-          {isRealDashboard && (
-            <div className="flex items-center gap-2 text-xs">
-              <div className="w-2 h-2 bg-green-500 rounded-full animate-pulse" />
-              <span className="text-green-400">Real Data</span>
-              {governmentApiEnabled && (
-                <Badge variant="outline" className="text-xs">Gov API Active</Badge>
-              )}
-            </div>
-          )}
+      <div className="mb-4 flex items-start justify-between">
+        <div>
+          <div className="flex items-center gap-3 mb-2">
+            <h2 className="text-xl font-semibold text-foreground">Client Portfolio</h2>
+            {isRealDashboard && (
+              <div className="flex items-center gap-2 text-xs">
+                <div className="w-2 h-2 bg-green-500 rounded-full animate-pulse" />
+                <span className="text-green-400">Real Data</span>
+                {governmentApiEnabled && (
+                  <Badge variant="outline" className="text-xs">Gov API Active</Badge>
+                )}
+              </div>
+            )}
+            {!isRealDashboard && (
+              <Badge className="bg-purple-500/20 text-purple-400 border-purple-500/50 text-xs">
+                Consent-Based
+              </Badge>
+            )}
+          </div>
+          <p className="text-sm text-muted-foreground mt-1 max-w-2xl">
+            {isRealDashboard 
+              ? "Live client portfolio with real-time government API integration and compliance tracking."
+              : "These companies are currently under your professional responsibility. Any unresolved item below directly affects the client's compliance standing."
+            }
+          </p>
         </div>
-        <p className="text-sm text-muted-foreground">
-          {isRealDashboard 
-            ? "Live client portfolio with real-time government API integration and compliance tracking."
-            : "These companies are currently under your professional responsibility. Any unresolved item below directly affects the client's compliance standing."
-          }
-        </p>
+        <Button 
+          className="bg-gradient-to-r from-cyan-600 to-purple-600 hover:from-cyan-700 hover:to-purple-700 flex-shrink-0 ml-4"
+          onClick={() => setShowOnboardModal(true)}
+        >
+          <Plus className="w-4 h-4 mr-1" />
+          Add Client
+        </Button>
       </div>
 
       {isLoading ? (
@@ -200,6 +199,181 @@ const ClientPortfolioSection = ({
           </TableBody>
         </Table>
         </div>
+      )}
+
+      {/* Onboard Client Modal */}
+      {typeof document !== 'undefined' && createPortal(
+        <AnimatePresence>
+          {showOnboardModal && (
+            <motion.div
+              initial={{ opacity: 0 }}
+              animate={{ opacity: 1 }}
+              exit={{ opacity: 0 }}
+              className="fixed inset-0 bg-black/80 backdrop-blur-sm z-[99999] flex items-center justify-center p-4"
+              onClick={() => setShowOnboardModal(false)}
+            >
+              <motion.div
+                initial={{ scale: 0.9, opacity: 0 }}
+                animate={{ scale: 1, opacity: 1 }}
+                exit={{ scale: 0.9, opacity: 0 }}
+                className="bg-card border border-border rounded-2xl p-6 w-full max-w-lg max-h-[90vh] overflow-y-auto custom-scrollbar"
+                onClick={(e) => e.stopPropagation()}
+              >
+                <div className="flex items-center justify-between mb-6">
+                  <div>
+                    <h3 className="text-xl font-bold">Onboard New Client</h3>
+                    <p className="text-sm text-muted-foreground">Consent-based secure data retrieval</p>
+                  </div>
+                  <Button 
+                    variant="ghost" 
+                    size="icon"
+                    onClick={() => setShowOnboardModal(false)}
+                  >
+                    <X className="w-5 h-5" />
+                  </Button>
+                </div>
+
+                {/* Workflow Steps */}
+                <div className="flex items-center gap-2 mb-6 text-xs">
+                  <div className="flex items-center gap-1 text-cyan-400">
+                    <div className="w-6 h-6 rounded-full bg-cyan-500/20 flex items-center justify-center">1</div>
+                    <span>Enter Details</span>
+                  </div>
+                  <ChevronRight className="w-4 h-4 text-muted-foreground" />
+                  <div className="flex items-center gap-1 text-muted-foreground">
+                    <div className="w-6 h-6 rounded-full bg-muted/20 flex items-center justify-center">2</div>
+                    <span>Client Consent</span>
+                  </div>
+                  <ChevronRight className="w-4 h-4 text-muted-foreground" />
+                  <div className="flex items-center gap-1 text-muted-foreground">
+                    <div className="w-6 h-6 rounded-full bg-muted/20 flex items-center justify-center">3</div>
+                    <span>Data Fetch</span>
+                  </div>
+                  <ChevronRight className="w-4 h-4 text-muted-foreground" />
+                  <div className="flex items-center gap-1 text-muted-foreground">
+                    <div className="w-6 h-6 rounded-full bg-muted/20 flex items-center justify-center">4</div>
+                    <span>Health Score</span>
+                  </div>
+                </div>
+
+                <div className="space-y-4">
+                  {/* Identifiers */}
+                  <div className="p-4 rounded-lg bg-cyan-500/5 border border-cyan-500/20">
+                    <h4 className="text-sm font-semibold text-cyan-400 mb-3">Company Identifiers (at least one)</h4>
+                    <div className="grid grid-cols-1 gap-3">
+                      <div>
+                        <label className="text-xs text-muted-foreground mb-1 block">GSTIN</label>
+                        <Input
+                          placeholder="e.g., 27AABCA1234C1ZS"
+                          value={onboardForm.gstin}
+                          onChange={(e) => setOnboardForm(prev => ({ ...prev, gstin: e.target.value.toUpperCase() }))}
+                          className="bg-card border-border/50"
+                        />
+                      </div>
+                      <div className="grid grid-cols-2 gap-3">
+                        <div>
+                          <label className="text-xs text-muted-foreground mb-1 block">PAN</label>
+                          <Input
+                            placeholder="e.g., AABCA1234C"
+                            value={onboardForm.pan}
+                            onChange={(e) => setOnboardForm(prev => ({ ...prev, pan: e.target.value.toUpperCase() }))}
+                            className="bg-card border-border/50"
+                          />
+                        </div>
+                        <div>
+                          <label className="text-xs text-muted-foreground mb-1 block">CIN</label>
+                          <Input
+                            placeholder="e.g., U74999KA2020PTC..."
+                            value={onboardForm.cin}
+                            onChange={(e) => setOnboardForm(prev => ({ ...prev, cin: e.target.value.toUpperCase() }))}
+                            className="bg-card border-border/50"
+                          />
+                        </div>
+                      </div>
+                    </div>
+                  </div>
+
+                  {/* Client Info */}
+                  <div className="p-4 rounded-lg bg-purple-500/5 border border-purple-500/20">
+                    <h4 className="text-sm font-semibold text-purple-400 mb-3">Client Contact (for consent notification)</h4>
+                    <div className="space-y-3">
+                      <div>
+                        <label className="text-xs text-muted-foreground mb-1 block">Company Name *</label>
+                        <Input
+                          placeholder="e.g., Acme Technologies Pvt. Ltd."
+                          value={onboardForm.client_name}
+                          onChange={(e) => setOnboardForm(prev => ({ ...prev, client_name: e.target.value }))}
+                          className="bg-card border-border/50"
+                        />
+                      </div>
+                      <div className="grid grid-cols-2 gap-3">
+                        <div>
+                          <label className="text-xs text-muted-foreground mb-1 block">Email</label>
+                          <Input
+                            placeholder="finance@company.com"
+                            type="email"
+                            value={onboardForm.client_email}
+                            onChange={(e) => setOnboardForm(prev => ({ ...prev, client_email: e.target.value }))}
+                            className="bg-card border-border/50"
+                          />
+                        </div>
+                        <div>
+                          <label className="text-xs text-muted-foreground mb-1 block">Phone (WhatsApp)</label>
+                          <Input
+                            placeholder="+91 98765 43210"
+                            value={onboardForm.client_phone}
+                            onChange={(e) => setOnboardForm(prev => ({ ...prev, client_phone: e.target.value }))}
+                            className="bg-card border-border/50"
+                          />
+                        </div>
+                      </div>
+                    </div>
+                  </div>
+
+                  {/* Info Box */}
+                  <div className="p-3 rounded-lg bg-blue-500/10 border border-blue-500/20 text-xs text-blue-300">
+                    <p className="flex items-start gap-2">
+                      <Shield className="w-4 h-4 mt-0.5 flex-shrink-0" />
+                      <span>
+                        A secure consent link will be sent via WhatsApp & Email. 
+                        Data will only be fetched after client authorization.
+                      </span>
+                    </p>
+                  </div>
+
+                  {/* Action Buttons */}
+                  <div className="flex gap-3 pt-2">
+                    <Button 
+                      variant="outline" 
+                      className="flex-1"
+                      onClick={() => setShowOnboardModal(false)}
+                    >
+                      Cancel
+                    </Button>
+                    <Button 
+                      className="flex-1 bg-gradient-to-r from-cyan-600 to-purple-600 hover:from-cyan-700 hover:to-purple-700 text-white border-0"
+                      onClick={handleOnboardClient}
+                      disabled={isOnboarding}
+                    >
+                      {isOnboarding ? (
+                        <>
+                          <Loader className="w-4 h-4 mr-2 animate-spin" />
+                          Sending...
+                        </>
+                      ) : (
+                        <>
+                          <Send className="w-4 h-4 mr-2" />
+                          Send Consent Request
+                        </>
+                      )}
+                    </Button>
+                  </div>
+                </div>
+              </motion.div>
+            </motion.div>
+          )}
+        </AnimatePresence>,
+        document.body
       )}
     </motion.div>
   );

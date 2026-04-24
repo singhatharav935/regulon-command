@@ -1,4 +1,5 @@
 import { useState, useEffect, useCallback } from 'react';
+import { CASectionAgentBadge } from '../agents/CASectionAgentBadge';
 import { motion, AnimatePresence } from 'framer-motion';
 import {
   Shield,
@@ -74,65 +75,7 @@ interface AuditSupportProps {
   caId?: string;
 }
 
-// Demo data for CA Demo Dashboard
-const DEMO_AUDITS: AuditRecord[] = [
-  {
-    id: 'audit-demo-1',
-    company_id: 'acme-001',
-    company_name: 'Acme Technologies Pvt Ltd',
-    authority: 'Income Tax Department',
-    authority_type: 'income_tax',
-    scope: 'Assessment Year 2024-25',
-    audit_type: 'tax_audit',
-    documents_required: ['ITR', 'TDS Returns', 'Books of Accounts', 'Bank Statements'],
-    documents_submitted: ['ITR', 'TDS Returns'],
-    status: 'documents_requested',
-    deadline: '2026-04-30',
-    assigned_ca: 'Self',
-    priority: 'high',
-    notes: 'Notice u/s 143(2) received',
-    ai_recommendations: ['Prepare reconciliation statement', 'Verify TDS credits'],
-    created_at: '2026-03-15T10:00:00Z',
-    updated_at: '2026-04-01T14:30:00Z',
-  },
-  {
-    id: 'audit-demo-2',
-    company_id: 'global-001',
-    company_name: 'GlobalTrade India Ltd',
-    authority: 'GST Audit Team',
-    authority_type: 'gst',
-    scope: 'FY 2024-25 GST Compliance',
-    audit_type: 'compliance_audit',
-    documents_required: ['GSTR-1', 'GSTR-3B', 'E-way Bills', 'ITC Register'],
-    documents_submitted: ['GSTR-1', 'GSTR-3B', 'E-way Bills', 'ITC Register'],
-    status: 'under_review',
-    deadline: '2026-05-15',
-    assigned_ca: 'Self',
-    priority: 'medium',
-    ai_recommendations: ['ITC reconciliation pending', 'Check reverse charge entries'],
-    created_at: '2026-03-20T09:00:00Z',
-    updated_at: '2026-04-02T11:00:00Z',
-  },
-  {
-    id: 'audit-demo-3',
-    company_id: 'secure-001',
-    company_name: 'SecurePay Solutions',
-    authority: 'RBI Inspection Team',
-    authority_type: 'rbi',
-    scope: 'Annual RBI Inspection',
-    audit_type: 'inspection',
-    documents_required: ['Compliance Certificates', 'Transaction Logs', 'KYC Records'],
-    documents_submitted: [],
-    status: 'scheduled',
-    scheduled_date: '2026-04-20',
-    deadline: '2026-04-25',
-    assigned_ca: 'Self',
-    priority: 'critical',
-    ai_recommendations: ['Prepare compliance matrix', 'Review transaction limits'],
-    created_at: '2026-04-01T08:00:00Z',
-    updated_at: '2026-04-01T08:00:00Z',
-  },
-];
+
 
 // Status badges
 const getStatusBadge = (status: string) => {
@@ -177,7 +120,7 @@ const getAuthorityIcon = (type: string) => {
 
 export default function AuditInspectionSupport({
   isRealDashboard = false,
-  apiEndpoint = 'http://localhost:8001/api/v1/ca',
+  apiEndpoint = `${(import.meta.env.VITE_CA_API_BASE_URL as string) || 'http://localhost:3001'}/api/v1/ca`,
   caId = 'ca-001',
 }: AuditSupportProps) {
   const [audits, setAudits] = useState<AuditRecord[]>([]);
@@ -231,14 +174,9 @@ export default function AuditInspectionSupport({
     }
   }, [isRealDashboard, apiEndpoint, caId]);
 
-  // Load initial data
+  // Load initial data — always fetch from real API, no mock fallback
   useEffect(() => {
-    if (isRealDashboard) {
-      fetchAudits();
-    } else {
-      setAudits(DEMO_AUDITS);
-      setFilteredAudits(DEMO_AUDITS);
-    }
+    fetchAudits();
   }, [isRealDashboard, fetchAudits]);
 
   // Apply filters
@@ -298,10 +236,13 @@ export default function AuditInspectionSupport({
                 <CardTitle className="text-xl flex items-center gap-2">
                   🛡️ Audit, Inspection & Due Diligence Support
                   {isRealDashboard && (
-                    <Badge className="bg-green-500/20 text-green-400 text-xs">
-                      <Zap className="w-3 h-3 mr-1" />
-                      Live System
-                    </Badge>
+                    <>
+                      <CASectionAgentBadge agentId="D3_ALIGNER" />
+                      <Badge className="bg-green-500/20 text-green-400 text-xs">
+                        <Zap className="w-3 h-3 mr-1" />
+                        Live System
+                      </Badge>
+                    </>
                   )}
                 </CardTitle>
                 <p className="text-sm text-muted-foreground mt-1">

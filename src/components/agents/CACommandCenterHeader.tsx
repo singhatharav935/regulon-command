@@ -4,6 +4,8 @@
  * Premium header for the External CA Dashboard.
  * Shows practice metrics ring, agent swarm status, client count,
  * agent control buttons, and Regulon Auto-Pilot ON/OFF indicator.
+ * 
+ * Updated to use the new Swarm Consensus API.
  */
 
 import { useMemo } from 'react';
@@ -22,22 +24,16 @@ interface CACommandCenterHeaderProps {
 }
 
 export const CACommandCenterHeader = ({ title, subtitle }: CACommandCenterHeaderProps) => {
-  const { state, actions } = useCAAgentOrchestrator();
+  const { agents, messages, isRunning, systemStatus, startAllAgents, pauseAllAgents, emergencyStop } = useCAAgentOrchestrator();
 
-  const activeAgentCount = state.agents.filter(a => 
+  const activeAgentCount = agents.filter(a => 
     a.status === 'active' || a.status === 'working' || a.status === 'analyzing'
   ).length;
 
-  const alertCount = state.agents.filter(a => a.status === 'alert').length;
-  const isOnline = state.isRunning && activeAgentCount > 0;
-
-  const timeSinceSync = useMemo(() => {
-    const diff = Date.now() - new Date(state.lastSyncTime).getTime();
-    const mins = Math.floor(diff / 60000);
-    if (mins < 1) return 'Just now';
-    if (mins < 60) return `${mins}m ago`;
-    return `${Math.floor(mins / 60)}h ago`;
-  }, [state.lastSyncTime]);
+  const alertCount = agents.filter(a => a.status === 'alert').length;
+  const conflictsResolved = agents.reduce((sum, a) => sum + a.metrics.conflictsResolved, 0);
+  const totalMessages = messages.length;
+  const isOnline = isRunning && activeAgentCount > 0;
 
   // Practice utilization ring
   const utilizationPercent = Math.round((activeAgentCount / 12) * 100);
@@ -51,6 +47,8 @@ export const CACommandCenterHeader = ({ title, subtitle }: CACommandCenterHeader
       case 'active': return 'bg-green-400';
       case 'working': return 'bg-blue-400';
       case 'analyzing': return 'bg-cyan-400';
+      case 'consensus_check': return 'bg-violet-400';
+      case 'resolving_conflict': return 'bg-amber-400';
       case 'alert': return 'bg-red-400';
       case 'error': return 'bg-red-500';
       case 'paused': return 'bg-yellow-400';
@@ -106,10 +104,10 @@ export const CACommandCenterHeader = ({ title, subtitle }: CACommandCenterHeader
             <h1 className="text-xl font-bold text-foreground tracking-tight">{title || 'CA Practice Command Center'}</h1>
             <p className="text-xs text-muted-foreground flex items-center gap-1.5 mt-0.5">
               <Briefcase className="w-3 h-3 text-cyan-400" />
-              {subtitle || 'External CA — AI-Powered Practice Management'}
+              {subtitle || 'Swarm Consensus Architecture — 4 Groups × 3 Agents'}
             </p>
             <div className="flex items-center gap-2 mt-2 flex-wrap">
-              {/* Auto-Pilot ON/OFF Indicator — inside the header */}
+              {/* Auto-Pilot ON/OFF Indicator */}
               <motion.div
                 initial={{ opacity: 0, scale: 0.9 }}
                 animate={{ opacity: 1, scale: 1 }}
@@ -139,22 +137,22 @@ export const CACommandCenterHeader = ({ title, subtitle }: CACommandCenterHeader
               </motion.div>
 
               <Badge variant="outline" className="text-[10px]">
-                <Building className="w-2.5 h-2.5 mr-1" />
-                {state.totalClientsManaged} Clients
+                <Activity className="w-2.5 h-2.5 mr-1" />
+                {totalMessages} Wire Msgs
               </Badge>
               <Badge variant="outline" className="text-[10px]">
-                <Clock className="w-2.5 h-2.5 mr-1" />
-                Synced {timeSinceSync}
+                <Shield className="w-2.5 h-2.5 mr-1" />
+                {conflictsResolved} Conflicts Resolved
               </Badge>
             </div>
           </div>
         </div>
 
-        {/* Center: Agent Swarm */}
+        {/* Center: Agent Swarm Dots */}
         <div className="flex-1 flex flex-col items-center gap-2">
           <div className="flex items-center gap-1.5 text-xs text-muted-foreground">
             <Bot className="w-3.5 h-3.5 text-cyan-400" />
-            <span className="font-medium">Agent Swarm</span>
+            <span className="font-medium">Swarm Consensus</span>
             <span className="text-foreground font-bold">{activeAgentCount}/12</span>
             <span>Active</span>
             {alertCount > 0 && (
@@ -164,55 +162,64 @@ export const CACommandCenterHeader = ({ title, subtitle }: CACommandCenterHeader
             )}
           </div>
 
-          <div className="flex items-center gap-1.5">
-            {state.agents.map((agent) => (
-              <motion.div key={agent.id} className="group relative cursor-pointer" whileHover={{ scale: 1.3 }}>
-                <div className={`w-3 h-3 rounded-full ${statusDotColor(agent.status)} transition-colors`}>
-                  {(agent.status === 'active' || agent.status === 'working') && (
-                    <motion.div
-                      className={`absolute inset-0 rounded-full ${statusDotColor(agent.status)} opacity-50`}
-                      animate={{ scale: [1, 1.6, 1], opacity: [0.5, 0, 0.5] }}
-                      transition={{ duration: 2, repeat: Infinity, delay: Math.random() }}
-                    />
-                  )}
-                </div>
-                <div className="absolute bottom-full left-1/2 -translate-x-1/2 mb-2 opacity-0 group-hover:opacity-100 transition-opacity pointer-events-none z-20">
-                  <div className="bg-popover border border-border rounded-md px-2 py-1 text-[10px] whitespace-nowrap shadow-lg">
-                    <p className="font-bold text-foreground">{agent.name}</p>
-                    <p className="text-muted-foreground">{agent.currentTask}</p>
+          {/* Group Labels + Agent Dots */}
+          <div className="flex items-center gap-4">
+            {(['ANALYSER', 'DRAFTER', 'REVIEWER', 'MONITOR'] as const).map(groupId => {
+              const groupAgents = agents.filter(a => a.groupId === groupId);
+              const groupColor = groupId === 'ANALYSER' ? 'text-cyan-400' : groupId === 'DRAFTER' ? 'text-purple-400' : groupId === 'REVIEWER' ? 'text-amber-400' : 'text-emerald-400';
+              return (
+                <div key={groupId} className="flex flex-col items-center gap-1">
+                  <span className={`text-[9px] font-bold tracking-wider ${groupColor}`}>{groupId}</span>
+                  <div className="flex items-center gap-1">
+                    {groupAgents.map(agent => (
+                      <motion.div key={agent.id} className="group relative cursor-pointer" whileHover={{ scale: 1.3 }}>
+                        <div className={`w-3 h-3 rounded-full ${statusDotColor(agent.status)} transition-colors`}>
+                          {(agent.status === 'active' || agent.status === 'working' || agent.status === 'consensus_check') && (
+                            <motion.div
+                              className={`absolute inset-0 rounded-full ${statusDotColor(agent.status)} opacity-50`}
+                              animate={{ scale: [1, 1.6, 1], opacity: [0.5, 0, 0.5] }}
+                              transition={{ duration: 2, repeat: Infinity, delay: Math.random() }}
+                            />
+                          )}
+                        </div>
+                        <div className="absolute bottom-full left-1/2 -translate-x-1/2 mb-2 opacity-0 group-hover:opacity-100 transition-opacity pointer-events-none z-20">
+                          <div className="bg-popover border border-border rounded-md px-2 py-1 text-[10px] whitespace-nowrap shadow-lg">
+                            <p className="font-bold text-foreground">{agent.name}</p>
+                            <p className="text-muted-foreground">{agent.currentTask}</p>
+                          </div>
+                        </div>
+                      </motion.div>
+                    ))}
                   </div>
                 </div>
-              </motion.div>
-            ))}
+              );
+            })}
           </div>
 
           <div className="flex items-center gap-1.5 text-[10px] text-muted-foreground">
             <motion.div animate={{ opacity: [0.3, 1, 0.3] }} transition={{ duration: 1.5, repeat: Infinity }}>
               <Wifi className="w-3 h-3 text-cyan-400" />
             </motion.div>
-            <span>{state.totalMessagesExchanged} cross-wire msgs</span>
+            <span>{totalMessages} cross-wire msgs</span>
             <span className="text-border">•</span>
-            <span>{state.totalTasksCompleted} tasks done</span>
+            <span>{conflictsResolved} conflicts resolved</span>
             <span className="text-border">•</span>
-            <span>{state.systemUptime}% uptime</span>
+            <span>System: {systemStatus.toUpperCase()}</span>
           </div>
         </div>
 
-        {/* Right: Controls */}
+        {/* Right: Controls — Start / Pause / Emergency */}
         <div className="flex items-center gap-2">
-          <Button size="sm" variant="outline" onClick={actions.syncNow} className="text-xs h-8 border-cyan-500/20 hover:bg-cyan-500/10">
-            <RefreshCw className="w-3.5 h-3.5 mr-1.5" /> Sync
-          </Button>
-          {state.isRunning ? (
-            <Button size="sm" variant="outline" onClick={actions.pauseAllAgents} className="text-xs h-8 border-yellow-500/20 hover:bg-yellow-500/10 text-yellow-400">
-              <Pause className="w-3.5 h-3.5 mr-1.5" /> Pause
+          {isRunning ? (
+            <Button size="sm" variant="outline" onClick={pauseAllAgents} className="text-xs h-8 border-yellow-500/20 hover:bg-yellow-500/10 text-yellow-400">
+              <Pause className="w-3.5 h-3.5 mr-1.5" /> Pause All
             </Button>
           ) : (
-            <Button size="sm" onClick={actions.startAllAgents} className="text-xs h-8 bg-green-600 hover:bg-green-700">
-              <Play className="w-3.5 h-3.5 mr-1.5" /> Start
+            <Button size="sm" onClick={startAllAgents} className="text-xs h-8 bg-green-600 hover:bg-green-700">
+              <Play className="w-3.5 h-3.5 mr-1.5" /> Start All
             </Button>
           )}
-          <Button size="sm" variant="outline" onClick={actions.emergencyStop} className="text-xs h-8 border-red-500/20 hover:bg-red-500/10 text-red-400">
+          <Button size="sm" variant="outline" onClick={emergencyStop} className="text-xs h-8 border-red-500/20 hover:bg-red-500/10 text-red-400">
             <AlertOctagon className="w-3.5 h-3.5" />
           </Button>
         </div>

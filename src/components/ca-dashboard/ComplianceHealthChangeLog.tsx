@@ -1,4 +1,5 @@
 import { useState, useEffect, useCallback } from 'react';
+import { CASectionAgentBadge } from '../agents/CASectionAgentBadge';
 import { motion, AnimatePresence } from 'framer-motion';
 import {
   TrendingUp,
@@ -69,73 +70,7 @@ interface ComplianceHealthChangeLogProps {
   caId?: string;
 }
 
-// Demo data for CA Demo Dashboard
-const DEMO_CHANGE_LOGS: ComplianceChangeLog[] = [
-  {
-    id: 'demo-1',
-    company_id: 'acme-001',
-    company_name: 'Acme Technologies Pvt Ltd',
-    previous_score: 82,
-    current_score: 87,
-    change_percentage: 5,
-    change_type: 'increase',
-    reason: 'Annual Return (AOC-4) filed successfully before due date',
-    reason_category: 'filing_completed',
-    action_by: 'CA',
-    affected_compliance: ['MCA', 'ROC'],
-    timestamp: '2026-04-01T10:30:00Z',
-    ai_analysis: 'Excellent compliance improvement. Continue maintaining filing schedules.',
-    risk_impact: 'low',
-  },
-  {
-    id: 'demo-2',
-    company_id: 'global-001',
-    company_name: 'GlobalTrade India Ltd',
-    previous_score: 68,
-    current_score: 62,
-    change_percentage: -6,
-    change_type: 'decrease',
-    reason: 'GSTR-3B filing delayed beyond due date - Late fee applicable',
-    reason_category: 'filing_delayed',
-    action_by: 'Client',
-    affected_compliance: ['GST'],
-    timestamp: '2026-03-30T14:15:00Z',
-    ai_analysis: 'Urgent: Schedule immediate client follow-up to prevent further score degradation.',
-    risk_impact: 'high',
-  },
-  {
-    id: 'demo-3',
-    company_id: 'secure-001',
-    company_name: 'SecurePay Solutions',
-    previous_score: 91,
-    current_score: 91,
-    change_percentage: 0,
-    change_type: 'no_change',
-    reason: 'Monthly compliance review completed - No pending actions',
-    reason_category: 'audit_completed',
-    action_by: 'System',
-    affected_compliance: ['All'],
-    timestamp: '2026-03-28T09:00:00Z',
-    ai_analysis: 'Stable compliance. Monitor upcoming Q1 filings.',
-    risk_impact: 'none',
-  },
-  {
-    id: 'demo-4',
-    company_id: 'data-001',
-    company_name: 'DataSync Analytics',
-    previous_score: 70,
-    current_score: 74,
-    change_percentage: 4,
-    change_type: 'increase',
-    reason: 'TDS Return (Form 24Q) verification and rectification completed',
-    reason_category: 'document_updated',
-    action_by: 'CA',
-    affected_compliance: ['Income Tax', 'TDS'],
-    timestamp: '2026-03-25T16:45:00Z',
-    ai_analysis: 'Good progress. Review remaining TDS quarters for similar issues.',
-    risk_impact: 'low',
-  },
-];
+
 
 // Reason category badges
 const getReasonCategoryBadge = (category: string) => {
@@ -188,7 +123,7 @@ const getRiskImpactBadge = (risk: string | undefined) => {
 
 export default function ComplianceHealthChangeLog({
   isRealDashboard = false,
-  apiEndpoint = 'http://localhost:8001/api/v1/ca',
+  apiEndpoint = `${(import.meta.env.VITE_CA_API_BASE_URL as string) || 'http://localhost:3001'}/api/v1/ca`,
   caId = 'ca-001',
 }: ComplianceHealthChangeLogProps) {
   const [changeLogs, setChangeLogs] = useState<ComplianceChangeLog[]>([]);
@@ -243,15 +178,8 @@ export default function ComplianceHealthChangeLog({
 
   // Load initial data
   useEffect(() => {
-    if (isRealDashboard) {
-      // Real dashboard - no mock data, will be populated when companies are added
-      // Try to fetch from API
-      fetchChangeLogs();
-    } else {
-      // Demo mode - use sample data
-      setChangeLogs(DEMO_CHANGE_LOGS);
-      setFilteredLogs(DEMO_CHANGE_LOGS);
-    }
+    // Always fetch from real API — no mock fallback for the real dashboard
+    fetchChangeLogs();
   }, [isRealDashboard, fetchChangeLogs]);
 
   // Apply filters
@@ -328,10 +256,13 @@ export default function ComplianceHealthChangeLog({
                 <CardTitle className="text-xl flex items-center gap-2">
                   📊 Compliance Health Change Log
                   {isRealDashboard && (
-                    <Badge className="bg-green-500/20 text-green-400 text-xs">
-                      <Zap className="w-3 h-3 mr-1" />
-                      Live System
-                    </Badge>
+                    <>
+                      <CASectionAgentBadge agentId="A2_CROSS" />
+                      <Badge className="bg-green-500/20 text-green-400 text-xs">
+                        <Zap className="w-3 h-3 mr-1" />
+                        Live System
+                      </Badge>
+                    </>
                   )}
                 </CardTitle>
                 <p className="text-sm text-muted-foreground mt-1">

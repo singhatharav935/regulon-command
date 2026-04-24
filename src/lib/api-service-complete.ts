@@ -1,7 +1,7 @@
 import axios from 'axios';
 
 // API Configuration
-const API_BASE_URL = import.meta.env.VITE_API_BASE_URL || '/api';
+const API_BASE_URL = import.meta.env.VITE_CA_API_BASE_URL || import.meta.env.VITE_API_BASE_URL || 'http://localhost:3001';
 const API_VERSION = 'v1';
 const BASE_URL = `${API_BASE_URL}/api/${API_VERSION}`;
 
@@ -272,8 +272,8 @@ class APIService {
 
   async getCAClients() {
     try {
-      const response = await api.get('/ca/clients');
-      return response.data.clients;
+      const response = await api.get('/ca/clients/portfolio');
+      return response.data.data;
     } catch (error) {
       throw this.handleError(error);
     }

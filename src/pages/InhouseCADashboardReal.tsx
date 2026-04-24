@@ -66,11 +66,13 @@ import {
 import { toast } from "sonner";
 import useCAMetrics from "@/hooks/useCAMetrics";
 import { addCompany as addCompanyAPI } from "@/services/api";
-import { CAAgentOrchestratorProvider } from "@/components/agents/CAAgentOrchestrator";
+import { CAAgentProvider } from "@/components/agents/CAAgentOrchestrator";
 import { CACommandCenterHeader } from "@/components/agents/CACommandCenterHeader";
 import { CAActionInbox } from "@/components/agents/CAActionInbox";
 
 // Daily Governance Brief Component
+const CA_API = (import.meta.env.VITE_CA_API_BASE_URL as string) || 'http://localhost:3001';
+
 const DailyGovernanceBrief = () => {
   const [briefData, setBriefData] = useState(null);
   const [loading, setLoading] = useState(false);
@@ -79,7 +81,7 @@ const DailyGovernanceBrief = () => {
   const fetchDailyBrief = async () => {
     setLoading(true);
     try {
-      const response = await fetch('http://localhost:3001/api/ca/daily-governance');
+      const response = await fetch(`${CA_API}/api/ca/daily-governance`);
       const data = await response.json();
       setBriefData(data);
       setLastRefresh(new Date());
@@ -441,7 +443,7 @@ const LiveAIDraftingEngine = () => {
   // Fetch Regulatory News
   const fetchRegulatoryNews = async () => {
     try {
-      const response = await fetch('http://localhost:3001/api/ai-engine/regulatory-news');
+      const response = await fetch(`${CA_API}/api/ai-engine/regulatory-news`);
       const data = await response.json();
       if (data.news) {
         setRegulatoryNews(data.news);
@@ -457,7 +459,7 @@ const LiveAIDraftingEngine = () => {
   // Fetch Client Deadlines
   const fetchClientDeadlines = async () => {
     try {
-      const response = await fetch('http://localhost:3001/api/ai-engine/client-deadlines');
+      const response = await fetch(`${CA_API}/api/ai-engine/client-deadlines`);
       const data = await response.json();
       if (data.deadlines) {
         setClientDeadlines(data.deadlines);
@@ -1281,7 +1283,7 @@ const InhouseCADashboardReal = () => {
   const [chatDrawerOpen, setChatDrawerOpen] = useState(false);
 
   // Compliance Service API URL
-  const COMPLIANCE_API = 'http://localhost:8001/api/v1';
+  const COMPLIANCE_API = (import.meta.env.VITE_CA_API_BASE_URL as string) || 'http://localhost:3001';
 
   // Fetch CA's clients from compliance service
   const fetchClients = async () => {
@@ -1524,7 +1526,7 @@ const InhouseCADashboardReal = () => {
   };
 
   return (
-    <CAAgentOrchestratorProvider>
+    <CAAgentProvider>
     <div className="min-h-screen bg-background">
       <Navbar />
       
@@ -1745,7 +1747,7 @@ const InhouseCADashboardReal = () => {
                       demoMode={false}
                       isRealDashboard={true}
                       includeLawyerReview={true}
-                      apiEndpoint="http://localhost:3001/api/ca-dashboard"
+                      apiEndpoint={`${CA_API}/api/ca-dashboard`}
                       openaiIntegration={true}
                       realDocumentGeneration={true}
                     />
@@ -2341,14 +2343,14 @@ const InhouseCADashboardReal = () => {
           {/* Task & Filing Management - Auto-synced from Client Portfolio */}
           <TaskFilingManagement 
             isRealDashboard={true}
-            apiEndpoint="http://localhost:8001/api/v1/ca/inhouse-ca-001/tasks"
+            apiEndpoint={`${(import.meta.env.VITE_CA_API_BASE_URL as string) || 'http://localhost:3001'}/api/v1/ca/inhouse-ca-001/tasks`}
             governmentIntegration={true}
           />
 
           {/* Client Dependency Tracker - Document & Data Tracking */}
           <ClientDependencyTracker 
             isRealDashboard={true}
-            apiEndpoint="http://localhost:8001/api/v1/ca/inhouse-ca-001/dependencies"
+            apiEndpoint={`${(import.meta.env.VITE_CA_API_BASE_URL as string) || 'http://localhost:3001'}/api/v1/ca/inhouse-ca-001/dependencies`}
             aiEnabled={true}
           />
 
@@ -2361,7 +2363,7 @@ const InhouseCADashboardReal = () => {
           >
             <RegulatoryNewsRuleImpact
               isRealDashboard={true}
-              apiEndpoint="http://localhost:8001/api/v1/regulatory/news"
+              apiEndpoint={`${(import.meta.env.VITE_CA_API_BASE_URL as string) || 'http://localhost:3001'}/api/v1/ca/regulatory-news`}
               aiEnabled={true}
               caId="inhouse-ca-001"
             />
@@ -2377,7 +2379,7 @@ const InhouseCADashboardReal = () => {
             {/* Live Compliance Health Change Log Component */}
             <ComplianceHealthChangeLog
               isRealDashboard={true}
-              apiEndpoint="http://localhost:8001/api/v1/ca"
+              apiEndpoint={`${(import.meta.env.VITE_CA_API_BASE_URL as string) || 'http://localhost:3001'}/api/v1/ca`}
               caId={'inhouse-ca-001'}
             />
           </motion.div>
@@ -2494,7 +2496,7 @@ const InhouseCADashboardReal = () => {
         </motion.button>
       )}
     </div>
-    </CAAgentOrchestratorProvider>
+    </CAAgentProvider>
   );
 };
 

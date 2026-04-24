@@ -24,7 +24,7 @@ export const PERSONA_CONFIG: Record<PersonaType, PersonaConfig> = {
     description: 'Chartered Accountant - Audit multiple companies',
     icon: '🔍',
     color: 'bg-blue-500',
-    dashboardRoute: '/dashboards/external-ca',
+    dashboardRoute: '/real-external-ca-dashboard',
   },
   inhouse_ca: {
     id: 'inhouse_ca',
@@ -32,7 +32,7 @@ export const PERSONA_CONFIG: Record<PersonaType, PersonaConfig> = {
     description: 'Company Tax Officer - Manage single company compliance',
     icon: '📊',
     color: 'bg-green-500',
-    dashboardRoute: '/dashboards/inhouse-ca',
+    dashboardRoute: '/real-inhouse-ca-dashboard',
   },
   ca_firm: {
     id: 'ca_firm',

@@ -41,8 +41,11 @@ const ProtectedRoute = ({ children, allowRoles, allowPersonas, requireVerified =
   const previewRoles: AppRole[] = previewPersona ? [personaToFallbackRole(previewPersona)] : [];
   const effectiveRoles = roles.length > 0 ? roles : previewRoles;
   const fallbackPersona = inferPersonaFromMetadata(user?.user_metadata?.registration_role);
-  const effectivePersona = persona ?? fallbackPersona ?? previewPersona;
-  const hasAccessIdentity = Boolean(user) || Boolean(previewPersona);
+  // localRole (from registration form) takes priority OVER previewPersona (from demo PersonaSelector)
+  // This prevents a stale demo session from overriding a fresh real registration.
+  const localRole = (localStorage.getItem("current_user_role") || localStorage.getItem("pending_registration_role")) as AppPersona | null;
+  const effectivePersona = persona ?? fallbackPersona ?? localRole ?? previewPersona;
+  const hasAccessIdentity = Boolean(user) || Boolean(previewPersona) || Boolean(localRole);
   const unresolvedIdentity = hasAccessIdentity && !effectivePersona && effectiveRoles.length === 0;
 
   useEffect(() => {

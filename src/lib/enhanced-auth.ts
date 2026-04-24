@@ -100,7 +100,17 @@ class EnhancedAuthService {
       const userStr = localStorage.getItem('regulon_user');
       const sessionStr = localStorage.getItem('regulon_session');
       
-      if (userStr) this.currentUser = JSON.parse(userStr);
+      if (userStr) {
+        const parsedUser = JSON.parse(userStr);
+        // Respect the freshly-set current_user_role over any stale backend user role.
+        // This prevents a previously stored in_house_ca account from overriding
+        // a fresh external_ca registration that just happened.
+        const freshRole = localStorage.getItem('current_user_role');
+        if (freshRole && parsedUser.registration_role !== freshRole) {
+          parsedUser.registration_role = freshRole;
+        }
+        this.currentUser = parsedUser;
+      }
       if (sessionStr) this.currentSession = JSON.parse(sessionStr);
     } catch (error) {
       console.warn('Error loading stored auth:', error);

@@ -68,6 +68,31 @@ const AgentWorkReview = () => {
   const [savingLiveDraft, setSavingLiveDraft] = useState(false);
   const [liveEdit, setLiveEdit] = useState("");
   const isLiveReview = Boolean(draftRunId);
+  const [agentLogs, setAgentLogs] = useState<Array<{
+    id: string; job_id: string; task_type: string; client_name: string;
+    status: string; priority: string; result_summary: string; created_at: string;
+  }>>([]);
+  const [loadingAgentLogs, setLoadingAgentLogs] = useState(false);
+
+  // Fetch real agent logs from production backend
+  const loadAgentLogs = async () => {
+    setLoadingAgentLogs(true);
+    try {
+      const CA_API = (import.meta.env.VITE_CA_API_BASE_URL as string) || 'http://localhost:3001';
+      const token = user?.id ? localStorage.getItem(`sb-${user.id}-auth-token`) : null;
+      const headers: Record<string, string> = { 'Content-Type': 'application/json' };
+      if (token) headers['Authorization'] = `Bearer ${token}`;
+      const res = await fetch(`${CA_API}/api/v1/ca/agent/logs?limit=50`, { headers });
+      if (res.ok) {
+        const data = await res.json();
+        if (data.success) setAgentLogs(data.data || []);
+      }
+    } catch (e) {
+      console.log('Agent logs fetch skipped:', e);
+    } finally {
+      setLoadingAgentLogs(false);
+    }
+  };
 
   const loadLiveDraft = async () => {
     if (!draftRunId) return;
@@ -185,6 +210,12 @@ const AgentWorkReview = () => {
     void loadLiveDraft();
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [isLiveReview, draftRunId]);
+
+  // Also load live agent logs if not in live review mode
+  useEffect(() => {
+    if (!isLiveReview) void loadAgentLogs();
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [isLiveReview]);
 
   const portals = useMemo(
     () => Array.from(new Set((payload?.items || []).map((item) => item.portal))).filter(Boolean),
@@ -327,11 +358,57 @@ const AgentWorkReview = () => {
               </>
             )
           ) : !payload ? (
-            <Card className="glass-card border-border/40">
-              <CardContent className="p-6 text-sm text-muted-foreground">
-                No agent work found for this dashboard yet. Generate or load dashboard actions first.
-              </CardContent>
-            </Card>
+            <div className="space-y-4">
+              <Card className="glass-card border-border/40">
+                <CardHeader>
+                  <CardTitle className="flex items-center gap-2 flex-wrap">
+                    Live Agent Work Output
+                    <Badge variant="outline" className="text-xs border-green-500/40 text-green-400">
+                      {loadingAgentLogs ? 'Loading...' : agentLogs.length + ' jobs from backend'}
+                    </Badge>
+                  </CardTitle>
+                  <p className="text-sm text-muted-foreground">
+                    Real-time AI agent activity from the production backend. Review and approve tasks here.
+                  </p>
+                </CardHeader>
+              </Card>
+              {loadingAgentLogs ? (
+                <Card className="glass-card border-border/40">
+                  <CardContent className="p-6 text-sm text-muted-foreground">Loading agent logs from backend...</CardContent>
+                </Card>
+              ) : agentLogs.length === 0 ? (
+                <Card className="glass-card border-border/40">
+                  <CardContent className="p-6 text-sm text-muted-foreground">
+                    No agent jobs found yet. Deploy an AI agent from the CA Dashboard to see work here.
+                  </CardContent>
+                </Card>
+              ) : (
+                <div className="space-y-3">
+                  {agentLogs.map((log) => (
+                    <Card key={log.id} className="glass-card border-border/40">
+                      <CardHeader>
+                        <div className="flex flex-wrap items-center justify-between gap-2">
+                          <CardTitle className="text-base">{log.task_type.replace(/_/g, ' ')} · {log.client_name || 'N/A'}</CardTitle>
+                          <Badge variant="outline" className={
+                            log.status === 'completed' ? 'border-emerald-500/40 text-emerald-300' :
+                            log.status === 'queued' ? 'border-blue-500/40 text-blue-300' :
+                            'border-amber-500/40 text-amber-300'
+                          }>{log.status}</Badge>
+                        </div>
+                        <p className="text-xs text-muted-foreground">
+                          Job: {log.job_id} · Priority: {log.priority} · {new Date(log.created_at).toLocaleString()}
+                        </p>
+                      </CardHeader>
+                      {log.result_summary && (
+                        <CardContent>
+                          <p className="text-sm bg-background/40 rounded p-3 border border-border/40">{log.result_summary}</p>
+                        </CardContent>
+                      )}
+                    </Card>
+                  ))}
+                </div>
+              )}
+            </div>
           ) : (
             <>
               <Card className="glass-card border-border/40">
