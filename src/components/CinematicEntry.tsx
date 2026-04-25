@@ -1,7 +1,7 @@
 import { useState, useEffect, useRef, Suspense } from "react";
 import { motion, AnimatePresence } from "framer-motion";
 import { Canvas, useFrame } from "@react-three/fiber";
-import { Text, Center, Float, Environment } from "@react-three/drei";
+import { Text, Center, Float } from "@react-three/drei";
 import * as THREE from "three";
 
 interface CinematicEntryProps {
@@ -198,6 +198,9 @@ const CinematicEntry = ({ onComplete }: CinematicEntryProps) => {
               <Canvas
                 camera={{ position: [0, 0, 6], fov: 40 }}
                 dpr={[1, 2]}
+                onCreated={({ gl }) => {
+                  gl.setClearColor(new THREE.Color('#000000'), 0);
+                }}
               >
                 <ambientLight intensity={0.4} />
                 <spotLight
@@ -220,7 +223,6 @@ const CinematicEntry = ({ onComplete }: CinematicEntryProps) => {
                 <Particles />
                 <OrbitalRing radius={2.5} speed={0.3} color="#00d4ff" />
                 <OrbitalRing radius={3} speed={-0.2} color="#0088aa" />
-                <Environment preset="night" />
               </Canvas>
             </Suspense>
           </motion.div>
