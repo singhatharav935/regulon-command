@@ -1,0 +1,42 @@
+<!doctype html>
+<html lang="en">
+  <head>
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+    <title>REGULON | Compliance & Regulatory Command Platform</title>
+    <meta name="description" content="Enterprise-grade AI-powered compliance infrastructure. Complete regulatory coverage across MCA, GST, Income Tax, RBI & SEBI with human-verified execution." />
+    <meta name="author" content="REGULON" />
+
+    <meta property="og:title" content="REGULON | Compliance & Regulatory Command Platform" />
+    <meta property="og:description" content="AI-powered, human-verified regulatory execution for businesses. Complete compliance infrastructure." />
+    <meta property="og:type" content="website" />
+    <meta property="og:image" content="https://lovable.dev/opengraph-image-p98pqg.png" />
+
+    <meta name="twitter:card" content="summary_large_image" />
+    <meta name="twitter:site" content="@REGULON" />
+    <meta name="twitter:image" content="https://lovable.dev/opengraph-image-p98pqg.png" />
+  </head>
+
+  <body class="dark">
+    <div id="root"></div>
+    <script type="module">
+      const showBootstrapError = (message) => {
+        const root = document.getElementById("root");
+        if (!root) return;
+        root.innerHTML = `
+          <div style="min-height:100vh;background:#040b1a;color:#e5eefc;font-family:Inter,system-ui,sans-serif;display:flex;align-items:center;justify-content:center;padding:24px;">
+            <div style="width:100%;max-width:860px;border:1px solid #1f355d;border-radius:12px;padding:20px;background:#07122a;">
+              <h1 style="margin:0 0 10px 0;font-size:20px;">REGULON startup error</h1>
+              <p style="margin:0 0 12px 0;color:#9eb2d9;">App failed during bootstrap.</p>
+              <pre style="white-space:pre-wrap;word-break:break-word;margin:0;padding:12px;background:#030917;border-radius:8px;border:1px solid #1a2a49;color:#9ce9ff;font-size:12px;line-height:1.5;max-height:50vh;overflow:auto;">${message}</pre>
+            </div>
+          </div>
+        `;
+      };
+
+      import("/src/main.tsx").catch((error) => {
+        showBootstrapError(error?.message || "Failed to load /src/main.tsx");
+      });
+    </script>
+  </body>
+</html>
