@@ -52,16 +52,37 @@ const ClientPortfolioSection = ({
     client_phone: ''
   });
 
-  const handleOnboardClient = () => {
+  const handleOnboardClient = async () => {
     setIsOnboarding(true);
-    setTimeout(() => {
-      setIsOnboarding(false);
-      setShowOnboardModal(false);
-      toast.success("Consent Request Sent", {
-        description: `Secure link sent via WhatsApp & Email to ${onboardForm.client_name || "the client"}.`
+    try {
+      const response = await fetch('http://localhost:3001/api/v1/ca/client/onboard-communication', {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+          'Authorization': `Bearer ${localStorage.getItem('auth_token') || 'test-token'}`
+        },
+        body: JSON.stringify(onboardForm)
       });
-      setOnboardForm({ gstin: '', pan: '', cin: '', client_name: '', client_email: '', client_phone: '' });
-    }, 1500);
+      
+      const data = await response.json();
+      
+      if (response.ok) {
+        toast.success("Consent Request Sent Securely", {
+          description: `Live tracking: Link sent via WhatsApp (${data.provider || 'Twilio Sandbox'}) & Email to ${onboardForm.client_name || "the client"}.`
+        });
+        if (isRealDashboard && apiEndpoint) {
+          loadRealClientData(); // Refresh table
+        }
+        setShowOnboardModal(false);
+        setOnboardForm({ gstin: '', pan: '', cin: '', client_name: '', client_email: '', client_phone: '' });
+      } else {
+        toast.error("Failed to send consent request", { description: data.error || "Unknown server error" });
+      }
+    } catch (error) {
+      toast.error("API Gateway Disconnected", { description: "Cannot reach Regulon Backend Server on Port 3001." });
+    } finally {
+      setIsOnboarding(false);
+    }
   };
 
   useEffect(() => {
