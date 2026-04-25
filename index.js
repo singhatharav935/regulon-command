@@ -2,8 +2,13 @@ import axios from "axios";
 import * as cheerio from "cheerio";
 import express from "express";
 import https from "node:https";
+import path from "node:path";
+import { fileURLToPath } from "node:url";
 
-const PORT = Number(process.env.ALERT_AGENT_PORT || 8787);
+const __filename = fileURLToPath(import.meta.url);
+const __dirname = path.dirname(__filename);
+
+const PORT = Number(process.env.PORT || process.env.ALERT_AGENT_PORT || 8787);
 const FETCH_TIMEOUT_MS = 25000;
 const FETCH_RETRIES = 3;
 const ALLOW_INSECURE_TLS = (process.env.ALLOW_INSECURE_PIB_TLS || "true").toLowerCase() === "true";
@@ -718,12 +723,17 @@ let lastFetchTime = null;
 const CACHE_DURATION_MS = 5 * 60 * 1000; // 5 minutes
 
 const app = express();
+app.use(express.json());
 app.use((_, res, next) => {
   res.setHeader("Access-Control-Allow-Origin", "*");
   res.setHeader("Access-Control-Allow-Methods", "GET,POST,OPTIONS");
   res.setHeader("Access-Control-Allow-Headers", "Content-Type, Authorization");
   next();
 });
+
+// --- Serve built frontend in production ---
+const distPath = path.join(__dirname, "dist");
+app.use(express.static(distPath));
 
 app.get("/alerts", async (_req, res) => {
   try {
@@ -981,9 +991,28 @@ app.get("/regulatory-news", async (_req, res) => {
   }
 });
 
+// --- Mount all API routes under /agent/ prefix for production parity ---
+// In dev, Vite proxy rewrites /agent/* -> /* on this server.
+// In production, the same server serves everything, so we need /agent/* routes too.
+app.get("/agent/alerts", (req, res) => app.handle({ ...req, url: "/alerts" }, res));
+app.post("/agent/sync-now", (req, res) => app.handle({ ...req, url: "/sync-now" }, res));
+app.get("/agent/sources/status", (req, res) => app.handle({ ...req, url: "/sources/status" }, res));
+app.get("/agent/health", (req, res) => app.handle({ ...req, url: "/health" }, res));
+app.get("/agent/status", (req, res) => app.handle({ ...req, url: "/health" }, res));
+app.get("/agent/regulatory-news", (req, res) => app.handle({ ...req, url: "/regulatory-news" }, res));
+
+// --- SPA fallback: serve index.html for any non-API route ---
+app.get("*", (req, res) => {
+  // Don't intercept API routes or static assets
+  if (req.path.startsWith("/api") || req.path.startsWith("/agent") || req.path.includes(".")) {
+    return res.status(404).json({ error: "Not found" });
+  }
+  res.sendFile(path.join(distPath, "index.html"));
+});
+
 if (process.env.REGULON_AGENT_NO_SERVER !== "1") {
-  app.listen(PORT, async () => {
-    console.log(`[Regulon Agent] listening on http://localhost:${PORT}`);
+  app.listen(PORT, "0.0.0.0", async () => {
+    console.log(`[Regulon Agent] listening on http://0.0.0.0:${PORT}`);
     // Fetch initial data on startup
     console.log(`[Regulon Agent] fetching initial data...`);
     try {
