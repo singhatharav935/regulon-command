@@ -1,5 +1,5 @@
 /**
- * REGULON - Complete Backend API Infrastructure
+ * SANNIDH - Complete Backend API Infrastructure
  * Extends regulatory agent with comprehensive REST API, user management, analytics
  * and all backend services needed for production
  */
@@ -128,7 +128,7 @@ function initializeSampleData() {
   const adminId = 'user-001';
   db.users.set(adminId, {
     id: adminId,
-    email: 'admin@regulon.in',
+    email: 'admin@sannidh.in',
     name: 'Admin User',
     role: 'admin',
     workspace_id: 'ws-001',
@@ -139,7 +139,7 @@ function initializeSampleData() {
   const caId = 'user-002';
   db.users.set(caId, {
     id: caId,
-    email: 'ca@regulon.in',
+    email: 'ca@sannidh.in',
     name: 'CA User',
     role: 'ca',
     workspace_id: 'ws-001',
@@ -346,7 +346,7 @@ app.get('/api/health', (req, res) => {
 
 app.get('/api/system/info', (req, res) => {
   res.json({
-    name: 'REGULON Backend API',
+    name: 'SANNIDH Backend API',
     description: 'Advanced regulatory compliance intelligence platform',
     version: '1.0.0',
     timestamp: new Date().toISOString(),
@@ -904,7 +904,7 @@ app.get('/api/platform/overview', authenticate, (req, res) => {
   const totalTasks = db.tasks.size;
   
   res.json({
-    platform_name: 'REGULON',
+    platform_name: 'SANNIDH',
     description: 'Enterprise Regulatory Intelligence Platform',
     version: '1.0.0',
     status: 'production',
@@ -1080,7 +1080,7 @@ app.get('/api/solutions/:solutionId/case-study', authenticate, (req, res) => {
       company: 'TechBank Solutions',
       industry: 'Financial Services',
       challenge: 'Managing RBI, SEBI compliance across 50+ branches',
-      solution: 'Automated compliance tracking with REGULON',
+      solution: 'Automated compliance tracking with SANNIDH',
       results: {
         time_saved: '45%',
         cost_reduced: '32%',
@@ -1093,7 +1093,7 @@ app.get('/api/solutions/:solutionId/case-study', authenticate, (req, res) => {
       company: 'Apex Legal Consultants',
       industry: 'Legal Firm',
       challenge: 'Multi-jurisdiction compliance tracking',
-      solution: 'Centralized regulatory intelligence with REGULON',
+      solution: 'Centralized regulatory intelligence with SANNIDH',
       results: {
         time_saved: '48%',
         cost_reduced: '35%',
@@ -1145,7 +1145,7 @@ app.get('/api/customers', authenticate, (req, res) => {
         title: 'CFO, TechBank Solutions',
         company: 'TechBank Solutions',
         rating: 5,
-        quote: 'REGULON transformed our compliance workflow. We now catch regulatory changes 10x faster.',
+        quote: 'SANNIDH transformed our compliance workflow. We now catch regulatory changes 10x faster.',
         avatar: 'https://api.dicebear.com/7.x/avataaars/svg?seed=rajesh',
       },
       {
@@ -1154,7 +1154,7 @@ app.get('/api/customers', authenticate, (req, res) => {
         title: 'Senior Partner, Apex Legal',
         company: 'Apex Legal Consultants',
         rating: 5,
-        quote: 'Managing multi-jurisdiction compliance was complex. REGULON simplified everything.',
+        quote: 'Managing multi-jurisdiction compliance was complex. SANNIDH simplified everything.',
         avatar: 'https://api.dicebear.com/7.x/avataaars/svg?seed=priya',
       },
       {
@@ -1172,7 +1172,7 @@ app.get('/api/customers', authenticate, (req, res) => {
         title: 'Principal, Gupta & Associates',
         company: 'Gupta & Associates',
         rating: 5,
-        quote: 'Our clients appreciate the automated compliance reports. REGULON saves us 20+ hours monthly.',
+        quote: 'Our clients appreciate the automated compliance reports. SANNIDH saves us 20+ hours monthly.',
         avatar: 'https://api.dicebear.com/7.x/avataaars/svg?seed=neha',
       },
     ],
@@ -1268,7 +1268,7 @@ app.get('/api/resources/documentation', authenticate, (req, res) => {
       {
         id: 'guide-4',
         title: 'Integration Guide',
-        description: 'Integrate REGULON with your systems',
+        description: 'Integrate SANNIDH with your systems',
         duration_minutes: 30,
         level: 'Advanced',
         downloads: 680,
@@ -1918,7 +1918,7 @@ app.use((err, req, res, next) => {
 
 app.listen(API_PORT, () => {
   console.log(`\n╔════════════════════════════════════════════════════════════╗`);
-  console.log(`║         REGULON Backend API Server Started                ║`);
+  console.log(`║         SANNIDH Backend API Server Started                ║`);
   console.log(`╚════════════════════════════════════════════════════════════╝\n`);
   console.log(`🚀 API Server running at: http://localhost:${API_PORT}`);
   console.log(`📚 API Documentation: http://localhost:${API_PORT}/api-docs`);

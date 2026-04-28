@@ -7,7 +7,7 @@ import { AlertCircle, TrendingUp, Users, Zap, CheckCircle, Clock, BarChart3, Fil
 
 /**
  * Advanced Features Dashboard Page
- * Comprehensive showcase of all Regulon features organized by domain
+ * Comprehensive showcase of all Sannidh features organized by domain
  */
 
 export default function AdvancedFeaturesPage() {

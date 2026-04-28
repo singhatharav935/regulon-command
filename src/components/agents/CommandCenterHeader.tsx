@@ -3,7 +3,7 @@
  * =====================
  * Premium dashboard header for the Real Company Dashboard.
  * Features: animated compliance score ring, agent swarm status, 
- * real-time sync indicator, Regulon Auto-Pilot indicator,
+ * real-time sync indicator, Sannidh Auto-Pilot indicator,
  * and agent control buttons.
  */
 
@@ -130,7 +130,7 @@ export const CommandCenterHeader = ({ companyName, complianceScore, healthStatus
               Compliance Command Center
             </p>
             <div className="flex items-center gap-2 mt-2 flex-wrap">
-              {/* Regulon Auto-Pilot ON/OFF Indicator */}
+              {/* Sannidh Auto-Pilot ON/OFF Indicator */}
               <motion.div
                 initial={{ opacity: 0, scale: 0.9 }}
                 animate={{ opacity: 1, scale: 1 }}
@@ -142,7 +142,7 @@ export const CommandCenterHeader = ({ companyName, complianceScore, healthStatus
                   borderColor: isOnline ? 'rgba(139,92,246,0.35)' : 'rgba(239,68,68,0.35)',
                   boxShadow: isOnline ? '0 0 14px rgba(139,92,246,0.2), 0 0 5px rgba(139,92,246,0.12)' : 'none',
                 }}
-                title={isOnline ? `Regulon Auto-Pilot: ${activeAgentCount}/10 agents active` : 'Auto-Pilot is OFF'}
+                title={isOnline ? `Sannidh Auto-Pilot: ${activeAgentCount}/10 agents active` : 'Auto-Pilot is OFF'}
               >
                 <span className="relative flex h-2 w-2">
                   {isOnline && (
@@ -155,7 +155,7 @@ export const CommandCenterHeader = ({ companyName, complianceScore, healthStatus
                   <span className={`relative inline-flex rounded-full h-2 w-2 ${isOnline ? 'bg-violet-400' : 'bg-red-400'}`} />
                 </span>
                 <span className={`text-[10px] font-bold tracking-wider ${isOnline ? 'text-violet-300' : 'text-red-400'}`}>
-                  Regulon Auto-Pilot: {isOnline ? 'ON' : 'OFF'}
+                  Sannidh Auto-Pilot: {isOnline ? 'ON' : 'OFF'}
                 </span>
               </motion.div>
 

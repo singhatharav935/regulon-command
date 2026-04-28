@@ -1,0 +1,17 @@
+project_id = "vqomazfvyyfofzdssmaw"
+
+[functions.ai-draft]
+enabled = true
+verify_jwt = false
+
+[functions.compliance-chat]
+enabled = true
+verify_jwt = false
+
+[functions.agent-backend]
+enabled = true
+verify_jwt = false
+
+[functions.workspace-backend]
+enabled = true
+verify_jwt = false

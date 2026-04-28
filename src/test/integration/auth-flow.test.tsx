@@ -81,7 +81,7 @@ describe("Auth Integration Tests", () => {
     it("should render login form by default", async () => {
       render(<Auth />, { wrapper: createWrapper() });
 
-      expect(screen.getByText("REGULON ACCESS")).toBeInTheDocument();
+      expect(screen.getByText("SANNIDH ACCESS")).toBeInTheDocument();
       expect(screen.getByLabelText("Email")).toBeInTheDocument();
       expect(screen.getByLabelText("Password")).toBeInTheDocument();
     });
@@ -179,7 +179,7 @@ describe("Auth Integration Tests", () => {
     it("should render the main access title", async () => {
       render(<Auth />, { wrapper: createWrapper() });
 
-      expect(screen.getByText("REGULON ACCESS")).toBeInTheDocument();
+      expect(screen.getByText("SANNIDH ACCESS")).toBeInTheDocument();
     });
   });
 });

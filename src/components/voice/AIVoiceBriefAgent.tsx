@@ -31,7 +31,7 @@ type VoiceOption = {
 };
 
 const clampRate = (value: number) => Math.max(0.8, Math.min(1.2, value));
-const statusStoragePrefix = "regulon:voice-agent:approval-status:";
+const statusStoragePrefix = "sannidh:voice-agent:approval-status:";
 const statusLabel = {
   completed: "Completed",
   queued: "Queued",
@@ -77,9 +77,9 @@ const AIVoiceBriefAgent = ({
   const navigate = useNavigate();
   const location = useLocation();
 
-  const storageKey = useMemo(() => `regulon:voice-agent:${dashboardId}`, [dashboardId]);
+  const storageKey = useMemo(() => `sannidh:voice-agent:${dashboardId}`, [dashboardId]);
   const approvalStorageKey = useMemo(() => `${statusStoragePrefix}${dashboardId}`, [dashboardId]);
-  const reviewStorageKey = useMemo(() => `regulon:agent-work-review:${dashboardId}`, [dashboardId]);
+  const reviewStorageKey = useMemo(() => `sannidh:agent-work-review:${dashboardId}`, [dashboardId]);
   const normalizedLedger = useMemo(() => {
     if (actionLedger.length > 0) return actionLedger;
     const syntheticActions = autopilotActions.slice(0, 3).map((action, idx) => ({
@@ -422,7 +422,7 @@ Owner Editable Section:
       <CardHeader>
         <CardTitle className="flex items-center gap-2">
           <Bot className="w-5 h-5 text-cyan-300" />
-          Regulon Compliance Partner
+          Sannidh Compliance Partner
         </CardTitle>
       </CardHeader>
       <CardContent className="space-y-3">

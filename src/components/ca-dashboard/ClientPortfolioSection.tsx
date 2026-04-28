@@ -79,7 +79,7 @@ const ClientPortfolioSection = ({
         toast.error("Failed to send consent request", { description: data.error || "Unknown server error" });
       }
     } catch (error) {
-      toast.error("API Gateway Disconnected", { description: "Cannot reach Regulon Backend Server on Port 3001." });
+      toast.error("API Gateway Disconnected", { description: "Cannot reach Sannidh Backend Server on Port 3001." });
     } finally {
       setIsOnboarding(false);
     }

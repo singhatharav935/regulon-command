@@ -3,7 +3,7 @@
  * ========================
  * Premium header for the External CA Dashboard.
  * Shows practice metrics ring, agent swarm status, client count,
- * agent control buttons, and Regulon Auto-Pilot ON/OFF indicator.
+ * agent control buttons, and Sannidh Auto-Pilot ON/OFF indicator.
  * 
  * Updated to use the new Swarm Consensus API.
  */
@@ -119,7 +119,7 @@ export const CACommandCenterHeader = ({ title, subtitle }: CACommandCenterHeader
                   borderColor: isOnline ? 'rgba(6,182,212,0.35)' : 'rgba(239,68,68,0.35)',
                   boxShadow: isOnline ? '0 0 14px rgba(6,182,212,0.2), 0 0 5px rgba(6,182,212,0.12)' : 'none',
                 }}
-                title={isOnline ? `Regulon Auto-Pilot: ${activeAgentCount}/12 agents active` : 'Auto-Pilot is OFF'}
+                title={isOnline ? `Sannidh Auto-Pilot: ${activeAgentCount}/12 agents active` : 'Auto-Pilot is OFF'}
               >
                 <span className="relative flex h-2 w-2">
                   {isOnline && (
@@ -132,7 +132,7 @@ export const CACommandCenterHeader = ({ title, subtitle }: CACommandCenterHeader
                   <span className={`relative inline-flex rounded-full h-2 w-2 ${isOnline ? 'bg-cyan-400' : 'bg-red-400'}`} />
                 </span>
                 <span className={`text-[10px] font-bold tracking-wider ${isOnline ? 'text-cyan-300' : 'text-red-400'}`}>
-                  Regulon Auto-Pilot: {isOnline ? 'ON' : 'OFF'}
+                  Sannidh Auto-Pilot: {isOnline ? 'ON' : 'OFF'}
                 </span>
               </motion.div>
 

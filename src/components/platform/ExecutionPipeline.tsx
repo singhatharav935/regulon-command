@@ -54,7 +54,7 @@ const ExecutionPipeline = () => {
           className="text-center mb-16"
         >
           <h2 className="text-4xl md:text-5xl font-extrabold mb-6 tracking-tight">
-            How <span className="text-gradient-primary drop-shadow-sm">REGULON</span> Works
+            How <span className="text-gradient-primary drop-shadow-sm">SANNIDH</span> Works
           </h2>
           <p className="text-xl text-muted-foreground max-w-3xl mx-auto font-light leading-relaxed">
             A rigorous execution pipeline ensuring every compliance action is AI-analyzed 

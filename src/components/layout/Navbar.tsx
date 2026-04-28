@@ -13,7 +13,7 @@ type NavDropdownItem = {
 };
 
 const platformLinks = [
-  { title: "Sovereign Infrastructure Overview", detail: "How REGULON Secures National Data.", href: "/platform/infrastructure", icon: Landmark },
+  { title: "Sovereign Infrastructure Overview", detail: "How SANNIDH Secures National Data.", href: "/platform/infrastructure", icon: Landmark },
   { title: "Agentic Execution Model", detail: "Understanding AI + Human Review Workflows.", href: "/platform/ai-human-review", icon: Users },
   { title: "Compliance Command Center", detail: "Unified Dashboard for Multiple Taxpayer Entities.", href: "/platform", icon: Building2 },
   { title: "Nexus-9™ Drafting Engine", detail: "Autonomous Legal & Regulatory Document Generation.", href: "/platform/ai-assistant", icon: Cpu },
@@ -83,7 +83,7 @@ const Navbar = () => {
         <div className="flex items-center justify-between h-16">
           {/* Logo */}
           <Link to="/" className="flex items-center gap-2">
-            <span className="text-xl font-bold text-gradient-primary">REGULON</span>
+            <span className="text-xl font-bold text-gradient-primary">SANNIDH</span>
           </Link>
 
           {/* Desktop Navigation */}

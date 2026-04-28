@@ -27,7 +27,7 @@ import {
 import Navbar from "@/components/layout/Navbar";
 import Footer from "@/components/layout/Footer";
 import AIVoiceBriefAgent from "@/components/voice/AIVoiceBriefAgent";
-import RegulonLiveAgent from "@/components/ai/RegulonLiveAgent";
+import SannidhLiveAgent from "@/components/ai/SannidhLiveAgent";
 import { Badge } from "@/components/ui/badge";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
@@ -994,7 +994,7 @@ const UniversityDashboardShell = ({ mode }: UniversityDashboardShellProps) => {
           />
 
           {/* Regulon Live AI Agent - Conversational like Siri/Alexa */}
-          <RegulonLiveAgent
+          <SannidhLiveAgent
             dashboardId={`university-${mode}`}
             dashboardType="university"
             userName={roleMeta[effectiveRole].title}

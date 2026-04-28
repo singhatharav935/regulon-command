@@ -107,7 +107,7 @@ const personas = [
   {
     id: "in_house_ca",
     label: "In-House CA",
-    description: "Regulon internal CA workflow with legal review path",
+    description: "Sannidh internal CA workflow with legal review path",
     icon: Users,
   },
   {
@@ -414,7 +414,7 @@ const Auth = () => {
 
         <div className="glass-card p-8">
           <div className="text-center mb-8">
-            <h1 className="text-2xl font-bold mb-2 text-gradient-primary">REGULON ACCESS</h1>
+            <h1 className="text-2xl font-bold mb-2 text-gradient-primary">SANNIDH ACCESS</h1>
             <p className="text-muted-foreground">Role-specific authentication and verification-first onboarding</p>
           </div>
 

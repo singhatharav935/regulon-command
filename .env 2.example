@@ -1,0 +1,47 @@
+# =============================================================================
+# REGULON Environment Variables
+# =============================================================================
+# Copy this file to .env and fill in your values
+# NEVER commit .env to git!
+
+# =============================================================================
+# REQUIRED: Supabase Configuration
+# =============================================================================
+VITE_SUPABASE_URL=https://your-project.supabase.co
+VITE_SUPABASE_ANON_KEY=your-supabase-anon-key
+
+# =============================================================================
+# REQUIRED: Real CA Dashboard Backend API
+# =============================================================================
+VITE_API_URL=http://localhost:3001/api
+
+# =============================================================================
+# OPTIONAL: Error Tracking (Sentry)
+# =============================================================================
+# Get your DSN from https://sentry.io
+VITE_SENTRY_DSN=
+# Force enable Sentry in development (default: disabled in dev)
+VITE_SENTRY_FORCE_ENABLE=false
+
+# =============================================================================
+# OPTIONAL: App Configuration
+# =============================================================================
+# App version (set automatically in CI/CD)
+VITE_APP_VERSION=1.0.0
+
+# =============================================================================
+# OPTIONAL: Feature Flags
+# =============================================================================
+# Enable demo mode (uses fallback data when backend fails)
+VITE_ENABLE_DEMO_MODE=true
+
+# =============================================================================
+# CI/CD Secrets (set in GitHub Actions, not in .env)
+# =============================================================================
+# SUPABASE_ACCESS_TOKEN - For deploying functions
+# SUPABASE_PROJECT_REF - Your Supabase project reference
+# VERCEL_TOKEN - For Vercel deployments
+# VERCEL_ORG_ID - Your Vercel organization
+# VERCEL_PROJECT_ID - Your Vercel project
+# NETLIFY_AUTH_TOKEN - For Netlify deployments
+# NETLIFY_SITE_ID - Your Netlify site

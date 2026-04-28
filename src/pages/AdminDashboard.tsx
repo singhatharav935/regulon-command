@@ -13,7 +13,7 @@ import IncidentManagement from "@/components/admin-dashboard/IncidentManagement"
 import SystemActivityLogs from "@/components/admin-dashboard/SystemActivityLogs";
 import PlatformAnalytics from "@/components/admin-dashboard/PlatformAnalytics";
 import AIVoiceBriefAgent from "@/components/voice/AIVoiceBriefAgent";
-import RegulonLiveAgent from "@/components/ai/RegulonLiveAgent";
+import SannidhLiveAgent from "@/components/ai/SannidhLiveAgent";
 
 const AdminDashboard = () => {
   const [isLoading, setIsLoading] = useState(true);
@@ -54,7 +54,7 @@ const AdminDashboard = () => {
           </motion.div>
 
           {/* Regulon Live AI Agent - Conversational like Siri/Alexa */}
-          <RegulonLiveAgent
+          <SannidhLiveAgent
             dashboardId="demo-admin"
             dashboardType="admin"
             userName="Platform Admin"

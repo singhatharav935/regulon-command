@@ -13,7 +13,7 @@ import { motion, AnimatePresence } from "framer-motion";
 import { useNavigate } from "react-router-dom";
 import Navbar from "@/components/layout/Navbar";
 import Footer from "@/components/layout/Footer";
-import RegulonAIAgent from "@/components/ai-agent/RegulonAIAgent";
+import SannidhAIAgent from "@/components/ai-agent/SannidhAIAgent";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
@@ -419,8 +419,8 @@ const EmptyState = ({ title, description, icon: Icon }: { title: string; descrip
 // SECTION COMPONENTS
 // ========================================
 
-// Section 1: Regulon AI Compliance Partner
-const RegulonAIPartnerSection = ({ 
+// Section 1: Sannidh AI Compliance Partner
+const SannidhAIPartnerSection = ({ 
   companyId, 
   companyName,
   messages,
@@ -478,7 +478,7 @@ const RegulonAIPartnerSection = ({
               </div>
               <div>
                 <CardTitle className="text-xl flex items-center gap-2">
-                  Regulon Compliance Partner
+                  Sannidh Compliance Partner
                   <Sparkles className="w-4 h-4 text-primary animate-pulse" />
                 </CardTitle>
                 <CardDescription className="flex items-center justify-between">
@@ -510,7 +510,7 @@ const RegulonAIPartnerSection = ({
                 <div className="p-4 rounded-xl bg-primary/10 border border-primary/20">
                   <p className="text-sm">
                     Good morning, <span className="font-semibold text-primary">{companyName}</span>! 
-                    I'm your Regulon Compliance Partner. I monitor your regulatory obligations 24/7 
+                    I'm your Sannidh Compliance Partner. I monitor your regulatory obligations 24/7 
                     and will alert you to important deadlines, changes, and opportunities.
                   </p>
                 </div>
@@ -1744,8 +1744,8 @@ const CompanyDashboardReal = () => {
 
   // Load company from session/localStorage
   useEffect(() => {
-    const storedCompanyId = localStorage.getItem('regulon_company_id');
-    const storedCompanyData = localStorage.getItem('regulon_company_data');
+    const storedCompanyId = localStorage.getItem('sannidh_company_id');
+    const storedCompanyData = localStorage.getItem('sannidh_company_data');
     
     if (storedCompanyId) {
       setCompanyId(storedCompanyId);
@@ -1879,8 +1879,8 @@ const CompanyDashboardReal = () => {
           <CompanyActionInbox />
 
           <div className="space-y-6">
-            {/* Section 1: Regulon AI Compliance Partner */}
-            <RegulonAIPartnerSection 
+            {/* Section 1: Sannidh AI Compliance Partner */}
+            <SannidhAIPartnerSection 
               companyId={companyId || ''}
               companyName={company?.company_name || 'Company'}
               messages={aiMessages}
@@ -1929,7 +1929,7 @@ const CompanyDashboardReal = () => {
       
       <Footer />
 
-      {/* Regulon AI Chat Slide-in Drawer — triggered by fixed side button */}
+      {/* Sannidh AI Chat Slide-in Drawer — triggered by fixed side button */}
       <AnimatePresence>
         {chatDrawerOpen && (
           <>
@@ -1956,7 +1956,7 @@ const CompanyDashboardReal = () => {
                     <Bot className="w-5 h-5 text-purple-400" />
                   </div>
                   <div>
-                    <h3 className="text-sm font-bold text-foreground">Regulon AI Agent</h3>
+                    <h3 className="text-sm font-bold text-foreground">Sannidh AI Agent</h3>
                     <p className="text-[11px] text-muted-foreground">Your Compliance Intelligence Partner</p>
                   </div>
                 </div>
@@ -1971,7 +1971,7 @@ const CompanyDashboardReal = () => {
 
               {/* Drawer Content — RegulonAIAgent */}
               <div className="flex-1 overflow-y-auto">
-                <RegulonAIAgent />
+                <SannidhAIAgent />
               </div>
             </motion.div>
           </>
@@ -1993,7 +1993,7 @@ const CompanyDashboardReal = () => {
             writingMode: 'vertical-rl' as const,
             textOrientation: 'mixed' as const,
           }}
-          title="Open Regulon AI Agent Chat"
+          title="Open Sannidh AI Agent Chat"
         >
           <Bot className="w-4 h-4 text-purple-400 rotate-90" />
           <span className="text-[11px] font-bold tracking-wider text-purple-300 group-hover:text-purple-200">

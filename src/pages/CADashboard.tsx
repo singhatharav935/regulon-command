@@ -15,7 +15,7 @@ import CAAnalyticsSection from "@/components/ca-dashboard/CAAnalyticsSection";
 import AIDraftingEngine from "@/components/ca-dashboard/AIDraftingEngine";
 import ComplianceChatbot from "@/components/ca-dashboard/ComplianceChatbot";
 import AIVoiceBriefAgent from "@/components/voice/AIVoiceBriefAgent";
-import RegulonLiveAgent from "@/components/ai/RegulonLiveAgent";
+import SannidhLiveAgent from "@/components/ai/SannidhLiveAgent";
 import { CAAgentProvider } from "@/components/agents/CAAgentOrchestrator";
 
 const CADashboard = () => {
@@ -58,7 +58,7 @@ const CADashboard = () => {
             </motion.div>
 
             {/* Regulon Live AI Agent - Conversational like Siri/Alexa */}
-            <RegulonLiveAgent
+            <SannidhLiveAgent
               dashboardId="demo-ca"
               dashboardType="ca"
               userName="CA Professional"

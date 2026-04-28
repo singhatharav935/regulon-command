@@ -195,7 +195,7 @@ const CompanyAgentControlCenterContent = () => {
                 </div>
                 <div>
                   <h1 className="text-3xl font-bold text-foreground tracking-tight">Agent Control Center</h1>
-                  <p className="text-sm text-muted-foreground mt-0.5">Advanced configuration for 10 Regulon AI compliance agents</p>
+                  <p className="text-sm text-muted-foreground mt-0.5">Advanced configuration for 10 Sannidh AI compliance agents</p>
                 </div>
               </div>
               <div className="flex items-center gap-2 flex-wrap">

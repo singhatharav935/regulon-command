@@ -12,11 +12,11 @@ const fallbackKey = "public-anon-key-placeholder";
 if (!hasSupabaseEnv) {
   if (import.meta.env.DEV) {
     console.warn(
-      "[REGULON] Missing VITE_SUPABASE_URL or VITE_SUPABASE_PUBLISHABLE_KEY. Supabase calls will fail until configured."
+      "[SANNIDH] Missing VITE_SUPABASE_URL or VITE_SUPABASE_PUBLISHABLE_KEY. Supabase calls will fail until configured."
     );
   } else {
     throw new Error(
-      "[REGULON] Production configuration error: missing VITE_SUPABASE_URL or VITE_SUPABASE_PUBLISHABLE_KEY."
+      "[SANNIDH] Production configuration error: missing VITE_SUPABASE_URL or VITE_SUPABASE_PUBLISHABLE_KEY."
     );
   }
 }

@@ -36,7 +36,7 @@ const HeroSection = ({ content }: HeroSectionProps) => {
     companyName: "",
     message: "",
   });
-  const title = content?.title || "REGULON";
+  const title = content?.title || "SANNIDH";
   const subtitle = content?.subtitle || "Compliance & Regulatory Command Platform";
   const description = content?.description ||
     "AI-powered, human-verified regulatory execution for businesses. Complete compliance coverage across MCA, GST, Income Tax, RBI & SEBI.";
@@ -205,7 +205,7 @@ const HeroSection = ({ content }: HeroSectionProps) => {
           <DialogHeader>
             <DialogTitle>{leadType === "expert" ? "Talk to Expert" : "Request Onboarding"}</DialogTitle>
             <DialogDescription>
-              Fill details and REGULON team will contact you.
+              Fill details and SANNIDH team will contact you.
             </DialogDescription>
           </DialogHeader>
           <div className="space-y-3">

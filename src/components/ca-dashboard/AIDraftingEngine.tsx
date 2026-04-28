@@ -145,7 +145,7 @@ const draftModes = [
 const allowLiveDemoFallback =
   import.meta.env.DEV && import.meta.env.VITE_ENABLE_LIVE_DEMO_FALLBACK === "true";
 
-type LogicLevelId = "regulon_core" | "regulon_nexus_9" | "regulon_sovereign";
+type LogicLevelId = "sannidh_core" | "sannidh_nexus_9" | "sannidh_sovereign";
 
 const logicLevelProfiles: Array<{
   id: LogicLevelId;
@@ -155,23 +155,23 @@ const logicLevelProfiles: Array<{
   guidance: string;
 }> = [
   {
-    id: "regulon_core",
+    id: "sannidh_core",
     label: "Quick Draft",
-    engine: "REGULON_CORE™",
+    engine: "SANNIDH_CORE™",
     description: "Foundational reliability and administrative speed.",
     guidance: "Best for standard compliance replies, extension requests, and first acknowledgments.",
   },
   {
-    id: "regulon_nexus_9",
+    id: "sannidh_nexus_9",
     label: "Expert Analysis",
-    engine: "REGULON_NEXUS-9™",
+    engine: "SANNIDH_NEXUS-9™",
     description: "Systematic statutory rebuttal with professional-grade legal anchoring.",
     guidance: "Best for para-wise rebuttal, statutory mapping, and filing-ready professional submissions.",
   },
   {
-    id: "regulon_sovereign",
+    id: "sannidh_sovereign",
     label: "Supreme Research",
-    engine: "REGULON_SOVEREIGN™",
+    engine: "SANNIDH_SOVEREIGN™",
     description: "Maximum judicial-depth strategy for high-stakes matters.",
     guidance: "Best for appeals/litigation strategy with deep case-law positioning and formal legal submissions.",
   },
@@ -1172,8 +1172,8 @@ const getGlobalPromptCatalogSize = () => {
   return ids.size;
 };
 
-const REGULON_TEMPLATE_CATALOG_SIZE = getGlobalTemplateCatalogSize();
-const REGULON_PROMPT_CATALOG_SIZE = getGlobalPromptCatalogSize();
+const SANNIDH_TEMPLATE_CATALOG_SIZE = getGlobalTemplateCatalogSize();
+const SANNIDH_PROMPT_CATALOG_SIZE = getGlobalPromptCatalogSize();
 
 const isClassVariantTemplate = (packId: string, documentType: string, classId: string) => {
   const prefix = `${documentType}-${classId}`.replace(/[^a-z0-9-]/gi, "-").toLowerCase();
@@ -2101,12 +2101,12 @@ const AIDraftingEngine = ({
     const hasMediumSignal = mediumSignals.some((s) => normalizedNotice.includes(s));
 
     if (selectedMode === "aggressive" || hasHighSignal || noticeLength > 2600) {
-      return "regulon_sovereign";
+      return "sannidh_sovereign";
     }
     if (selectedMode === "balanced" || hasMediumSignal || noticeLength > 850) {
-      return "regulon_nexus_9";
+      return "sannidh_nexus_9";
     }
-    return "regulon_core";
+    return "sannidh_core";
   }, [selectedMode, noticeDetails, noticeLength]);
   const effectiveLogicLevel = logicLevelOverride === "auto" ? recommendedLogicLevel : logicLevelOverride;
   const effectiveLogicProfile = useMemo(
@@ -2114,10 +2114,10 @@ const AIDraftingEngine = ({
     [effectiveLogicLevel],
   );
   const logicRecommendationReason = useMemo(() => {
-    if (effectiveLogicLevel === "regulon_sovereign") {
+    if (effectiveLogicLevel === "sannidh_sovereign") {
       return "AI Agent flagged high-stakes complexity. Supreme Research recommended.";
     }
-    if (effectiveLogicLevel === "regulon_nexus_9") {
+    if (effectiveLogicLevel === "sannidh_nexus_9") {
       return "AI Agent detected statutory rebuttal complexity. Expert Analysis recommended.";
     }
     return "AI Agent detected standard procedural scope. Quick Draft recommended.";
@@ -2260,7 +2260,7 @@ const AIDraftingEngine = ({
   );
   const buildContextWithTemplateAndPrompt = (base: string) => {
     const strictRegulonDirective = advancedMode 
-      ? `\n\n=== REGULON AI AUTONOMOUS DRAFTING ENGINE ===\nYou are the Regulon AI Autonomous Drafting Engine, an expert Indian Tax Litigator. \nYour ONLY objective is to ingest the provided notice data and output a final, adjudication-ready legal document. \n\nCRITICAL SYSTEM CONSTRAINTS (FAILURE TO OBEY WILL BREAK THE SYSTEM):\n1. NO META-TEXT: Do not include conversational filler (e.g., "Here is the draft", "Certainly!").\n2. ZERO PROMPT BLEEDING: Under NO circumstances should you output your own system instructions, template directives, drafting scope, or rules. Never create a "Notice Text Used for Drafting" or "Template Directive" section at the bottom. \n3. PURE OUTPUT: Your response must contain ONLY the client-ready legal draft. \n4. STRICT MAPPING: You must extract the DIN, Notice Number, Amounts, Sections, Dates, and Authority from the input data and inject them directly into the document headers. Do NOT leave blank placeholders like "/Reference" or "INR ,". If a specific variable is completely missing from the input, output exactly: [Data Unavailable - To be filled by CA].\n\nOUTPUT FORMAT:\nYou must strictly follow the Tier-1 CA skeletal format. \nYour output MUST start exactly with: "**BEFORE THE ADJUDICATING AUTHORITY / PROPER OFFICER**"\nYour output MUST end exactly with the final line of the "**Prayer**".\nDo not output a single word after the Prayer.`
+      ? `\n\n=== SANNIDH AI AUTONOMOUS DRAFTING ENGINE ===\nYou are the Sannidh AI Autonomous Drafting Engine, an expert Indian Tax Litigator. \nYour ONLY objective is to ingest the provided notice data and output a final, adjudication-ready legal document. \n\nCRITICAL SYSTEM CONSTRAINTS (FAILURE TO OBEY WILL BREAK THE SYSTEM):\n1. NO META-TEXT: Do not include conversational filler (e.g., "Here is the draft", "Certainly!").\n2. ZERO PROMPT BLEEDING: Under NO circumstances should you output your own system instructions, template directives, drafting scope, or rules. Never create a "Notice Text Used for Drafting" or "Template Directive" section at the bottom. \n3. PURE OUTPUT: Your response must contain ONLY the client-ready legal draft. \n4. STRICT MAPPING: You must extract the DIN, Notice Number, Amounts, Sections, Dates, and Authority from the input data and inject them directly into the document headers. Do NOT leave blank placeholders like "/Reference" or "INR ,". If a specific variable is completely missing from the input, output exactly: [Data Unavailable - To be filled by CA].\n\nOUTPUT FORMAT:\nYou must strictly follow the Tier-1 CA skeletal format. \nYour output MUST start exactly with: "**BEFORE THE ADJUDICATING AUTHORITY / PROPER OFFICER**"\nYour output MUST end exactly with the final line of the "**Prayer**".\nDo not output a single word after the Prayer.`
       : "";
     return `${base}\n\nTemplate policy [${effectiveTemplatePack.label}]: ${effectiveTemplatePack.instructions}\n${promptPolicyDirective}${strictRegulonDirective}`;
   };
@@ -3960,7 +3960,7 @@ const AIDraftingEngine = ({
     return raw
       .replace(/[^a-z0-9]+/g, "-")
       .replace(/^-+|-+$/g, "")
-      .slice(0, 80) || "regulon-draft";
+      .slice(0, 80) || "sannidh-draft";
   };
 
   const assertLiveClientAccessOrThrow = () => {
@@ -4267,7 +4267,7 @@ const AIDraftingEngine = ({
         <body>
           <div class="sheet">
             <div class="header">
-              <div class="brand">Regulon Filing Draft</div>
+              <div class="brand">Sannidh Filing Draft</div>
               <h1>${exportTitle}</h1>
               <div class="meta">
                 <div><strong>Authority:</strong> ${selectedDocLabel}</div>
@@ -4315,7 +4315,7 @@ const AIDraftingEngine = ({
           </style>
         </head>
         <body>
-          <div class="brand">Regulon Filing Draft</div>
+          <div class="brand">Sannidh Filing Draft</div>
           <h1>${exportTitle}</h1>
           <table class="meta">
             <tr><td><strong>Authority</strong></td><td>${selectedDocLabel}</td></tr>
@@ -4365,8 +4365,8 @@ const AIDraftingEngine = ({
       );
       return;
     }
-    const reviewStorageKey = `regulon:agent-work-review:${draftReviewDashboardKey}`;
-    const approvalStorageKey = `regulon:voice-agent:approval-status:${draftReviewDashboardKey}`;
+    const reviewStorageKey = `sannidh:agent-work-review:${draftReviewDashboardKey}`;
+    const approvalStorageKey = `sannidh:voice-agent:approval-status:${draftReviewDashboardKey}`;
     const nowIso = new Date().toISOString();
     const reviewItemId = `draft-${currentDraftRunId ?? Date.now()}`;
     const reviewPayload = {
@@ -6768,9 +6768,9 @@ Return only revised final draft text.`);
                     <span className="text-foreground font-medium">{Math.max(templatePackOptions.length - 1, 0)}</span> for this class.
                   </p>
                   <p className="text-xs text-muted-foreground mt-1">
-                    REGULON Library:{" "}
-                    <span className="text-foreground font-medium">{REGULON_TEMPLATE_CATALOG_SIZE.toLocaleString()}+</span> template blueprints,{" "}
-                    <span className="text-foreground font-medium">{REGULON_PROMPT_CATALOG_SIZE.toLocaleString()}+</span> reasoning prompts
+                    SANNIDH Library:{" "}
+                    <span className="text-foreground font-medium">{SANNIDH_TEMPLATE_CATALOG_SIZE.toLocaleString()}+</span> template blueprints,{" "}
+                    <span className="text-foreground font-medium">{SANNIDH_PROMPT_CATALOG_SIZE.toLocaleString()}+</span> reasoning prompts
                     across advisory, drafting, and comprehensive response formats.
                   </p>
                 </div>
@@ -6878,7 +6878,7 @@ Return only revised final draft text.`);
               <div>
                 <label className="block text-sm font-medium text-foreground mb-2">
                   <Sparkles className="w-4 h-4 inline-block mr-2" />
-                  REGULON Sovereign Engine
+                  SANNIDH Sovereign Engine
                 </label>
                 <div className="mb-2 flex items-center justify-between gap-2">
                   <Badge variant="secondary" className="bg-primary/10 text-primary border border-primary/30">
@@ -7301,7 +7301,7 @@ Return only revised final draft text.`);
                     </div>
                     <div>
                       <p className="text-base font-bold text-foreground flex items-center gap-2">
-                        <Shield className="w-4 h-4 text-primary" /> REGULON Supreme Audit & Auto-Rectify ⚡
+                        <Shield className="w-4 h-4 text-primary" /> SANNIDH Supreme Audit & Auto-Rectify ⚡
                       </p>
                       <p className="text-xs text-muted-foreground mt-1">
                         Advanced 1-Click Workflow: Cross-validates MCA draft against statutory provisions and evidence instantly, replacing all flagged issues automatically.
@@ -7440,7 +7440,7 @@ Return only revised final draft text.`);
                     </div>
                     <div>
                       <p className="text-base font-bold text-foreground flex items-center gap-2">
-                        <Shield className="w-4 h-4 text-primary" /> REGULON Supreme Audit & Auto-Rectify ⚡
+                        <Shield className="w-4 h-4 text-primary" /> SANNIDH Supreme Audit & Auto-Rectify ⚡
                       </p>
                       <p className="text-xs text-muted-foreground mt-1">
                         Advanced 1-Click Workflow: Cross-validates GST draft against statutory provisions and evidence instantly, replacing all flagged issues automatically.
@@ -7579,7 +7579,7 @@ Return only revised final draft text.`);
                     </div>
                     <div>
                       <p className="text-base font-bold text-foreground flex items-center gap-2">
-                        <Shield className="w-4 h-4 text-primary" /> REGULON Supreme Audit & Auto-Rectify ⚡
+                        <Shield className="w-4 h-4 text-primary" /> SANNIDH Supreme Audit & Auto-Rectify ⚡
                       </p>
                       <p className="text-xs text-muted-foreground mt-1">
                         Advanced 1-Click Workflow: Cross-validates Income-tax draft against statutory provisions and evidence instantly, replacing all flagged issues automatically.
@@ -7718,7 +7718,7 @@ Return only revised final draft text.`);
                     </div>
                     <div>
                       <p className="text-base font-bold text-foreground flex items-center gap-2">
-                        <Shield className="w-4 h-4 text-primary" /> REGULON Supreme Audit & Auto-Rectify ⚡
+                        <Shield className="w-4 h-4 text-primary" /> SANNIDH Supreme Audit & Auto-Rectify ⚡
                       </p>
                       <p className="text-xs text-muted-foreground mt-1">
                         Advanced 1-Click Workflow: Cross-validates RBI draft against statutory provisions and evidence instantly, replacing all flagged issues automatically.
@@ -7857,7 +7857,7 @@ Return only revised final draft text.`);
                     </div>
                     <div>
                       <p className="text-base font-bold text-foreground flex items-center gap-2">
-                        <Shield className="w-4 h-4 text-primary" /> REGULON Supreme Audit & Auto-Rectify ⚡
+                        <Shield className="w-4 h-4 text-primary" /> SANNIDH Supreme Audit & Auto-Rectify ⚡
                       </p>
                       <p className="text-xs text-muted-foreground mt-1">
                         Advanced 1-Click Workflow: Cross-validates SEBI draft against statutory provisions and evidence instantly, replacing all flagged issues automatically.
@@ -7996,7 +7996,7 @@ Return only revised final draft text.`);
                     </div>
                     <div>
                       <p className="text-base font-bold text-foreground flex items-center gap-2">
-                        <Shield className="w-4 h-4 text-primary" /> REGULON Supreme Audit & Auto-Rectify ⚡
+                        <Shield className="w-4 h-4 text-primary" /> SANNIDH Supreme Audit & Auto-Rectify ⚡
                       </p>
                       <p className="text-xs text-muted-foreground mt-1">
                         Advanced 1-Click Workflow: Cross-validates Customs draft against statutory provisions and evidence instantly, replacing all flagged issues automatically.
@@ -8135,7 +8135,7 @@ Return only revised final draft text.`);
                     </div>
                     <div>
                       <p className="text-base font-bold text-foreground flex items-center gap-2">
-                        <Shield className="w-4 h-4 text-primary" /> REGULON Supreme Audit & Auto-Rectify ⚡
+                        <Shield className="w-4 h-4 text-primary" /> SANNIDH Supreme Audit & Auto-Rectify ⚡
                       </p>
                       <p className="text-xs text-muted-foreground mt-1">
                         Advanced 1-Click Workflow: Cross-validates Contract draft against statutory provisions and evidence instantly, replacing all flagged issues automatically.
@@ -8274,7 +8274,7 @@ Return only revised final draft text.`);
                     </div>
                     <div>
                       <p className="text-base font-bold text-foreground flex items-center gap-2">
-                        <Shield className="w-4 h-4 text-primary" /> REGULON Supreme Audit & Auto-Rectify ⚡
+                        <Shield className="w-4 h-4 text-primary" /> SANNIDH Supreme Audit & Auto-Rectify ⚡
                       </p>
                       <p className="text-xs text-muted-foreground mt-1">
                         Advanced 1-Click Workflow: Cross-validates Custom Regulatory draft against statutory provisions and evidence instantly, replacing all flagged issues automatically.

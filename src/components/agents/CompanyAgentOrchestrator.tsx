@@ -108,7 +108,7 @@ const createInitialAgents = (): AgentDefinition[] => [
     id: 'ARIA',
     name: 'ARIA',
     fullName: 'AI Response & Intelligence Agent',
-    section: 'Regulon Compliance Partner',
+    section: 'Sannidh Compliance Partner',
     sectionIndex: 1,
     description: 'Central coordinator — manages notifications, CA communication, and alert triage across all agents',
     status: 'active',
