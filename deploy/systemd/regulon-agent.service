@@ -1,5 +1,5 @@
 [Unit]
-Description=Regulon Live Regulatory Ingestion Agent
+Description=Sannidh Live Regulatory Ingestion Agent
 After=network.target
 Wants=network.target
 
@@ -7,17 +7,17 @@ Wants=network.target
 Type=simple
 User=www-data
 Group=www-data
-WorkingDirectory=/opt/regulon
+WorkingDirectory=/opt/sannidh
 Environment=NODE_ENV=production
 Environment=ALERT_AGENT_PORT=8787
-EnvironmentFile=/etc/regulon/regulon-agent.env
-ExecStart=/usr/bin/node /opt/regulon/index.js
+EnvironmentFile=/etc/sannidh/sannidh-agent.env
+ExecStart=/usr/bin/node /opt/sannidh/index.js
 Restart=always
 RestartSec=5
 TimeoutStartSec=30
 TimeoutStopSec=30
-StandardOutput=append:/var/log/regulon-agent/out.log
-StandardError=append:/var/log/regulon-agent/err.log
+StandardOutput=append:/var/log/sannidh-agent/out.log
+StandardError=append:/var/log/sannidh-agent/err.log
 
 [Install]
 WantedBy=multi-user.target

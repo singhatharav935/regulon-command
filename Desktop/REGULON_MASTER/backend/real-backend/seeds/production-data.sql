@@ -1,10 +1,10 @@
--- REGULON Production Sample Data
+-- SANNIDH Production Sample Data
 -- This file contains realistic sample data for production testing
 
 -- Create realistic sample users
 INSERT INTO public.users (id, email, full_name, registration_role, verification_entity_name, email_verified, profile_completed) VALUES 
 -- System Admin
-('11111111-1111-1111-1111-111111111111', 'admin@regulon.com', 'Sarah Mitchell', 'admin', 'REGULON System', true, true),
+('11111111-1111-1111-1111-111111111111', 'admin@sannidh.com', 'Sarah Mitchell', 'admin', 'SANNIDH System', true, true),
 -- External CAs
 ('22222222-2222-2222-2222-222222222222', 'rajesh.sharma@compliancetech.com', 'Rajesh Sharma', 'external_ca', 'ComplianceTech Partners', true, true),
 ('22222222-2222-2222-2222-222222222223', 'priya.patel@legaladvisors.in', 'Priya Patel', 'external_ca', 'Legal Advisors India', true, true),

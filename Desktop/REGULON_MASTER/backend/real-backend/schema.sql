@@ -1,4 +1,4 @@
--- REGULON Real Backend Database Schema
+-- SANNIDH Real Backend Database Schema
 -- Run this SQL in your Supabase SQL editor
 
 -- Enable Row Level Security
@@ -292,9 +292,9 @@ CREATE TRIGGER update_company_onboarding_updated_at BEFORE UPDATE ON public.comp
 -- Insert sample data for testing
 INSERT INTO public.users (id, email, full_name, registration_role, email_verified, profile_completed)
 VALUES 
-    ('00000000-0000-0000-0000-000000000001', 'admin@regulon.com', 'System Administrator', 'admin', true, true),
-    ('00000000-0000-0000-0000-000000000002', 'ca@regulon.com', 'Demo CA', 'external_ca', true, true),
-    ('00000000-0000-0000-0000-000000000003', 'company@regulon.com', 'Demo Company Owner', 'company_owner', true, true)
+    ('00000000-0000-0000-0000-000000000001', 'admin@sannidh.com', 'System Administrator', 'admin', true, true),
+    ('00000000-0000-0000-0000-000000000002', 'ca@sannidh.com', 'Demo CA', 'external_ca', true, true),
+    ('00000000-0000-0000-0000-000000000003', 'company@sannidh.com', 'Demo Company Owner', 'company_owner', true, true)
 ON CONFLICT (id) DO NOTHING;
 
 -- Grant necessary permissions

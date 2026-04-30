@@ -56,7 +56,7 @@ BEGIN
   ELSIF registration_role = 'in_house_ca' THEN
     mapped_role := 'manager';
     mapped_persona := 'in_house_ca';
-    mapped_workspace := 'regulon_ca';
+    mapped_workspace := 'sannidh_ca';
   ELSIF registration_role = 'in_house_lawyer' THEN
     mapped_role := 'manager';
     mapped_persona := 'in_house_lawyer';
@@ -101,7 +101,7 @@ SELECT
     ) THEN 'admin'
     WHEN EXISTS (
       SELECT 1 FROM public.ca_workspace_profiles cwp
-      WHERE cwp.user_id = u.id AND cwp.workspace_type = 'regulon_ca'
+      WHERE cwp.user_id = u.id AND cwp.workspace_type = 'sannidh_ca'
     ) THEN 'in_house_ca'
     WHEN EXISTS (
       SELECT 1 FROM public.ca_workspace_profiles cwp

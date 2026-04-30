@@ -902,7 +902,7 @@ Build: Compile all statutory documents required by auditor: financial statements
 
 Copy any prompt above and paste into Copilot with this prefix:
 
-**"Based on the Regulon External CA Dashboard, build this feature:**
+**"Based on the Sannidh External CA Dashboard, build this feature:**
 
 [Paste prompt here]
 
@@ -934,7 +934,7 @@ So you don't need separate prompts for those.
 
 Copy any prompt above and paste into Copilot with this prefix:
 
-**"Based on the Regulon External CA Dashboard, build this feature:**
+**"Based on the Sannidh External CA Dashboard, build this feature:**
 
 [Paste prompt here]
 

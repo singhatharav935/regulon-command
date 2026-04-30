@@ -2695,7 +2695,7 @@ const queueWorkflowNotifications = async (
   const actorName = actorProfile?.full_name || actorProfile?.email || "A team member";
   const companyName = company?.name || "Your company";
   const prettyEvent = eventType.replace(/_/g, " ").replace(/\b\w/g, (char) => char.toUpperCase());
-  const subject = `[Regulon] ${prettyEvent}: ${run.document_type}`;
+  const subject = `[Sannidh] ${prettyEvent}: ${run.document_type}`;
   const rows = recipientProfiles
     .filter((profile) => typeof profile.email === "string" && profile.email.trim().length > 0)
     .map((profile) => ({
@@ -4877,7 +4877,7 @@ const repairUserDashboardReadinessByAdmin = async (
         caFirmId = existingFirm?.id ?? null;
       }
       if (!caFirmId) {
-        const firmName = profileReadiness.full_name ? `${profileReadiness.full_name} & Co.` : "Regulon Partner Firm";
+        const firmName = profileReadiness.full_name ? `${profileReadiness.full_name} & Co.` : "Sannidh Partner Firm";
         const registration = `AUTO-${Date.now().toString().slice(-8)}`;
         const { data: newFirm, error: newFirmError } = await serviceClient
           .from("ca_firms")

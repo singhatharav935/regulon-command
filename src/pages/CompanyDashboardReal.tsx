@@ -1969,7 +1969,7 @@ const CompanyDashboardReal = () => {
                 </Button>
               </div>
 
-              {/* Drawer Content — RegulonAIAgent */}
+              {/* Drawer Content — SannidhAIAgent */}
               <div className="flex-1 overflow-y-auto">
                 <SannidhAIAgent />
               </div>

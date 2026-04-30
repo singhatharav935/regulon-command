@@ -1,6 +1,6 @@
 # 🚀 SANNIDH FINAL MARKET DISTRIBUTION LAUNCH CHECKLIST
 
-This document strictly parses every remaining action required to transition the Regulon platform from a 100% complete local architecture to a fully public, secure, and revenue-generating live platform on the open market.
+This document strictly parses every remaining action required to transition the Sannidh platform from a 100% complete local architecture to a fully public, secure, and revenue-generating live platform on the open market.
 
 ---
 
@@ -45,7 +45,7 @@ Local mock keys must be replaced with live production keys that charge real mone
 Before charging CAs, legal frameworks must be in place.
 
 - [ ] **Terms of Service (ToS)**
-  - Write and embed a strict ToS protecting Regulon against errors made by the AI Drafting Engine (Disclaimers of Liability for legal responses).
+  - Write and embed a strict ToS protecting Sannidh against errors made by the AI Drafting Engine (Disclaimers of Liability for legal responses).
 - [ ] **Privacy Policy**
   - Disclose how CA firm data, PANs, CINs, and Client data are stored securely on Supabase.
 - [ ] **Refund & Cancellation Policy**

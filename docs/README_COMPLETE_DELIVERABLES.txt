@@ -1,9 +1,9 @@
 ================================================================================
-                    REGULON COMPLETE DOCUMENTATION
+                    SANNIDH COMPLETE DOCUMENTATION
                      All Deliverables & Locations
 ================================================================================
 
-PROJECT: REGULON - AI-Powered Regulatory Compliance Platform for India
+PROJECT: SANNIDH - AI-Powered Regulatory Compliance Platform for India
 CREATED: April 16, 2026
 STATUS: ✅ COMPLETE - All deliverables ready for demo video and exams
 
@@ -12,7 +12,7 @@ STATUS: ✅ COMPLETE - All deliverables ready for demo video and exams
 ================================================================================
 
 1. DEMO_VIDEO_SCRIPT.md (21 KB)
-   Location: /Users/atharavsingh/Desktop/REGULON_MASTER/frontend/DEMO_VIDEO_SCRIPT.md
+   Location: /Users/atharavsingh/Desktop/SANNIDH_MASTER/frontend/DEMO_VIDEO_SCRIPT.md
    Purpose: Demo video script with one-liner for each section
    Contents:
    - Business Model Overview (1 one-liner)
@@ -23,7 +23,7 @@ STATUS: ✅ COMPLETE - All deliverables ready for demo video and exams
    Format: Markdown, ready for video recording
    
 2. COMPREHENSIVE_TECH_README.md (80 KB - 2500+ lines)
-   Location: /Users/atharavsingh/Desktop/REGULON_MASTER/frontend/COMPREHENSIVE_TECH_README.md
+   Location: /Users/atharavsingh/Desktop/SANNIDH_MASTER/frontend/COMPREHENSIVE_TECH_README.md
    Purpose: Complete technical documentation
    Contents:
    
@@ -90,7 +90,7 @@ STATUS: ✅ COMPLETE - All deliverables ready for demo video and exams
    - Cost structure comparison
    - Customer loyalty mechanisms
    
-   ✅ WHY CAs & COMPANIES CHOOSE REGULON
+   ✅ WHY CAs & COMPANIES CHOOSE SANNIDH
    - ROI calculations (time saved, audit risk, revenue impact)
    - For CAs: 20 hours/month saved, 30% more clients, ₹12K/year benefit
    - For Companies: ₹10L+ audit risk avoided, CFO productivity, ₹499/mo vs ₹40K hiring
@@ -100,7 +100,7 @@ STATUS: ✅ COMPLETE - All deliverables ready for demo video and exams
    Format: Markdown with code examples, ready for printing to PDF
 
 3. DEMO_VIDEO_SCRIPT.html (32 KB)
-   Location: /Users/atharavsingh/Desktop/REGULON_MASTER/frontend/DEMO_VIDEO_SCRIPT.html
+   Location: /Users/atharavsingh/Desktop/SANNIDH_MASTER/frontend/DEMO_VIDEO_SCRIPT.html
    Purpose: Print-ready HTML version of demo script
    Format: Professional CSS styling, optimized for browser printing
    How to convert to PDF:
@@ -115,15 +115,15 @@ STATUS: ✅ COMPLETE - All deliverables ready for demo video and exams
 ================================================================================
 
 4. README_DEMO_VIDEO.md (10 KB)
-   Location: /Users/atharavsingh/Desktop/REGULON_MASTER/frontend/README_DEMO_VIDEO.md
+   Location: /Users/atharavsingh/Desktop/SANNIDH_MASTER/frontend/README_DEMO_VIDEO.md
    Quick reference guide with tables, metrics, demo flow recommendations
 
 5. QUICK_START.txt (7.7 KB)
-   Location: /Users/atharavsingh/Desktop/REGULON_MASTER/frontend/QUICK_START.txt
+   Location: /Users/atharavsingh/Desktop/SANNIDH_MASTER/frontend/QUICK_START.txt
    30-second quick start guide
 
 6. 📖_START_HERE.txt (27 KB)
-   Location: /Users/atharavsingh/Desktop/REGULON_MASTER/frontend/📖_START_HERE.txt
+   Location: /Users/atharavsingh/Desktop/SANNIDH_MASTER/frontend/📖_START_HERE.txt
    Main entry point with complete overview and quick links
 
 ================================================================================
@@ -141,13 +141,13 @@ FOR TECHNICAL INTERVIEWS/EXAMS:
    - AI Swarm Control Engine (architecture, implementation)
    - Security 12 Layers (memorize all 12)
    - Technical Q&A (13 questions with detailed answers)
-   - Competitive Advantages (why REGULON wins)
+   - Competitive Advantages (why SANNIDH wins)
 2. Review code examples for implementation details
 3. Understand tech stack choices and alternatives
 
 FOR INVESTOR PITCH:
 1. Business Model Overview
-2. Why CAs & Companies Choose REGULON (ROI)
+2. Why CAs & Companies Choose SANNIDH (ROI)
 3. Competitive Advantages section
 4. Security & Compliance highlights
 
@@ -162,7 +162,7 @@ FOR CUSTOMER ONBOARDING:
 ================================================================================
 
 Option 1: From HTML (Fastest - 30 seconds)
-- Open: /Users/atharavsingh/Desktop/REGULON_MASTER/frontend/DEMO_VIDEO_SCRIPT.html
+- Open: /Users/atharavsingh/Desktop/SANNIDH_MASTER/frontend/DEMO_VIDEO_SCRIPT.html
 - Press: Cmd+P (Mac) or Ctrl+P (Windows)
 - Save as: PDF
 - Done!
@@ -183,7 +183,7 @@ OUTPUT:
                          FILE STRUCTURE
 ================================================================================
 
-/Users/atharavsingh/Desktop/REGULON_MASTER/frontend/
+/Users/atharavsingh/Desktop/SANNIDH_MASTER/frontend/
 ├── DEMO_VIDEO_SCRIPT.md ........................ 21 KB (460 lines)
 ├── DEMO_VIDEO_SCRIPT.html ..................... 32 KB (print to PDF)
 ├── COMPREHENSIVE_TECH_README.md .............. 80 KB (2500+ lines) ⭐ MAIN
@@ -329,7 +329,7 @@ INFRASTRUCTURE:
 ================================================================================
 
 All files are located in:
-/Users/atharavsingh/Desktop/REGULON_MASTER/frontend/
+/Users/atharavsingh/Desktop/SANNIDH_MASTER/frontend/
 
 For questions or updates, refer to the main documents:
 - Technical: COMPREHENSIVE_TECH_README.md

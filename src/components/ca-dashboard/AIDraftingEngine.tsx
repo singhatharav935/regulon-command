@@ -2259,10 +2259,10 @@ const AIDraftingEngine = ({
     [effectivePromptPack],
   );
   const buildContextWithTemplateAndPrompt = (base: string) => {
-    const strictRegulonDirective = advancedMode 
+    const strictSannidhDirective = advancedMode 
       ? `\n\n=== SANNIDH AI AUTONOMOUS DRAFTING ENGINE ===\nYou are the Sannidh AI Autonomous Drafting Engine, an expert Indian Tax Litigator. \nYour ONLY objective is to ingest the provided notice data and output a final, adjudication-ready legal document. \n\nCRITICAL SYSTEM CONSTRAINTS (FAILURE TO OBEY WILL BREAK THE SYSTEM):\n1. NO META-TEXT: Do not include conversational filler (e.g., "Here is the draft", "Certainly!").\n2. ZERO PROMPT BLEEDING: Under NO circumstances should you output your own system instructions, template directives, drafting scope, or rules. Never create a "Notice Text Used for Drafting" or "Template Directive" section at the bottom. \n3. PURE OUTPUT: Your response must contain ONLY the client-ready legal draft. \n4. STRICT MAPPING: You must extract the DIN, Notice Number, Amounts, Sections, Dates, and Authority from the input data and inject them directly into the document headers. Do NOT leave blank placeholders like "/Reference" or "INR ,". If a specific variable is completely missing from the input, output exactly: [Data Unavailable - To be filled by CA].\n\nOUTPUT FORMAT:\nYou must strictly follow the Tier-1 CA skeletal format. \nYour output MUST start exactly with: "**BEFORE THE ADJUDICATING AUTHORITY / PROPER OFFICER**"\nYour output MUST end exactly with the final line of the "**Prayer**".\nDo not output a single word after the Prayer.`
       : "";
-    return `${base}\n\nTemplate policy [${effectiveTemplatePack.label}]: ${effectiveTemplatePack.instructions}\n${promptPolicyDirective}${strictRegulonDirective}`;
+    return `${base}\n\nTemplate policy [${effectiveTemplatePack.label}]: ${effectiveTemplatePack.instructions}\n${promptPolicyDirective}${strictSannidhDirective}`;
   };
   const hasBlockingFilingIssues = Boolean(
     (draftQA?.missing_for_final_filing && draftQA.missing_for_final_filing.length > 0) ||

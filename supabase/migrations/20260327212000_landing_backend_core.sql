@@ -97,7 +97,7 @@ INSERT INTO public.landing_public_content (
   stat_review_model
 ) VALUES (
   'homepage',
-  'REGULON',
+  'SANNIDH',
   'Compliance & Regulatory Command Platform',
   'AI-powered, human-verified regulatory execution for businesses. Complete compliance coverage across MCA, GST, Income Tax, RBI & SEBI.',
   'Get Started',

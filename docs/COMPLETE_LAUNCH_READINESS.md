@@ -376,7 +376,7 @@
 **Sections**:
 1. Hero: "AI-Powered Compliance for CAs" (headline)
 2. Problem: "CA firms waste 20+ hours/month on compliance"
-3. Solution: "Regulon automates GSTR, ITR, Payroll, Board Meetings"
+3. Solution: "Sannidh automates GSTR, ITR, Payroll, Board Meetings"
 4. Features: 10 biggest features with visuals
 5. Testimonials: 3-5 real CA quotes (collect during beta)
 6. Pricing: Freemium pricing table
@@ -394,7 +394,7 @@
 
 **1. Sales Deck** (15-20 slides):
 - Problem (20% of CA time wasted on compliance)
-- Solution (Regulon dashboard)
+- Solution (Sannidh dashboard)
 - Features (10 critical automations)
 - Pricing ($999/month vs ₹50000+/year outsourcing)
 - Social proof (beta CA testimonials)
@@ -417,7 +417,7 @@
 **Example**: "How CA Sharma & Associates saved 15 hours/month"
 - About the CA firm (size, services)
 - Problem before (manual GSTR filing, errors, delays)
-- Solution (Regulon GSTR-1 automation)
+- Solution (Sannidh GSTR-1 automation)
 - Result (15 hours saved, 0 errors in 3 months)
 - Quote from the CA
 
@@ -441,7 +441,7 @@
 
 **3. CA WhatsApp Groups** (Grassroots)
 - [ ] Find CA WhatsApp groups online
-- [ ] Ask permission to share Regulon
+- [ ] Ask permission to share Sannidh
 - [ ] Offer "exclusive WhatsApp group discount"
 
 **4. GST Compliance Podcasts & Communities**
@@ -503,7 +503,7 @@
 **Estimated**: 1 week
 
 - [ ] Conduct 10 video interviews with beta CAs
-- [ ] Ask: "What was hardest before Regulon?" "What's easiest now?" "Would you recommend?"
+- [ ] Ask: "What was hardest before Sannidh?" "What's easiest now?" "Would you recommend?"
 - [ ] Record short quotes (10-30 seconds each)
 - [ ] Use quotes on website + marketing materials
 

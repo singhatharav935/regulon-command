@@ -1,6 +1,6 @@
 import { readFileSync, writeFileSync } from 'fs';
 
-const filePath = '/Users/atharavsingh/Desktop/REGULON_MASTER/frontend/src/pages/ExternalCADashboardReal.tsx';
+const filePath = '/Users/atharavsingh/Desktop/SANNIDH_MASTER/frontend/src/pages/ExternalCADashboardReal.tsx';
 let content = readFileSync(filePath, 'utf8');
 
 // 1. Identify the imports we need
@@ -72,12 +72,12 @@ const finalStructure = `
                         </div>
                         <div className="pt-2 border-t border-border/30">
                            <p className="text-xs text-muted-foreground leading-relaxed">
-                              Regulon AI swarm is currently cross-referencing GST portal data with internal filing drafts for all 4 clients.
+                              Sannidh AI swarm is currently cross-referencing GST portal data with internal filing drafts for all 4 clients.
                            </p>
                         </div>
                      </div>
                   </div>
-                  <RegulonAIAgent showMinimal />
+                  <SannidhAIAgent showMinimal />
                </div>
             </div>
           </section>

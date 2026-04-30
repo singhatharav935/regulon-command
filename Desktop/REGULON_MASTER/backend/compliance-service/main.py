@@ -1,5 +1,5 @@
 """
-REGULON Compliance Service - FastAPI Backend
+SANNIDH Compliance Service - FastAPI Backend
 Handles client onboarding, consent workflow, and compliance data retrieval
 """
 
@@ -288,7 +288,7 @@ class NotificationService:
                 "https://api.resend.com/emails",
                 headers={"Authorization": f"Bearer {self.resend_key}"},
                 json={
-                    "from": os.getenv("FROM_EMAIL", "noreply@regulon.ai"),
+                    "from": os.getenv("FROM_EMAIL", "noreply@sannidh.ai"),
                     "to": [email],
                     "subject": subject,
                     "html": html_content
@@ -575,7 +575,7 @@ class ComplianceHealthCalculator:
 @asynccontextmanager
 async def lifespan(app: FastAPI):
     # Startup
-    print("🚀 REGULON Compliance Service Starting...")
+    print("🚀 SANNIDH Compliance Service Starting...")
     print(f"📊 Database: {'SQLite (Dev)' if 'sqlite' in DATABASE_URL else 'PostgreSQL'}")
     print(f"🔄 Mock Mode: {MOCK_MODE}")
     yield
@@ -584,7 +584,7 @@ async def lifespan(app: FastAPI):
 
 
 app = FastAPI(
-    title="REGULON Compliance Service",
+    title="SANNIDH Compliance Service",
     description="Consent-based compliance data retrieval and health scoring",
     version="1.0.0",
     lifespan=lifespan
@@ -620,7 +620,7 @@ def get_db():
 async def health_check():
     return {
         "status": "healthy",
-        "service": "REGULON Compliance Service",
+        "service": "SANNIDH Compliance Service",
         "version": "1.0.0",
         "mock_mode": MOCK_MODE,
         "timestamp": datetime.utcnow().isoformat()
@@ -698,7 +698,7 @@ async def send_consent_notifications(request: ClientOnboardRequest, consent_url:
         wa_message = f"""
 Hello {request.client_name},
 
-CA {request.ca_name} has requested access to your compliance data through REGULON.
+CA {request.ca_name} has requested access to your compliance data through SANNIDH.
 
 This will allow them to:
 • View your GST filing history
@@ -709,7 +709,7 @@ To authorize access, click: {consent_url}
 
 This link expires in 7 days.
 
-REGULON AI - Your Compliance Partner
+SANNIDH AI - Your Compliance Partner
         """
         
         wa_result = await notification_service.send_whatsapp(
@@ -749,13 +749,13 @@ REGULON AI - Your Compliance Partner
 <body>
     <div class="container">
         <div class="header">
-            <div class="logo">⚡ REGULON</div>
+            <div class="logo">⚡ SANNIDH</div>
             <p>Compliance Data Authorization Request</p>
         </div>
         
         <div class="card">
             <h2 class="title">Hello {request.client_name},</h2>
-            <p>CA <strong>{request.ca_name}</strong> has requested access to your compliance data through REGULON AI.</p>
+            <p>CA <strong>{request.ca_name}</strong> has requested access to your compliance data through SANNIDH AI.</p>
             
             <p>By authorizing, you allow them to:</p>
             <ul>
@@ -772,7 +772,7 @@ REGULON AI - Your Compliance Partner
         </div>
         
         <div class="footer">
-            <p>REGULON AI - Your Compliance Partner</p>
+            <p>SANNIDH AI - Your Compliance Partner</p>
             <p>This is an automated message. Please do not reply.</p>
         </div>
     </div>

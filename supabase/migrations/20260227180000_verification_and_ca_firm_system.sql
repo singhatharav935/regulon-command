@@ -299,7 +299,7 @@ BEGIN
   ELSIF registration_role = 'in_house_ca' THEN
     mapped_role := 'manager';
     mapped_persona := 'in_house_ca';
-    mapped_workspace := 'regulon_ca';
+    mapped_workspace := 'sannidh_ca';
   ELSIF registration_role = 'in_house_lawyer' THEN
     mapped_role := 'manager';
     mapped_persona := 'in_house_lawyer';

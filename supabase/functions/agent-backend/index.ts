@@ -105,7 +105,7 @@ const isValidEmail = (value: string) => /^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(value)
 
 const normalizeEmailPayload = (payload: Record<string, unknown>) => {
   const to = typeof payload.to === "string" ? payload.to.trim() : "";
-  const subject = typeof payload.subject === "string" ? payload.subject.trim().slice(0, 200) : "Regulon Notification";
+  const subject = typeof payload.subject === "string" ? payload.subject.trim().slice(0, 200) : "Sannidh Notification";
   const bodyText = typeof payload.body_text === "string"
     ? payload.body_text.slice(0, 20000)
     : "You have a new workflow update.";

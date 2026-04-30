@@ -78,7 +78,7 @@ const CapabilitiesSection = () => {
           className="text-center mb-16"
         >
           <h2 className="text-4xl md:text-5xl font-extrabold mb-6 tracking-tight">
-            What <span className="text-gradient-primary drop-shadow-sm">REGULON</span> Serves
+            What <span className="text-gradient-primary drop-shadow-sm">SANNIDH</span> Serves
           </h2>
           <p className="text-xl text-muted-foreground max-w-3xl mx-auto font-light leading-relaxed">
             Comprehensive compliance capabilities powered by AI analysis and verified professional execution.

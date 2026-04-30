@@ -4,7 +4,7 @@
 
 ### Location
 ```
-/Users/atharavsingh/Desktop/REGULON_MASTER/frontend/
+/Users/atharavsingh/Desktop/SANNIDH_MASTER/frontend/
 ```
 
 ### Files
@@ -20,7 +20,7 @@
 ### Option 1: Finder (Easiest for Mac Users)
 1. Open Finder
 2. Click: **Macintosh HD** → **Users** → **atharavsingh** → **Desktop**
-3. Open folder: **REGULON_MASTER**
+3. Open folder: **SANNIDH_MASTER**
 4. Open folder: **frontend**
 5. Find files starting with: **COMPETITIVE_**
 
@@ -28,22 +28,22 @@
 
 **View the Feature Comparison Matrix:**
 ```bash
-cat /Users/atharavsingh/Desktop/REGULON_MASTER/frontend/COMPETITIVE_LANDSCAPE_ANALYSIS.md
+cat /Users/atharavsingh/Desktop/SANNIDH_MASTER/frontend/COMPETITIVE_LANDSCAPE_ANALYSIS.md
 ```
 
 **View the Executive Summary:**
 ```bash
-cat /Users/atharavsingh/Desktop/REGULON_MASTER/frontend/COMPETITIVE_ANALYSIS_SUMMARY.md
+cat /Users/atharavsingh/Desktop/SANNIDH_MASTER/frontend/COMPETITIVE_ANALYSIS_SUMMARY.md
 ```
 
 **Open in Default Editor:**
 ```bash
-open /Users/atharavsingh/Desktop/REGULON_MASTER/frontend/COMPETITIVE_LANDSCAPE_ANALYSIS.md
+open /Users/atharavsingh/Desktop/SANNIDH_MASTER/frontend/COMPETITIVE_LANDSCAPE_ANALYSIS.md
 ```
 
 ### Option 3: VS Code
 ```bash
-code /Users/atharavsingh/Desktop/REGULON_MASTER/frontend/COMPETITIVE_LANDSCAPE_ANALYSIS.md
+code /Users/atharavsingh/Desktop/SANNIDH_MASTER/frontend/COMPETITIVE_LANDSCAPE_ANALYSIS.md
 ```
 
 ---
@@ -167,11 +167,11 @@ code /Users/atharavsingh/Desktop/REGULON_MASTER/frontend/COMPETITIVE_LANDSCAPE_A
 ## 📱 Access from Different Devices
 
 ### Mac
-- **Finder**: Desktop → REGULON_MASTER → frontend → COMPETITIVE_*.md
-- **Terminal**: `cat /Users/atharavsingh/Desktop/REGULON_MASTER/frontend/COMPETITIVE_LANDSCAPE_ANALYSIS.md`
+- **Finder**: Desktop → SANNIDH_MASTER → frontend → COMPETITIVE_*.md
+- **Terminal**: `cat /Users/atharavsingh/Desktop/SANNIDH_MASTER/frontend/COMPETITIVE_LANDSCAPE_ANALYSIS.md`
 
 ### Windows (if shared via network)
-- Navigate to network path: `\\Users\atharavsingh\Desktop\REGULON_MASTER\frontend\`
+- Navigate to network path: `\\Users\atharavsingh\Desktop\SANNIDH_MASTER\frontend\`
 
 ### GitHub (if pushed)
 - Branch: main
@@ -191,7 +191,7 @@ If searching for files:
 
 ## ✅ Quick Checklist
 
-- [ ] Can find files in /Users/atharavsingh/Desktop/REGULON_MASTER/frontend/
+- [ ] Can find files in /Users/atharavsingh/Desktop/SANNIDH_MASTER/frontend/
 - [ ] Opened COMPETITIVE_LANDSCAPE_ANALYSIS.md
 - [ ] Viewed feature comparison matrix
 - [ ] Reviewed pricing & ROI analysis

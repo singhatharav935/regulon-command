@@ -360,4 +360,4 @@ Uses Tailwind CSS with custom color scheme:
 
 ## License
 
-Part of the Regulon Compliance Management System
+Part of the Sannidh Compliance Management System

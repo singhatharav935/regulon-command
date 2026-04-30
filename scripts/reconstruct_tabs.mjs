@@ -1,6 +1,6 @@
 import { readFileSync, writeFileSync } from 'fs';
 
-const filePath = '/Users/atharavsingh/Desktop/REGULON_MASTER/frontend/src/pages/ExternalCADashboardReal.tsx';
+const filePath = '/Users/atharavsingh/Desktop/SANNIDH_MASTER/frontend/src/pages/ExternalCADashboardReal.tsx';
 let content = readFileSync(filePath, 'utf8');
 
 // The file currently has a flat structure. Let's rebuild the CADashboardSubNav and Tabs structure exactly as it was.

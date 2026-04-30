@@ -1,6 +1,6 @@
 import re
 
-file_path = "/Users/atharavsingh/Desktop/REGULON_MASTER/frontend/src/components/ca-dashboard/AIDraftingEngine.tsx"
+file_path = "/Users/atharavsingh/Desktop/SANNIDH_MASTER/frontend/src/components/ca-dashboard/AIDraftingEngine.tsx"
 with open(file_path, "r") as f:
     content = f.read()
 

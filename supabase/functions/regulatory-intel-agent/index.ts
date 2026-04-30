@@ -146,7 +146,7 @@ const fetchWithRetry = async (url: string, sourceKey: SourceConfig["key"]) => {
         headers: {
           "User-Agent": pickUserAgent(attempt),
           Accept: "text/html,application/rss+xml,application/xml;q=0.9,*/*;q=0.8",
-          "X-Regulon-Agent": sourceKey,
+          "X-Sannidh-Agent": sourceKey,
         },
         signal: controller.signal,
       });

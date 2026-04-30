@@ -1,5 +1,5 @@
 ╔═══════════════════════════════════════════════════════════════════════════╗
-║                    REGULON DEMO VIDEO SCRIPT - QUICK START               ║
+║                    SANNIDH DEMO VIDEO SCRIPT - QUICK START               ║
 ╚═══════════════════════════════════════════════════════════════════════════╝
 
 🎯 YOUR DEMO VIDEO SCRIPT IS READY!
@@ -9,25 +9,25 @@
 📁 FILES LOCATION:
 
 1. 📄 DEMO_VIDEO_SCRIPT.md
-   Path: /Users/atharavsingh/Desktop/REGULON_MASTER/frontend/DEMO_VIDEO_SCRIPT.md
+   Path: /Users/atharavsingh/Desktop/SANNIDH_MASTER/frontend/DEMO_VIDEO_SCRIPT.md
    Format: Markdown (editable text)
    Size: ~21 KB
    Use: Edit content, maintain version control
 
 2. 🌐 DEMO_VIDEO_SCRIPT.html  
-   Path: /Users/atharavsingh/Desktop/REGULON_MASTER/frontend/DEMO_VIDEO_SCRIPT.html
+   Path: /Users/atharavsingh/Desktop/SANNIDH_MASTER/frontend/DEMO_VIDEO_SCRIPT.html
    Format: HTML with styling (ready to print)
    Size: ~32 KB
    Use: Open in browser, print to PDF
 
 3. 📋 README_DEMO_VIDEO.md
-   Path: /Users/atharavsingh/Desktop/REGULON_MASTER/frontend/README_DEMO_VIDEO.md
+   Path: /Users/atharavsingh/Desktop/SANNIDH_MASTER/frontend/README_DEMO_VIDEO.md
    Format: Comprehensive guide
    Size: ~20 KB
    Use: Reference and usage instructions
 
 4. 📖 PDF_GENERATION_INSTRUCTIONS.txt
-   Path: /Users/atharavsingh/Desktop/REGULON_MASTER/frontend/PDF_GENERATION_INSTRUCTIONS.txt
+   Path: /Users/atharavsingh/Desktop/SANNIDH_MASTER/frontend/PDF_GENERATION_INSTRUCTIONS.txt
    Format: Step-by-step guide
    Use: Convert to PDF
 
@@ -35,7 +35,7 @@
 
 ⚡ FASTEST WAY TO GET PDF:
 
-$ open /Users/atharavsingh/Desktop/REGULON_MASTER/frontend/DEMO_VIDEO_SCRIPT.html
+$ open /Users/atharavsingh/Desktop/SANNIDH_MASTER/frontend/DEMO_VIDEO_SCRIPT.html
 
 Then:
 1. Press Cmd+P (Mac) or Ctrl+P (Windows)
@@ -127,7 +127,7 @@ COMPANY DASHBOARD (12 sections):
 
 🎤 DEMO VIDEO TALKING POINTS:
 
-Start: "REGULON is an AI-powered, human-verified compliance platform..."
+Start: "SANNIDH is an AI-powered, human-verified compliance platform..."
 
 Landing Page: "Our platform covers all major Indian regulators and offers 
              complete compliance solutions with mandatory professional review."
@@ -138,7 +138,7 @@ CA Dashboard: "CAs get AI-powered task prioritization, automated drafting,
 Company: "Companies track compliance health, manage deadlines, communicate 
          directly with CAs, and access audit-ready documentation."
 
-Close: "REGULON transforms compliance from a burden into a competitive 
+Close: "SANNIDH transforms compliance from a burden into a competitive 
        advantage through AI and professional expertise."
 
 ═══════════════════════════════════════════════════════════════════════════
@@ -160,13 +160,13 @@ Just open, read the one-liners, and present!
 📞 QUICK REFERENCE:
 
 Markdown (to edit):
-/Users/atharavsingh/Desktop/REGULON_MASTER/frontend/DEMO_VIDEO_SCRIPT.md
+/Users/atharavsingh/Desktop/SANNIDH_MASTER/frontend/DEMO_VIDEO_SCRIPT.md
 
 HTML (to view/print):
-/Users/atharavsingh/Desktop/REGULON_MASTER/frontend/DEMO_VIDEO_SCRIPT.html
+/Users/atharavsingh/Desktop/SANNIDH_MASTER/frontend/DEMO_VIDEO_SCRIPT.html
 
 README (for help):
-/Users/atharavsingh/Desktop/REGULON_MASTER/frontend/README_DEMO_VIDEO.md
+/Users/atharavsingh/Desktop/SANNIDH_MASTER/frontend/README_DEMO_VIDEO.md
 
 ═══════════════════════════════════════════════════════════════════════════
 

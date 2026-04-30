@@ -1,5 +1,5 @@
 /**
- * Database utilities for Regulon Backend
+ * Database utilities for Sannidh Backend
  */
 
 import pkg from 'pg';

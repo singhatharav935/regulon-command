@@ -993,7 +993,7 @@ const UniversityDashboardShell = ({ mode }: UniversityDashboardShellProps) => {
             ]}
           />
 
-          {/* Regulon Live AI Agent - Conversational like Siri/Alexa */}
+          {/* Sannidh Live AI Agent - Conversational like Siri/Alexa */}
           <SannidhLiveAgent
             dashboardId={`university-${mode}`}
             dashboardType="university"

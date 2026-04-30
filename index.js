@@ -35,7 +35,7 @@ const AUTHORITY_DOMAIN = {
 };
 
 const USER_AGENTS = [
-  "Regulon-Agent/3.0 (+https://sannidh.in)",
+  "Sannidh-Agent/3.0 (+https://sannidh.in)",
   "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/122.0.0.0 Safari/537.36",
 ];
 
@@ -471,7 +471,7 @@ const fetchSEBI = async () => {
       if (item) rows.push(item);
     });
   } catch (error) {
-    console.log("[Regulon Agent] SEBI scraping error:", error.message);
+    console.log("[Sannidh Agent] SEBI scraping error:", error.message);
   }
 
   return dedupeAndSort(rows).slice(0, 15);
@@ -693,14 +693,14 @@ export const fetchLiveUpdates = async () => {
     try {
       const items = await plan.fn();
       allItems.push(...items);
-      console.log(`[Regulon Agent] ${plan.authority}: fetched ${items.length} item(s)`);
+      console.log(`[Sannidh Agent] ${plan.authority}: fetched ${items.length} item(s)`);
       sourceStatus[plan.authority] = {
         status: "active",
         last_fetch_at: now,
         last_error: null,
       };
     } catch (error) {
-      console.log(`[Regulon Agent] ${plan.authority}: source temporarily unavailable`);
+      console.log(`[Sannidh Agent] ${plan.authority}: source temporarily unavailable`);
       sourceStatus[plan.authority] = {
         status: "awaiting_feed",
         last_fetch_at: now,
@@ -983,15 +983,15 @@ app.get("/regulatory-news", async (_req, res) => {
 
 if (process.env.SANNIDH_AGENT_NO_SERVER !== "1") {
   app.listen(PORT, async () => {
-    console.log(`[Regulon Agent] listening on http://localhost:${PORT}`);
+    console.log(`[Sannidh Agent] listening on http://localhost:${PORT}`);
     // Fetch initial data on startup
-    console.log(`[Regulon Agent] fetching initial data...`);
+    console.log(`[Sannidh Agent] fetching initial data...`);
     try {
       cachedAlerts = await fetchLiveUpdates();
       lastFetchTime = Date.now();
-      console.log(`[Regulon Agent] initial fetch complete: ${cachedAlerts.length} alerts cached`);
+      console.log(`[Sannidh Agent] initial fetch complete: ${cachedAlerts.length} alerts cached`);
     } catch (error) {
-      console.log(`[Regulon Agent] initial fetch failed:`, error.message);
+      console.log(`[Sannidh Agent] initial fetch failed:`, error.message);
     }
   });
 }

@@ -3,7 +3,7 @@
 ## Current Status
 
 ✅ **Local Commit Created**: `867bb06`  
-📝 **Commit Message**: "chore: rebrand project from REGULON to SANNIDH"  
+📝 **Commit Message**: "chore: rebrand project from SANNIDH to SANNIDH"  
 📊 **Files Changed**: 702 files  
 ✏️ **Insertions/Deletions**: 169,785 insertions(+), 11,677 deletions(-)  
 
@@ -16,10 +16,10 @@ commit 867bb06ee691b45bcf6405726a7165730ff615c1
 Author: singhatharav935 <singhatharav935@gmail.com>
 Date:   Tue Apr 28 13:53:38 2026 +0530
 
-chore: rebrand project from REGULON to SANNIDH
+chore: rebrand project from SANNIDH to SANNIDH
 
-- Renamed all occurrences: REGULON → SANNIDH (2,635 replacements)
-- Renamed components: RegulonLiveAgent → SannidhLiveAgent, RegulonAIAgent → SannidhAIAgent
+- Renamed all occurrences: SANNIDH → SANNIDH (2,635 replacements)
+- Renamed components: SannidhLiveAgent → SannidhLiveAgent, SannidhAIAgent → SannidhAIAgent
 - Updated all import paths across 6+ dashboard files
 - Updated configuration domains: sannidh.ai
 - Updated encryption salt and Supabase references
@@ -46,7 +46,7 @@ Co-authored-by: Copilot <223556219+Copilot@users.noreply.github.com>
 
 ### Option 1: Using GitHub CLI (Recommended)
 ```bash
-cd /Users/atharavsingh/Desktop/REGULON_MASTER/frontend
+cd /Users/atharavsingh/Desktop/SANNIDH_MASTER/frontend
 gh auth login  # If not already authenticated
 git push origin main
 ```
@@ -60,7 +60,7 @@ ssh-keygen -t ed25519 -C "singhatharav935@gmail.com"
 ssh-add ~/.ssh/id_ed25519
 
 # Update remote to SSH
-git remote set-url origin git@github.com:singhatharav935/regulon-command.git
+git remote set-url origin git@github.com:singhatharav935/sannidh-command.git
 
 # Push
 git push origin main
@@ -107,7 +107,7 @@ Once pushed to GitHub:
    ```
 
 2. ✅ Check GitHub repository:
-   - Go to: https://github.com/singhatharav935/regulon-command
+   - Go to: https://github.com/singhatharav935/sannidh-command
    - Verify commit appears in recent commits
    - Verify files are updated
 

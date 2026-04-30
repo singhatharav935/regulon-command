@@ -151,11 +151,11 @@ const buildLocalAgentPayload = async () => {
     announcements: (announcements as AgentAlert[]).map((item, index: number) => ({
       id: `agent-${index}-${item.title ?? "notice"}`,
       source: String(item.authority ?? "agent").toLowerCase(),
-      source_label: item.authority ?? "Regulon Agent",
+      source_label: item.authority ?? "Sannidh Agent",
       title: item.title ?? "Regulatory update",
       summary: item.summary ?? null,
       category: null,
-      announced_by: item.authority ?? "Regulon Agent",
+      announced_by: item.authority ?? "Sannidh Agent",
       source_url: item.source_url ?? null,
       announced_on: item.publish_date ?? nowIso.slice(0, 10),
       published_date: item.publish_date ?? nowIso.slice(0, 10),

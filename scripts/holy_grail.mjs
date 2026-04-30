@@ -1,6 +1,6 @@
 import { readFileSync, writeFileSync } from 'fs';
 
-const filePath = '/Users/atharavsingh/Desktop/REGULON_MASTER/frontend/src/pages/ExternalCADashboardReal.tsx';
+const filePath = '/Users/atharavsingh/Desktop/SANNIDH_MASTER/frontend/src/pages/ExternalCADashboardReal.tsx';
 
 // We'll read the current file just to get the `DailyGovernanceBrief` and `ExternalCADashboardReal` component setups.
 // But we will completely rewrite the JSX structure of `<main>`.
@@ -10,7 +10,7 @@ import { useNavigate } from "react-router-dom";
 import { motion, AnimatePresence } from "framer-motion";
 import Navbar from "@/components/layout/Navbar";
 import Footer from "@/components/layout/Footer";
-import RegulonAIAgent from "@/components/ai-agent/RegulonAIAgent";
+import SannidhAIAgent from "@/components/ai-agent/SannidhAIAgent";
 import AIDraftingEngine from "@/components/ca-dashboard/AIDraftingEngine";
 import TaskFilingManagement from "@/components/ca-dashboard/TaskFilingManagement";
 import ClientDependencyTracker from "@/components/ca-dashboard/ClientDependencyTracker";
@@ -113,7 +113,7 @@ const mainUI = `
                   </motion.div>
                   <DailyGovernanceBrief />
 
-                  {/* ---------------- REGULON AI DRAFTING ENGINE BANNER -------------- */}
+                  {/* ---------------- SANNIDH AI DRAFTING ENGINE BANNER -------------- */}
                   <motion.div className="mt-8" initial={{ opacity: 0, y: 20 }} animate={{ opacity: 1, y: 0 }} transition={{ delay: 0.12 }}>
                     <button
                       onClick={() => setIsDrawerOpen(true)}
@@ -129,7 +129,7 @@ const mainUI = `
                           </div>
                           <div className="text-left">
                             <div className="flex items-center gap-2 mb-1">
-                              <h3 className="font-bold text-white text-lg">REGULON AI Drafting Engine</h3>
+                              <h3 className="font-bold text-white text-lg">SANNIDH AI Drafting Engine</h3>
                               <Badge className="bg-gradient-to-r from-purple-600 to-cyan-600 text-white text-xs">LIVE v3.0</Badge>
                             </div>
                             <p className="text-xs text-muted-foreground">Connected to Live AI Agent • Real-time Document Generation • CA Final Approval</p>
@@ -174,7 +174,7 @@ const mainUI = `
                         </div>
                      </div>
                   </div>
-                  <RegulonAIAgent showMinimal />
+                  <SannidhAIAgent showMinimal />
                </div>
             </div>
           </section>
@@ -353,7 +353,7 @@ const stateHooks = `const ExternalCADashboardReal = () => {
                      <Cpu className="w-5 h-5 text-purple-400" />
                   </div>
                   <div>
-                    <h2 className="text-lg font-bold text-foreground">REGULON AI Drafting Engine</h2>
+                    <h2 className="text-lg font-bold text-foreground">SANNIDH AI Drafting Engine</h2>
                     <p className="text-xs text-muted-foreground">Full Autonomous Executive Interface</p>
                   </div>
                 </div>

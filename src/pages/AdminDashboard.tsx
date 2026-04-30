@@ -53,7 +53,7 @@ const AdminDashboard = () => {
             </p>
           </motion.div>
 
-          {/* Regulon Live AI Agent - Conversational like Siri/Alexa */}
+          {/* Sannidh Live AI Agent - Conversational like Siri/Alexa */}
           <SannidhLiveAgent
             dashboardId="demo-admin"
             dashboardType="admin"

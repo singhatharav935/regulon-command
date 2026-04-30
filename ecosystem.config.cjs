@@ -1,7 +1,7 @@
 module.exports = {
   apps: [
     {
-      name: "regulon-agent",
+      name: "sannidh-agent",
       script: "./index.js",
       cwd: ".",
       instances: 1,
@@ -13,8 +13,8 @@ module.exports = {
       max_restarts: 20,
       exp_backoff_restart_delay: 200,
       merge_logs: true,
-      out_file: "./logs/regulon-agent.out.log",
-      error_file: "./logs/regulon-agent.err.log",
+      out_file: "./logs/sannidh-agent.out.log",
+      error_file: "./logs/sannidh-agent.err.log",
       log_date_format: "YYYY-MM-DD HH:mm:ss Z",
       env: {
         NODE_ENV: "production",

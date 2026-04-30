@@ -1,4 +1,4 @@
--- Production hardening for Regulon Agent regulatory intelligence pipeline.
+-- Production hardening for Sannidh Agent regulatory intelligence pipeline.
 
 create table if not exists public.regulatory_source_states (
   source text primary key,

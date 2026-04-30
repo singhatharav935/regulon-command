@@ -253,7 +253,7 @@ The Company Dashboard provides real-time compliance visibility, AI-powered insig
 
 ---
 
-### 1. **Regulon AI Compliance Partner**
+### 1. **Sannidh AI Compliance Partner**
 **One-Liner:** An intelligent AI assistant providing compliance recommendations, tracking regulatory impacts on your business, and enabling direct communication with your assigned CA.
 
 **Features:**

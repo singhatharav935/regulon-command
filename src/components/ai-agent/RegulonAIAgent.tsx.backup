@@ -1,5 +1,5 @@
 /**
- * Regulon AI Executive Agent
+ * Sannidh AI Executive Agent
  * Autonomous, proactive AI system for CA compliance management
  * Features: Activity Stream, Task Console, Voice I/O, Tool Execution, Approval Workflow
  */
@@ -70,7 +70,7 @@ interface ApprovalRequest {
   generatedAt: string;
 }
 
-const RegulonAIAgent = () => {
+const SannidhAIAgent = () => {
   // State Management
   const [tasks, setTasks] = useState<Task[]>([]);
   const [activities, setActivities] = useState<ActivityLog[]>([]);
@@ -91,7 +91,7 @@ const RegulonAIAgent = () => {
   const recognitionRef = useRef<SpeechRecognition | null>(null);
   const synthesisRef = useRef<SpeechSynthesisUtterance | null>(null);
 
-  // Initialize Speech Recognition with "Hey Regulon" wake-word detection
+  // Initialize Speech Recognition with "Hey Sannidh" wake-word detection
   useEffect(() => {
     const SpeechRecognition =
       window.SpeechRecognition || (window as any).webkitSpeechRecognition;
@@ -117,8 +117,8 @@ const RegulonAIAgent = () => {
 
         const lowerTranscript = transcript.toLowerCase().trim();
 
-        // Check for "Hey Regulon" wake-word
-        if (isFinal && (lowerTranscript.includes("hey regulon") || lowerTranscript.startsWith("hey regulon"))) {
+        // Check for "Hey Sannidh" wake-word
+        if (isFinal && (lowerTranscript.includes("hey sannidh") || lowerTranscript.startsWith("hey sannidh"))) {
           setIsListening(true);
           setWakeWordDetected(true);
           setShowSiriInterface(true);
@@ -129,9 +129,9 @@ const RegulonAIAgent = () => {
             setShowSiriInterface(false);
           }, 3000);
           
-          // Text-to-Speech: Regulon responds
+          // Text-to-Speech: Sannidh responds
           const utterance = new SpeechSynthesisUtterance(
-            "Hey, this is Regulon AI, your compliance partner. Tell me what you need."
+            "Hey, this is Sannidh AI, your compliance partner. Tell me what you need."
           );
           utterance.rate = 1;
           utterance.pitch = 1;
@@ -139,7 +139,7 @@ const RegulonAIAgent = () => {
           window.speechSynthesis.cancel(); // Cancel any previous speech
           window.speechSynthesis.speak(utterance);
           
-          toast.success("🎤 Regulon activated!");
+          toast.success("🎤 Sannidh activated!");
           
           // Send wake-word event to backend
           fetch("/api/ca/voice/wake-word", {
@@ -156,9 +156,9 @@ const RegulonAIAgent = () => {
             }),
           }).catch(err => console.error("Wake-word logging failed:", err));
 
-          // Extract command after "Hey Regulon"
+          // Extract command after "Hey Sannidh"
           const commandText = lowerTranscript
-            .replace(/hey regulon[\s,]*/i, "")
+            .replace(/hey sannidh[\s,]*/i, "")
             .trim();
 
           if (commandText) {
@@ -657,7 +657,7 @@ What would you like me to do next?`;
 
   return (
     <>
-      {/* Siri-like "Hey Regulon" Interface with Animated Circles */}
+      {/* Siri-like "Hey Sannidh" Interface with Animated Circles */}
       <AnimatePresence>
         {showSiriInterface && (
           <motion.div
@@ -740,10 +740,10 @@ What would you like me to do next?`;
                 transition={{ duration: 0.5, repeat: Infinity, repeatType: "mirror" }}
                 className="text-center"
               >
-                <h2 className="text-4xl font-bold text-cyan-400 mb-2">REGULON AI</h2>
+                <h2 className="text-4xl font-bold text-cyan-400 mb-2">SANNIDH AI</h2>
                 <p className="text-xl text-cyan-300 mb-4">Listening...</p>
                 <p className="text-gray-300 max-w-md mx-auto">
-                  "Hey, this is Regulon AI, your compliance partner. Tell me what you need."
+                  "Hey, this is Sannidh AI, your compliance partner. Tell me what you need."
                 </p>
               </motion.div>
             </motion.div>
@@ -778,10 +778,10 @@ What would you like me to do next?`;
               </motion.div>
               <div>
                 <p className="text-sm font-semibold text-cyan-400">
-                  {isListening ? "Listening..." : "Regulon AI"}
+                  {isListening ? "Listening..." : "Sannidh AI"}
                 </p>
                 <p className="text-xs text-muted-foreground">
-                  {isListening ? '🎤 Say "Hey Regulon"' : "Ready"}
+                  {isListening ? '🎤 Say "Hey Sannidh"' : "Ready"}
                 </p>
               </div>
             </div>
@@ -825,7 +825,7 @@ What would you like me to do next?`;
             {/* Chat Input */}
             <div className="flex gap-3">
               <Textarea
-                placeholder='Say "Hey Regulon" or type here...\n• "Draft GSTR-3B response"\n• "Check GST notices"\n• "Reconcile data"'
+                placeholder='Say "Hey Sannidh" or type here...\n• "Draft GSTR-3B response"\n• "Check GST notices"\n• "Reconcile data"'
                 value={userInput}
                 onChange={(e) => setUserInput(e.target.value)}
                 onKeyDown={(e) => {
@@ -868,7 +868,7 @@ What would you like me to do next?`;
             {tasks.length > 0 && (
               <div className="pt-2 border-t border-border/50">
                 <p className="text-xs text-muted-foreground mb-2">
-                  {tasks.length} pending tasks • Say "Hey Regulon, show tasks"
+                  {tasks.length} pending tasks • Say "Hey Sannidh, show tasks"
                 </p>
                 <div className="flex gap-2 overflow-x-auto">
                   {tasks.slice(0, 3).map((task) => (
@@ -892,9 +892,9 @@ What would you like me to do next?`;
                 <Bot className="w-5 h-5 text-cyan-400" />
               </div>
               <div>
-                <CardTitle className="text-cyan-400">Regulon AI Voice Agent</CardTitle>
+                <CardTitle className="text-cyan-400">Sannidh AI Voice Agent</CardTitle>
                 <CardDescription>
-                  Say <span className="text-cyan-400 font-semibold">"Hey Regulon"</span> to activate voice mode | Or type commands below
+                  Say <span className="text-cyan-400 font-semibold">"Hey Sannidh"</span> to activate voice mode | Or type commands below
                 </CardDescription>
               </div>
             </div>
@@ -906,7 +906,7 @@ What would you like me to do next?`;
                   : "bg-green-500/10 text-green-400 border-green-500/50"
               }`}
             >
-              {isListening && "🎤 Listening for 'Hey Regulon'..."}
+              {isListening && "🎤 Listening for 'Hey Sannidh'..."}
               {!isListening && (isProcessing ? "Processing..." : "Ready")}
             </Badge>
           </div>
@@ -1044,7 +1044,7 @@ What would you like me to do next?`;
           <div className="space-y-3">
             <label className="text-sm font-medium text-cyan-400 flex items-center gap-2">
               <MessageSquare className="w-4 h-4" />
-              Manual Text Input (or say "Hey Regulon" for voice)
+              Manual Text Input (or say "Hey Sannidh" for voice)
             </label>
             <div className="flex gap-2">
               <Textarea
@@ -1186,4 +1186,4 @@ What would you like me to do next?`;
   );
 };
 
-export default RegulonAIAgent;
+export default SannidhAIAgent;

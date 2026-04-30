@@ -133,7 +133,7 @@ Official grievance and privacy contact details must be maintained by admin/legal
 
 Last Updated: 2026-03-28
 
-These terms govern access and use of the REGULON platform.
+These terms govern access and use of the SANNIDH platform.
 
 ## Service Scope
 - AI-assisted compliance drafting with human-in-the-loop controls

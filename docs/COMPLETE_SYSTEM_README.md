@@ -2,7 +2,7 @@
 
 🏛️ **Complete Backend & Advanced Landing Pages Implementation**
 
-Regulon is an enterprise-grade regulatory compliance intelligence platform that monitors 7 government sources in real-time and provides AI-powered compliance automation for Chartered Accountants, legal teams, and organizations.
+Sannidh is an enterprise-grade regulatory compliance intelligence platform that monitors 7 government sources in real-time and provides AI-powered compliance automation for Chartered Accountants, legal teams, and organizations.
 
 ## 🌟 What's New in This Release
 

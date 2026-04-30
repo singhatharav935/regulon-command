@@ -1,6 +1,6 @@
 import re
 
-file_path = "/Users/atharavsingh/Desktop/REGULON_MASTER/frontend/src/components/ca-dashboard/AIDraftingEngine.tsx"
+file_path = "/Users/atharavsingh/Desktop/SANNIDH_MASTER/frontend/src/components/ca-dashboard/AIDraftingEngine.tsx"
 with open(file_path, "r") as f:
     content = f.read()
 
@@ -36,7 +36,7 @@ for prefix_cap, label, prefix_low in sections:
                     </div>
                     <div>
                       <p className="text-base font-bold text-foreground flex items-center gap-2">
-                        <Shield className="w-4 h-4 text-primary" /> REGULON Supreme Audit & Auto-Rectify ⚡
+                        <Shield className="w-4 h-4 text-primary" /> SANNIDH Supreme Audit & Auto-Rectify ⚡
                       </p>
                       <p className="text-xs text-muted-foreground mt-1">
                         Advanced 1-Click Workflow: Cross-validates {label} draft against statutory provisions and evidence instantly, replacing all flagged issues automatically.

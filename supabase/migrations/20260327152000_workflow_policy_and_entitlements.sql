@@ -11,7 +11,7 @@ CREATE TABLE IF NOT EXISTS public.authority_workflow_policies (
 CREATE TABLE IF NOT EXISTS public.ca_actor_entitlements (
   id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
   user_id UUID NOT NULL UNIQUE REFERENCES auth.users(id) ON DELETE CASCADE,
-  regulon_legal_lane_enabled BOOLEAN NOT NULL DEFAULT false,
+  sannidh_legal_lane_enabled BOOLEAN NOT NULL DEFAULT false,
   assistant_access_enabled BOOLEAN NOT NULL DEFAULT true,
   plan_monthly_request_limit INTEGER,
   notes TEXT,

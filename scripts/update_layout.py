@@ -1,6 +1,6 @@
 import sys
 
-path = '/Users/atharavsingh/Desktop/REGULON_MASTER/frontend/src/pages/ExternalCADashboardReal.tsx'
+path = '/Users/atharavsingh/Desktop/SANNIDH_MASTER/frontend/src/pages/ExternalCADashboardReal.tsx'
 with open(path, 'r') as f:
     content = f.read()
 

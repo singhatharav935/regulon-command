@@ -1,4 +1,4 @@
--- REGULON Database Functions for Performance
+-- SANNIDH Database Functions for Performance
 -- These functions provide optimized queries for dashboard statistics and reporting
 
 -- Function to get compliance statistics for a user

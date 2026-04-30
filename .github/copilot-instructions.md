@@ -1,4 +1,4 @@
-# Copilot Instructions for Regulon
+# Copilot Instructions for Sannidh
 
 ## Quick Reference
 

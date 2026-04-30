@@ -1,6 +1,6 @@
 import { readFileSync, writeFileSync } from 'fs';
 
-const filePath = '/Users/atharavsingh/Desktop/REGULON_MASTER/frontend/src/pages/ExternalCADashboardReal.tsx';
+const filePath = '/Users/atharavsingh/Desktop/SANNIDH_MASTER/frontend/src/pages/ExternalCADashboardReal.tsx';
 let content = readFileSync(filePath, 'utf8');
 
 // 1. Correct Imports
@@ -105,7 +105,7 @@ const sidebarAndTabs = `
                 <div className="mt-8 p-6 rounded-2xl border border-dashed border-border/50 flex flex-col items-center justify-center text-center">
                   <Cpu className="w-12 h-12 text-muted-foreground mb-4 opacity-50" />
                   <h3 className="text-lg font-medium text-foreground">Advanced Drafting Engine</h3>
-                  <p className="text-sm text-muted-foreground max-w-md mx-auto mb-6">Access the full potential of Regulon AI for complex legal responses and regulatory filings.</p>
+                  <p className="text-sm text-muted-foreground max-w-md mx-auto mb-6">Access the full potential of Sannidh AI for complex legal responses and regulatory filings.</p>
                   <Button onClick={() => setIsDrawerOpen(true)} className="bg-purple-600 hover:bg-purple-700">Open Full Drafting Engine</Button>
                 </div>
               </TabsContent>

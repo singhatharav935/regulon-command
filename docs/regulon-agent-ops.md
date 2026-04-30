@@ -1,4 +1,4 @@
-# Regulon Agent Production Ops
+# Sannidh Agent Production Ops
 
 This runs the live ingestion worker continuously and writes announcements into Supabase.
 

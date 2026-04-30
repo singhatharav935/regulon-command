@@ -2,7 +2,7 @@
  * SANNIDH LIVE AI AGENT
  * 
  * A Siri/Alexa-like conversational AI assistant that:
- * - Listens to voice commands ("Hey Regulon, make their balance sheet")
+ * - Listens to voice commands ("Hey Sannidh, make their balance sheet")
  * - Responds with natural voice like a human
  * - Executes tasks autonomously (Ingestor, Matchmaker, Architect, Sentinel)
  * - Keeps CA in control with approval workflows
@@ -183,7 +183,7 @@ const COMMAND_PATTERNS = [
 
 const RESPONSES = {
   greeting: [
-    "Namaste! Main Regulon hoon, aapka compliance partner. Kaise madad kar sakta hoon?",
+    "Namaste! Main Sannidh hoon, aapka compliance partner. Kaise madad kar sakta hoon?",
     "Good morning! I'm Sannidh, your AI compliance partner. How can I help you today?",
     "Hello! Sannidh here. Ready to work on your compliance tasks."
   ],
@@ -799,7 +799,7 @@ const SannidhLiveAgent = ({
                   <Input
                     value={inputText}
                     onChange={(e) => setInputText(e.target.value)}
-                    placeholder="Type a command or say 'Hey Regulon'..."
+                    placeholder="Type a command or say 'Hey Sannidh'..."
                     className="flex-1 bg-slate-800 border-slate-600 text-white placeholder:text-slate-500"
                   />
                   <Button type="submit" className="bg-cyan-600 hover:bg-cyan-700">

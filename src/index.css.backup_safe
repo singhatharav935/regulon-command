@@ -4,7 +4,7 @@
 @tailwind components;
 @tailwind utilities;
 
-/* REGULON Design System - Premium Dark Infrastructure Aesthetic */
+/* SANNIDH Design System - Premium Dark Infrastructure Aesthetic */
 
 @layer base {
   :root {

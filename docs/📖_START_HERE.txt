@@ -1,5 +1,5 @@
 ╔═══════════════════════════════════════════════════════════════════════════╗
-║         🎬 REGULON DEMO VIDEO SCRIPT - START HERE                        ║
+║         🎬 SANNIDH DEMO VIDEO SCRIPT - START HERE                        ║
 ║                     Complete Demo Reference Package                      ║
 ╚═══════════════════════════════════════════════════════════════════════════╝
 
@@ -44,7 +44,7 @@ All sections, one-liners, and talking points have been generated for:
 🚀 FASTEST PATH TO PDF (30 SECONDS):
 
 STEP 1: Open HTML in Browser
-$ open /Users/atharavsingh/Desktop/REGULON_MASTER/frontend/DEMO_VIDEO_SCRIPT.html
+$ open /Users/atharavsingh/Desktop/SANNIDH_MASTER/frontend/DEMO_VIDEO_SCRIPT.html
 
 STEP 2: Print to PDF
 Mac: Press Cmd + P
@@ -102,7 +102,7 @@ Company Dashboard:
 💬 ONE-LINER FOR EACH SECTION:
 
 BUSINESS MODEL:
-"REGULON is an AI-powered, human-verified regulatory execution platform that 
+"SANNIDH is an AI-powered, human-verified regulatory execution platform that 
 automates compliance across Indian regulators (MCA, GST, Income Tax, RBI, SEBI) 
 with mandatory professional verification by licensed CAs and lawyers before 
 submission."
@@ -207,7 +207,7 @@ Ready for:
 📍 FILE LOCATIONS:
 
 All files in:
-/Users/atharavsingh/Desktop/REGULON_MASTER/frontend/
+/Users/atharavsingh/Desktop/SANNIDH_MASTER/frontend/
 
 Main files:
 ├─ DEMO_VIDEO_SCRIPT.md ............ Markdown (editable)
@@ -264,7 +264,7 @@ FOR TRAINING:
 
 🔑 KEY TALKING POINTS:
 
-"REGULON covers 5+ major regulators including MCA, GST, Income Tax, RBI, 
+"SANNIDH covers 5+ major regulators including MCA, GST, Income Tax, RBI, 
 and SEBI. We have 10,000+ regulatory blueprints and monitor 7 government 
 portals in real-time. Every compliance action is verified by licensed CAs 
 and lawyers before submission to regulators."
@@ -318,9 +318,9 @@ NEXT STEPS:
 📞 QUICK LINKS:
 
 Open Files:
-open /Users/atharavsingh/Desktop/REGULON_MASTER/frontend/DEMO_VIDEO_SCRIPT.html
-open /Users/atharavsingh/Desktop/REGULON_MASTER/frontend/DEMO_VIDEO_SCRIPT.md
-open /Users/atharavsingh/Desktop/REGULON_MASTER/frontend/README_DEMO_VIDEO.md
+open /Users/atharavsingh/Desktop/SANNIDH_MASTER/frontend/DEMO_VIDEO_SCRIPT.html
+open /Users/atharavsingh/Desktop/SANNIDH_MASTER/frontend/DEMO_VIDEO_SCRIPT.md
+open /Users/atharavsingh/Desktop/SANNIDH_MASTER/frontend/README_DEMO_VIDEO.md
 
 ═══════════════════════════════════════════════════════════════════════════
 

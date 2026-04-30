@@ -268,7 +268,7 @@ app.get('/api/v1/ca/', mockAuth, (req, res) => {
 
 // Start server
 app.listen(PORT, () => {
-  console.log(`\n🚀 Regulon Real Backend Test Server`);
+  console.log(`\n🚀 Sannidh Real Backend Test Server`);
   console.log(`📍 Running on: http://localhost:${PORT}`);
   console.log(`🔗 Health Check: http://localhost:${PORT}/health`);
   console.log(`📊 CA Dashboard API: http://localhost:${PORT}/api/v1/ca/`);

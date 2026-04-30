@@ -1,8 +1,8 @@
-# Regulon Platform - Quick Start Guide
+# Sannidh Platform - Quick Start Guide
 
 ## Overview
 
-Regulon is an AI-powered regulatory compliance platform for Indian businesses. It monitors 7 government portals in real-time and provides CAs with actionable compliance intelligence.
+Sannidh is an AI-powered regulatory compliance platform for Indian businesses. It monitors 7 government portals in real-time and provides CAs with actionable compliance intelligence.
 
 ## System Architecture
 
@@ -403,5 +403,5 @@ git push origin feature/your-feature
 ---
 
 **Last Updated:** 2026-03-29
-**Maintainer:** Regulon Team
+**Maintainer:** Sannidh Team
 **Repository:** https://github.com/singhatharav935/sannidh-command

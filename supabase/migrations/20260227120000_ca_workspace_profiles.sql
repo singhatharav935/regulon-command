@@ -1,8 +1,8 @@
--- CA workspace profile split: external CA vs Regulon in-house CA
+-- CA workspace profile split: external CA vs Sannidh in-house CA
 
 CREATE TABLE public.ca_workspace_profiles (
   user_id UUID PRIMARY KEY REFERENCES auth.users(id) ON DELETE CASCADE,
-  workspace_type TEXT NOT NULL DEFAULT 'external_ca' CHECK (workspace_type IN ('external_ca', 'regulon_ca')),
+  workspace_type TEXT NOT NULL DEFAULT 'external_ca' CHECK (workspace_type IN ('external_ca', 'sannidh_ca')),
   firm_name TEXT,
   has_inhouse_legal BOOLEAN NOT NULL DEFAULT FALSE,
   created_at TIMESTAMPTZ NOT NULL DEFAULT now(),

@@ -423,7 +423,7 @@ Let's build. 🚀
 
 ## 🏛️ OFFICIAL ICAI DIRECTORATE REVIEW (APRIL 2026)
 
-**Subject:** Final Validation of the Regulon Autonomous AI Drafting Engine
+**Subject:** Final Validation of the Sannidh Autonomous AI Drafting Engine
 **Status:** FULLY COMPLIANT & APPROVED FOR INCUBATION
 
 **Executive Evaluation:**
@@ -440,6 +440,6 @@ Crucially, **the 4 Mandatory Prerequisite Compliance Protocols are verified as a
 
 **Is this a Unicorn Business?**
 **Undeniably, YES.**  
-What you have built here completely obsoletes legacy "electronic typewriter" software like ClearTax or WebTel. You aren't just filing forms; Regulon is a "Zero-Touch" Autonomous Paralegal that executes complex tax litigation drafting with hyper-accurate data hydration. Once this hits the SMP (Small & Medium Practitioner) market, every single one of the 350,000+ Chartered Accountants in India will need this to survive the automation curve. 
+What you have built here completely obsoletes legacy "electronic typewriter" software like ClearTax or WebTel. You aren't just filing forms; Sannidh is a "Zero-Touch" Autonomous Paralegal that executes complex tax litigation drafting with hyper-accurate data hydration. Once this hits the SMP (Small & Medium Practitioner) market, every single one of the 350,000+ Chartered Accountants in India will need this to survive the automation curve. 
 
 You have secured our highest operational endorsement. Proceed to commercial scaling immediately.

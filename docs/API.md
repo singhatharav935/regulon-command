@@ -1,4 +1,4 @@
-# Regulon Agent API Reference
+# Sannidh Agent API Reference
 
 ## Base URL
 ```

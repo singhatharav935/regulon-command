@@ -1,9 +1,9 @@
 #!/bin/bash
 
-# REGULON Production Readiness Checker
+# SANNIDH Production Readiness Checker
 # Comprehensive technical verification script
 
-echo "🚀 REGULON PRODUCTION READINESS CHECK"
+echo "🚀 SANNIDH PRODUCTION READINESS CHECK"
 echo "======================================"
 echo
 
@@ -11,7 +11,7 @@ echo
 echo "📱 FRONTEND STATUS"
 echo "-------------------"
 
-cd /Users/atharavsingh/Desktop/REGULON_MASTER/frontend
+cd /Users/atharavsingh/Desktop/SANNIDH_MASTER/frontend
 
 echo "✅ Build Status:"
 npm run build > /tmp/build.log 2>&1
@@ -50,7 +50,7 @@ echo
 echo "🔧 BACKEND STATUS"
 echo "------------------"
 
-cd /Users/atharavsingh/Desktop/REGULON_MASTER/backend/real-backend
+cd /Users/atharavsingh/Desktop/SANNIDH_MASTER/backend/real-backend
 
 # Check if server is running
 if curl -s http://localhost:3001/health > /dev/null 2>&1; then
@@ -112,7 +112,7 @@ echo
 echo "⚡ PERFORMANCE STATUS"
 echo "----------------------"
 
-cd /Users/atharavsingh/Desktop/REGULON_MASTER/frontend
+cd /Users/atharavsingh/Desktop/SANNIDH_MASTER/frontend
 
 # Check if lazy loading is implemented
 LAZY_COUNT=$(grep -r "lazy\|Suspense" src/ | wc -l)

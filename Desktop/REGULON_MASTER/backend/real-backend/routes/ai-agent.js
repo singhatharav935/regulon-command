@@ -835,7 +835,7 @@ async function generateComplianceReport(company_id) {
 
 /**
  * POST /api/ca/voice/wake-word
- * Handle "Hey Regulon" wake-word detection
+ * Handle "Hey Sannidh" wake-word detection
  */
 router.post('/voice/wake-word', async (req, res) => {
   try {
@@ -844,15 +844,15 @@ router.post('/voice/wake-word', async (req, res) => {
     // Log wake-word event with TTS response
     console.log(`[VOICE] Wake-word detected at ${timestamp} for CA: ${ca_id}`);
     if (responded_with_tts) {
-      console.log(`[VOICE-TTS] Regulon AI spoke: "Hey, this is Regulon AI, your compliance partner. Tell me what you need."`);
+      console.log(`[VOICE-TTS] Sannidh AI spoke: "Hey, this is Sannidh AI, your compliance partner. Tell me what you need."`);
     }
 
     // Return success with TTS confirmation
     res.json({
       success: true,
       event: 'wake_word_acknowledged',
-      message: 'Regulon is listening for your command',
-      tts_response: responded_with_tts ? 'Hey, this is Regulon AI, your compliance partner. Tell me what you need.' : null,
+      message: 'Sannidh is listening for your command',
+      tts_response: responded_with_tts ? 'Hey, this is Sannidh AI, your compliance partner. Tell me what you need.' : null,
       siri_interface_shown: true,
       timestamp: new Date().toISOString(),
       ca_id,
@@ -868,7 +868,7 @@ router.post('/voice/wake-word', async (req, res) => {
 
 /**
  * POST /api/ca/voice/command
- * Process voice commands after "Hey Regulon" activation
+ * Process voice commands after "Hey Sannidh" activation
  */
 router.post('/voice/command', async (req, res) => {
   try {

@@ -262,7 +262,7 @@ Owner Editable Section:
       ? `You have ${ledgerNeedsApproval.length} approval items pending before external submission. Pending approval highlights: ${topApprovals.join(". ")}.`
       : "No approval-blocked item right now.";
 
-    return `Good morning, ${actorName}. This is your Regulon autonomous brief for ${roleLabel}. ${completed} ${pending} ${rules} ${actions} ${approvals} Please review and approve pending actions so I can execute the final outbound steps.`;
+    return `Good morning, ${actorName}. This is your Sannidh autonomous brief for ${roleLabel}. ${completed} ${pending} ${rules} ${actions} ${approvals} Please review and approve pending actions so I can execute the final outbound steps.`;
   }, [actorName, roleLabel, pendingWork, newRules, autopilotActions, ledgerCompleted, ledgerNeedsApproval, handledPortals, topCompletedActions, topApprovals]);
   const scriptHindi = useMemo(() => {
     const pending = pendingWork.length > 0
@@ -281,7 +281,7 @@ Owner Editable Section:
       ? `${ledgerNeedsApproval.length} approval items pending hain. Pending highlights: ${topApprovals.join(". ")}. Submission se pehle confirm karein.`
       : "Is waqt koi approval-blocked item pending nahi hai.";
 
-    return `Namaste ${actorName}. Yeh aapka Regulon autonomous brief hai, role ${roleLabel}. ${completed} ${pending} ${rules} ${actions} ${approvals} Kripya review karke pending approvals approve karein.`;
+    return `Namaste ${actorName}. Yeh aapka Sannidh autonomous brief hai, role ${roleLabel}. ${completed} ${pending} ${rules} ${actions} ${approvals} Kripya review karke pending approvals approve karein.`;
   }, [actorName, roleLabel, pendingWork, newRules, autopilotActions, ledgerCompleted, ledgerNeedsApproval, handledPortals, topCompletedActions, topApprovals]);
   const script = voiceLanguage === "hi-IN" ? scriptHindi : scriptEnglish;
 
