@@ -1,0 +1,120 @@
+import { useEffect, useState } from "react";
+import { Navigate, useLocation } from "react-router-dom";
+import type { ReactElement } from "react";
+import { useAuth } from "@/hooks/use-auth";
+import type { Database } from "@/integrations/supabase/types";
+import type { AppPersona } from "@/hooks/use-auth";
+import { previewBypassEnabled } from "@/lib/runtime-flags";
+import { getLocalPreviewPersona, personaToFallbackRole } from "@/lib/local-preview-auth";
+
+type AppRole = Database["public"]["Enums"]["app_role"];
+
+interface ProtectedRouteProps {
+  children: ReactElement;
+  allowRoles?: AppRole[];
+  allowPersonas?: AppPersona[];
+  requireVerified?: boolean;
+}
+
+const verificationRequiredPersonas: AppPersona[] = ["external_ca", "in_house_ca", "in_house_lawyer", "company_owner", "admin", "ca_firm"];
+const VERIFICATION_OPTIONAL_FOR_NOW = previewBypassEnabled;
+
+const inferPersonaFromMetadata = (registrationRole: unknown): AppPersona | null => {
+  if (
+    registrationRole === "external_ca" ||
+    registrationRole === "admin" ||
+    registrationRole === "company_owner" ||
+    registrationRole === "in_house_ca" ||
+    registrationRole === "in_house_lawyer" ||
+    registrationRole === "ca_firm"
+  ) {
+    return registrationRole;
+  }
+  return null;
+};
+
+const ProtectedRoute = ({ children, allowRoles, allowPersonas, requireVerified = true }: ProtectedRouteProps) => {
+  const { loading, user, roles, persona, isVerified } = useAuth();
+  const location = useLocation();
+  const [forceResolve, setForceResolve] = useState(false);
+  const previewPersona = VERIFICATION_OPTIONAL_FOR_NOW ? getLocalPreviewPersona() : null;
+  const previewRoles: AppRole[] = previewPersona ? [personaToFallbackRole(previewPersona)] : [];
+  const effectiveRoles = roles.length > 0 ? roles : previewRoles;
+  const fallbackPersona = inferPersonaFromMetadata(user?.user_metadata?.registration_role);
+  // localRole (from registration form) takes priority OVER previewPersona (from demo PersonaSelector)
+  // This prevents a stale demo session from overriding a fresh real registration.
+  const localRole = (localStorage.getItem("current_user_role") || localStorage.getItem("pending_registration_role")) as AppPersona | null;
+  const effectivePersona = persona ?? fallbackPersona ?? localRole ?? previewPersona;
+  const hasAccessIdentity = Boolean(user) || Boolean(previewPersona) || Boolean(localRole);
+  const unresolvedIdentity = hasAccessIdentity && !effectivePersona && effectiveRoles.length === 0;
+
+  useEffect(() => {
+    if (!loading) return;
+    const timer = setTimeout(() => setForceResolve(true), 5000);
+    return () => clearTimeout(timer);
+  }, [loading]);
+
+  if (loading && !forceResolve) {
+    return (
+      <div className="min-h-screen bg-background flex items-center justify-center">
+        <div className="text-center">
+          <div className="w-12 h-12 border-4 border-primary border-t-transparent rounded-full animate-spin mx-auto mb-4" />
+          <p className="text-muted-foreground">Checking access...</p>
+        </div>
+      </div>
+    );
+  }
+
+  if (loading && forceResolve) {
+    return <Navigate to="/auth" replace state={{ from: location.pathname }} />;
+  }
+
+  if (!hasAccessIdentity) {
+    return <Navigate to="/auth" replace state={{ from: location.pathname }} />;
+  }
+
+  // Use user metadata as a temporary fallback while role/persona rows hydrate.
+  if (unresolvedIdentity) {
+    if (allowPersonas && allowPersonas.length > 0 && (!effectivePersona || !allowPersonas.includes(effectivePersona))) {
+      return <Navigate to="/app" replace />;
+    }
+
+    if (requireVerified && effectivePersona && verificationRequiredPersonas.includes(effectivePersona) && !VERIFICATION_OPTIONAL_FOR_NOW && !isVerified) {
+      return <Navigate to="/app/verification" replace />;
+    }
+
+    if (!allowRoles || allowRoles.length === 0 || effectivePersona) {
+      return children;
+    }
+
+    return <Navigate to="/app" replace />;
+  }
+
+  if (allowRoles && allowRoles.length > 0) {
+    const hasAllowedRole = allowRoles.some((role) => effectiveRoles.includes(role));
+
+    if (!hasAllowedRole && (!allowPersonas || allowPersonas.length === 0)) {
+      return <Navigate to="/dashboard" replace />;
+    }
+  }
+
+  if (allowPersonas && allowPersonas.length > 0) {
+    const hasAllowedPersona = effectivePersona ? allowPersonas.includes(effectivePersona) : false;
+    const hasAllowedRole = allowRoles && allowRoles.length > 0
+      ? allowRoles.some((role) => effectiveRoles.includes(role))
+      : false;
+
+    // Fallback for older users/sessions where persona row is not present yet.
+    if (!hasAllowedPersona && !hasAllowedRole) {
+      return <Navigate to="/app" replace />;
+    }
+  }
+
+  if (!VERIFICATION_OPTIONAL_FOR_NOW && requireVerified && effectivePersona && verificationRequiredPersonas.includes(effectivePersona) && !isVerified) {
+    return <Navigate to="/app/verification" replace />;
+  }
+
+  return children;
+};
+
+export default ProtectedRoute;
