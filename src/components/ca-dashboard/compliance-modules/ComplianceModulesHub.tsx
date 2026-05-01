@@ -43,6 +43,12 @@ const DINTANRenewalPanel  = lazy(() => import('./DINTANRenewalPanel'));
 const AccountingSoftwareSync = lazy(() => import('./AccountingSoftwareSync'));
 const BankReconciliationAutomator = lazy(() => import('./BankReconciliationAutomator'));
 
+// Phase 6: Advanced Optimizer Suite
+const RegimeOptimizerPanel       = lazy(() => import('./RegimeOptimizerPanel'));
+const CapitalGainsPanel          = lazy(() => import('./CapitalGainsPanel'));
+const AdvanceTaxRadarPanel       = lazy(() => import('./AdvanceTaxRadarPanel'));
+const DeferredTaxDepreciationPanel = lazy(() => import('./DeferredTaxDepreciationPanel'));
+
 const CA_API = (import.meta.env.VITE_CA_API_BASE_URL as string) || 'http://localhost:3001';
 
 interface Module {
@@ -226,6 +232,35 @@ const MODULES: Module[] = [
     description: 'Upload PDF statements for automated parsing and suspense ledger analysis.',
     icon: Landmark, color: 'text-teal-400', bgColor: 'bg-teal-500/20', badge: 'Finance', isNew: true,
     component: BankReconciliationAutomator,
+  },
+  // ── Phase 6: Advanced Optimizer Suite ─────────────────────────────────────
+  {
+    id: 'regime-optimizer',
+    label: 'Tax Regime Optimizer (Old vs New)',
+    description: 'Side-by-side Old vs New Regime comparison. Auto-calculates optimal regime and shows exact savings.',
+    icon: TrendingUp, color: 'text-violet-400', bgColor: 'bg-violet-500/20', badge: 'Income Tax', isNew: true,
+    component: RegimeOptimizerPanel,
+  },
+  {
+    id: 'capital-gains',
+    label: 'Capital Gains Calculator (Broker Sync)',
+    description: 'STCG / LTCG with CII indexation, Grandfathering clause (Jan 31, 2018 FMV), and Sec 112A exemption.',
+    icon: BarChart3, color: 'text-emerald-400', bgColor: 'bg-emerald-500/20', badge: 'Income Tax', isNew: true,
+    component: CapitalGainsPanel,
+  },
+  {
+    id: 'advance-tax-radar',
+    label: 'Advance Tax Radar (234B/C Predictor)',
+    description: 'Projects full-year tax from YTD profit. Shows per-installment dues and interest risk under Sec 234B/C.',
+    icon: AlertTriangle, color: 'text-cyan-400', bgColor: 'bg-cyan-500/20', badge: 'Income Tax', isNew: true,
+    component: AdvanceTaxRadarPanel,
+  },
+  {
+    id: 'deferred-tax',
+    label: 'Deferred Tax & Dual Depreciation',
+    description: 'Generates dual depreciation schedules (Companies Act vs IT Act) and computes DTL / DTA for balance sheet.',
+    icon: FileText, color: 'text-indigo-400', bgColor: 'bg-indigo-500/20', badge: 'Audit', isNew: true,
+    component: DeferredTaxDepreciationPanel,
   },
 ];
 

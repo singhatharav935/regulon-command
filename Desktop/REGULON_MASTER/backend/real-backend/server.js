@@ -30,6 +30,7 @@ import auditRoutes from './routes/audit.js';
 import securityRoutes from './routes/security.js';
 import monitoringRoutes from './routes/monitoring.js';
 import regulatoryRoutes from './routes/regulatory.js';
+import advancedCalculatorsRoutes from './routes/advanced-calculators.js';
 
 // Load environment variables
 dotenv.config();
@@ -140,6 +141,7 @@ app.use(`/api/${apiVersion}/audit`, auditRoutes);
 app.use(`/api/${apiVersion}/security`, securityRoutes);
 app.use(`/api/${apiVersion}/monitoring`, monitoringRoutes);
 app.use(`/api/${apiVersion}/regulatory`, regulatoryRoutes);
+app.use(`/api/${apiVersion}/ca/calculators`, advancedCalculatorsRoutes);
 
 // 404 handler
 app.use('*', (req, res) => {
