@@ -36,7 +36,7 @@ const HeroSection = ({ content }: HeroSectionProps) => {
     companyName: "",
     message: "",
   });
-  const title = content?.title || "SANNIDH";
+  const title = "SANNIDH"; // Brand name - always hardcoded, not from backend
   const subtitle = content?.subtitle || "Compliance & Regulatory Command Platform";
   const description = content?.description ||
     "AI-powered, human-verified regulatory execution for businesses. Complete compliance coverage across MCA, GST, Income Tax, RBI & SEBI.";
