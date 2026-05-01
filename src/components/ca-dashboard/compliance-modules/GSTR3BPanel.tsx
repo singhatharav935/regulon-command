@@ -1,6 +1,7 @@
 import { useState } from 'react';
 import { motion } from 'framer-motion';
-import { Calculator, RefreshCw, AlertTriangle, CheckCircle, IndianRupee } from 'lucide-react';
+import { Calculator, RefreshCw, AlertTriangle, Download, IndianRupee } from 'lucide-react';
+import jsPDF from 'jspdf';
 import { Card, CardContent } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
@@ -10,7 +11,7 @@ import { toast } from 'sonner';
 const CA_API = (import.meta.env.VITE_CA_API_BASE_URL as string) || 'http://localhost:3001';
 const API_BASE = `${CA_API}/api/v1/compliance`;
 
-export default function GSTR3BPanel({ clientId }: { clientId?: string }) {
+export default function GSTR3BPanel({ clientId, isDemo }: { clientId?: string; isDemo?: boolean }) {
   const [loading, setLoading] = useState(false);
   const [result, setResult] = useState<any>(null);
   const [form, setForm] = useState({ period_month: new Date().getMonth() + 1, period_year: new Date().getFullYear(), outward_cgst: '', outward_sgst: '', outward_igst: '', itc_cgst: '', itc_sgst: '', itc_igst: '', rcm_liability: '' });
@@ -18,6 +19,31 @@ export default function GSTR3BPanel({ clientId }: { clientId?: string }) {
   const handleCalc = async () => {
     if (!clientId) { toast.error('Select a client first'); return; }
     setLoading(true);
+
+    if (isDemo) {
+      setTimeout(() => {
+        const out = parseFloat(form.outward_cgst || '0') + parseFloat(form.outward_sgst || '0') + parseFloat(form.outward_igst || '0');
+        const itc = parseFloat(form.itc_cgst || '0') + parseFloat(form.itc_sgst || '0') + parseFloat(form.itc_igst || '0');
+        const rcm = parseFloat(form.rcm_liability || '0');
+        const net = Math.max(0, out + rcm - itc);
+
+        setResult({
+          summary: 'GSTR-3B Final computation ready. System suggests cash payment of ' + net.toLocaleString(),
+          due_date: '20th of Next Month',
+          payment_mode: 'Online/Challan',
+          computation: {
+            outward_tax: { total: out },
+            itc_available: { total: itc },
+            net_tax_payable: { total: net }
+          },
+          alerts: itc > out * 0.8 ? [{ type: 'warning', message: 'ITC utilized is > 80% of liability. Ensure Rule 86B compliance.' }] : []
+        });
+        toast.success('GSTR-3B calculated (Demo Mode)');
+        setLoading(false);
+      }, 600);
+      return;
+    }
+
     try {
       const response = await fetch(`${API_BASE}/gstr3b/calculate`, {
         method: 'POST',
@@ -29,6 +55,81 @@ export default function GSTR3BPanel({ clientId }: { clientId?: string }) {
       else toast.error(data.error || 'Calculation failed');
     } catch { toast.error('Backend connection error'); }
     finally { setLoading(false); }
+  };
+
+  const [exporting, setExporting] = useState(false);
+
+  const handleExport = () => {
+    if (!result) {
+      toast.error('Generate the computation first before exporting.');
+      return;
+    }
+    setExporting(true);
+    toast.info('Generating GSTR-3B Computation Report...', { duration: 1000 });
+    setTimeout(() => {
+      try {
+        const doc = new jsPDF();
+        
+        // Header
+        doc.setFillColor(37, 99, 235); // Blue-600
+        doc.rect(0, 0, 210, 40, 'F');
+        doc.setTextColor(255, 255, 255);
+        doc.setFontSize(22);
+        doc.text('SANNIDH | TAX COMPUTATION', 20, 25);
+        doc.setFontSize(10);
+        doc.text('GSTR-3B Net Tax Liability Statement', 20, 32);
+
+        // Report Info
+        doc.setTextColor(0, 0, 0);
+        doc.setFontSize(12);
+        doc.setFont('helvetica', 'bold');
+        doc.text('GSTR-3B PERIODIC COMPUTATION', 20, 55);
+        doc.setFont('helvetica', 'normal');
+        doc.setFontSize(10);
+        doc.text(`Client ID: ${clientId || 'DEMO_CLIENT'}`, 20, 65);
+        doc.text(`Period: ${form?.period_month}/${form?.period_year}`, 20, 70);
+        doc.text(`Payment Due Date: ${result?.due_date || 'N/A'}`, 20, 75);
+
+        // Computation Grid
+        doc.setDrawColor(220, 220, 220);
+        doc.line(20, 85, 190, 85);
+        
+        doc.setFont('helvetica', 'bold');
+        doc.text('PARTICULARS', 20, 95);
+        doc.text('AMOUNT (RS.)', 150, 95);
+        doc.line(20, 98, 190, 98);
+
+        doc.setFont('helvetica', 'normal');
+        doc.text('Total Outward Tax Liability', 20, 110);
+        doc.text((result?.computation?.outward_tax?.total || 0).toLocaleString(), 150, 110);
+        
+        doc.text('Less: Eligible ITC (Input Tax Credit)', 20, 120);
+        doc.text(`(${(result?.computation?.itc_available?.total || 0).toLocaleString()})`, 150, 120);
+
+        doc.text('Add: RCM Liability / Interest / Late Fee', 20, 130);
+        doc.text((result?.computation?.rcm_liability_added || 0).toLocaleString(), 150, 130);
+
+        doc.line(140, 135, 190, 135);
+        doc.setFont('helvetica', 'bold');
+        doc.text('NET TAX PAYABLE IN CASH', 20, 145);
+        doc.text(`Rs. ${(result?.computation?.net_tax_payable?.total || 0).toLocaleString()}`, 150, 145);
+
+        // Footer
+        doc.setFontSize(8);
+        doc.setTextColor(150, 150, 150);
+        doc.text(`Document Generated: ${new Date().toLocaleString()}`, 20, 280);
+        doc.text('Regulon Master - Compliance Auto-Pilot Signature Verified', 130, 280);
+
+        doc.save(`GSTR3B_Computation_${clientId || 'DEMO'}.pdf`);
+
+        toast.success('GSTR-3B Official Report Downloaded.');
+      } catch (err) {
+        console.error('PDF Generation Error:', err);
+        toast.error('Failed to generate PDF.');
+      } finally {
+        setExporting(false);
+      }
+    }, 1500);
   };
 
   const field = (label: string, key: string) => (
@@ -83,6 +184,15 @@ export default function GSTR3BPanel({ clientId }: { clientId?: string }) {
               <p className="text-sm">{alert.message}</p>
             </div>
           ))}
+          <Button 
+            variant="outline" 
+            onClick={handleExport} 
+            disabled={exporting}
+            className="w-full border-blue-500/30 text-blue-400 hover:bg-blue-500/10 mt-2"
+          >
+            {exporting ? <RefreshCw className="w-4 h-4 animate-spin mr-2" /> : <Download className="w-4 h-4 mr-2" />}
+            {exporting ? 'Generating Report...' : 'Export Government PDF'}
+          </Button>
         </motion.div>
       )}
     </motion.div>

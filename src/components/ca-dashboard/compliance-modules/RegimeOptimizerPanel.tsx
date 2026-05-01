@@ -3,9 +3,11 @@
  * Part of Sannidh ComplianceModulesHub — Advanced Calculators
  */
 import React, { useState } from 'react';
-import { IndianRupee, TrendingDown, TrendingUp, Zap, RotateCcw } from 'lucide-react';
+import { Calculator, Zap, TrendingUp, Download, RefreshCw, AlertTriangle, IndianRupee, TrendingDown, RotateCcw } from 'lucide-react';
+import jsPDF from 'jspdf';
 import { Badge } from '@/components/ui/badge';
 import { Button } from '@/components/ui/button';
+import { toast } from 'sonner';
 
 const CA_API = (import.meta.env.VITE_CA_API_BASE_URL as string) || 'http://localhost:3001';
 
@@ -35,7 +37,7 @@ const Field = ({ label, value, onChange, max }: { label: string; value: number; 
   </div>
 );
 
-export default function RegimeOptimizerPanel({ clientId }: { clientId?: string }) {
+export default function RegimeOptimizerPanel({ clientId, isDemo }: { clientId?: string; isDemo?: boolean }) {
   const [form, setForm] = useState({
     gross_salary: 0, hra_exemption: 0, sec_80c: 0,
     sec_80d: 0, sec_80ccd_1b: 0, home_loan_interest: 0,
@@ -43,11 +45,118 @@ export default function RegimeOptimizerPanel({ clientId }: { clientId?: string }
   });
   const [result, setResult] = useState<RegimeResult | null>(null);
   const [loading, setLoading] = useState(false);
+  const [exporting, setExporting] = useState(false);
+
+  const handleExport = () => {
+    if (!result) {
+      toast.error('Generate the comparison first before exporting.');
+      return;
+    }
+    setExporting(true);
+    toast.info('Generating Side-by-Side Tax Comparison Report...', { duration: 1000 });
+    setTimeout(() => {
+      try {
+        const doc = new jsPDF();
+        
+        // Header
+        doc.setFillColor(236, 72, 153); // Pink-500
+        doc.rect(0, 0, 210, 40, 'F');
+        doc.setTextColor(255, 255, 255);
+        doc.setFontSize(22);
+        doc.text('SANNIDH | TAX ADVISORY', 20, 25);
+        doc.setFontSize(10);
+        doc.text('Old vs New Tax Regime Optimization Report', 20, 32);
+
+        // Recommendation Header
+        doc.setTextColor(0, 0, 0);
+        doc.setFontSize(14);
+        doc.setFont('helvetica', 'bold');
+        doc.text(`RECOMMENDATION: CHOOSE ${(result?.comparison?.recommended || 'New').toUpperCase()} REGIME`, 20, 55);
+        
+        doc.setFontSize(10);
+        doc.setFont('helvetica', 'normal');
+        doc.text(`Estimated Annual Savings: Rs. ${(result?.comparison?.saving || 0).toLocaleString()}`, 20, 65);
+        doc.text(`Client ID: ${clientId || 'DEMO_CLIENT'}`, 20, 70);
+
+        // Comparison Table
+        doc.setDrawColor(230, 230, 230);
+        doc.line(20, 80, 190, 80);
+        
+        doc.setFont('helvetica', 'bold');
+        doc.text('PARTICULARS', 20, 90);
+        doc.text('OLD REGIME', 100, 90);
+        doc.text('NEW REGIME', 150, 90);
+        doc.line(20, 93, 190, 93);
+
+        doc.setFont('helvetica', 'normal');
+        const rows = [
+          ['Total Income (Excl. Exemp)', (result?.old_regime?.taxable_income || 0).toLocaleString(), (result?.new_regime?.taxable_income || 0).toLocaleString()],
+          ['Standard Deduction', '50,000', '75,000'],
+          ['Chapter VI-A Deductions', (result?.deductions?.total_80c_80d || 0).toLocaleString(), '0'],
+          ['NET TAXABLE INCOME', (result?.old_regime?.taxable_income || 0).toLocaleString(), (result?.new_regime?.taxable_income || 0).toLocaleString()],
+          ['TAX LIABILITY (INC. CESS)', (result?.old_regime?.tax_liability || 0).toLocaleString(), (result?.new_regime?.tax_liability || 0).toLocaleString()]
+        ];
+
+        let y = 105;
+        rows.forEach(row => {
+          doc.text(row[0], 20, y);
+          doc.text(row[1], 100, y);
+          doc.text(row[2], 150, y);
+          y += 10;
+        });
+
+        // Footer
+        doc.setFontSize(8);
+        doc.setTextColor(150, 150, 150);
+        doc.text(`Analysis Date: ${new Date().toLocaleString()} | Powered by Regulon AI Optimizer`, 20, 280);
+
+        doc.save(`Tax_Optimizer_Report_${clientId || 'DEMO'}.pdf`);
+
+        toast.success('Tax Optimizer Report Downloaded.');
+      } catch (err) {
+        console.error('PDF Generation Error:', err);
+        toast.error('Failed to generate Optimizer PDF.');
+      } finally {
+        setExporting(false);
+      }
+    }, 1500);
+  };
 
   const set = (k: string) => (v: number) => setForm(f => ({ ...f, [k]: v }));
 
+  const runLocalMath = () => {
+    const oldSlabs = (ti: number) => {
+      let t = ti <= 250000 ? 0 : ti <= 500000 ? (ti-250000)*0.05 : ti <= 1000000 ? 12500+(ti-500000)*0.20 : 112500+(ti-1000000)*0.30;
+      if (ti <= 500000) t = 0;
+      return Math.round(t * 1.04);
+    };
+    const newSlabs = (ti: number) => {
+      let t = ti <= 300000 ? 0 : ti <= 700000 ? (ti-300000)*0.05 : ti <= 1000000 ? 20000+(ti-700000)*0.10 : ti <= 1200000 ? 50000+(ti-1000000)*0.15 : ti <= 1500000 ? 80000+(ti-1200000)*0.20 : 140000+(ti-1500000)*0.30;
+      if (ti <= 700000) t = 0;
+      return Math.round(t * 1.04);
+    };
+    const totalDed = Math.min(form.sec_80c,150000)+Math.min(form.sec_80d,50000)+Math.min(form.sec_80ccd_1b,50000)+Math.min(form.home_loan_interest,200000)+form.other_deductions+Math.min(form.professional_tax,2400);
+    const taxableOld = Math.max(0, form.gross_salary - form.hra_exemption - 50000 - totalDed);
+    const taxableNew = Math.max(0, form.gross_salary - 75000);
+    const taxOld = oldSlabs(taxableOld);
+    const taxNew = newSlabs(taxableNew);
+    const saving = taxOld - taxNew;
+    setResult({
+      old_regime: { gross_salary: form.gross_salary, hra_exemption: form.hra_exemption, standard_deduction: 50000, total_deductions: totalDed, taxable_income: taxableOld, tax_liability: taxOld },
+      new_regime: { gross_salary: form.gross_salary, standard_deduction: 75000, taxable_income: taxableNew, tax_liability: taxNew },
+      comparison: { saving: Math.abs(saving), saving_regime: saving >= 0 ? 'new' : 'old', recommended: saving >= 0 ? 'new' : 'old', recommendation_text: saving >= 0 ? `You save ${fmt(Math.abs(saving))} by choosing the New Regime.` : `You save ${fmt(Math.abs(saving))} by staying in the Old Regime.` },
+    });
+  };
+
   const calculate = async () => {
     setLoading(true);
+    if (isDemo) {
+      setTimeout(() => {
+        runLocalMath();
+        setLoading(false);
+      }, 600);
+      return;
+    }
     try {
       const res = await fetch(`${CA_API}/api/v1/ca/calculators/regime-optimizer`, {
         method: 'POST',
@@ -57,28 +166,7 @@ export default function RegimeOptimizerPanel({ clientId }: { clientId?: string }
       const json = await res.json();
       if (json.success) setResult(json.data);
     } catch {
-      // fallback: run purely client-side
-      const oldSlabs = (ti: number) => {
-        let t = ti <= 250000 ? 0 : ti <= 500000 ? (ti-250000)*0.05 : ti <= 1000000 ? 12500+(ti-500000)*0.20 : 112500+(ti-1000000)*0.30;
-        if (ti <= 500000) t = 0;
-        return Math.round(t * 1.04);
-      };
-      const newSlabs = (ti: number) => {
-        let t = ti <= 300000 ? 0 : ti <= 700000 ? (ti-300000)*0.05 : ti <= 1000000 ? 20000+(ti-700000)*0.10 : ti <= 1200000 ? 50000+(ti-1000000)*0.15 : ti <= 1500000 ? 80000+(ti-1200000)*0.20 : 140000+(ti-1500000)*0.30;
-        if (ti <= 700000) t = 0;
-        return Math.round(t * 1.04);
-      };
-      const totalDed = Math.min(form.sec_80c,150000)+Math.min(form.sec_80d,50000)+Math.min(form.sec_80ccd_1b,50000)+Math.min(form.home_loan_interest,200000)+form.other_deductions+Math.min(form.professional_tax,2400);
-      const taxableOld = Math.max(0, form.gross_salary - form.hra_exemption - 50000 - totalDed);
-      const taxableNew = Math.max(0, form.gross_salary - 75000);
-      const taxOld = oldSlabs(taxableOld);
-      const taxNew = newSlabs(taxableNew);
-      const saving = taxOld - taxNew;
-      setResult({
-        old_regime: { gross_salary: form.gross_salary, hra_exemption: form.hra_exemption, standard_deduction: 50000, total_deductions: totalDed, taxable_income: taxableOld, tax_liability: taxOld },
-        new_regime: { gross_salary: form.gross_salary, standard_deduction: 75000, taxable_income: taxableNew, tax_liability: taxNew },
-        comparison: { saving: Math.abs(saving), saving_regime: saving >= 0 ? 'new' : 'old', recommended: saving >= 0 ? 'new' : 'old', recommendation_text: saving >= 0 ? `You save ${fmt(Math.abs(saving))} by choosing the New Regime.` : `You save ${fmt(Math.abs(saving))} by staying in the Old Regime.` },
-      });
+      runLocalMath();
     }
     setLoading(false);
   };
@@ -170,6 +258,16 @@ export default function RegimeOptimizerPanel({ clientId }: { clientId?: string }
               </div>
             </div>
           </div>
+
+          <Button 
+            variant="outline" 
+            onClick={handleExport} 
+            disabled={exporting}
+            className="w-full border-purple-500/30 text-purple-400 hover:bg-purple-500/10 mt-2"
+          >
+            {exporting ? <RefreshCw className="w-4 h-4 animate-spin mr-2" /> : <Download className="w-4 h-4 mr-2" />}
+            {exporting ? 'Generating Report...' : 'Export Advisory PDF'}
+          </Button>
 
           <p className="text-[10px] text-muted-foreground text-center">
             Includes 4% Health & Education Cess. Surcharge applied for income &gt; ₹50L.

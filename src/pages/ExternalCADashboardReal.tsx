@@ -17,15 +17,7 @@ import AuditInspectionSupport from "@/components/ca-dashboard/AuditInspectionSup
 import CommunicationLogsLive from "@/components/ca-dashboard/CommunicationLogsLive";
 import CAAnalyticsPerformance from "@/components/ca-dashboard/CAAnalyticsPerformance";
 
-import InvoiceParserPanel from "@/components/ca-dashboard/compliance-modules/InvoiceParserPanel";
-import GSTR1Panel from "@/components/ca-dashboard/compliance-modules/GSTR1Panel";
-import GSTR3BPanel from "@/components/ca-dashboard/compliance-modules/GSTR3BPanel";
-import ITRPanel from "@/components/ca-dashboard/compliance-modules/ITRPanel";
-import MCAForm20BPanel from "@/components/ca-dashboard/compliance-modules/MCAForm20BPanel";
-import SalaryTDSPanel from "@/components/ca-dashboard/compliance-modules/SalaryTDSPanel";
-import EPFESIPanel from "@/components/ca-dashboard/compliance-modules/EPFESIPanel";
-import AuditFilePanel from "@/components/ca-dashboard/compliance-modules/AuditFilePanel";
-import FinancialsPanel from "@/components/ca-dashboard/compliance-modules/FinancialsPanel";
+import ComplianceModulesHub from "@/components/ca-dashboard/compliance-modules/ComplianceModulesHub";
 import ApprovalWorkflowHub from "@/components/ca-dashboard/ApprovalWorkflowHub";
 import ClientPortfolioSection from "@/components/ca-dashboard/ClientPortfolioSection";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
@@ -1659,7 +1651,7 @@ const ExternalCADashboardReal = () => {
                   <p className="text-sm text-muted-foreground">Manage multi-entity compliance status and secure documentation.</p>
                 </div>
                 <MultiClientMasterHub />
-                <InvoiceParserPanel isRealDashboard={true} />
+                
                 
                 <div className="flex flex-col space-y-8">
                   <TaskFilingManagement isRealDashboard={true} apiEndpoint={`${CA_API}/api/v1/ca/tasks`} governmentIntegration={true} />
@@ -1716,11 +1708,7 @@ const ExternalCADashboardReal = () => {
                 </div>
                 
                 <div className="flex flex-col space-y-8">
-                  <GSTR1Panel isRealDashboard={true} />
-                  <GSTR3BPanel isRealDashboard={true} />
-                  <ITRPanel isRealDashboard={true} />
-                  <AuditFilePanel isRealDashboard={true} />
-                  <FinancialsPanel isRealDashboard={true} />
+                  <ComplianceModulesHub />
                 </div>
               </TabsContent>
             </Tabs>

@@ -3,9 +3,11 @@
  * Part of Sannidh ComplianceModulesHub — Advanced Calculators
  */
 import React, { useState } from 'react';
-import { Building2, Plus, Trash2, Zap, RotateCcw, BookOpen, Scale } from 'lucide-react';
+import { Building2, Plus, Trash2, Zap, RotateCcw, BookOpen, Calculator, RefreshCw, Download, AlertTriangle, Table, Scale } from 'lucide-react';
+import jsPDF from 'jspdf';
 import { Badge } from '@/components/ui/badge';
 import { Button } from '@/components/ui/button';
+import { toast } from 'sonner';
 
 const CA_API = (import.meta.env.VITE_CA_API_BASE_URL as string) || 'http://localhost:3001';
 const fmt = (n: number) => `₹${Math.round(n).toLocaleString('en-IN')}`;
@@ -34,11 +36,84 @@ interface Asset { id: string; name: string; cost: number; asset_class: string; }
 
 const EMPTY = (): Asset => ({ id: Date.now().toString(), name: '', cost: 0, asset_class: 'plant_machinery' });
 
-export default function DeferredTaxDepreciationPanel({ clientId }: { clientId?: string }) {
+export default function DeferredTaxDepreciationPanel({ clientId, isDemo }: { clientId?: string; isDemo?: boolean }) {
   const [assets, setAssets] = useState<Asset[]>([EMPTY()]);
   const [taxRate, setTaxRate] = useState(25.92);
   const [result, setResult] = useState<any>(null);
   const [loading, setLoading] = useState(false);
+  const [exporting, setExporting] = useState(false);
+
+  const handleExport = () => {
+    if (!result) {
+      toast.error('Generate the schedule first before exporting.');
+      return;
+    }
+    setExporting(true);
+    toast.info('Generating Asset Depreciation Schedule (Dual-Book)...', { duration: 1000 });
+    setTimeout(() => {
+      try {
+        const doc = new jsPDF();
+        
+        // Header
+        doc.setFillColor(79, 70, 229); // Indigo-600
+        doc.rect(0, 0, 210, 40, 'F');
+        doc.setTextColor(255, 255, 255);
+        doc.setFontSize(22);
+        doc.text('SANNIDH | DEFERRED TAX AUDIT', 20, 25);
+        doc.setFontSize(10);
+        doc.text('Dual Depreciation Schedule: Companies Act vs IT Act', 20, 32);
+
+        // Summary
+        doc.setTextColor(0, 0, 0);
+        doc.setFontSize(14);
+        doc.setFont('helvetica', 'bold');
+        doc.text('CONSOLIDATED DEFERRED TAX SUMMARY', 20, 55);
+        
+        doc.setFontSize(10);
+        doc.setFont('helvetica', 'normal');
+        doc.text(`Client ID: ${clientId || 'DEMO_CLIENT'}`, 20, 65);
+        doc.text(`Total Gross Block: Rs. ${(result?.summary?.total_gross_block || 0).toLocaleString()}`, 20, 75);
+        doc.text(`Net Timing Difference: Rs. ${(result?.summary?.net_timing_difference || 0).toLocaleString()}`, 20, 80);
+        doc.text(`Deferred Tax Balance: Rs. ${Math.abs(result?.summary?.total_deferred_tax || 0).toLocaleString()} (${(result?.summary?.total_deferred_tax || 0) >= 0 ? 'Liability' : 'Asset'})`, 20, 85);
+        
+        doc.setFont('helvetica', 'bold');
+        doc.text(`ACCOUNTING ENTRY: ${result?.summary?.balance_sheet_entry || 'Pending'}`, 20, 95);
+
+        // Asset Schedule
+        doc.setDrawColor(200, 200, 200);
+        doc.line(20, 105, 190, 105);
+        doc.text('ASSET NAME', 25, 112);
+        doc.text('CA DEPN', 100, 112);
+        doc.text('IT DEPN', 130, 112);
+        doc.text('DT IMPACT', 160, 112);
+        doc.line(20, 115, 190, 115);
+
+        doc.setFont('helvetica', 'normal');
+        let y = 125;
+        (result?.asset_schedule || []).slice(0, 10).forEach((a: any) => {
+          doc.text(a.name || 'Asset', 25, y);
+          doc.text((a.companies_act?.depreciation || 0).toLocaleString(), 100, y);
+          doc.text((a.it_act?.depreciation || 0).toLocaleString(), 130, y);
+          doc.text((a.deferred_tax_impact || 0).toLocaleString(), 160, y);
+          y += 10;
+        });
+
+        // Footer
+        doc.setFontSize(8);
+        doc.setTextColor(150, 150, 150);
+        doc.text(`Compliance Check: Companies Act Sch II vs IT Act App I | Timestamp: ${new Date().toLocaleString()}`, 20, 280);
+
+        doc.save(`Deferred_Tax_Schedule_${clientId || 'DEMO'}.pdf`);
+
+        toast.success('Deferred Tax & Depn Report Downloaded.');
+      } catch (err) {
+        console.error('PDF Generation Error:', err);
+        toast.error('Failed to generate Deferred Tax PDF.');
+      } finally {
+        setExporting(false);
+      }
+    }, 1500);
+  };
 
   const update = (id: string, key: keyof Asset, val: any) =>
     setAssets(a => a.map(x => x.id === id ? { ...x, [key]: val } : x));
@@ -80,6 +155,13 @@ export default function DeferredTaxDepreciationPanel({ clientId }: { clientId?: 
   const calculate = async () => {
     if (assets.some(a => !a.name || !a.cost)) return;
     setLoading(true);
+    if (isDemo) {
+      setTimeout(() => {
+        calcClientSide();
+        setLoading(false);
+      }, 600);
+      return;
+    }
     try {
       const res = await fetch(`${CA_API}/api/v1/ca/calculators/deferred-tax`, {
         method: 'POST', headers: { 'Content-Type': 'application/json' },
@@ -229,6 +311,15 @@ export default function DeferredTaxDepreciationPanel({ clientId }: { clientId?: 
               </tbody>
             </table>
           </div>
+          <Button 
+            variant="outline" 
+            onClick={handleExport} 
+            disabled={exporting}
+            className="w-full border-indigo-500/30 text-indigo-400 hover:bg-indigo-500/10 mt-2"
+          >
+            {exporting ? <RefreshCw className="w-4 h-4 animate-spin mr-2" /> : <Download className="w-4 h-4 mr-2" />}
+            {exporting ? 'Generating Signed PDF...' : 'Export Government PDF'}
+          </Button>
           <p className="text-[10px] text-muted-foreground text-center">Rates: Companies Act Schedule II WDV vs IT Act Appendix I (Section 32). One-year depreciation shown.</p>
         </div>
       )}

@@ -16,6 +16,9 @@ import AIDraftingEngine from "@/components/ca-dashboard/AIDraftingEngine";
 import ComplianceChatbot from "@/components/ca-dashboard/ComplianceChatbot";
 import AIVoiceBriefAgent from "@/components/voice/AIVoiceBriefAgent";
 import SannidhLiveAgent from "@/components/ai/SannidhLiveAgent";
+import ComplianceModulesHub from "@/components/ca-dashboard/compliance-modules/ComplianceModulesHub";
+import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
+import { Calculator } from "lucide-react";
 import { CAAgentProvider } from "@/components/agents/CAAgentOrchestrator";
 
 const CADashboard = () => {
@@ -123,6 +126,37 @@ const CADashboard = () => {
             
             <ClientPortfolioSection />
             <TaskFilingManagement />
+            
+            {/* Calculators & Forms Section */}
+            <section className="mt-16 mb-16">
+              <div className="p-6 rounded-2xl bg-gradient-to-r from-rose-500/10 to-transparent border border-rose-500/20 mb-8">
+                <div className="flex items-center justify-between">
+                  <div>
+                    <h2 className="text-2xl font-bold text-rose-400 flex items-center gap-2">
+                      <Calculator className="w-6 h-6" />
+                      Calculators, Forms & Audits
+                    </h2>
+                    <p className="text-sm text-muted-foreground mt-1">
+                      Professional financial optimizers and compliance generators.
+                    </p>
+                  </div>
+                  <div className="hidden sm:block">
+                    <span className="px-3 py-1 rounded-full bg-rose-500/10 border border-rose-500/20 text-rose-400 text-xs font-medium">
+                      23+ Modules Active
+                    </span>
+                  </div>
+                </div>
+              </div>
+              <ComplianceModulesHub 
+                demoClients={[
+                  { id: "demo-1", name: "Acme Technologies (Demo)" },
+                  { id: "demo-2", name: "GlobalTrade India (Demo)" },
+                  { id: "demo-3", name: "SecurePay Solutions (Demo)" },
+                  { id: "demo-4", name: "Vertex EduTech (Demo)" }
+                ]} 
+              />
+            </section>
+
             <ClientDependencyTracker isRealDashboard={false} />
             <RegulatoryNewsRuleImpact isRealDashboard={false} />
             <ComplianceChangeLog />

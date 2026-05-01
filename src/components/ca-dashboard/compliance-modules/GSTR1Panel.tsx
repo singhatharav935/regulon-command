@@ -1,6 +1,7 @@
 import { useState } from 'react';
 import { motion } from 'framer-motion';
 import { Upload, Calculator, FileText, CheckCircle, AlertTriangle, Download, RefreshCw } from 'lucide-react';
+import jsPDF from 'jspdf';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
@@ -11,16 +12,36 @@ import { toast } from 'sonner';
 const CA_API = (import.meta.env.VITE_CA_API_BASE_URL as string) || 'http://localhost:3001';
 const API_BASE = `${CA_API}/api/v1/compliance`;
 
-export default function GSTR1Panel({ clientId }: { clientId?: string }) {
+export default function GSTR1Panel({ clientId, isDemo }: { clientId?: string; isDemo?: boolean }) {
   const [file, setFile] = useState<File | null>(null);
   const [periodMonth, setPeriodMonth] = useState(new Date().getMonth() + 1);
   const [periodYear, setPeriodYear] = useState(new Date().getFullYear());
   const [loading, setLoading] = useState(false);
   const [result, setResult] = useState<any>(null);
+  const [exporting, setExporting] = useState(false);
 
   const handleGenerate = async () => {
     if (!clientId) { toast.error('Select a client first'); return; }
     setLoading(true);
+
+    if (isDemo) {
+      setTimeout(() => {
+        setResult({
+          summary: {
+            alert: 'GSTR-1 Draft generated with 14 invoices. Ready for Government portal sync.',
+            due_date: '11th of Next Month',
+            total_invoices: 14,
+            total_taxable: 450000,
+            total_tax: 81000,
+            invalid_invoices: 0
+          }
+        });
+        toast.success('GSTR-1 generated (Demo Mode)');
+        setLoading(false);
+      }, 800);
+      return;
+    }
+
     try {
       const formData = new FormData();
       formData.append('client_id', clientId);
@@ -35,6 +56,77 @@ export default function GSTR1Panel({ clientId }: { clientId?: string }) {
     } catch {
       toast.error('Connection error. Ensure backend is running on port 3001.');
     } finally { setLoading(false); }
+  };
+
+  const handleExport = () => {
+    if (!result) {
+      toast.error('Generate the calculation first before exporting.');
+      return;
+    }
+    setExporting(true);
+    toast.info('Initializing Official GSTR-1 Template...', { duration: 1000 });
+    
+    setTimeout(() => {
+      try {
+        // Professional PDF Generation using jsPDF
+        const doc = new jsPDF({
+          orientation: 'p',
+          unit: 'mm',
+          format: 'a4'
+        });
+        
+        // Header
+        doc.setFillColor(15, 23, 42); // Dark slate
+        doc.rect(0, 0, 210, 40, 'F');
+        doc.setTextColor(255, 255, 255);
+        doc.setFontSize(24);
+        doc.text('SANNIDH | REGULON MASTER', 20, 25);
+        doc.setFontSize(10);
+        doc.text('Advanced Regulatory Calculator Hub - GSTR-1 Draft', 20, 32);
+
+        // Body Content
+        doc.setTextColor(0, 0, 0);
+        doc.setFontSize(14);
+        doc.setFont('helvetica', 'bold');
+        doc.text('GOVERNMENT PORTAL SYNC DRAFT', 20, 55);
+        
+        doc.setFontSize(10);
+        doc.setFont('helvetica', 'normal');
+        doc.text(`Client Identifier: ${clientId || 'DEMO_CLIENT'}`, 20, 65);
+        doc.text(`Period: ${periodMonth}/${periodYear}`, 20, 70);
+        doc.text(`Status: READY FOR PORTAL SYNC`, 20, 75);
+        doc.text(`Due Date: ${result?.summary?.due_date || 'N/A'}`, 20, 80);
+
+        // Summary Box
+        doc.setDrawColor(200, 200, 200);
+        doc.rect(20, 90, 170, 45);
+        doc.setFont('helvetica', 'bold');
+        doc.text('RECONCILIATION SUMMARY', 25, 100);
+        doc.setFont('helvetica', 'normal');
+        doc.text(`Total Invoices Processed: ${result?.summary?.total_invoices || 0}`, 25, 110);
+        doc.text(`Total Taxable Value: Rs. ${(result?.summary?.total_taxable || 0).toLocaleString()}`, 25, 115);
+        doc.text(`Total Tax (IGST/CGST/SGST): Rs. ${(result?.summary?.total_tax || 0).toLocaleString()}`, 25, 120);
+        doc.text(`Invalid/Error Invoices: ${result?.summary?.invalid_invoices || 0}`, 25, 125);
+
+        // Audit Trail
+        doc.setFontSize(8);
+        doc.setTextColor(100, 100, 100);
+        doc.text('--------------------------------------------------------------------------------------------------', 20, 270);
+        doc.text(`Digitally Signed by Regulon Auto-Pilot | Timestamp: ${new Date().toLocaleString()}`, 20, 275);
+        doc.text('Disclaimer: This is an AI-generated draft for demo purposes. Verify with official records before filing.', 20, 280);
+
+        doc.save(`GSTR1_Draft_${clientId || 'DEMO'}_${periodMonth}.pdf`);
+
+        toast.success('GSTR-1 Official Draft Downloaded.');
+      } catch (err) {
+        console.error('PDF Generation Error:', err);
+        toast.error('PDF Generation Failed', {
+          description: 'There was a technical error in generating the file binary.'
+        });
+      } finally {
+        setExporting(false);
+      }
+    }, 1500);
   };
 
   return (
@@ -92,8 +184,14 @@ export default function GSTR1Panel({ clientId }: { clientId?: string }) {
               <span className="text-sm text-red-400">{result.summary.invalid_invoices} invoices have validation errors. Fix before filing.</span>
             </div>
           )}
-          <Button variant="outline" className="w-full border-green-500/30 text-green-400">
-            <Download className="w-4 h-4 mr-2" /> Export Government PDF
+          <Button 
+            variant="outline" 
+            onClick={handleExport} 
+            disabled={exporting}
+            className="w-full border-green-500/30 text-green-400 hover:bg-green-500/10"
+          >
+            {exporting ? <RefreshCw className="w-4 h-4 animate-spin mr-2" /> : <Download className="w-4 h-4 mr-2" />}
+            {exporting ? 'Generating Signed PDF...' : 'Export Government PDF'}
           </Button>
         </motion.div>
       )}

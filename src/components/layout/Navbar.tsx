@@ -184,7 +184,7 @@ const Navbar = () => {
           </div>
 
           {/* Desktop Actions */}
-          <div className="hidden lg:flex items-center gap-2">
+          <div className="hidden lg:flex items-center gap-3">
             <Button variant="ghost" size="sm" onClick={() => navigate("/auth?mode=login&role=company_owner")}>
               <LogIn className="w-4 h-4 mr-2" />
               Login

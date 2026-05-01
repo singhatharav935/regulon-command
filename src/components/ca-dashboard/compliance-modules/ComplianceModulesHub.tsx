@@ -10,7 +10,7 @@ import {
   Calculator, FileText, Users, BarChart3, PieChart,
   FolderCheck, AlertTriangle, Building2, IndianRupee,
   ChevronRight, Sparkles, GitCompare, Calendar, ScanLine, Globe, Anchor,
-  DollarSign, FileSignature, Fingerprint, Database, Landmark
+  DollarSign, FileSignature, Fingerprint, Database, Landmark, TrendingUp
 } from 'lucide-react';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
 import { Badge } from '@/components/ui/badge';
@@ -273,13 +273,19 @@ const PanelFallback = () => (
   </div>
 );
 
-export default function ComplianceModulesHub() {
+export default function ComplianceModulesHub({ demoClients }: { demoClients?: { id: string, name: string }[] }) {
   const [activeModule, setActiveModule] = useState<string | null>(null);
   const [selectedClient, setSelectedClient] = useState<string>('');
   const [clients, setClients] = useState<{ id: string, name: string }[]>([]);
   const [loading, setLoading] = useState(true);
 
   React.useEffect(() => {
+    if (demoClients) {
+      setClients(demoClients);
+      setLoading(false);
+      return;
+    }
+
     const fetchClients = async () => {
       try {
         const response = await fetch(`${CA_API}/api/v1/ca/clients/list`);
@@ -410,7 +416,12 @@ export default function ComplianceModulesHub() {
               </div>
             ) : (
               <Suspense fallback={<PanelFallback />}>
-                {ActiveComponent && <ActiveComponent clientId={selectedClient} />}
+                {ActiveComponent && (
+                  <ActiveComponent 
+                    clientId={selectedClient} 
+                    isDemo={!!demoClients}
+                  />
+                )}
               </Suspense>
             )}
           </motion.div>

@@ -3,9 +3,11 @@
  * Part of Sannidh ComplianceModulesHub — Advanced Calculators
  */
 import React, { useState } from 'react';
-import { Radar, AlertTriangle, CheckCircle, Zap, RotateCcw, IndianRupee, Calendar } from 'lucide-react';
+import { Zap, Target, RefreshCw, Download, AlertTriangle, ChevronRight, IndianRupee, Calendar } from 'lucide-react';
+import jsPDF from 'jspdf';
 import { Badge } from '@/components/ui/badge';
 import { Button } from '@/components/ui/button';
+import { toast } from 'sonner';
 
 const CA_API = (import.meta.env.VITE_CA_API_BASE_URL as string) || 'http://localhost:3001';
 const fmt = (n: number) => `₹${Math.round(n).toLocaleString('en-IN')}`;
@@ -29,7 +31,7 @@ const calcOldTax = (ti: number) => {
   return Math.round(t * 1.04);
 };
 
-export default function AdvanceTaxRadarPanel({ clientId }: { clientId?: string }) {
+export default function AdvanceTaxRadarPanel({ clientId, isDemo }: { clientId?: string; isDemo?: boolean }) {
   const now = new Date();
   const currentMonth = now.getMonth() + 1; // 1-based
 
@@ -43,6 +45,86 @@ export default function AdvanceTaxRadarPanel({ clientId }: { clientId?: string }
   });
   const [result, setResult] = useState<any>(null);
   const [loading, setLoading] = useState(false);
+  const [exporting, setExporting] = useState(false);
+
+  const handleExport = () => {
+    if (!result) {
+      toast.error('Generate the projection first before exporting.');
+      return;
+    }
+    setExporting(true);
+    toast.info('Generating Advance Tax Payment Schedule...', { duration: 1000 });
+    setTimeout(() => {
+      try {
+        const doc = new jsPDF();
+        
+        // Header
+        doc.setFillColor(6, 182, 212); // Cyan-500
+        doc.rect(0, 0, 210, 40, 'F');
+        doc.setTextColor(255, 255, 255);
+        doc.setFontSize(22);
+        doc.text('SANNIDH | ADVANCE TAX ADVISORY', 20, 25);
+        doc.setFontSize(10);
+        doc.text('FY 2024-25 - Predictive Installment Schedule', 20, 32);
+
+        // Projections
+        doc.setTextColor(0, 0, 0);
+        doc.setFontSize(14);
+        doc.setFont('helvetica', 'bold');
+        doc.text('ANNUAL TAX PROJECTION SUMMARY', 20, 55);
+        
+        doc.setFontSize(10);
+        doc.setFont('helvetica', 'normal');
+        doc.text(`Client ID: ${clientId || 'DEMO_CLIENT'}`, 20, 65);
+        doc.text(`Projected Annual Profit: Rs. ${(result?.projection?.projected_annual_profit || 0).toLocaleString()}`, 20, 75);
+        doc.text(`Gross Tax Liability (Est): Rs. ${(result?.projection?.gross_tax_liability || 0).toLocaleString()}`, 20, 80);
+        doc.text(`Net Payable after TDS/Paid: Rs. ${(result?.projection?.balance_payable || 0).toLocaleString()}`, 20, 85);
+
+        // Schedule Table
+        doc.setDrawColor(200, 200, 200);
+        doc.line(20, 95, 190, 95);
+        doc.setFont('helvetica', 'bold');
+        doc.text('INSTALLMENT', 25, 102);
+        doc.text('DUE DATE', 80, 102);
+        doc.text('PAYABLE (RS.)', 150, 102);
+        doc.line(20, 105, 190, 105);
+
+        doc.setFont('helvetica', 'normal');
+        let y = 115;
+        (result?.installment_schedule || []).forEach((inst: any) => {
+          doc.text(inst.label || 'Installment', 25, y);
+          doc.text(inst.due || 'N/A', 80, y);
+          doc.text((inst.amount_due_now || 0).toLocaleString(), 150, y);
+          y += 10;
+        });
+
+        // Risk Alert
+        y += 10;
+        doc.setFillColor(254, 242, 242); // Red-50
+        doc.rect(20, y, 170, 20, 'F');
+        doc.setTextColor(153, 27, 27); // Red-800
+        doc.setFont('helvetica', 'bold');
+        doc.text('INTEREST RISK ANALYSIS (SEC 234B/C)', 25, y + 8);
+        doc.setFont('helvetica', 'normal');
+        doc.setFontSize(9);
+        doc.text(result?.interest_risk?.message || 'Calculation complete.', 25, y + 15);
+
+        // Footer
+        doc.setFontSize(8);
+        doc.setTextColor(150, 150, 150);
+        doc.text(`Document Type: Tax Advisory | Generated: ${new Date().toLocaleString()}`, 20, 280);
+
+        doc.save(`Advance_Tax_Schedule_${clientId || 'DEMO'}.pdf`);
+
+        toast.success('Advance Tax Advisory PDF Downloaded.');
+      } catch (err) {
+        console.error('PDF Generation Error:', err);
+        toast.error('Failed to generate Advance Tax PDF.');
+      } finally {
+        setExporting(false);
+      }
+    }, 1500);
+  };
 
   const set = (k: string) => (v: any) => setForm(f => ({ ...f, [k]: v }));
 
@@ -66,6 +148,13 @@ export default function AdvanceTaxRadarPanel({ clientId }: { clientId?: string }
   const calculate = async () => {
     if (!form.ytd_profit || !form.months_elapsed) return;
     setLoading(true);
+    if (isDemo) {
+      setTimeout(() => {
+        calcClientSide();
+        setLoading(false);
+      }, 600);
+      return;
+    }
     try {
       const res = await fetch(`${CA_API}/api/v1/ca/calculators/advance-tax`, {
         method: 'POST', headers: { 'Content-Type': 'application/json' },
@@ -188,6 +277,15 @@ export default function AdvanceTaxRadarPanel({ clientId }: { clientId?: string }
             </div>
           </div>
 
+          <Button 
+            variant="outline" 
+            onClick={handleExport} 
+            disabled={exporting}
+            className="w-full border-cyan-500/30 text-cyan-400 hover:bg-cyan-500/10 mt-2"
+          >
+            {exporting ? <RefreshCw className="w-4 h-4 animate-spin mr-2" /> : <Download className="w-4 h-4 mr-2" />}
+            {exporting ? 'Generating Advisory Report...' : 'Export Government PDF'}
+          </Button>
           <p className="text-[10px] text-muted-foreground text-center">Interest projections are indicative. Actual computation subject to final assessment.</p>
         </div>
       )}

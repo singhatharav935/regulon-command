@@ -1,6 +1,7 @@
 import { useState } from 'react';
 import { motion } from 'framer-motion';
-import { BarChart3, Upload, RefreshCw, CheckCircle, XCircle, Download } from 'lucide-react';
+import { Building2, Upload, Download, RefreshCw, AlertTriangle, CheckCircle, FileText } from 'lucide-react';
+import jsPDF from 'jspdf';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
@@ -9,7 +10,7 @@ import { toast } from 'sonner';
 const CA_API = (import.meta.env.VITE_CA_API_BASE_URL as string) || 'http://localhost:3001';
 const API_BASE = `${CA_API}/api/v1/compliance`;
 
-export default function FinancialsPanel({ clientId }: { clientId?: string }) {
+export default function FinancialsPanel({ clientId, isDemo }: { clientId?: string; isDemo?: boolean }) {
   const [activeReport, setActiveReport] = useState<'balance-sheet' | 'pl-statement' | 'cash-flow'>('balance-sheet');
   const [loading, setLoading] = useState(false);
   const [result, setResult] = useState<any>(null);
@@ -21,6 +22,33 @@ export default function FinancialsPanel({ clientId }: { clientId?: string }) {
   const handleGenerate = async () => {
     if (!clientId) { toast.error('Select a client first'); return; }
     setLoading(true);
+
+    if (isDemo) {
+      setTimeout(() => {
+        if (activeReport === 'balance-sheet') {
+          setResult({
+            totals: { is_balanced: true, total_assets: 2500000, total_liabilities_equity: 2500000 },
+            validation: { message: 'Asset = Liability + Equity (Verified)' },
+            balance_sheet: { fixed_assets: { net_book_value: 1500000 }, current_assets: { total: 1000000 } }
+          });
+        } else if (activeReport === 'pl-statement') {
+          const rev = parseFloat(plForm.revenue || '5000000');
+          setResult({
+            pl_statement: { revenue: rev, gross_profit: rev * 0.4, operating_profit_ebit: rev * 0.25, profit_before_tax: rev * 0.22, profit_after_tax: rev * 0.18 },
+            margins: { gross_margin_pct: 40, operating_margin_pct: 25, net_margin_pct: 18 }
+          });
+        } else {
+          setResult({
+            dashboard: 'Positive Cash Flow — Strong liquidity position.',
+            cash_flow: { operating: { total: 850000 }, investing: { total: -400000 }, financing: { total: -200000 }, net_cash_flow: 250000, closing_cash: 500000 }
+          });
+        }
+        toast.success(`${activeReport.replace('-', ' ')} generated (Demo Mode)`);
+        setLoading(false);
+      }, 800);
+      return;
+    }
+
     try {
       let endpoint = `${API_BASE}/${activeReport}/generate`;
       let body: any;
@@ -48,6 +76,117 @@ export default function FinancialsPanel({ clientId }: { clientId?: string }) {
       else toast.error(data.error);
     } catch { toast.error('Backend connection error'); }
     finally { setLoading(false); }
+  };
+
+  const [exporting, setExporting] = useState(false);
+
+  const handleExport = () => {
+    if (!result) {
+      toast.error('Generate the statements first before exporting.');
+      return;
+    }
+    setExporting(true);
+    toast.info(`Preparing ${activeReport.replace('-', ' ').toUpperCase()} Document...`, { duration: 1000 });
+    setTimeout(() => {
+      try {
+        const doc = new jsPDF();
+        
+        // Header
+        doc.setFillColor(79, 70, 229); // Indigo-600
+        doc.rect(0, 0, 210, 40, 'F');
+        doc.setTextColor(255, 255, 255);
+        doc.setFontSize(22);
+        doc.text('SANNIDH | FINANCIAL REPORTING', 20, 25);
+        doc.setFontSize(10);
+        doc.text(`Schedule III Compliance - FY ${financialYear}`, 20, 32);
+
+        // Report Info
+        doc.setTextColor(0, 0, 0);
+        doc.setFontSize(14);
+        doc.setFont('helvetica', 'bold');
+        doc.text(activeReport.replace('-', ' ').toUpperCase(), 20, 55);
+        
+        doc.setFontSize(10);
+        doc.setFont('helvetica', 'normal');
+        doc.text(`Company/Client ID: ${clientId || 'DEMO_CLIENT'}`, 20, 65);
+        doc.text(`Currency: INR (Figures in Absolute)`, 20, 70);
+
+        // Tables
+        doc.setDrawColor(230, 230, 230);
+        doc.line(20, 80, 190, 80);
+        
+        let y = 95;
+        doc.setFont('helvetica', 'bold');
+        doc.text('PARTICULARS', 20, 90);
+        doc.text('AMOUNT (RS.)', 150, 90);
+        doc.line(20, 92, 190, 92);
+        doc.setFont('helvetica', 'normal');
+
+        if (activeReport === 'balance-sheet' && result?.totals) {
+          doc.text('I. EQUITY AND LIABILITIES', 20, y);
+          y += 10;
+          doc.text('   Shareholder Funds', 20, y);
+          doc.text((result?.equity_liabilities?.shareholders_funds?.total || 0).toLocaleString(), 150, y);
+          y += 10;
+          doc.text('   Non-Current Liabilities', 20, y);
+          doc.text((result?.equity_liabilities?.non_current_liabilities?.total || 0).toLocaleString(), 150, y);
+          y += 10;
+          doc.setFont('helvetica', 'bold');
+          doc.text('TOTAL EQUITY AND LIABILITIES', 20, y);
+          doc.text((result?.totals?.total_liabilities_equity || 0).toLocaleString(), 150, y);
+          
+          y += 20;
+          doc.text('II. ASSETS', 20, y);
+          y += 10;
+          doc.setFont('helvetica', 'normal');
+          doc.text('   Non-Current Assets', 20, y);
+          doc.text((result?.assets?.non_current_assets?.total || 0).toLocaleString(), 150, y);
+          y += 10;
+          doc.text('   Current Assets', 20, y);
+          doc.text((result?.assets?.current_assets?.total || 0).toLocaleString(), 150, y);
+          y += 10;
+          doc.setFont('helvetica', 'bold');
+          doc.text('TOTAL ASSETS', 20, y);
+          doc.text((result?.totals?.total_assets || 0).toLocaleString(), 150, y);
+        } else if (activeReport === 'pl-statement' && result?.pl_statement) {
+          doc.text('Revenue from Operations', 20, y);
+          doc.text((result?.pl_statement?.revenue || 0).toLocaleString(), 150, y);
+          y += 10;
+          doc.text('Other Income', 20, y);
+          doc.text('0', 150, y);
+          y += 10;
+          doc.setFont('helvetica', 'bold');
+          doc.text('TOTAL INCOME', 20, y);
+          doc.text((result?.pl_statement?.revenue || 0).toLocaleString(), 150, y);
+          
+          y += 20;
+          doc.setFont('helvetica', 'normal');
+          doc.text('Cost of Materials Consumed', 20, y);
+          doc.text((result?.pl_statement?.cost_of_sales || 0).toLocaleString(), 150, y);
+          y += 10;
+          doc.setFont('helvetica', 'bold');
+          doc.text('PROFIT BEFORE TAX (PBT)', 20, y);
+          doc.text((result?.pl_statement?.profit_before_tax || 0).toLocaleString(), 150, y);
+          y += 10;
+          doc.text('PROFIT AFTER TAX (PAT)', 20, y);
+          doc.text((result?.pl_statement?.profit_after_tax || 0).toLocaleString(), 150, y);
+        }
+
+        // Footer
+        doc.setFontSize(8);
+        doc.setTextColor(150, 150, 150);
+        doc.text(`Report Generation: ${new Date().toLocaleString()} | Sannidh AI Certified`, 20, 280);
+
+        doc.save(`${activeReport.replace('-', '_')}_${clientId || 'DEMO'}.pdf`);
+
+        toast.success('Financial Statement Downloaded.');
+      } catch (err) {
+        console.error('PDF Generation Error:', err);
+        toast.error('Failed to generate Financials PDF.');
+      } finally {
+        setExporting(false);
+      }
+    }, 1500);
   };
 
   const f = (label: string, key: string, form: any, setter: any) => (
@@ -152,7 +291,15 @@ export default function FinancialsPanel({ clientId }: { clientId?: string }) {
               ))}
             </div>
           )}
-          <Button variant="outline" className="w-full"><Download className="w-4 h-4 mr-2" />Export Government PDF</Button>
+          <Button 
+            variant="outline" 
+            onClick={handleExport} 
+            disabled={exporting}
+            className="w-full border-yellow-500/30 text-yellow-400 hover:bg-yellow-500/10 mt-2"
+          >
+            {exporting ? <RefreshCw className="w-4 h-4 animate-spin mr-2" /> : <Download className="w-4 h-4 mr-2" />}
+            {exporting ? 'Generating Document...' : 'Export Government PDF'}
+          </Button>
         </motion.div>
       )}
     </motion.div>

@@ -1,6 +1,7 @@
 import { useState } from 'react';
 import { motion } from 'framer-motion';
-import { GitCompare, Upload, RefreshCw, AlertTriangle, CheckCircle, ArrowRight, Bell } from 'lucide-react';
+import { GitCompare, Upload, RefreshCw, AlertTriangle, CheckCircle, ArrowRight, Bell, Download, Zap } from 'lucide-react';
+import jsPDF from 'jspdf';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { Badge } from '@/components/ui/badge';
@@ -15,14 +16,79 @@ const API_BASE = `${CA_API}/api/v1/compliance`;
  * Runs: Purchase Register vs Portal GSTR-2B
  * Flags: missing_in_2b | missing_in_register | amount_mismatch
  */
-export default function GSTR2BPanel({ clientId }: { clientId?: string }) {
+export default function GSTR2BPanel({ clientId, isDemo }: { clientId?: string; isDemo?: boolean }) {
   const [loading, setLoading] = useState(false);
   const [result, setResult] = useState<any>(null);
   const [periodMonth, setPeriodMonth] = useState(new Date().getMonth() + 1);
   const [periodYear, setPeriodYear] = useState(new Date().getFullYear());
   const [purchaseRegisterJSON, setPurchaseRegisterJSON] = useState('');
   const [gstr2bJSON, setGstr2bJSON] = useState('');
+  const [exporting, setExporting] = useState(false);
   const { triggerAI } = useAICommunication();
+
+  const handleExport = () => {
+    setExporting(true);
+    toast.info('Generating GSTR-2B Reconciliation Audit Report...', { duration: 1000 });
+    setTimeout(() => {
+      const doc = new jsPDF();
+      
+      // Header
+      doc.setFillColor(139, 92, 246); // Violet-500
+      doc.rect(0, 0, 210, 40, 'F');
+      doc.setTextColor(255, 255, 255);
+      doc.setFontSize(22);
+      doc.text('SANNIDH | RECONCILIATION AUDIT', 20, 25);
+      doc.setFontSize(10);
+      doc.text('GSTR-2B Portal vs Purchase Register Reconciliation', 20, 32);
+
+      // Summary
+      doc.setTextColor(0, 0, 0);
+      doc.setFontSize(14);
+      doc.setFont('helvetica', 'bold');
+      doc.text('RECONCILIATION SUMMARY', 20, 55);
+      
+      doc.setFontSize(10);
+      doc.setFont('helvetica', 'normal');
+      doc.text(`Client ID: ${clientId}`, 20, 65);
+      doc.text(`Period: ${periodMonth}/${periodYear}`, 20, 70);
+      doc.text(`Purchase Register Total: Rs. ${result.summary.purchase_register_total.toLocaleString()}`, 20, 80);
+      doc.text(`GSTR-2B Portal Total: Rs. ${result.summary.gstr2b_total.toLocaleString()}`, 20, 85);
+      doc.setFont('helvetica', 'bold');
+      doc.text(`NET VARIANCE: Rs. ${result.summary.variance.toLocaleString()}`, 20, 95);
+
+      // Mismatches Table
+      doc.setDrawColor(200, 200, 200);
+      doc.line(20, 105, 190, 105);
+      doc.text('INV NUMBER', 25, 112);
+      doc.text('TYPE', 70, 112);
+      doc.text('VARIANCE', 120, 112);
+      doc.text('RECOMMENDED ACTION', 150, 112);
+      doc.line(20, 115, 190, 115);
+
+      doc.setFont('helvetica', 'normal');
+      doc.setFontSize(8);
+      let y = 125;
+      result.mismatches.slice(0, 15).forEach((m: any) => {
+        doc.text(m.purchase?.invoice_number || m.gstr2b?.invoice_number || 'N/A', 25, y);
+        doc.text(m.type, 70, y);
+        doc.text(m.variance?.toLocaleString() || '0', 120, y);
+        doc.text(m.action, 150, y, { maxWidth: 40 });
+        y += 12;
+      });
+
+      // Footer
+      doc.setFontSize(8);
+      doc.setTextColor(150, 150, 150);
+      doc.text(`Audit Generation: ${new Date().toLocaleString()} | Sannidh AI Reconciliation Engine`, 20, 280);
+
+      doc.save(`GSTR2B_Reconciliation_${clientId}.pdf`);
+
+      toast.success('Reconciliation Report Downloaded.', {
+        description: 'Check your downloads for the real PDF.',
+      });
+      setExporting(false);
+    }, 1500);
+  };
 
   const sampleData = () => {
     const sample = {
@@ -48,6 +114,31 @@ export default function GSTR2BPanel({ clientId }: { clientId?: string }) {
     } catch { toast.error('Invalid JSON format. Use the sample data loader to see the expected format.'); return; }
 
     setLoading(true);
+
+    if (isDemo) {
+      setTimeout(() => {
+        setResult({
+          summary: {
+            alert: 'Reconciliation complete. 2 mismatches found. Recommend sending notices to vendors.',
+            total_mismatches: 2,
+            missing_in_2b: 1,
+            missing_in_register: 0,
+            amount_mismatches: 1,
+            purchase_register_total: 180000,
+            gstr2b_total: 162000,
+            variance: 18000
+          },
+          mismatches: [
+            { type: 'missing_in_2b', purchase: { invoice_number: 'INV-EXTRA', supplier_gstin: '06AAACT2727Q1ZX' }, action: 'Vendor hasn\'t filed GSTR-1. Send reminder.' },
+            { type: 'amount_mismatch', purchase: { invoice_number: 'INV-001', supplier_gstin: '07AABCU9603R1ZP' }, gstr2b: { taxable_value: 90000 }, variance: 10000, action: 'Tax value mismatch. Verify with physical invoice.' }
+          ]
+        });
+        toast.success('Reconciliation complete (Demo Mode)');
+        setLoading(false);
+      }, 800);
+      return;
+    }
+
     try {
       const response = await fetch(`${API_BASE}/gstr2b/reconcile`, {
         method: 'POST',
@@ -185,6 +276,15 @@ export default function GSTR2BPanel({ clientId }: { clientId?: string }) {
               <p className="text-sm font-medium text-green-400">All invoices matched. Purchase register is fully reconciled with GSTR-2B.</p>
             </div>
           )}
+          <Button 
+            variant="outline" 
+            onClick={handleExport} 
+            disabled={exporting}
+            className="w-full border-violet-500/30 text-violet-400 hover:bg-violet-500/10 mt-2"
+          >
+            {exporting ? <RefreshCw className="w-4 h-4 animate-spin mr-2" /> : <Download className="w-4 h-4 mr-2" />}
+            {exporting ? 'Generating Reconciliation Report...' : 'Export Government PDF'}
+          </Button>
         </motion.div>
       )}
     </motion.div>
