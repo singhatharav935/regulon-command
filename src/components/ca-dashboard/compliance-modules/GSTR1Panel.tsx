@@ -80,7 +80,7 @@ export default function GSTR1Panel({ clientId, isDemo }: { clientId?: string; is
         doc.rect(0, 0, 210, 40, 'F');
         doc.setTextColor(255, 255, 255);
         doc.setFontSize(24);
-        doc.text('SANNIDH | REGULON MASTER', 20, 25);
+        doc.text('SANNIDH | COMPLIANCE ENGINE', 20, 25);
         doc.setFontSize(10);
         doc.text('Advanced Regulatory Calculator Hub - GSTR-1 Draft', 20, 32);
 
@@ -112,7 +112,7 @@ export default function GSTR1Panel({ clientId, isDemo }: { clientId?: string; is
         doc.setFontSize(8);
         doc.setTextColor(100, 100, 100);
         doc.text('--------------------------------------------------------------------------------------------------', 20, 270);
-        doc.text(`Digitally Signed by Regulon Auto-Pilot | Timestamp: ${new Date().toLocaleString()}`, 20, 275);
+        doc.text(`Digitally Signed by Sannidh Auto-Pilot | Timestamp: ${new Date().toLocaleString()}`, 20, 275);
         doc.text('Disclaimer: This is an AI-generated draft for demo purposes. Verify with official records before filing.', 20, 280);
 
         doc.save(`GSTR1_Draft_${clientId || 'DEMO'}_${periodMonth}.pdf`);

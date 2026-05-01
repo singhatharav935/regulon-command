@@ -1010,9 +1010,9 @@ app.get("*", (req, res) => {
   res.sendFile(path.join(distPath, "index.html"));
 });
 
-if (process.env.REGULON_AGENT_NO_SERVER !== "1") {
+if (process.env.SANNIDH_AGENT_NO_SERVER !== "1" && process.env.REGULON_AGENT_NO_SERVER !== "1") {
   app.listen(PORT, "0.0.0.0", async () => {
-    console.log(`[Regulon Agent] listening on http://0.0.0.0:${PORT}`);
+    console.log(`[Sannidh Agent] listening on http://0.0.0.0:${PORT}`);
     // Fetch initial data on startup
     console.log(`[Sannidh Agent] fetching initial data...`);
     try {

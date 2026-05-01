@@ -108,7 +108,7 @@ export default function RegimeOptimizerPanel({ clientId, isDemo }: { clientId?: 
         // Footer
         doc.setFontSize(8);
         doc.setTextColor(150, 150, 150);
-        doc.text(`Analysis Date: ${new Date().toLocaleString()} | Powered by Regulon AI Optimizer`, 20, 280);
+        doc.text(`Analysis Date: ${new Date().toLocaleString()} | Powered by Sannidh AI Optimizer`, 20, 280);
 
         doc.save(`Tax_Optimizer_Report_${clientId || 'DEMO'}.pdf`);
 

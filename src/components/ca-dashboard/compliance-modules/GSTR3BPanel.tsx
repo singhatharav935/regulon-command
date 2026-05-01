@@ -118,7 +118,7 @@ export default function GSTR3BPanel({ clientId, isDemo }: { clientId?: string; i
         doc.setFontSize(8);
         doc.setTextColor(150, 150, 150);
         doc.text(`Document Generated: ${new Date().toLocaleString()}`, 20, 280);
-        doc.text('Regulon Master - Compliance Auto-Pilot Signature Verified', 130, 280);
+        doc.text('Sannidh - Compliance Auto-Pilot Signature Verified', 130, 280);
 
         doc.save(`GSTR3B_Computation_${clientId || 'DEMO'}.pdf`);
 
