@@ -7,11 +7,11 @@ import { Badge } from '@/components/ui/badge';
 import { useAICommunication } from '@/store/useAICommunication';
 
 export default function BankReconciliationAutomator() {
-  const { setActivePrompt, setDrawerOpen } = useAICommunication();
+  const { triggerAI, setDrawerOpen } = useAICommunication();
   const [reconciled, setReconciled] = useState(false);
 
   const handleRunAI = () => {
-    setActivePrompt(`
+    triggerAI(`
 SYSTEM DIRECTIVE:
 You are preparing a Bank Reconciliation gap response.
 
@@ -19,7 +19,6 @@ TASK:
 Review the following unmatched Suspense Ledger entries extracted from the uploaded PDF bank statement.
 Generate a clarification query to the client asking them to identify these 3 unknown NEFT incoming payments so they can be matched to the correct Debtors ledger.
     `);
-    setDrawerOpen(true);
     setTimeout(() => setReconciled(true), 2000);
   };
 

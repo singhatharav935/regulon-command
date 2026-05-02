@@ -11,7 +11,7 @@ const API_BASE = `${CA_API}/api/v1/compliance`;
 
 type Employee = { name: string; pan: string; uan: string; esi_number: string; basic_salary: string; da: string; gross_wages: string };
 
-export default function EPFESIPanel({ clientId }: { clientId?: string }) {
+export default function EPFESIPanel({ clientId, isDemo }: { clientId?: string; isDemo?: boolean }) {
   const [activeTab, setActiveTab] = useState<'epf' | 'esi'>('epf');
   const [loading, setLoading] = useState(false);
   const [result, setResult] = useState<any>(null);
@@ -25,6 +25,37 @@ export default function EPFESIPanel({ clientId }: { clientId?: string }) {
   const handleCalculate = async () => {
     if (!clientId) { toast.error('Select a client first'); return; }
     setLoading(true);
+
+    if (isDemo) {
+      setTimeout(() => {
+        const totalWages = employees.reduce((s, e) => s + parseFloat(e.gross_wages || e.basic_salary || '0'), 0);
+        const employeeCont = Math.round(totalWages * (activeTab === 'epf' ? 0.12 : 0.0075));
+        const employerCont = Math.round(totalWages * (activeTab === 'epf' ? 0.13 : 0.0325));
+        
+        setResult({
+          summary: {
+            total_employees: employees.length,
+            total_employee_contribution: employeeCont,
+            total_employer_contribution: employerCont,
+            total_epf_liability: activeTab === 'epf' ? employeeCont + employerCont : undefined,
+            total_esi_liability: activeTab === 'esi' ? employeeCont + employerCont : undefined,
+            alert: 'Demo Calculation: Successful.'
+          },
+          employees: employees.map(e => ({
+            employee_name: e.name || 'Demo Employee',
+            employee_epf: activeTab === 'epf' ? Math.round(parseFloat(e.basic_salary || '0') * 0.12) : undefined,
+            employee_esi: activeTab === 'esi' ? Math.round(parseFloat(e.gross_wages || '0') * 0.0075) : undefined,
+            total_employer_cost: activeTab === 'epf' ? Math.round(parseFloat(e.basic_salary || '0') * 0.13) : undefined,
+            employer_esi: activeTab === 'esi' ? Math.round(parseFloat(e.gross_wages || '0') * 0.0325) : undefined,
+            total_esi: activeTab === 'esi' ? Math.round(parseFloat(e.gross_wages || '0') * 0.04) : undefined,
+          }))
+        });
+        toast.success(`${activeTab.toUpperCase()} calculated (Demo)`);
+        setLoading(false);
+      }, 600);
+      return;
+    }
+
     try {
       const endpoint = `${API_BASE}/${activeTab}/calculate`;
       const payload = { client_id: clientId, period_month: periodMonth, period_year: periodYear, employees: employees.map(e => ({ ...e, basic_salary: parseFloat(e.basic_salary || '0'), da: parseFloat(e.da || '0'), gross_wages: parseFloat(e.gross_wages || e.basic_salary || '0') })) };

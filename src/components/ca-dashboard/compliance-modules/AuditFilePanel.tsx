@@ -13,7 +13,7 @@ const API_BASE = `${CA_API}/api/v1/corporate`;
 
 const DOCS = ['balance_sheet','pl_statement','cash_flow','gl_trial_balance','fixed_assets_schedule','debtors_schedule','creditors_schedule','bank_reconciliation','audit_report','board_resolutions','agm_minutes','shareholders_list','management_representation','rpt_disclosure','contingent_liabilities','notes_to_accounts','investments_schedule'];
 
-export default function AuditFilePanel({ clientId }: { clientId?: string }) {
+export default function AuditFilePanel({ clientId, isDemo }: { clientId?: string; isDemo?: boolean }) {
   const [financialYear, setFinancialYear] = useState('2024-25');
   const [available, setAvailable] = useState<Record<string, boolean>>({});
   const [result, setResult] = useState<any>(null);
@@ -24,6 +24,32 @@ export default function AuditFilePanel({ clientId }: { clientId?: string }) {
   const prepare = async () => {
     if (!clientId) { toast.error('Select a client first'); return; }
     setLoading(true);
+
+    if (isDemo) {
+      setTimeout(() => {
+        const mandatory = ['balance_sheet','pl_statement','cash_flow','notes_to_accounts','audit_report','gl_trial_balance'];
+        const readyCount = Object.keys(available).filter(k => available[k]).length;
+        const pendingMandatory = mandatory.filter(m => !available[m]);
+        
+        setResult({
+          summary: {
+            total_documents: DOCS.length,
+            ready: readyCount,
+            pending: DOCS.length - readyCount,
+            mandatory_total: mandatory.length,
+            mandatory_ready: mandatory.length - pendingMandatory.length,
+            completion_percentage: Math.round((readyCount / DOCS.length) * 100),
+            is_audit_ready: pendingMandatory.length === 0 && readyCount > DOCS.length * 0.5
+          },
+          checklist_status: pendingMandatory.length === 0 ? 'Audit Checklist is complete and ready for signature.' : 'Audit Checklist incomplete. Missing mandatory documents.',
+          pending_documents: pendingMandatory.map(d => d.replace(/_/g, ' ').toUpperCase())
+        });
+        toast.success('Audit file checklist generated (Demo)');
+        setLoading(false);
+      }, 600);
+      return;
+    }
+
     try {
       const res = await fetch(`${API_BASE}/audit-file/prepare`, { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ client_id: clientId, financial_year: financialYear, available_documents: available }) });
       const data = await res.json();

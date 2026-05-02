@@ -14,7 +14,7 @@ type DebtorRow = { customer_name: string; invoice_date: string; invoice_amount: 
 const BUCKET_COLORS: Record<string, string> = { '0-30': 'bg-green-500', '31-60': 'bg-yellow-400', '61-90': 'bg-orange-500', '90+': 'bg-red-500' };
 const BUCKET_TEXT: Record<string, string> = { '0-30': 'text-green-400', '31-60': 'text-yellow-400', '61-90': 'text-orange-400', '90+': 'text-red-400' };
 
-export default function DebtorsAgingPanel({ clientId }: { clientId?: string }) {
+export default function DebtorsAgingPanel({ clientId, isDemo }: { clientId?: string; isDemo?: boolean }) {
   const [debtors, setDebtors] = useState<DebtorRow[]>([{ customer_name: '', invoice_date: '', invoice_amount: '', amount_received: '' }]);
   const [result, setResult] = useState<any>(null);
   const [loading, setLoading] = useState(false);
@@ -25,6 +25,58 @@ export default function DebtorsAgingPanel({ clientId }: { clientId?: string }) {
   const analyze = async () => {
     if (!clientId) { toast.error('Select a client first'); return; }
     setLoading(true);
+
+    if (isDemo) {
+      setTimeout(() => {
+        let amt0_30 = 0, amt31_60 = 0, amt61_90 = 0, amt90plus = 0;
+        let provReq = 0;
+        const actionReq: any[] = [];
+
+        debtors.forEach(d => {
+          const invAmt = parseFloat(d.invoice_amount || '0');
+          const recAmt = parseFloat(d.amount_received || '0');
+          const out = Math.max(0, invAmt - recAmt);
+          if (out > 0) {
+            let days = 0;
+            if (d.invoice_date) {
+              days = Math.floor((new Date().getTime() - new Date(d.invoice_date).getTime()) / 86400000);
+            }
+            if (days <= 30) amt0_30 += out;
+            else if (days <= 60) amt31_60 += out;
+            else if (days <= 90) amt61_90 += out;
+            else {
+              amt90plus += out;
+              provReq += out * 0.5;
+              actionReq.push({
+                customer_name: d.customer_name || 'Unknown',
+                days_outstanding: days,
+                outstanding_amount: out,
+                provision_pct: '50%'
+              });
+            }
+          }
+        });
+
+        const totalOut = amt0_30 + amt31_60 + amt61_90 + amt90plus;
+
+        setResult({
+          summary: {
+            '0_30': amt0_30,
+            '31_60': amt31_60,
+            '61_90': amt61_90,
+            '90plus': amt90plus,
+            total_outstanding: totalOut,
+            total_provision_required: provReq,
+          },
+          aged_debtors_requiring_action: actionReq,
+          collection_forecast: { provision_note: 'Demo Mode: 50% provision auto-calculated for >90 days.' }
+        });
+        toast.success('Debtors aging analyzed (Demo)');
+        setLoading(false);
+      }, 600);
+      return;
+    }
+
     try {
       const payload = {
         client_id: clientId,

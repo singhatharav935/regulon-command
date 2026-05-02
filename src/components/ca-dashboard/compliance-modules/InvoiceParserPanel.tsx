@@ -24,7 +24,7 @@ const HEALTH_COLORS: Record<string, string> = {
  * InvoiceParserPanel — OCR invoice upload + DIN/TAN registry
  * Combined as a single panel since both are lightweight operations
  */
-export default function InvoiceParserPanel({ clientId }: { clientId?: string }) {
+export default function InvoiceParserPanel({ clientId, isDemo }: { clientId?: string; isDemo?: boolean }) {
   const [subTab, setSubTab] = useState<SubTab>('invoice');
   const [loading, setLoading] = useState(false);
   const [result, setResult] = useState<any>(null);
@@ -47,6 +47,33 @@ export default function InvoiceParserPanel({ clientId }: { clientId?: string }) 
     if (!clientId) { toast.error('Select a client first'); return; }
     if (!file) { toast.error('Upload an invoice file first'); return; }
     setLoading(true);
+    
+    if (isDemo) {
+      setTimeout(() => {
+        setResult({
+          document_type: 'Tax Invoice',
+          file_name: file.name,
+          file_size_bytes: file.size,
+          file_type: file.type,
+          confidence: 98,
+          message: 'Parsed via Demo Engine',
+          extracted: {
+            invoice_number: 'INV-2025-099',
+            invoice_date: '2025-10-15',
+            vendor_name: 'Acme Corp',
+            gstin: '27ABCDE1234F1Z5',
+            total_amount: '₹45,000',
+            tax_amount: '₹8,100',
+            ocr_ready: true,
+            ocr_note: 'Demo extraction successful.'
+          }
+        });
+        toast.success(`Invoice parsed — Tax Invoice detected (Demo)`);
+        setLoading(false);
+      }, 1200);
+      return;
+    }
+
     try {
       // Convert file to base64 for OCR endpoint
       const reader = new FileReader();
@@ -83,6 +110,19 @@ export default function InvoiceParserPanel({ clientId }: { clientId?: string }) 
   const fetchDINList = async () => {
     if (!clientId) { toast.error('Select a client first'); return; }
     setLoading(true);
+
+    if (isDemo) {
+      setTimeout(() => {
+        setDinList([
+          { person_name: 'Rahul Desai', registration_type: 'DIN', registration_number: '09876543', health: 'active', days_to_kyc: 45, pan: 'ABCDE1234F' },
+          { person_name: 'Priya Sharma', registration_type: 'DIN', registration_number: '01234567', health: 'critical', alert: 'DIR-3 KYC Overdue', days_to_kyc: -12, pan: 'FGHIJ5678K' }
+        ]);
+        toast.success('Loaded 2 records (Demo)');
+        setLoading(false);
+      }, 600);
+      return;
+    }
+
     try {
       const res = await fetch(`${API_BASE}/din-tan/list?client_id=${clientId}`);
       const data = await res.json();
@@ -96,6 +136,14 @@ export default function InvoiceParserPanel({ clientId }: { clientId?: string }) 
     if (!clientId || !dinForm.registration_number || !dinForm.person_name) {
       toast.error('Registration number and person name required'); return;
     }
+
+    if (isDemo) {
+      setDinList([{ ...dinForm, health: 'active', days_to_kyc: 300 }, ...dinList]);
+      toast.success(`${dinForm.registration_type} added successfully (Demo)`);
+      setShowAddDIN(false);
+      return;
+    }
+
     try {
       const res = await fetch(`${API_BASE}/din-tan/add`, {
         method: 'POST',

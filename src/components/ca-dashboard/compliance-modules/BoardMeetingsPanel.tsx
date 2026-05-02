@@ -26,7 +26,7 @@ const RESOLUTION_TYPES = [
 
 type SubTab = 'meeting' | 'resolution' | 'agm' | 'mca';
 
-export default function BoardMeetingsPanel({ clientId }: { clientId?: string }) {
+export default function BoardMeetingsPanel({ clientId, isDemo }: { clientId?: string; isDemo?: boolean }) {
   const [subTab, setSubTab] = useState<SubTab>('meeting');
   const [loading, setLoading] = useState(false);
   const [result, setResult] = useState<any>(null);
@@ -52,6 +52,23 @@ export default function BoardMeetingsPanel({ clientId }: { clientId?: string }) 
     if (!clientId) { toast.error('Select a client first'); return; }
     if (!meetingForm.meeting_date) { toast.error('Meeting date is required'); return; }
     setLoading(true);
+
+    if (isDemo) {
+      setTimeout(() => {
+        setResult({
+          meeting_date: meetingForm.meeting_date,
+          notice_required: 'SS-1: 7 days notice required for Board Meetings.',
+          compliance_note: 'Ensure attendance registers are signed physically or via digital signatures for virtual meetings.',
+          invite_template: {
+            body: `Notice is hereby given that a ${meetingForm.meeting_type} meeting of the Board of Directors will be held on ${new Date(meetingForm.meeting_date).toLocaleString('en-IN')} at ${meetingForm.location || 'Registered Office'}.\n\nAgenda:\n${meetingForm.agenda}`
+          }
+        });
+        toast.success('Meeting scheduled (Demo)');
+        setLoading(false);
+      }, 600);
+      return;
+    }
+
     try {
       const agendaItems = meetingForm.agenda.split('\n').filter(Boolean);
       const res = await fetch(`${API_BASE}/board-meetings/schedule`, {
@@ -69,6 +86,21 @@ export default function BoardMeetingsPanel({ clientId }: { clientId?: string }) 
   const handleResolution = async () => {
     if (!clientId) { toast.error('Select a client first'); return; }
     setLoading(true);
+
+    if (isDemo) {
+      setTimeout(() => {
+        setResult({
+          resolution_number: `BR/${new Date().getFullYear()}/001`,
+          formal_header: `CERTIFIED TRUE COPY OF THE RESOLUTION PASSED AT THE MEETING OF THE BOARD OF DIRECTORS OF ${resForm.company_name || 'THE COMPANY'} HELD ON ${new Date().toLocaleDateString('en-IN')}`,
+          resolution_text: `"RESOLVED THAT pursuant to the applicable provisions of the Companies Act, 2013, approval of the Board be and is hereby accorded for ${resForm.resolution_type.replace(/_/g, ' ')}... (Demo AI Generated Draft)"`,
+          signing_instructions: 'Requires signatures from at least two directors or one director and the Company Secretary.'
+        });
+        toast.success('Resolution drafted (Demo)');
+        setLoading(false);
+      }, 600);
+      return;
+    }
+
     try {
       const res = await fetch(`${API_BASE}/resolutions/generate`, {
         method: 'POST',
@@ -85,6 +117,22 @@ export default function BoardMeetingsPanel({ clientId }: { clientId?: string }) 
   const handleAGM = async () => {
     if (!clientId) { toast.error('Select a client first'); return; }
     setLoading(true);
+
+    if (isDemo) {
+      setTimeout(() => {
+        setResult({
+          agm_date: agmForm.proposed_agm_date || '2025-09-30',
+          compliance_alert: 'AGM scheduled within statutory limits (Section 96).',
+          days_to_deadline: 45,
+          notice_must_be_sent_by: '2025-09-08',
+          agenda: ['To receive, consider and adopt Audited Financial Statements', 'To appoint a Director in place of retiring director', 'To ratify the appointment of Statutory Auditors']
+        });
+        toast.success('AGM schedule computed (Demo)');
+        setLoading(false);
+      }, 600);
+      return;
+    }
+
     try {
       const res = await fetch(`${API_BASE}/agm/schedule`, {
         method: 'POST',
@@ -102,6 +150,27 @@ export default function BoardMeetingsPanel({ clientId }: { clientId?: string }) 
     if (!clientId) { toast.error('Select a client first'); return; }
     if (!mcaForm.cin) { toast.error('CIN is required'); return; }
     setLoading(true);
+
+    if (isDemo) {
+      setTimeout(() => {
+        setResult({
+          form_type: 'MGT-7 Annual Return',
+          cin: mcaForm.cin,
+          filing_due_date: '2025-11-29',
+          alert: 'File within 60 days of AGM to avoid penalty of ₹100/day.',
+          checklist: [
+            { item: 'List of Shareholders', status: 'attached' },
+            { item: 'List of Directors', status: 'attached' },
+            { item: 'Financial Statements (AOC-4)', status: 'pending' },
+            { item: 'MGT-8 Certification (if applicable)', status: 'pending' }
+          ]
+        });
+        toast.success('MGT-7 structure generated (Demo)');
+        setLoading(false);
+      }, 600);
+      return;
+    }
+
     try {
       const res = await fetch(`${API_BASE}/mca-annual-return/generate`, {
         method: 'POST',

@@ -28,7 +28,7 @@ const TRAFFIC_COLORS: Record<string, string> = {
   green: 'bg-green-500',
 };
 
-export default function NoticeTrackerPanel({ clientId }: { clientId?: string }) {
+export default function NoticeTrackerPanel({ clientId, isDemo }: { clientId?: string; isDemo?: boolean }) {
   const [notices, setNotices] = useState<any[]>([]);
   const [loading, setLoading] = useState(false);
   const [showAddForm, setShowAddForm] = useState(false);
@@ -37,6 +37,19 @@ export default function NoticeTrackerPanel({ clientId }: { clientId?: string }) 
   const fetchNotices = async () => {
     if (!clientId) { toast.error('Select a client first'); return; }
     setLoading(true);
+
+    if (isDemo) {
+      setTimeout(() => {
+        setNotices([
+          { id: '1', department: 'Income Tax', notice_type: '143(2) Scrutiny', notice_number: 'IT-2025-01', subject: 'Mismatch in TDS claimed', issue_date: '2025-10-01', response_due_date: '2025-10-15', amount_involved: 450000, status: 'received', traffic_light: 'red', days_left: 2 },
+          { id: '2', department: 'GST', notice_type: 'ASMT-10', notice_number: 'GST-2025-44', subject: 'GSTR-1 and 3B mismatch', issue_date: '2025-09-01', response_due_date: '2025-09-30', amount_involved: 1200000, status: 'responded', traffic_light: 'green', days_left: 0 }
+        ]);
+        toast.success('Notices loaded (Demo)');
+        setLoading(false);
+      }, 600);
+      return;
+    }
+
     try {
       const response = await fetch(`${API_BASE}/notices/list?client_id=${clientId}&ca_firm_id=`);
       const data = await response.json();
@@ -50,6 +63,15 @@ export default function NoticeTrackerPanel({ clientId }: { clientId?: string }) 
     if (!newNotice.department || !newNotice.issue_date || !newNotice.response_due_date || !newNotice.subject) {
       toast.error('Fill in all required fields'); return;
     }
+    
+    if (isDemo) {
+      const added = { ...newNotice, id: Date.now().toString(), status: 'received', traffic_light: 'yellow', days_left: 15, amount_involved: parseFloat(newNotice.amount_involved || '0') };
+      setNotices([added, ...notices]);
+      toast.success('Notice added (Demo)');
+      setShowAddForm(false);
+      return;
+    }
+
     try {
       const response = await fetch(`${API_BASE}/notices/add`, { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ ...newNotice, client_id: clientId, ca_firm_id: '', amount_involved: parseFloat(newNotice.amount_involved || '0') }) });
       const data = await response.json();
@@ -59,6 +81,11 @@ export default function NoticeTrackerPanel({ clientId }: { clientId?: string }) 
   };
 
   const updateStatus = async (id: string, status: string) => {
+    if (isDemo) {
+      setNotices(notices.map(n => n.id === id ? { ...n, status } : n));
+      toast.success(`Status updated to ${status} (Demo)`);
+      return;
+    }
     try {
       await fetch(`${API_BASE}/notices/${id}/update`, { method: 'PUT', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ status }) });
       toast.success(`Status updated to ${status}`);

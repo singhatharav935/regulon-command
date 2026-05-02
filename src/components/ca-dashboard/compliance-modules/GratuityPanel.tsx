@@ -6,6 +6,7 @@ import { Badge } from '@/components/ui/badge';
 import { Input } from '@/components/ui/input';
 import { DollarSign, ShieldAlert, Calculator, BookOpen, AlertCircle, CheckCircle2 } from 'lucide-react';
 import { CASectionAgentBadge } from '@/components/agents/CASectionAgentBadge';
+import { jsPDF } from 'jspdf';
 
 export default function GratuityPanel() {
   const [salary, setSalary] = useState<string>('');
@@ -39,6 +40,20 @@ export default function GratuityPanel() {
       exempt: Math.round(exempt),
       taxable: Math.round(taxable),
     });
+  };
+
+  const handleDownloadPDF = () => {
+    if (!calculation) return;
+    const doc = new jsPDF();
+    doc.setFontSize(16);
+    doc.text('Gratuity Actuarial Report', 20, 20);
+    doc.setFontSize(12);
+    doc.text(`Basic Salary + DA: Rs. ${salary}`, 20, 30);
+    doc.text(`Years of Service: ${years}`, 20, 40);
+    doc.text(`Total Payable Amount: Rs. ${calculation.amount.toLocaleString('en-IN')}`, 20, 50);
+    doc.text(`Tax Exempt: Rs. ${calculation.exempt.toLocaleString('en-IN')}`, 20, 60);
+    doc.text(`Taxable Gratuity: Rs. ${calculation.taxable.toLocaleString('en-IN')}`, 20, 70);
+    doc.save('Gratuity_Report.pdf');
   };
 
   return (
@@ -129,7 +144,7 @@ export default function GratuityPanel() {
                 </div>
               </div>
 
-              <Button variant="outline" className="w-full">
+              <Button variant="outline" className="w-full" onClick={handleDownloadPDF}>
                 <BookOpen className="w-4 h-4 mr-2" /> Generate Actuarial Report PDF
               </Button>
             </CardContent>

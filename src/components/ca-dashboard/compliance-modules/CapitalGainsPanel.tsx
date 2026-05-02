@@ -4,7 +4,7 @@
  */
 import React, { useState } from 'react';
 import { TrendingUp, Plus, Trash2, Upload, Zap, RotateCcw, IndianRupee, Download, RefreshCw } from 'lucide-react';
-import jsPDF from 'jspdf';
+import { jsPDF } from 'jspdf';
 import { Badge } from '@/components/ui/badge';
 import { Button } from '@/components/ui/button';
 import { toast } from 'sonner';

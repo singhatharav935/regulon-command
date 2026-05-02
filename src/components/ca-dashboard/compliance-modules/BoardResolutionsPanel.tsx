@@ -12,10 +12,10 @@ const TEMPLATES = [
 ];
 
 export default function BoardResolutionsPanel() {
-  const { setActivePrompt, setDrawerOpen } = useAICommunication();
+  const { triggerAI, setDrawerOpen } = useAICommunication();
 
   const handleAIDraft = (template: typeof TEMPLATES[0]) => {
-    setActivePrompt(`
+    triggerAI(`
 SYSTEM DIRECTIVE:
 Draft a formal Board Resolution under the Companies Act, 2013.
 
@@ -27,7 +27,6 @@ Company: [Insert Selected Client Name]
 ACTION:
 Generate the completely legal text of the resolution including the "RESOLVED THAT" clauses. Make it ready to be copied into a Word Document or PDF.
     `);
-    setDrawerOpen(true);
   };
 
   return (

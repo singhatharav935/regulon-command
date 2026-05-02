@@ -3,8 +3,8 @@
  * Part of Sannidh ComplianceModulesHub — Advanced Calculators
  */
 import React, { useState } from 'react';
-import { Zap, Target, RefreshCw, Download, AlertTriangle, ChevronRight, IndianRupee, Calendar } from 'lucide-react';
-import jsPDF from 'jspdf';
+import { Zap, Target, RefreshCw, Download, AlertTriangle, ChevronRight, IndianRupee, Calendar, CheckCircle, RotateCcw } from 'lucide-react';
+import { jsPDF } from 'jspdf';
 import { Badge } from '@/components/ui/badge';
 import { Button } from '@/components/ui/button';
 import { toast } from 'sonner';

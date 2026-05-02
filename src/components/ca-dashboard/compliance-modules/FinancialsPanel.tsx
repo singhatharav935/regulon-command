@@ -1,7 +1,7 @@
 import { useState } from 'react';
 import { motion } from 'framer-motion';
-import { Building2, Upload, Download, RefreshCw, AlertTriangle, CheckCircle, FileText } from 'lucide-react';
-import jsPDF from 'jspdf';
+import { Building2, Upload, Download, RefreshCw, AlertTriangle, CheckCircle, FileText, XCircle, BarChart3 } from 'lucide-react';
+import { jsPDF } from 'jspdf';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
@@ -50,7 +50,7 @@ export default function FinancialsPanel({ clientId, isDemo }: { clientId?: strin
     }
 
     try {
-      let endpoint = `${API_BASE}/${activeReport}/generate`;
+      const endpoint = `${API_BASE}/${activeReport}/generate`;
       let body: any;
 
       if (activeReport === 'balance-sheet') {

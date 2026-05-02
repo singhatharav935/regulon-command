@@ -4,13 +4,13 @@ import { Card, CardContent, CardHeader, CardTitle, CardDescription } from '@/com
 import { Button } from '@/components/ui/button';
 import { Badge } from '@/components/ui/badge';
 import { FileText, Download, Users, AlertTriangle, CheckCircle2, ChevronRight, Zap, RefreshCw } from 'lucide-react';
-import jsPDF from 'jspdf';
+import { jsPDF } from 'jspdf';
 import { toast } from 'sonner';
 import { useAICommunication } from '@/store/useAICommunication';
 import { CASectionAgentBadge } from '@/components/agents/CASectionAgentBadge';
 
 export default function SalaryTDSPanel() {
-  const { setActivePrompt, setDrawerOpen } = useAICommunication();
+  const { triggerAI, setDrawerOpen } = useAICommunication();
   const [activeTab, setActiveTab] = useState<'form16' | 'form24q' | 'form27q'>('form16');
   const [exporting, setExporting] = useState(false);
 
@@ -67,7 +67,7 @@ export default function SalaryTDSPanel() {
   };
 
   const handleAIDrafting = (formType: string, issue: string) => {
-    setActivePrompt(`
+    triggerAI(`
 SYSTEM DIRECTIVE:
 You are an expert Indian CA drafting a response regarding a TDS/Salary Certificate discrepancy.
 
@@ -78,7 +78,6 @@ Primary Issue: ${issue}
 TASK:
 Write a formal email to the client's HR department explaining the discrepancy, what section of the Income Tax Act applies, and what Excel/payroll data they need to provide immediately to resolve it before the deadline.
     `);
-    setDrawerOpen(true);
   };
 
   return (
