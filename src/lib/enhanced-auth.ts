@@ -1,9 +1,10 @@
 /**
  * Enhanced Authentication Service
- * Production-ready authentication with advanced security features
+ * Production-ready authentication powered by Supabase Auth
+ * with client-side security features (rate limiting, device tracking)
  */
 
-import { backendRequest } from "./real-backend";
+import { supabase } from "@/integrations/supabase/client";
 import { ClientRateLimiter, validatePasswordStrength, generateSecureToken } from "./security";
 
 export interface AuthUser {
@@ -49,6 +50,7 @@ export interface AuthResponse {
   expires_in: number;
   message: string;
   session: AuthSession;
+  requiresEmailConfirmation?: boolean;
 }
 
 export interface SecurityEvent {
@@ -69,14 +71,14 @@ const passwordResetLimiter = new ClientRateLimiter(2, 600000); // 2 attempts per
 class EnhancedAuthService {
   private currentUser: AuthUser | null = null;
   private currentSession: AuthSession | null = null;
-  private refreshTimer: NodeJS.Timeout | null = null;
+  private refreshTimer: ReturnType<typeof setInterval> | null = null;
   private deviceId: string;
   private suspiciousActivityScore = 0;
 
   constructor() {
     this.deviceId = this.getOrCreateDeviceId();
     this.loadStoredAuth();
-    this.startTokenRefreshTimer();
+    this.startSessionListener();
     this.trackDeviceFingerprint();
   }
 
@@ -103,8 +105,6 @@ class EnhancedAuthService {
       if (userStr) {
         const parsedUser = JSON.parse(userStr);
         // Respect the freshly-set current_user_role over any stale backend user role.
-        // This prevents a previously stored in_house_ca account from overriding
-        // a fresh external_ca registration that just happened.
         const freshRole = localStorage.getItem('current_user_role');
         if (freshRole && parsedUser.registration_role !== freshRole) {
           parsedUser.registration_role = freshRole;
@@ -146,31 +146,72 @@ class EnhancedAuthService {
   }
 
   /**
-   * Detect suspicious activity based on various factors
+   * Listen for Supabase auth state changes and keep local state in sync
    */
-  private detectSuspiciousActivity(): boolean {
-    const storedFingerprint = localStorage.getItem('sannidh_device_fingerprint');
-    if (!storedFingerprint) return false;
+  private startSessionListener(): void {
+    supabase.auth.onAuthStateChange((_event, session) => {
+      if (session?.user) {
+        const meta = session.user.user_metadata || {};
+        const authUser: AuthUser = {
+          id: session.user.id,
+          email: session.user.email || '',
+          full_name: meta.full_name || '',
+          registration_role: meta.registration_role || 'company_owner',
+          verification_entity_name: meta.verification_entity_name,
+          email_verified: !!session.user.email_confirmed_at,
+          profile_completed: true,
+          created_at: session.user.created_at,
+          last_login: new Date().toISOString(),
+        };
+        this.currentUser = authUser;
+        localStorage.setItem('sannidh_user', JSON.stringify(authUser));
 
-    try {
-      const stored = JSON.parse(storedFingerprint);
-      const current = {
-        userAgent: navigator.userAgent,
-        language: navigator.language,
-        timezone: Intl.DateTimeFormat().resolvedOptions().timeZone,
-        screen: `${screen.width}x${screen.height}`,
-        platform: navigator.platform,
-      };
+        if (session.access_token) {
+          localStorage.setItem('sannidh_auth_token', session.access_token);
+        }
+        if (session.refresh_token) {
+          localStorage.setItem('sannidh_refresh_token', session.refresh_token);
+        }
+      } else {
+        // User signed out or session expired
+        this.currentUser = null;
+        this.clearStoredAuth();
+      }
+    });
+  }
 
-      // Check for significant changes
-      if (stored.userAgent !== current.userAgent) this.suspiciousActivityScore += 2;
-      if (stored.timezone !== current.timezone) this.suspiciousActivityScore += 1;
-      if (stored.platform !== current.platform) this.suspiciousActivityScore += 3;
+  /**
+   * Build AuthUser from a Supabase User object
+   */
+  private buildAuthUser(supabaseUser: any): AuthUser {
+    const meta = supabaseUser.user_metadata || {};
+    return {
+      id: supabaseUser.id,
+      email: supabaseUser.email || '',
+      full_name: meta.full_name || '',
+      registration_role: meta.registration_role || 'company_owner',
+      verification_entity_name: meta.verification_entity_name,
+      email_verified: !!supabaseUser.email_confirmed_at,
+      profile_completed: true,
+      created_at: supabaseUser.created_at,
+      last_login: new Date().toISOString(),
+    };
+  }
 
-      return this.suspiciousActivityScore >= 3;
-    } catch {
-      return false;
-    }
+  /**
+   * Build a mock AuthSession from a Supabase session
+   */
+  private buildAuthSession(supabaseSession: any): AuthSession {
+    return {
+      id: supabaseSession?.access_token?.slice(0, 16) || generateSecureToken(8),
+      user_id: supabaseSession?.user?.id || '',
+      device_info: this.getDeviceInfo(),
+      ip_address: '0.0.0.0',
+      user_agent: navigator.userAgent,
+      created_at: new Date().toISOString(),
+      last_activity: new Date().toISOString(),
+      is_current: true,
+    };
   }
 
   /**
@@ -204,7 +245,7 @@ class EnhancedAuthService {
   }
 
   /**
-   * Register new user with enhanced security
+   * Register new user with Supabase Auth
    */
   async register(
     email: string,
@@ -224,28 +265,68 @@ class EnhancedAuthService {
       throw new Error(`Password requirements: ${passwordValidation.feedback.join(', ')}`);
     }
 
-    const deviceInfo = this.getDeviceInfo();
-    const isSuspicious = this.detectSuspiciousActivity();
+    const redirectUrl = `${window.location.origin}/auth?mode=login&role=${registrationRole}`;
 
-    const response = await backendRequest<AuthResponse>('/auth/register', {
-      method: 'POST',
-      body: JSON.stringify({
-        email: email.trim().toLowerCase(),
-        password,
-        full_name: fullName.trim(),
-        registration_role: registrationRole,
-        verification_entity_name: entityName?.trim(),
-        device_info: deviceInfo,
-        suspicious_activity: isSuspicious,
-      }),
+    const { data, error } = await supabase.auth.signUp({
+      email: email.trim().toLowerCase(),
+      password,
+      options: {
+        emailRedirectTo: redirectUrl,
+        data: {
+          full_name: fullName.trim(),
+          registration_role: registrationRole,
+          verification_entity_name: entityName?.trim(),
+        },
+      },
     });
 
-    this.storeAuthData(response, rememberDevice);
+    if (error) {
+      const msg = error.message.toLowerCase();
+      if (msg.includes('already registered') || msg.includes('already exists')) {
+        throw new Error('An account with this email already exists. Please sign in instead.');
+      }
+      throw new Error(error.message);
+    }
+
+    if (!data.user) {
+      throw new Error('Registration failed. Please try again.');
+    }
+
+    // Detect fake user for duplicate signups (identities array is empty)
+    const identities = (data.user as any)?.identities ?? data.user?.identities;
+    if (Array.isArray(identities) && identities.length === 0) {
+      throw new Error('An account with this email already exists. Please sign in instead.');
+    }
+
+    const needsConfirmation = !data.session;
+    const authUser = this.buildAuthUser(data.user);
+    const authSession = data.session ? this.buildAuthSession(data.session) : this.buildAuthSession(null);
+
+    const response: AuthResponse = {
+      user: authUser,
+      token: data.session?.access_token || '',
+      refresh_token: data.session?.refresh_token || '',
+      expires_in: data.session?.expires_in || 0,
+      message: needsConfirmation
+        ? 'Account created! Please check your email to confirm your account.'
+        : 'Account created successfully!',
+      session: authSession,
+      requiresEmailConfirmation: needsConfirmation,
+    };
+
+    if (data.session) {
+      this.storeAuthData(response, rememberDevice);
+    } else {
+      // Store user info for the email verification flow, but not session tokens
+      this.currentUser = authUser;
+      localStorage.setItem('sannidh_user', JSON.stringify(authUser));
+    }
+
     return response;
   }
 
   /**
-   * Login user with enhanced security
+   * Login user with Supabase Auth
    */
   async login(
     email: string,
@@ -257,37 +338,48 @@ class EnhancedAuthService {
       throw new Error('Too many login attempts. Please try again in a minute.');
     }
 
-    const deviceInfo = this.getDeviceInfo();
-    const isSuspicious = this.detectSuspiciousActivity();
+    const { data, error } = await supabase.auth.signInWithPassword({
+      email: email.trim().toLowerCase(),
+      password,
+    });
 
-    try {
-      const response = await backendRequest<AuthResponse>('/auth/login', {
-        method: 'POST',
-        body: JSON.stringify({
-          email: email.trim().toLowerCase(),
-          password,
-          device_info: deviceInfo,
-          remember_me: rememberMe,
-          trust_device: trustDevice,
-          suspicious_activity: isSuspicious,
-        }),
-      });
-
-      this.storeAuthData(response, rememberMe);
-      
-      if (trustDevice) {
-        localStorage.setItem(`trusted_device_${this.deviceId}`, 'true');
+    if (error) {
+      const msg = error.message.toLowerCase();
+      if (msg.includes('invalid login credentials') || msg.includes('invalid')) {
+        throw new Error('Invalid email or password. Please check your credentials and try again.');
       }
-
-      // Reset suspicious activity score on successful login
-      this.suspiciousActivityScore = 0;
-
-      return response;
-    } catch (error) {
-      // Track failed login attempt
-      console.warn('Login failed:', error.message);
-      throw error;
+      if (msg.includes('email not confirmed')) {
+        throw new Error('Please confirm your email before signing in. Check your inbox for the confirmation link.');
+      }
+      throw new Error(error.message);
     }
+
+    if (!data.user || !data.session) {
+      throw new Error('Login failed. Please try again.');
+    }
+
+    const authUser = this.buildAuthUser(data.user);
+    const authSession = this.buildAuthSession(data.session);
+
+    const response: AuthResponse = {
+      user: authUser,
+      token: data.session.access_token,
+      refresh_token: data.session.refresh_token,
+      expires_in: data.session.expires_in,
+      message: 'Login successful!',
+      session: authSession,
+    };
+
+    this.storeAuthData(response, rememberMe);
+    
+    if (trustDevice) {
+      localStorage.setItem(`trusted_device_${this.deviceId}`, 'true');
+    }
+
+    // Reset suspicious activity score on successful login
+    this.suspiciousActivityScore = 0;
+
+    return response;
   }
 
   /**
@@ -300,38 +392,32 @@ class EnhancedAuthService {
     storage.setItem('sannidh_refresh_token', response.refresh_token);
     localStorage.setItem('sannidh_user', JSON.stringify(response.user));
     localStorage.setItem('sannidh_session', JSON.stringify(response.session));
+    // Also store in localStorage so the api.ts service can read it
+    localStorage.setItem('auth_token', response.token);
 
     this.currentUser = response.user;
     this.currentSession = response.session;
   }
 
   /**
-   * Refresh authentication token
+   * Refresh authentication token via Supabase
    */
   async refreshToken(): Promise<void> {
-    const refreshToken = localStorage.getItem('sannidh_refresh_token') || 
-                        sessionStorage.getItem('sannidh_refresh_token');
-
-    if (!refreshToken) {
-      throw new Error('No refresh token available');
-    }
-
     try {
-      const response = await backendRequest<AuthResponse>('/auth/refresh', {
-        method: 'POST',
-        body: JSON.stringify({
-          refresh_token: refreshToken,
-          device_id: this.deviceId,
-        }),
-      });
+      const { data, error } = await supabase.auth.refreshSession();
+      if (error || !data.session) {
+        throw new Error(error?.message || 'Session refresh failed');
+      }
 
-      // Update stored tokens
       const storage = localStorage.getItem('sannidh_auth_token') ? localStorage : sessionStorage;
-      storage.setItem('sannidh_auth_token', response.token);
-      storage.setItem('sannidh_refresh_token', response.refresh_token);
+      storage.setItem('sannidh_auth_token', data.session.access_token);
+      storage.setItem('sannidh_refresh_token', data.session.refresh_token);
+      localStorage.setItem('auth_token', data.session.access_token);
 
-      this.currentUser = response.user;
-      this.currentSession = response.session;
+      if (data.user) {
+        this.currentUser = this.buildAuthUser(data.user);
+        localStorage.setItem('sannidh_user', JSON.stringify(this.currentUser));
+      }
     } catch (error) {
       console.warn('Token refresh failed:', error);
       this.logout();
@@ -340,38 +426,18 @@ class EnhancedAuthService {
   }
 
   /**
-   * Start automatic token refresh timer
-   */
-  private startTokenRefreshTimer(): void {
-    if (this.refreshTimer) {
-      clearInterval(this.refreshTimer);
-    }
-
-    // Refresh token every 15 minutes
-    this.refreshTimer = setInterval(() => {
-      if (this.isAuthenticated()) {
-        this.refreshToken().catch(() => {
-          // Silent fail - user will be logged out
-        });
-      }
-    }, 15 * 60 * 1000);
-  }
-
-  /**
    * Logout user
    */
   async logout(): Promise<void> {
     try {
-      await backendRequest<{ message: string }>('/auth/logout', {
-        method: 'POST',
-        body: JSON.stringify({
-          session_id: this.currentSession?.id,
-        }),
-      });
+      await supabase.auth.signOut();
     } catch (error) {
       console.warn('Logout error:', error);
     } finally {
       this.clearStoredAuth();
+      localStorage.removeItem('auth_token');
+      localStorage.removeItem('current_user_role');
+      localStorage.removeItem('pending_registration_role');
       if (this.refreshTimer) {
         clearInterval(this.refreshTimer);
         this.refreshTimer = null;
@@ -380,125 +446,117 @@ class EnhancedAuthService {
   }
 
   /**
-   * Request password reset
+   * Request password reset via Supabase
    */
   async requestPasswordReset(email: string): Promise<{ message: string }> {
     if (!passwordResetLimiter.canProceed()) {
       throw new Error('Too many password reset requests. Please try again later.');
     }
 
-    return backendRequest<{ message: string }>('/auth/forgot-password', {
-      method: 'POST',
-      body: JSON.stringify({
-        email: email.trim().toLowerCase(),
-      }),
-    });
+    const redirectUrl = `${window.location.origin}/auth/reset-password`;
+    const { error } = await supabase.auth.resetPasswordForEmail(
+      email.trim().toLowerCase(),
+      { redirectTo: redirectUrl }
+    );
+
+    if (error) throw new Error(error.message);
+    return { message: 'Password reset email sent. Please check your inbox.' };
   }
 
   /**
-   * Reset password with token
+   * Reset password with token (user is already authenticated via the reset link)
    */
-  async resetPassword(token: string, newPassword: string): Promise<{ message: string }> {
-    // Validate password strength
+  async resetPassword(_token: string, newPassword: string): Promise<{ message: string }> {
     const passwordValidation = validatePasswordStrength(newPassword);
     if (!passwordValidation.isValid) {
       throw new Error(`Password requirements: ${passwordValidation.feedback.join(', ')}`);
     }
 
-    return backendRequest<{ message: string }>('/auth/reset-password', {
-      method: 'POST',
-      body: JSON.stringify({
-        token,
-        password: newPassword,
-      }),
-    });
+    const { error } = await supabase.auth.updateUser({ password: newPassword });
+    if (error) throw new Error(error.message);
+    return { message: 'Password has been reset successfully.' };
   }
 
   /**
    * Change password (authenticated user)
    */
-  async changePassword(currentPassword: string, newPassword: string): Promise<{ message: string }> {
+  async changePassword(_currentPassword: string, newPassword: string): Promise<{ message: string }> {
     if (!this.isAuthenticated()) {
       throw new Error('User not authenticated');
     }
 
-    // Validate password strength
     const passwordValidation = validatePasswordStrength(newPassword);
     if (!passwordValidation.isValid) {
       throw new Error(`Password requirements: ${passwordValidation.feedback.join(', ')}`);
     }
 
-    return backendRequest<{ message: string }>('/auth/change-password', {
-      method: 'POST',
-      body: JSON.stringify({
-        current_password: currentPassword,
-        new_password: newPassword,
-      }),
-    });
+    const { error } = await supabase.auth.updateUser({ password: newPassword });
+    if (error) throw new Error(error.message);
+    return { message: 'Password changed successfully.' };
   }
 
   /**
-   * Get user sessions (for device management)
+   * Get user sessions — Supabase doesn't expose multi-session management on the client,
+   * so we return the current session only.
    */
   async getSessions(): Promise<AuthSession[]> {
     if (!this.isAuthenticated()) {
       throw new Error('User not authenticated');
     }
-
-    const response = await backendRequest<{ sessions: AuthSession[] }>('/auth/sessions');
-    return response.sessions;
+    return this.currentSession ? [this.currentSession] : [];
   }
 
   /**
-   * Revoke a specific session
+   * Revoke a specific session (sign out)
    */
-  async revokeSession(sessionId: string): Promise<{ message: string }> {
+  async revokeSession(_sessionId: string): Promise<{ message: string }> {
     if (!this.isAuthenticated()) {
       throw new Error('User not authenticated');
     }
-
-    return backendRequest<{ message: string }>(`/auth/sessions/${sessionId}/revoke`, {
-      method: 'DELETE',
-    });
+    await this.logout();
+    return { message: 'Session revoked.' };
   }
 
   /**
-   * Get security events/audit trail
+   * Get security events/audit trail (placeholder — would need a custom table)
    */
-  async getSecurityEvents(limit = 50): Promise<SecurityEvent[]> {
+  async getSecurityEvents(_limit = 50): Promise<SecurityEvent[]> {
     if (!this.isAuthenticated()) {
       throw new Error('User not authenticated');
     }
-
-    const response = await backendRequest<{ events: SecurityEvent[] }>(`/auth/security-events?limit=${limit}`);
-    return response.events;
+    return [];
   }
 
   /**
-   * Verify email with token
+   * Verify email with token (handled by Supabase link click)
    */
-  async verifyEmail(token: string): Promise<{ message: string }> {
-    return backendRequest<{ message: string }>('/auth/verify-email', {
-      method: 'POST',
-      body: JSON.stringify({ token }),
-    });
+  async verifyEmail(_token: string): Promise<{ message: string }> {
+    return { message: 'Email verified via confirmation link.' };
   }
 
   /**
-   * Resend email verification
+   * Resend email verification via Supabase
    */
   async resendEmailVerification(): Promise<{ message: string }> {
-    if (!this.isAuthenticated()) {
-      throw new Error('User not authenticated');
+    const email = this.currentUser?.email;
+    if (!email) {
+      throw new Error('No email to verify.');
     }
 
-    return backendRequest<{ message: string }>('/auth/resend-verification', {
-      method: 'POST',
+    const { error } = await supabase.auth.resend({
+      type: 'signup',
+      email,
+      options: {
+        emailRedirectTo: `${window.location.origin}/auth?mode=login`,
+      },
     });
+
+    if (error) throw new Error(error.message);
+    return { message: 'Verification email sent. Please check your inbox.' };
   }
 
   /**
-   * Check if user is authenticated
+   * Check if user is authenticated (has a valid Supabase session)
    */
   isAuthenticated(): boolean {
     const token = localStorage.getItem('sannidh_auth_token') || 
@@ -529,22 +587,29 @@ class EnhancedAuthService {
   }
 
   /**
-   * Update user profile
+   * Update user profile via Supabase
    */
   async updateProfile(updates: Partial<AuthUser>): Promise<AuthUser> {
     if (!this.isAuthenticated()) {
       throw new Error('User not authenticated');
     }
 
-    const response = await backendRequest<{ user: AuthUser }>('/auth/profile', {
-      method: 'PATCH',
-      body: JSON.stringify(updates),
+    const { data, error } = await supabase.auth.updateUser({
+      data: {
+        full_name: updates.full_name,
+        registration_role: updates.registration_role,
+        verification_entity_name: updates.verification_entity_name,
+      },
     });
 
-    this.currentUser = response.user;
-    localStorage.setItem('sannidh_user', JSON.stringify(response.user));
+    if (error) throw new Error(error.message);
+
+    if (data.user) {
+      this.currentUser = this.buildAuthUser(data.user);
+      localStorage.setItem('sannidh_user', JSON.stringify(this.currentUser));
+    }
     
-    return response.user;
+    return this.currentUser!;
   }
 
   /**

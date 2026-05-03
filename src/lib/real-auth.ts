@@ -1,9 +1,9 @@
 /**
  * Real Authentication Service
- * Handles registration and login with real backend
+ * Handles registration and login with Supabase Auth
  */
 
-import { backendRequest } from "./real-backend";
+import { supabase } from "@/integrations/supabase/client";
 
 export interface AuthUser {
   id: string;
@@ -23,7 +23,7 @@ export interface AuthResponse {
 }
 
 /**
- * Register new user with real backend
+ * Register new user with Supabase Auth
  */
 export async function registerUser(
   email: string,
@@ -32,41 +32,81 @@ export async function registerUser(
   registrationRole: string,
   entityName?: string
 ): Promise<AuthResponse> {
-  const response = await backendRequest<AuthResponse>('/auth/register', {
-    method: 'POST',
-    body: JSON.stringify({
-      email,
-      password,
-      full_name: fullName,
-      registration_role: registrationRole,
-      verification_entity_name: entityName,
-    }),
+  const redirectUrl = `${window.location.origin}/auth?mode=login&role=${registrationRole}`;
+
+  const { data, error } = await supabase.auth.signUp({
+    email: email.trim().toLowerCase(),
+    password,
+    options: {
+      emailRedirectTo: redirectUrl,
+      data: {
+        full_name: fullName,
+        registration_role: registrationRole,
+        verification_entity_name: entityName,
+      },
+    },
   });
 
-  // Store token in localStorage
-  localStorage.setItem('sannidh_auth_token', response.token);
-  localStorage.setItem('sannidh_user', JSON.stringify(response.user));
+  if (error) throw new Error(error.message);
+  if (!data.user) throw new Error('Registration failed');
 
-  return response;
+  const user: AuthUser = {
+    id: data.user.id,
+    email: data.user.email || '',
+    full_name: fullName,
+    registration_role: registrationRole,
+    verification_entity_name: entityName,
+    email_verified: !!data.user.email_confirmed_at,
+    profile_completed: true,
+  };
+
+  if (data.session) {
+    localStorage.setItem('sannidh_auth_token', data.session.access_token);
+    localStorage.setItem('auth_token', data.session.access_token);
+  }
+  localStorage.setItem('sannidh_user', JSON.stringify(user));
+
+  return {
+    user,
+    token: data.session?.access_token || '',
+    expires_in: String(data.session?.expires_in || 0),
+    message: data.session ? 'Account created!' : 'Please check your email to confirm your account.',
+  };
 }
 
 /**
- * Login user with real backend
+ * Login user with Supabase Auth
  */
 export async function loginUser(email: string, password: string): Promise<AuthResponse> {
-  const response = await backendRequest<AuthResponse>('/auth/login', {
-    method: 'POST',
-    body: JSON.stringify({
-      email,
-      password,
-    }),
+  const { data, error } = await supabase.auth.signInWithPassword({
+    email: email.trim().toLowerCase(),
+    password,
   });
 
-  // Store token in localStorage
-  localStorage.setItem('sannidh_auth_token', response.token);
-  localStorage.setItem('sannidh_user', JSON.stringify(response.user));
+  if (error) throw new Error(error.message);
+  if (!data.user || !data.session) throw new Error('Login failed');
 
-  return response;
+  const meta = data.user.user_metadata || {};
+  const user: AuthUser = {
+    id: data.user.id,
+    email: data.user.email || '',
+    full_name: meta.full_name || '',
+    registration_role: meta.registration_role || 'company_owner',
+    verification_entity_name: meta.verification_entity_name,
+    email_verified: !!data.user.email_confirmed_at,
+    profile_completed: true,
+  };
+
+  localStorage.setItem('sannidh_auth_token', data.session.access_token);
+  localStorage.setItem('auth_token', data.session.access_token);
+  localStorage.setItem('sannidh_user', JSON.stringify(user));
+
+  return {
+    user,
+    token: data.session.access_token,
+    expires_in: String(data.session.expires_in),
+    message: 'Login successful',
+  };
 }
 
 /**
@@ -74,14 +114,12 @@ export async function loginUser(email: string, password: string): Promise<AuthRe
  */
 export async function logoutUser(): Promise<void> {
   try {
-    await backendRequest<{ message: string }>('/auth/logout', {
-      method: 'POST',
-    });
+    await supabase.auth.signOut();
   } catch (error) {
     console.error('Logout error:', error);
   } finally {
-    // Clear local storage regardless of backend success
     localStorage.removeItem('sannidh_auth_token');
+    localStorage.removeItem('auth_token');
     localStorage.removeItem('sannidh_user');
   }
 }

@@ -144,18 +144,10 @@ const AuthReal = () => {
     try {
       const response = await enhancedAuth.login(email.trim(), password, rememberMe, trustDevice);
 
-      toast({
-        title: "Welcome back!",
-        description: "You've been logged in successfully",
-      });
+      // Use the role from Supabase user metadata
+      const effectiveRole = response.user.registration_role || 'company_owner';
 
-      // Determine the effective role:
-      // If localStorage has a freshly-set role (from a recent registration),
-      // prefer it over what the backend might have stored for an old account.
-      const freshLocalRole = localStorage.getItem('current_user_role');
-      const effectiveRole = freshLocalRole || response.user.registration_role;
-
-      // Keep localStorage in sync with the real role
+      // Keep localStorage in sync
       localStorage.setItem('current_user_role', effectiveRole);
       localStorage.setItem('pending_registration_role', effectiveRole);
 
@@ -163,8 +155,17 @@ const AuthReal = () => {
       if (!response.user.email_verified) {
         setCurrentUser({...response.user, registration_role: effectiveRole});
         setMode('email-verification');
+        toast({
+          title: "Email Not Verified",
+          description: "Please verify your email to continue.",
+        });
         return;
       }
+
+      toast({
+        title: "Welcome back!",
+        description: "You've been logged in successfully",
+      });
 
       // Navigate to appropriate dashboard
       const redirectTo = (location.state as any)?.from || getDashboardRoute(effectiveRole);
@@ -191,7 +192,6 @@ const AuthReal = () => {
         return;
       }
 
-      // Use local demo mode directly
       const localResponse = await createLocalDemoUser(
         email.trim(),
         password,
@@ -200,42 +200,34 @@ const AuthReal = () => {
         entityName.trim() || undefined
       );
 
-      if (localResponse.success && localResponse.user) {
+      if (!localResponse.success) {
+        throw new Error(localResponse.error || "Failed to create account");
+      }
+
+      if (localResponse.requiresEmailConfirmation) {
+        toast({
+          title: "✅ Account Created!",
+          description: `We've sent a confirmation email to ${email}. Please confirm your email to sign in.`,
+        });
+        setTimeout(() => {
+          setMode('login');
+        }, 2000);
+        return;
+      }
+
+      if (localResponse.user) {
         toast({
           title: "✅ Account Created Successfully!",
           description: `Welcome to SANNIDH, ${fullName}! Redirecting to your dashboard...`,
         });
 
-        // Store user info
         localStorage.setItem('pending_registration_role', registrationRole);
         localStorage.setItem('current_user_role', registrationRole);
-        // Clear ALL stale auth keys that could contaminate the new role
-        localStorage.removeItem('sannidh:local-preview-auth');
-        localStorage.removeItem('sannidh_user');         // clears enhancedAuth stale user
-        localStorage.removeItem('sannidh_auth_token');   // clears any old backend session
-        localStorage.removeItem('sannidh_session');
-        
 
-        // For company_owner, store company ID for real dashboard
-        if (registrationRole === 'company_owner') {
-          const localCompanyId = `company-${Date.now()}-${Math.random().toString(36).substr(2, 9)}`;
-          localStorage.setItem('sannidh_company_id', localCompanyId);
-          localStorage.setItem('sannidh_company_data', JSON.stringify({
-            id: localCompanyId,
-            company_name: entityName || fullName + "'s Company",
-            industry: 'General',
-            compliance_score: 0,
-            health_status: 'unknown'
-          }));
-        }
-        
-        // Navigate to appropriate dashboard based on role
         const dashboardRoute = getDashboardRoute(registrationRole);
         setTimeout(() => {
           navigate(dashboardRoute);
         }, 500);
-      } else {
-        throw new Error(localResponse.error || "Failed to create account");
       }
     } catch (error: any) {
       console.error("Registration error:", error);
@@ -250,13 +242,7 @@ const AuthReal = () => {
   };
 
   const handleMultiStepRegistration = async (formData: RegistrationFormData) => {
-    console.log("=== REGISTRATION STARTED ===");
-    console.log("1. Form Role:", formData.registrationRole);
-    console.log("2. Form Email:", formData.email);
-    console.log("3. Form Entity:", formData.entityName);
-    
     try {
-      console.log("4. Calling createLocalDemoUser...");
       const localResponse = await createLocalDemoUser(
         formData.email,
         formData.password,
@@ -264,102 +250,93 @@ const AuthReal = () => {
         formData.registrationRole,
         formData.entityName
       );
-      console.log("5. createLocalDemoUser response:", localResponse);
 
-      if (localResponse.success && localResponse.user) {
-        console.log("6. User created successfully:", localResponse.user.email);
-        
-        // For company_owner role, register with backend API to get isolated dashboard
-        if (formData.registrationRole === 'company_owner') {
-          console.log("7. Role is company_owner - registering with backend...");
-          try {
-            const API_BASE = import.meta.env.VITE_API_URL || 'http://localhost:8001/api/v1';
-            console.log("8. API_BASE:", API_BASE);
-            const companyResponse = await fetch(`${API_BASE}/company/register`, {
-              method: 'POST',
-              headers: { 'Content-Type': 'application/json' },
-              body: JSON.stringify({
-                company_name: formData.companyInfo?.name || formData.entityName || formData.fullName + "'s Company",
-                industry: formData.companyInfo?.industry || null,
-                email: formData.email,
-                phone: null,
-                gstin: null,  // Optional - user can add later
-                pan: null,    // Optional - user can add later
-                cin: null,    // Optional - user can add later
-                company_type: null,
-                state: formData.companyInfo?.location || null,
-                password: formData.password
-              })
-            });
-            console.log("9. Company API response status:", companyResponse.status);
-            
-            if (companyResponse.ok) {
-              const companyData = await companyResponse.json();
-              console.log("10. Company registered with ID:", companyData.company_id);
-              // Store company ID for Real Company Dashboard
-              localStorage.setItem('sannidh_company_id', companyData.company_id);
-              localStorage.setItem('sannidh_company_data', JSON.stringify({
-                id: companyData.company_id,
-                company_name: companyData.company_name,
-                compliance_score: 0,
-                health_status: 'unknown'
-              }));
-              console.log('11. Company data stored in localStorage');
-            }
-          } catch (apiError) {
-            console.warn('12. Backend registration failed, using local storage:', apiError);
-            // Fallback: create local company ID
-            const localCompanyId = `local-${Date.now()}-${Math.random().toString(36).substr(2, 9)}`;
-            localStorage.setItem('sannidh_company_id', localCompanyId);
-            localStorage.setItem('sannidh_company_data', JSON.stringify({
-              id: localCompanyId,
+      if (!localResponse.success) {
+        throw new Error(localResponse.error || "Failed to create account");
+      }
+
+      if (!localResponse.user) {
+        throw new Error("Failed to create account. Please try again.");
+      }
+
+      // If email confirmation is required, show check-email message
+      if (localResponse.requiresEmailConfirmation) {
+        toast({
+          title: "✅ Account Created!",
+          description: `We've sent a confirmation email to ${formData.email}. Please check your inbox and confirm your email to sign in.`,
+        });
+
+        // Store role for after confirmation
+        localStorage.setItem('pending_registration_role', formData.registrationRole);
+        localStorage.setItem('current_user_role', formData.registrationRole);
+
+        // Redirect to login page after a short delay
+        setTimeout(() => {
+          navigate('/auth?mode=login');
+        }, 2000);
+        return;
+      }
+
+      // Email confirmation not required — user is immediately signed in
+      // For company_owner role, try registering with backend API
+      if (formData.registrationRole === 'company_owner') {
+        try {
+          const API_BASE = import.meta.env.VITE_API_URL || 'http://localhost:8001/api/v1';
+          const companyResponse = await fetch(`${API_BASE}/company/register`, {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify({
               company_name: formData.companyInfo?.name || formData.entityName || formData.fullName + "'s Company",
               industry: formData.companyInfo?.industry || null,
+              email: formData.email,
+              phone: null,
+              gstin: null,
+              pan: null,
+              cin: null,
+              company_type: null,
+              state: formData.companyInfo?.location || null,
+              password: formData.password
+            })
+          });
+          
+          if (companyResponse.ok) {
+            const companyData = await companyResponse.json();
+            localStorage.setItem('sannidh_company_id', companyData.company_id);
+            localStorage.setItem('sannidh_company_data', JSON.stringify({
+              id: companyData.company_id,
+              company_name: companyData.company_name,
               compliance_score: 0,
               health_status: 'unknown'
             }));
-            console.log('13. Local company ID created:', localCompanyId);
           }
-        } else {
-          console.log("7b. Role is NOT company_owner, skipping backend registration");
+        } catch (apiError) {
+          console.warn('Backend company registration failed, using local fallback:', apiError);
+          const localCompanyId = `local-${Date.now()}-${Math.random().toString(36).substr(2, 9)}`;
+          localStorage.setItem('sannidh_company_id', localCompanyId);
+          localStorage.setItem('sannidh_company_data', JSON.stringify({
+            id: localCompanyId,
+            company_name: formData.companyInfo?.name || formData.entityName || formData.fullName + "'s Company",
+            industry: formData.companyInfo?.industry || null,
+            compliance_score: 0,
+            health_status: 'unknown'
+          }));
         }
-
-        toast({
-          title: "✅ Account Created Successfully!",
-          description: `Welcome to SANNIDH, ${formData.fullName}! Redirecting to your dashboard...`,
-        });
-
-        // Store user info and role
-        console.log("14. Storing role in localStorage:", formData.registrationRole);
-        localStorage.setItem('pending_registration_role', formData.registrationRole);
-        localStorage.setItem('current_user_role', formData.registrationRole);
-        // Clear ALL stale auth keys that could contaminate the new role
-        localStorage.removeItem('sannidh:local-preview-auth');
-        localStorage.removeItem('sannidh_user');         // clears enhancedAuth stale user
-        localStorage.removeItem('sannidh_auth_token');   // clears any old backend session
-        localStorage.removeItem('sannidh_session');
-        
-
-        // Get the correct dashboard route based on role
-        const dashboardRoute = getDashboardRoute(formData.registrationRole);
-        console.log('15a. formData.registrationRole is:', JSON.stringify(formData.registrationRole));
-        console.log('15b. dashboardRoute value is:', JSON.stringify(dashboardRoute));
-        console.log('15c. dashboardRoute === "/dashboard"?', dashboardRoute === '/dashboard');
-        console.log('15d. dashboardRoute.length:', dashboardRoute?.length);
-        console.log('15e. dashboardRoute charCodes:', dashboardRoute?.split('').map(c => c.charCodeAt(0)));
-        
-        // Force redirect using window.location for reliability
-        setTimeout(() => {
-          console.log('18a. About to execute redirect');
-          console.log('18b. dashboardRoute value before redirect:', JSON.stringify(dashboardRoute));
-          console.log('18c. Setting window.location.href to:', dashboardRoute);
-          window.location.href = dashboardRoute;
-          console.log('18d. Redirect command executed');
-        }, 500);
-      } else {
-        console.log("ERROR: Registration failed:", localResponse.error);
-        throw new Error(localResponse.error || "Failed to create account");
       }
+
+      toast({
+        title: "✅ Account Created Successfully!",
+        description: `Welcome to SANNIDH, ${formData.fullName}! Redirecting to your dashboard...`,
+      });
+
+      // Store role info
+      localStorage.setItem('pending_registration_role', formData.registrationRole);
+      localStorage.setItem('current_user_role', formData.registrationRole);
+
+      // Redirect to dashboard
+      const dashboardRoute = getDashboardRoute(formData.registrationRole);
+      setTimeout(() => {
+        window.location.href = dashboardRoute;
+      }, 500);
     } catch (error: any) {
       console.error("Registration error:", error);
       toast({

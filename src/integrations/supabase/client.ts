@@ -3,20 +3,23 @@ import { createClient } from '@supabase/supabase-js';
 import type { Database } from './types';
 
 const SUPABASE_URL = import.meta.env.VITE_SUPABASE_URL;
-const SUPABASE_PUBLISHABLE_KEY = import.meta.env.VITE_SUPABASE_PUBLISHABLE_KEY;
+// Support both key names for backward compatibility
+const SUPABASE_KEY =
+  import.meta.env.VITE_SUPABASE_ANON_KEY ||
+  import.meta.env.VITE_SUPABASE_PUBLISHABLE_KEY;
 
-const hasSupabaseEnv = Boolean(SUPABASE_URL && SUPABASE_PUBLISHABLE_KEY);
+const hasSupabaseEnv = Boolean(SUPABASE_URL && SUPABASE_KEY);
 const fallbackUrl = "https://placeholder.supabase.co";
 const fallbackKey = "public-anon-key-placeholder";
 
 if (!hasSupabaseEnv) {
   if (import.meta.env.DEV) {
     console.warn(
-      "[SANNIDH] Missing VITE_SUPABASE_URL or VITE_SUPABASE_PUBLISHABLE_KEY. Supabase calls will fail until configured."
+      "[SANNIDH] Missing VITE_SUPABASE_URL or VITE_SUPABASE_ANON_KEY. Supabase calls will fail until configured."
     );
   } else {
     throw new Error(
-      "[SANNIDH] Production configuration error: missing VITE_SUPABASE_URL or VITE_SUPABASE_PUBLISHABLE_KEY."
+      "[SANNIDH] Production configuration error: missing VITE_SUPABASE_URL or VITE_SUPABASE_ANON_KEY."
     );
   }
 }
@@ -26,7 +29,7 @@ if (!hasSupabaseEnv) {
 
 export const supabase = createClient<Database>(
   hasSupabaseEnv ? SUPABASE_URL : fallbackUrl,
-  hasSupabaseEnv ? SUPABASE_PUBLISHABLE_KEY : fallbackKey,
+  hasSupabaseEnv ? SUPABASE_KEY : fallbackKey,
   {
   auth: {
     storage: localStorage,
