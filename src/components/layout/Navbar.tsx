@@ -1,11 +1,12 @@
 import { useState } from "react";
 import { Link, useNavigate, useLocation } from "react-router-dom";
 import { motion, AnimatePresence } from "framer-motion";
-import { ChevronDown, Menu, X, Shield, Cpu, Building2, Users, Lock, LogIn, Landmark, FileCheck, LayoutDashboard } from "lucide-react";
+import { ChevronDown, Menu, X, Shield, Cpu, Building2, Users, Lock, LogIn, LogOut, Landmark, FileCheck, LayoutDashboard } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { cn } from "@/lib/utils";
 import { useAuth } from "@/hooks/use-auth";
 import { getDashboardRoute } from "@/lib/dashboard-routes";
+import { supabase } from "@/integrations/supabase/client";
 
 type NavDropdownItem = {
   title: string;
@@ -57,6 +58,13 @@ const Navbar = () => {
     "/app/", "/agent-control", "/drafting"
   ];
   const isOnDashboard = dashboardPrefixes.some(prefix => location.pathname.startsWith(prefix));
+
+  const handleLogout = async () => {
+    await supabase.auth.signOut();
+    localStorage.removeItem("current_user_role");
+    localStorage.removeItem("pending_registration_role");
+    navigate("/");
+  };
 
   const handleDropdownEnter = (dropdown: string) => {
     setActiveDropdown(dropdown);
@@ -200,7 +208,12 @@ const Navbar = () => {
 
           {/* Desktop Actions — auth-aware */}
           <div className="hidden lg:flex items-center gap-3">
-            {isLoggedIn && isOnDashboard ? null : isLoggedIn ? (
+            {isLoggedIn && isOnDashboard ? (
+              <Button variant="ghost" size="sm" onClick={handleLogout}>
+                <LogOut className="w-4 h-4 mr-2" />
+                Logout
+              </Button>
+            ) : isLoggedIn ? (
               <Button size="sm" className="btn-glow" onClick={() => navigate(dashboardPath)}>
                 <LayoutDashboard className="w-4 h-4 mr-2" />
                 Return to Dashboard
@@ -278,7 +291,12 @@ const Navbar = () => {
                 ))}
               </div>
               <div className="pt-4 space-y-3 border-t border-border/50">
-                {isLoggedIn && isOnDashboard ? null : isLoggedIn ? (
+                {isLoggedIn && isOnDashboard ? (
+                  <Button variant="outline" className="w-full" onClick={() => { handleLogout(); setMobileOpen(false); }}>
+                    <LogOut className="w-4 h-4 mr-2" />
+                    Logout
+                  </Button>
+                ) : isLoggedIn ? (
                   <Button className="w-full" onClick={() => { navigate(dashboardPath); setMobileOpen(false); }}>
                     <LayoutDashboard className="w-4 h-4 mr-2" />
                     Return to Dashboard
