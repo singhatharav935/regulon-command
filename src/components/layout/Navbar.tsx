@@ -1,5 +1,5 @@
 import { useState } from "react";
-import { Link, useNavigate } from "react-router-dom";
+import { Link, useNavigate, useLocation } from "react-router-dom";
 import { motion, AnimatePresence } from "framer-motion";
 import { ChevronDown, Menu, X, Shield, Cpu, Building2, Users, Lock, LogIn, Landmark, FileCheck, LayoutDashboard } from "lucide-react";
 import { Button } from "@/components/ui/button";
@@ -42,12 +42,21 @@ const securityLinks = [
 
 const Navbar = () => {
   const navigate = useNavigate();
+  const location = useLocation();
   const { user, persona, loading } = useAuth();
   const [mobileOpen, setMobileOpen] = useState(false);
   const [activeDropdown, setActiveDropdown] = useState<string | null>(null);
 
   const isLoggedIn = !loading && !!user;
   const dashboardPath = isLoggedIn ? getDashboardRoute(persona) : "/auth?mode=login&role=company_owner";
+
+  // Hide "Return to Dashboard" when user is already on a dashboard page
+  const dashboardPrefixes = [
+    "/real-company-dashboard", "/real-external-ca-dashboard", "/real-inhouse-ca-dashboard",
+    "/ca-firm-dashboard", "/lawyer-dashboard", "/admin-dashboard", "/dashboard",
+    "/app/", "/agent-control", "/drafting"
+  ];
+  const isOnDashboard = dashboardPrefixes.some(prefix => location.pathname.startsWith(prefix));
 
   const handleDropdownEnter = (dropdown: string) => {
     setActiveDropdown(dropdown);
@@ -191,7 +200,7 @@ const Navbar = () => {
 
           {/* Desktop Actions — auth-aware */}
           <div className="hidden lg:flex items-center gap-3">
-            {isLoggedIn ? (
+            {isLoggedIn && isOnDashboard ? null : isLoggedIn ? (
               <Button size="sm" className="btn-glow" onClick={() => navigate(dashboardPath)}>
                 <LayoutDashboard className="w-4 h-4 mr-2" />
                 Return to Dashboard
@@ -269,7 +278,7 @@ const Navbar = () => {
                 ))}
               </div>
               <div className="pt-4 space-y-3 border-t border-border/50">
-                {isLoggedIn ? (
+                {isLoggedIn && isOnDashboard ? null : isLoggedIn ? (
                   <Button className="w-full" onClick={() => { navigate(dashboardPath); setMobileOpen(false); }}>
                     <LayoutDashboard className="w-4 h-4 mr-2" />
                     Return to Dashboard
