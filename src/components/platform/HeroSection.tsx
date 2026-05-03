@@ -1,7 +1,9 @@
 import { motion } from "framer-motion";
-import { ArrowRight, Shield, Users, FileCheck, Building2 } from "lucide-react";
+import { ArrowRight, Shield, Users, FileCheck, Building2, LayoutDashboard } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { useNavigate } from "react-router-dom";
+import { useAuth } from "@/hooks/use-auth";
+import { getDashboardRoute } from "@/lib/dashboard-routes";
 import { useState } from "react";
 import { Dialog, DialogContent, DialogDescription, DialogFooter, DialogHeader, DialogTitle } from "@/components/ui/dialog";
 import { Label } from "@/components/ui/label";
@@ -26,6 +28,9 @@ type HeroSectionProps = {
 
 const HeroSection = ({ content }: HeroSectionProps) => {
   const navigate = useNavigate();
+  const { user, persona, loading } = useAuth();
+  const isLoggedIn = !loading && !!user;
+  const dashboardPath = isLoggedIn ? getDashboardRoute(persona) : "/auth?mode=signup&role=company_owner";
   const [leadDialogOpen, setLeadDialogOpen] = useState(false);
   const [leadType, setLeadType] = useState<"onboarding" | "expert">("onboarding");
   const [isSubmittingLead, setIsSubmittingLead] = useState(false);
@@ -147,19 +152,36 @@ const HeroSection = ({ content }: HeroSectionProps) => {
             transition={{ duration: 0.5, delay: 0.4 }}
             className="flex flex-wrap items-center justify-center gap-4 mb-16"
           >
-            <Button size="lg" className="btn-glow h-12 px-8" onClick={() => navigate("/auth?mode=signup&role=company_owner")}>
-              {ctaPrimary}
-              <ArrowRight className="w-4 h-4 ml-2" />
-            </Button>
-            <Button size="lg" variant="outline" className="h-12 px-8" onClick={() => navigate("/auth?mode=login&role=company_owner")}>
-              {ctaSecondary}
-            </Button>
-            <Button size="lg" variant="ghost" className="h-12 px-8" onClick={() => openLeadDialog("onboarding")}>
-              Request Onboarding
-            </Button>
-            <Button size="lg" variant="ghost" className="h-12 px-8" onClick={() => openLeadDialog("expert")}>
-              Talk to Expert
-            </Button>
+            {isLoggedIn ? (
+              <>
+                <Button size="lg" className="btn-glow h-12 px-8" onClick={() => navigate(dashboardPath)}>
+                  <LayoutDashboard className="w-4 h-4 mr-2" />
+                  Go to Dashboard
+                </Button>
+                <Button size="lg" variant="ghost" className="h-12 px-8" onClick={() => openLeadDialog("onboarding")}>
+                  Request Onboarding
+                </Button>
+                <Button size="lg" variant="ghost" className="h-12 px-8" onClick={() => openLeadDialog("expert")}>
+                  Talk to Expert
+                </Button>
+              </>
+            ) : (
+              <>
+                <Button size="lg" className="btn-glow h-12 px-8" onClick={() => navigate("/auth?mode=signup&role=company_owner")}>
+                  {ctaPrimary}
+                  <ArrowRight className="w-4 h-4 ml-2" />
+                </Button>
+                <Button size="lg" variant="outline" className="h-12 px-8" onClick={() => navigate("/auth?mode=login&role=company_owner")}>
+                  {ctaSecondary}
+                </Button>
+                <Button size="lg" variant="ghost" className="h-12 px-8" onClick={() => openLeadDialog("onboarding")}>
+                  Request Onboarding
+                </Button>
+                <Button size="lg" variant="ghost" className="h-12 px-8" onClick={() => openLeadDialog("expert")}>
+                  Talk to Expert
+                </Button>
+              </>
+            )}
           </motion.div>
 
           <motion.div

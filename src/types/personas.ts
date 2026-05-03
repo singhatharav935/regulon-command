@@ -40,7 +40,7 @@ export const PERSONA_CONFIG: Record<PersonaType, PersonaConfig> = {
     description: 'Firm Management - Manage CAs and clients',
     icon: '🏢',
     color: 'bg-purple-500',
-    dashboardRoute: '/dashboards/ca-firm',
+    dashboardRoute: '/ca-firm-dashboard',
   },
   inhouse_lawyer: {
     id: 'inhouse_lawyer',
@@ -48,7 +48,7 @@ export const PERSONA_CONFIG: Record<PersonaType, PersonaConfig> = {
     description: 'Legal Department - Manage contracts and litigation',
     icon: '⚖️',
     color: 'bg-red-500',
-    dashboardRoute: '/dashboards/inhouse-lawyer',
+    dashboardRoute: '/lawyer-dashboard',
   },
   company_owner: {
     id: 'company_owner',
@@ -64,7 +64,7 @@ export const PERSONA_CONFIG: Record<PersonaType, PersonaConfig> = {
     description: 'System Administrator - Full system control',
     icon: '⚙️',
     color: 'bg-slate-500',
-    dashboardRoute: '/dashboards/admin',
+    dashboardRoute: '/admin-dashboard',
   },
 };
 

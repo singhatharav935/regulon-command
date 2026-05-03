@@ -1,9 +1,11 @@
 import { useState } from "react";
 import { Link, useNavigate } from "react-router-dom";
 import { motion, AnimatePresence } from "framer-motion";
-import { ChevronDown, Menu, X, Shield, Cpu, Building2, Users, Lock, LogIn, Landmark, FileCheck } from "lucide-react";
+import { ChevronDown, Menu, X, Shield, Cpu, Building2, Users, Lock, LogIn, Landmark, FileCheck, LayoutDashboard } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { cn } from "@/lib/utils";
+import { useAuth } from "@/hooks/use-auth";
+import { getDashboardRoute } from "@/lib/dashboard-routes";
 
 type NavDropdownItem = {
   title: string;
@@ -40,8 +42,12 @@ const securityLinks = [
 
 const Navbar = () => {
   const navigate = useNavigate();
+  const { user, persona, loading } = useAuth();
   const [mobileOpen, setMobileOpen] = useState(false);
   const [activeDropdown, setActiveDropdown] = useState<string | null>(null);
+
+  const isLoggedIn = !loading && !!user;
+  const dashboardPath = isLoggedIn ? getDashboardRoute(persona) : "/auth?mode=login&role=company_owner";
 
   const handleDropdownEnter = (dropdown: string) => {
     setActiveDropdown(dropdown);
@@ -183,15 +189,24 @@ const Navbar = () => {
             </Link>
           </div>
 
-          {/* Desktop Actions */}
+          {/* Desktop Actions — auth-aware */}
           <div className="hidden lg:flex items-center gap-3">
-            <Button variant="ghost" size="sm" onClick={() => navigate("/auth?mode=login&role=company_owner")}>
-              <LogIn className="w-4 h-4 mr-2" />
-              Login
-            </Button>
-            <Button size="sm" className="btn-glow" onClick={() => navigate("/auth?mode=signup&role=company_owner")}>
-              Get Started
-            </Button>
+            {isLoggedIn ? (
+              <Button size="sm" className="btn-glow" onClick={() => navigate(dashboardPath)}>
+                <LayoutDashboard className="w-4 h-4 mr-2" />
+                Return to Dashboard
+              </Button>
+            ) : (
+              <>
+                <Button variant="ghost" size="sm" onClick={() => navigate("/auth?mode=login&role=company_owner")}>
+                  <LogIn className="w-4 h-4 mr-2" />
+                  Login
+                </Button>
+                <Button size="sm" className="btn-glow" onClick={() => navigate("/auth?mode=signup&role=company_owner")}>
+                  Get Started
+                </Button>
+              </>
+            )}
           </div>
 
           {/* Mobile Menu Button */}
@@ -254,12 +269,21 @@ const Navbar = () => {
                 ))}
               </div>
               <div className="pt-4 space-y-3 border-t border-border/50">
-                <Button variant="outline" className="w-full" onClick={() => { navigate("/auth?mode=login&role=company_owner"); setMobileOpen(false); }}>
-                  Login
-                </Button>
-                <Button className="w-full" onClick={() => { navigate("/auth?mode=signup&role=company_owner"); setMobileOpen(false); }}>
-                  Get Started
-                </Button>
+                {isLoggedIn ? (
+                  <Button className="w-full" onClick={() => { navigate(dashboardPath); setMobileOpen(false); }}>
+                    <LayoutDashboard className="w-4 h-4 mr-2" />
+                    Return to Dashboard
+                  </Button>
+                ) : (
+                  <>
+                    <Button variant="outline" className="w-full" onClick={() => { navigate("/auth?mode=login&role=company_owner"); setMobileOpen(false); }}>
+                      Login
+                    </Button>
+                    <Button className="w-full" onClick={() => { navigate("/auth?mode=signup&role=company_owner"); setMobileOpen(false); }}>
+                      Get Started
+                    </Button>
+                  </>
+                )}
               </div>
             </div>
           </motion.div>
