@@ -52,8 +52,8 @@ When a regulatory notice is issued, Sannidh executes the following pipeline auto
 ### Quick Start
 ```sh
 # 1. Clone the repository
-git clone <YOUR_GIT_URL>
-cd sannidh
+git clone https://github.com/singhatharav935/regulon-command.git
+cd regulon-command
 
 # 2. Install dependencies
 npm install
