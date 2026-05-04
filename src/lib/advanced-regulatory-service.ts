@@ -5,9 +5,9 @@
 
 import axios from 'axios';
 
-const API_BASE = process.env.NODE_ENV === 'production' 
-  ? 'https://api.sannidh.ai/api'
-  : '/api';
+// Use /api for both dev (Vite proxy) and production (Vercel rewrites)
+// There is no standalone api.sannidh.ai backend — all API calls go through the proxy/rewrite
+const API_BASE = '/api';
 
 export interface RegulatoryAlert {
   id: string;
@@ -107,7 +107,8 @@ export const fetchRegulatoryAlerts = async (options: {
     const response = await axios.get(`${API_BASE}/regulatory/alerts?${params}`);
     return response.data;
   } catch (error) {
-    console.error('Error fetching regulatory alerts:', error);
+    // Network errors are expected when no backend is running — fall back silently to mock data
+    if (import.meta.env.DEV) console.debug('Regulatory alerts API unavailable, using mock data');
     // Return mock data as fallback
     return {
       alerts: generateMockAlerts(),
@@ -124,7 +125,7 @@ export const fetchAlertsSummary = async (): Promise<AlertsSummary> => {
     const response = await axios.get(`${API_BASE}/regulatory/alerts/summary`);
     return response.data;
   } catch (error) {
-    console.error('Error fetching alerts summary:', error);
+    if (import.meta.env.DEV) console.debug('Alerts summary API unavailable, using mock data');
     // Return mock summary
     const mockAlerts = generateMockAlerts();
     return {
@@ -158,7 +159,7 @@ export const fetchRegulatoryNews = async (options: {
     const response = await axios.get(`${API_BASE}/regulatory/news?${params}`);
     return response.data;
   } catch (error) {
-    console.error('Error fetching regulatory news:', error);
+    if (import.meta.env.DEV) console.debug('Regulatory news API unavailable, using mock data');
     // Return mock data as fallback
     return generateMockNews();
   }
@@ -190,8 +191,7 @@ export const fetchAgentStatus = async (): Promise<AgentStatus> => {
     const response = await axios.get(`${API_BASE}/regulatory/agents/status`);
     return response.data.runtime_status;
   } catch (error) {
-    console.error('Error fetching agent status:', error);
-    console.log('🤖 Using mock agent status - all agents active');
+    if (import.meta.env.DEV) console.debug('Agent status API unavailable, using mock data');
     // Return mock status
     return {
       government_agents: [
@@ -327,7 +327,7 @@ const getValidNewsUrl = (sourceName: string, index: number, isGovSource: boolean
 
 // Mock data generators (fallbacks)
 const generateMockAlerts = (): RegulatoryAlert[] => {
-  console.log('🔄 Generating mock regulatory alerts...');
+  // Mock data fallback — no log needed in production
   const alerts: RegulatoryAlert[] = [];
   const sources = [
     { id: 'gstn', name: 'GSTN', authority: 'Goods and Services Tax Network', category: 'GST' },

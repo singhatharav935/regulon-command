@@ -105,7 +105,7 @@ const AdvancedComplianceRadar = ({
   const loadData = async () => {
     try {
       setLoading(true);
-      console.log('📊 Loading regulatory data...');
+
       const [alertsData, summaryData, statusData, healthData] = await Promise.all([
         fetchRegulatoryAlerts({ limit: 20 }),
         fetchAlertsSummary(),
@@ -113,9 +113,7 @@ const AdvancedComplianceRadar = ({
         checkRegulatoryHealth()
       ]);
 
-      console.log('📈 Alerts loaded:', alertsData.alerts?.length || 0);
-      console.log('🤖 Agent status:', statusData);
-      console.log('💚 Health status:', healthData);
+
       
       setAlerts(alertsData.alerts);
       setSummary(summaryData);
@@ -148,8 +146,7 @@ const AdvancedComplianceRadar = ({
     ? alerts 
     : alerts.filter(alert => alert.source === selectedSource);
 
-  console.log('🚨 Alerts array length:', alerts.length);
-  console.log('🔍 Filtered alerts length:', filteredAlerts.length);
+
 
   const displayedAlerts = isAlertsExpanded ? filteredAlerts : filteredAlerts.slice(0, 3);
   const hiddenAlertsCount = filteredAlerts.length - 3;
@@ -230,7 +227,7 @@ const AdvancedComplianceRadar = ({
               <div className="inline-flex items-center gap-2 rounded-full border border-border/40 px-3 py-1.5">
                 <Activity className="w-3.5 h-3.5 text-blue-400" />
                 <span className="text-xs text-muted-foreground">
-                  {console.log('🔍 Agent Status Data:', agentStatus) || ''}
+
                   {agentStatus?.active_agents || 0}/{agentStatus?.total_agents || 11} Agents Active
                 </span>
               </div>

@@ -15,7 +15,7 @@ const SENTRY_DSN = import.meta.env.VITE_SENTRY_DSN;
 export function initSentry() {
   // Only initialize if DSN is configured
   if (!SENTRY_DSN) {
-    console.log('[Sentry] DSN not configured. Error tracking disabled.');
+    // Silently skip — Sentry DSN is optional and not having it is expected
     return;
   }
 
