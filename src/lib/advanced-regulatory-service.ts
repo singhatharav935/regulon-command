@@ -81,6 +81,13 @@ export interface AlertsSummary {
   error_agents: number;
 }
 
+// ─────────────────────────────────────────────────────────────────────────────
+// NOTE: No regulatory backend is currently deployed.  All functions below
+// return curated mock data directly (the same data the catch-fallbacks used
+// to return).  When a backend becomes available, uncomment the axios calls
+// and remove the mock returns.
+// ─────────────────────────────────────────────────────────────────────────────
+
 // Regulatory Alerts API
 export const fetchRegulatoryAlerts = async (options: {
   source?: string;
@@ -96,128 +103,74 @@ export const fetchRegulatoryAlerts = async (options: {
   limit: number;
   offset: number;
 }> => {
-  try {
-    const params = new URLSearchParams();
-    Object.entries(options).forEach(([key, value]) => {
-      if (value !== undefined) {
-        params.append(key, String(value));
-      }
-    });
-
-    const response = await axios.get(`${API_BASE}/regulatory/alerts?${params}`);
-    return response.data;
-  } catch (error) {
-    // Network errors are expected when no backend is running — fall back silently to mock data
-    if (import.meta.env.DEV) console.debug('Regulatory alerts API unavailable, using mock data');
-    // Return mock data as fallback
-    return {
-      alerts: generateMockAlerts(),
-      total: 25,
-      limit: options.limit || 50,
-      offset: options.offset || 0
-    };
-  }
+  // Return mock data directly — no backend to call
+  return {
+    alerts: generateMockAlerts(),
+    total: 25,
+    limit: options.limit || 50,
+    offset: options.offset || 0
+  };
 };
 
 // Get alerts summary for dashboard
 export const fetchAlertsSummary = async (): Promise<AlertsSummary> => {
-  try {
-    const response = await axios.get(`${API_BASE}/regulatory/alerts/summary`);
-    return response.data;
-  } catch (error) {
-    if (import.meta.env.DEV) console.debug('Alerts summary API unavailable, using mock data');
-    // Return mock summary
-    const mockAlerts = generateMockAlerts();
-    return {
-      total_alerts: mockAlerts.length,
-      alerts_24h: 12,
-      alerts_7d: 89,
-      high_exposure_alerts: 23,
-      urgent_deadlines: 5,
-      avg_impact_score: 4.2,
-      active_agents: 11,
-      error_agents: 0
-    };
-  }
+  const mockAlerts = generateMockAlerts();
+  return {
+    total_alerts: mockAlerts.length,
+    alerts_24h: 12,
+    alerts_7d: 89,
+    high_exposure_alerts: 23,
+    urgent_deadlines: 5,
+    avg_impact_score: 4.2,
+    active_agents: 11,
+    error_agents: 0
+  };
 };
 
 // Regulatory News API
-export const fetchRegulatoryNews = async (options: {
+export const fetchRegulatoryNews = async (_options: {
   category?: string;
   severity?: string;
   limit?: number;
   offset?: number;
 } = {}): Promise<NewsItem[]> => {
-  try {
-    const params = new URLSearchParams();
-    Object.entries(options).forEach(([key, value]) => {
-      if (value !== undefined) {
-        params.append(key, String(value));
-      }
-    });
-
-    const response = await axios.get(`${API_BASE}/regulatory/news?${params}`);
-    return response.data;
-  } catch (error) {
-    if (import.meta.env.DEV) console.debug('Regulatory news API unavailable, using mock data');
-    // Return mock data as fallback
-    return generateMockNews();
-  }
+  return generateMockNews();
 };
 
 // Agent Management API
 export const startRegulatoryAgents = async (): Promise<{ message: string }> => {
-  try {
-    const response = await axios.post(`${API_BASE}/regulatory/agents/start`);
-    return response.data;
-  } catch (error) {
-    console.error('Error starting agents:', error);
-    throw error;
-  }
+  return { message: 'Agents started (mock)' };
 };
 
 export const runAgentsNow = async (): Promise<{ message: string }> => {
-  try {
-    const response = await axios.post(`${API_BASE}/regulatory/agents/run`);
-    return response.data;
-  } catch (error) {
-    console.error('Error running agents:', error);
-    throw error;
-  }
+  return { message: 'Agents running (mock)' };
 };
 
 export const fetchAgentStatus = async (): Promise<AgentStatus> => {
-  try {
-    const response = await axios.get(`${API_BASE}/regulatory/agents/status`);
-    return response.data.runtime_status;
-  } catch (error) {
-    if (import.meta.env.DEV) console.debug('Agent status API unavailable, using mock data');
-    // Return mock status
-    return {
-      government_agents: [
-        { name: 'GSTN', isActive: true, lastFetch: new Date().toISOString(), errorCount: 0, status: 'active' },
-        { name: 'CBIC', isActive: true, lastFetch: new Date().toISOString(), errorCount: 0, status: 'active' },
-        { name: 'INCOMETAX', isActive: true, lastFetch: new Date().toISOString(), errorCount: 0, status: 'active' },
-        { name: 'MCA', isActive: true, lastFetch: new Date().toISOString(), errorCount: 0, status: 'active' },
-        { name: 'SEBI', isActive: true, lastFetch: new Date().toISOString(), errorCount: 0, status: 'active' },
-        { name: 'RBI', isActive: true, lastFetch: new Date().toISOString(), errorCount: 0, status: 'active' },
-        { name: 'EGAZETTE', isActive: true, lastFetch: new Date().toISOString(), errorCount: 0, status: 'active' }
-      ],
-      news_agents: [
-        { name: 'BUSINESS_STANDARD', isActive: true, lastFetch: new Date().toISOString(), errorCount: 0, status: 'active' },
-        { name: 'ECONOMIC_TIMES', isActive: true, lastFetch: new Date().toISOString(), errorCount: 0, status: 'active' },
-        { name: 'LIVEMINT', isActive: true, lastFetch: new Date().toISOString(), errorCount: 0, status: 'active' },
-        { name: 'FINANCIAL_EXPRESS', isActive: true, lastFetch: new Date().toISOString(), errorCount: 0, status: 'active' }
-      ],
-      total_agents: 11,
-      active_agents: 11,
-      system_running: true
-    };
-  }
+  return {
+    government_agents: [
+      { name: 'GSTN', isActive: true, lastFetch: new Date().toISOString(), errorCount: 0, status: 'active' },
+      { name: 'CBIC', isActive: true, lastFetch: new Date().toISOString(), errorCount: 0, status: 'active' },
+      { name: 'INCOMETAX', isActive: true, lastFetch: new Date().toISOString(), errorCount: 0, status: 'active' },
+      { name: 'MCA', isActive: true, lastFetch: new Date().toISOString(), errorCount: 0, status: 'active' },
+      { name: 'SEBI', isActive: true, lastFetch: new Date().toISOString(), errorCount: 0, status: 'active' },
+      { name: 'RBI', isActive: true, lastFetch: new Date().toISOString(), errorCount: 0, status: 'active' },
+      { name: 'EGAZETTE', isActive: true, lastFetch: new Date().toISOString(), errorCount: 0, status: 'active' }
+    ],
+    news_agents: [
+      { name: 'BUSINESS_STANDARD', isActive: true, lastFetch: new Date().toISOString(), errorCount: 0, status: 'active' },
+      { name: 'ECONOMIC_TIMES', isActive: true, lastFetch: new Date().toISOString(), errorCount: 0, status: 'active' },
+      { name: 'LIVEMINT', isActive: true, lastFetch: new Date().toISOString(), errorCount: 0, status: 'active' },
+      { name: 'FINANCIAL_EXPRESS', isActive: true, lastFetch: new Date().toISOString(), errorCount: 0, status: 'active' }
+    ],
+    total_agents: 11,
+    active_agents: 11,
+    system_running: true
+  };
 };
 
 // Search alerts
-export const searchAlerts = async (searchParams: {
+export const searchAlerts = async (_searchParams: {
   query?: string;
   sources?: string[];
   categories?: string[];
@@ -228,13 +181,7 @@ export const searchAlerts = async (searchParams: {
   };
   limit?: number;
 }): Promise<RegulatoryAlert[]> => {
-  try {
-    const response = await axios.post(`${API_BASE}/regulatory/alerts/search`, searchParams);
-    return response.data;
-  } catch (error) {
-    console.error('Error searching alerts:', error);
-    return [];
-  }
+  return [];
 };
 
 // Health check
@@ -247,18 +194,13 @@ export const checkRegulatoryHealth = async (): Promise<{
     running: boolean;
   };
 }> => {
-  try {
-    const response = await axios.get(`${API_BASE}/regulatory/health`);
-    return response.data;
-  } catch (error) {
-    console.error('Error checking regulatory health:', error);
-    return {
-      status: 'healthy',
-      timestamp: new Date().toISOString(),
-      agents: { total: 11, active: 11, running: true }
-    };
-  }
+  return {
+    status: 'healthy',
+    timestamp: new Date().toISOString(),
+    agents: { total: 11, active: 11, running: true }
+  };
 };
+
 
 // Helper function to get valid source URLs
 const getValidSourceUrl = (sourceId: string, index: number): string => {

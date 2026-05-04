@@ -188,20 +188,26 @@ const Index = () => {
   const [showCinematic, setShowCinematic] = useState(true);
   const { data: landingOverview } = useQuery({
     queryKey: ["landing-overview"],
-    queryFn: async () =>
-      workspacePublicRequest<{
-        title?: string;
-        subtitle?: string;
-        description?: string;
-        cta_primary_label?: string;
-        cta_secondary_label?: string;
-        stat_regulators_covered?: number;
-        stat_regulatory_blueprints?: string;
-        stat_reasoning_prompts?: string;
-        stat_review_model?: string;
-      }>("/public/landing/overview"),
+    queryFn: async () => {
+      try {
+        return await workspacePublicRequest<{
+          title?: string;
+          subtitle?: string;
+          description?: string;
+          cta_primary_label?: string;
+          cta_secondary_label?: string;
+          stat_regulators_covered?: number;
+          stat_regulatory_blueprints?: string;
+          stat_reasoning_prompts?: string;
+          stat_review_model?: string;
+        }>("/public/landing/overview");
+      } catch {
+        // Edge function not deployed yet — use hardcoded defaults
+        return null;
+      }
+    },
     staleTime: 60_000,
-    retry: 1,
+    retry: false,
   });
   const { data: publicAnnouncements, refetch: refetchPublicAnnouncements } = useQuery({
     queryKey: ["public-regulatory-announcements"],

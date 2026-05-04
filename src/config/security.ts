@@ -42,7 +42,7 @@ export const securityHeaders = [
       "style-src 'self' 'unsafe-inline' https://fonts.googleapis.com",
       "font-src 'self' https://fonts.gstatic.com data:",
       "img-src 'self' data: https: blob:",
-      "connect-src 'self' https://*.supabase.co wss://*.supabase.co https://www.google-analytics.com https://api.sentry.io https://*.onrender.com https://api.sannidh.ai",
+      "connect-src 'self' https://*.supabase.co wss://*.supabase.co https://fonts.googleapis.com https://fonts.gstatic.com https://www.google-analytics.com https://api.sentry.io https://*.onrender.com https://api.sannidh.ai",
       "worker-src 'self' blob:",
       "frame-src 'self'",
       "object-src 'none'",

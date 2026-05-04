@@ -200,6 +200,10 @@ const CinematicEntry = ({ onComplete }: CinematicEntryProps) => {
                 dpr={[1, 2]}
                 onCreated={({ gl }) => {
                   gl.setClearColor(new THREE.Color('#000000'), 0);
+                  // Suppress WebGL context lost errors on unmount
+                  gl.domElement.addEventListener('webglcontextlost', (e) => {
+                    e.preventDefault();
+                  });
                 }}
               >
                 <ambientLight intensity={0.4} />

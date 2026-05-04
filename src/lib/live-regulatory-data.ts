@@ -523,36 +523,8 @@ const LIVE_FALLBACK_RULES = [
 ];
 
 export async function fetchLiveRegulatoryNews(): Promise<NewsItem[]> {
-  try {
-    // Try to fetch from the regulatory agent first
-    const response = await axios.get('/agent/status', {
-      timeout: 5000,
-    });
-
-    // If agent returns data, process it
-    if (response.data && Array.isArray(response.data)) {
-      return response.data.map((item: any, idx: number) => ({
-        id: `live-${idx}`,
-        category: item.source?.toUpperCase() || 'OTHER',
-        title: item.title || 'Regulatory Update',
-        summary: item.summary,
-        authority: item.announced_by || 'Government Portal',
-        sourceUrl: item.source_url || '#',
-        impactType: item.impact_level ? `${item.impact_level} Impact` : 'Standard',
-        affectedEntities: 'Relevant Entities',
-        implementationStatus: 'Active',
-        urgency: item.impact_level === 'High' ? 'high' : 'medium',
-        regulatoryArea: item.category || 'General',
-        date: item.publish_date || new Date().toISOString().split('T')[0],
-        severity: item.impact_level === 'High' ? 'high' : 'medium',
-        previousNotices: 1,
-      }));
-    }
-  } catch (error) {
-    console.log('Agent not available, using cached regulatory data');
-  }
-
-  // Return fallback live data
+  // No regulatory agent backend is running — return curated fallback data directly
+  // to avoid 404 network errors in the browser console.
   return LIVE_FALLBACK_NEWS;
 }
 
@@ -566,10 +538,10 @@ export async function fetchFromGovernmentPortal(portal: keyof typeof GOV_PORTALS
     const url = GOV_PORTALS[portal];
     // Note: In production, you would use an actual API or web scraping service
     // For now, we'll return cached data
-    console.log(`Fetching from ${portal}:`, url);
+    // Actual portal scraping would happen here
     return [];
-  } catch (error) {
-    console.error(`Failed to fetch from ${portal}:`, error);
+  } catch {
+    // Portal not available
     return [];
   }
 }
