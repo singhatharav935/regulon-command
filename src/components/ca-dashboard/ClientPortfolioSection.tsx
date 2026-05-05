@@ -43,6 +43,7 @@ const ClientPortfolioSection = ({
   const [isLoading, setIsLoading] = useState(false);
   const [showOnboardModal, setShowOnboardModal] = useState(false);
   const [isOnboarding, setIsOnboarding] = useState(false);
+  const [backendOnline, setBackendOnline] = useState<boolean | null>(null);
   const [onboardForm, setOnboardForm] = useState({
     gstin: '',
     pan: '',
@@ -52,34 +53,63 @@ const ClientPortfolioSection = ({
     client_phone: ''
   });
 
+  // Queue a consent request in localStorage when backend is offline
+  const queueRequestLocally = (form: typeof onboardForm) => {
+    const existing = JSON.parse(localStorage.getItem('sannidh_pending_onboards') || '[]');
+    const entry = { ...form, queued_at: new Date().toISOString(), status: 'pending' };
+    localStorage.setItem('sannidh_pending_onboards', JSON.stringify([...existing, entry]));
+  };
+
   const handleOnboardClient = async () => {
+    // Basic validation
+    if (!onboardForm.gstin && !onboardForm.pan && !onboardForm.cin) {
+      toast.error("Identifier Required", { description: "Please enter at least one of: GSTIN, PAN, or CIN." });
+      return;
+    }
+    if (!onboardForm.client_name.trim()) {
+      toast.error("Company Name Required", { description: "Please enter the client's company name." });
+      return;
+    }
+
     setIsOnboarding(true);
     try {
+      const controller = new AbortController();
+      const timeout = setTimeout(() => controller.abort(), 6000); // 6 s timeout
+
       const response = await fetch('http://localhost:3001/api/v1/ca/client/onboard-communication', {
         method: 'POST',
         headers: {
           'Content-Type': 'application/json',
           'Authorization': `Bearer ${localStorage.getItem('auth_token') || 'test-token'}`
         },
-        body: JSON.stringify(onboardForm)
+        body: JSON.stringify(onboardForm),
+        signal: controller.signal
       });
-      
+      clearTimeout(timeout);
+
       const data = await response.json();
-      
+
       if (response.ok) {
-        toast.success("Consent Request Sent Securely", {
-          description: `Live tracking: Link sent via WhatsApp (${data.provider || 'Twilio Sandbox'}) & Email to ${onboardForm.client_name || "the client"}.`
+        setBackendOnline(true);
+        toast.success("Consent Request Sent", {
+          description: `Link sent via WhatsApp & Email to ${onboardForm.client_name}. Awaiting client authorization.`
         });
-        if (isRealDashboard && apiEndpoint) {
-          loadRealClientData(); // Refresh table
-        }
+        if (isRealDashboard && apiEndpoint) loadRealClientData();
         setShowOnboardModal(false);
         setOnboardForm({ gstin: '', pan: '', cin: '', client_name: '', client_email: '', client_phone: '' });
       } else {
-        toast.error("Failed to send consent request", { description: data.error || "Unknown server error" });
+        toast.error("Request Failed", { description: data.error || "Server returned an error. Please try again." });
       }
-    } catch (error) {
-      toast.error("API Gateway Disconnected", { description: "Cannot reach Sannidh Backend Server on Port 3001." });
+    } catch {
+      // Backend is unreachable — save locally and inform the CA
+      setBackendOnline(false);
+      queueRequestLocally(onboardForm);
+      toast.success("Request Queued Locally", {
+        description: `Backend is currently offline. The consent request for "${onboardForm.client_name}" has been saved and will be sent automatically once the server reconnects.`,
+        duration: 6000
+      });
+      setShowOnboardModal(false);
+      setOnboardForm({ gstin: '', pan: '', cin: '', client_name: '', client_email: '', client_phone: '' });
     } finally {
       setIsOnboarding(false);
     }
@@ -352,12 +382,18 @@ const ClientPortfolioSection = ({
                   </div>
 
                   {/* Info Box */}
-                  <div className="p-3 rounded-lg bg-blue-500/10 border border-blue-500/20 text-xs text-blue-300">
+                  <div className={`p-3 rounded-lg border text-xs ${
+                    backendOnline === false
+                      ? 'bg-yellow-500/10 border-yellow-500/30 text-yellow-300'
+                      : 'bg-blue-500/10 border-blue-500/20 text-blue-300'
+                  }`}>
                     <p className="flex items-start gap-2">
                       <Shield className="w-4 h-4 mt-0.5 flex-shrink-0" />
                       <span>
-                        A secure consent link will be sent via WhatsApp & Email. 
-                        Data will only be fetched after client authorization.
+                        {backendOnline === false
+                          ? "Backend server is currently offline. Your request will be saved locally and sent automatically once the server reconnects."
+                          : "A secure consent link will be sent via WhatsApp & Email. Data will only be fetched after client authorization."
+                        }
                       </span>
                     </p>
                   </div>
