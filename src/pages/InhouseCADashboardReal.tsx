@@ -12,6 +12,13 @@ import ComplianceHealthChangeLog from "@/components/ca-dashboard/ComplianceHealt
 import AuditInspectionSupport from "@/components/ca-dashboard/AuditInspectionSupport";
 import CommunicationLogsLive from "@/components/ca-dashboard/CommunicationLogsLive";
 import CAAnalyticsPerformance from "@/components/ca-dashboard/CAAnalyticsPerformance";
+import MultiClientMasterHub from "@/components/ca-dashboard/MultiClientMasterHub";
+import PracticeBillingPanel from "@/components/ca-dashboard/PracticeBillingPanel";
+import SecureFileSharingPanel from "@/components/ca-dashboard/SecureFileSharingPanel";
+import StatutoryDeadlineCalendar from "@/components/ca-dashboard/StatutoryDeadlineCalendar";
+import ApprovalWorkflowHub from "@/components/ca-dashboard/ApprovalWorkflowHub";
+import ClientPortfolioSection from "@/components/ca-dashboard/ClientPortfolioSection";
+import ComplianceModulesHub from "@/components/ca-dashboard/compliance-modules/ComplianceModulesHub";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
@@ -1251,6 +1258,8 @@ const InhouseCADashboardReal = () => {
   // Role-based access control — disabled for now (registration optional)
   // Will re-enable when auth flow for inhouse_ca is built
 
+  const [activeZone, setActiveZone] = useState<'command' | 'clients' | 'operations' | 'ai-swarm' | 'calculations'>('command');
+
   const [stats, setStats] = useState([
     { id: "companies", label: "Managed Entities", value: "0", icon: Building, color: "text-cyan-400" },
     { id: "tasks", label: "Pending Tasks", value: "0", icon: FileText, color: "text-yellow-400" },
@@ -1539,140 +1548,163 @@ const InhouseCADashboardReal = () => {
             subtitle="In-House CA — Corporate Compliance Management"
           />
 
-          {/* CA AI Action Inbox — Clean results from background agents */}
-          <CAActionInbox />
-
-          {/* Control Tower - Metrics */}
-          <motion.div
-            initial={{ opacity: 0, y: 20 }}
-            animate={{ opacity: 1, y: 0 }}
-            className="mb-16 space-y-6"
-          >
-            <div className="flex items-center justify-between">
-              <div>
-                <h2 className="text-2xl font-bold text-foreground">Control Tower</h2>
-                <p className="text-sm text-muted-foreground mt-1">Real-time metrics and status overview</p>
+          {/* Main Dashboard Layout with Horizontal Tabs */}
+          <div className="mt-8">
+            <Tabs value={activeZone} onValueChange={(val: any) => setActiveZone(val)} className="w-full">
+              <div className="flex items-center justify-between mb-8 overflow-x-auto pb-2 scrollbar-none">
+                <TabsList className="h-14 bg-card/40 border border-border/50 p-1 flex-shrink-0">
+                  <TabsTrigger value="command" className="px-6 py-2.5 rounded-lg data-[state=active]:bg-cyan-500/20 data-[state=active]:text-cyan-400 font-medium">Overview</TabsTrigger>
+                  <TabsTrigger value="clients" className="px-6 py-2.5 rounded-lg data-[state=active]:bg-indigo-500/20 data-[state=active]:text-indigo-400 font-medium">Client Vault</TabsTrigger>
+                  <TabsTrigger value="operations" className="px-6 py-2.5 rounded-lg data-[state=active]:bg-emerald-500/20 data-[state=active]:text-emerald-400 font-medium">Firm Operations</TabsTrigger>
+                  <TabsTrigger value="ai-swarm" className="px-6 py-2.5 rounded-lg data-[state=active]:bg-purple-500/20 data-[state=active]:text-purple-400 font-medium">Regulatory News & Calendar</TabsTrigger>
+                  <TabsTrigger value="calculations" className="px-6 py-2.5 rounded-lg data-[state=active]:bg-rose-500/20 data-[state=active]:text-rose-400 font-medium">Calculators & Forms</TabsTrigger>
+                </TabsList>
+                <Button onClick={() => setIsDrawerOpen(true)} className="ml-4 flex-shrink-0 bg-gradient-to-r from-purple-600 to-cyan-600 hover:from-purple-500 hover:to-cyan-500 text-white border-0 shadow-[0_0_20px_rgba(139,92,246,0.3)]">
+                  <Cpu className="w-4 h-4 mr-2" /> Open Engine
+                </Button>
               </div>
-              <Button
-                size="sm"
-                variant="outline"
-                className="gap-2"
-                onClick={refetch}
-                disabled={loading}
-              >
-                <RefreshCw className={`w-4 h-4 ${loading ? "animate-spin" : ""}`} />
-                {loading ? "Refreshing..." : "Refresh"}
-              </Button>
-            </div>
 
-            {loading && stats.every((s) => s.value === "0" || s.value === "0/10") ? (
-              <div className="grid grid-cols-2 md:grid-cols-3 lg:grid-cols-6 gap-4">
-                {stats.map((stat) => (
-                  <Card key={stat.id} className="glass-card border-border/50 bg-cyan-500/5 border-cyan-500/20">
-                    <CardContent className="p-4">
-                      <div className="flex items-center gap-3">
-                        <div className={`p-2 rounded-lg bg-card/50 ${stat.color}`}>
-                          <Loader className="w-5 h-5 animate-spin" />
-                        </div>
-                        <div>
-                          <p className="text-2xl font-bold text-muted-foreground">--</p>
-                          <p className="text-xs text-muted-foreground">{stat.label}</p>
-                        </div>
-                      </div>
-                    </CardContent>
-                  </Card>
-                ))}
-              </div>
-            ) : (
-              <div className="grid grid-cols-2 md:grid-cols-3 lg:grid-cols-6 gap-4">
-                {stats.map((stat, index) => {
-                  const Icon = stat.icon;
-                  return (
-                    <motion.div
-                      key={stat.id}
-                      initial={{ opacity: 0, y: 20 }}
-                      animate={{ opacity: 1, y: 0 }}
-                      transition={{ delay: index * 0.05 }}
-                    >
-                      <Card className="glass-card border-border/50 hover:border-primary/30 transition-colors bg-cyan-500/5 border-cyan-500/20">
-                        <CardContent className="p-4">
-                          <div className="flex items-center gap-3">
-                            <div className={`p-2 rounded-lg bg-card/50 ${stat.color}`}>
-                              <Icon className="w-5 h-5" />
+              {/* ZONE 1: OVERVIEW */}
+              <TabsContent value="command" className="m-0 focus-visible:outline-none focus-visible:ring-0 space-y-8">
+                <CAActionInbox />
+                <div className="space-y-8">
+                  <motion.div className="p-6 rounded-2xl border border-border/50 bg-card/30 h-full">
+                    <h3 className="text-xl font-bold text-foreground mb-4">Control Tower Metrics</h3>
+                    <div className="grid grid-cols-2 lg:grid-cols-6 gap-4">
+                      {stats.map((stat) => {
+                        const Icon = stat.icon;
+                        return (
+                          <div key={stat.id} className="p-4 rounded-xl bg-background/50 border border-border/40 hover:border-cyan-500/30 transition-colors flex flex-col justify-between">
+                            <div className="flex items-center justify-between mb-2">
+                              <p className="text-[10px] text-muted-foreground uppercase">{stat.label}</p>
+                              <Icon className={`w-4 h-4 ${stat.color}`} />
                             </div>
-                            <div>
-                              <p className="text-2xl font-bold text-foreground">{stat.value}</p>
-                              <p className="text-xs text-muted-foreground">{stat.label}</p>
+                            <p className="text-xl font-bold text-foreground">{stat.value}</p>
+                          </div>
+                        );
+                      })}
+                    </div>
+                  </motion.div>
+                  <DailyGovernanceBrief />
+                  <ClientPortfolioSection />
+                  <LiveAIDraftingEngine />
+                  {/* Full AI Drafting Engine — Inline trigger button */}
+                  <motion.div
+                    id="ai-drafting-engine-full"
+                    initial={{ opacity: 0, y: 20 }}
+                    animate={{ opacity: 1, y: 0 }}
+                    transition={{ delay: 0.12 }}
+                    className="mt-8"
+                  >
+                    <button
+                      onClick={() => setIsDrawerOpen(true)}
+                      className="w-full text-left group relative overflow-hidden rounded-2xl border border-purple-500/30 bg-gradient-to-r from-purple-900/20 via-indigo-900/20 to-cyan-900/20 p-6 hover:border-purple-500/60 hover:from-purple-900/30 hover:to-cyan-900/30 transition-all duration-300"
+                    >
+                      <div className="flex items-center justify-between flex-wrap gap-4">
+                        <div className="flex items-center gap-4">
+                          <div className="relative flex-shrink-0">
+                            <div className="w-14 h-14 rounded-full bg-gradient-to-r from-purple-500 to-cyan-500 flex items-center justify-center shadow-[0_0_20px_rgba(139,92,246,0.4)]">
+                              <Cpu className="w-7 h-7 text-white" />
+                            </div>
+                            <div className="absolute -top-1 -right-1 w-4 h-4 bg-green-500 rounded-full border-2 border-background animate-pulse" />
+                          </div>
+                          <div>
+                            <div className="flex items-center gap-2 mb-1">
+                              <h3 className="font-bold text-white text-lg">SANNIDH AI Drafting Engine</h3>
+                              <Badge className="bg-gradient-to-r from-purple-600 to-cyan-600 text-white text-xs border-0">LIVE v3.0</Badge>
+                            </div>
+                            <p className="text-xs text-muted-foreground">Connected to Live AI Agent • Real-time Document Generation • CA Final Approval</p>
+                            <div className="flex flex-wrap gap-2 mt-3">
+                              <Badge variant="outline" className="border-cyan-500/50 text-cyan-400 text-[10px]"><Sparkles className="w-2.5 h-2.5 mr-1" />MCA Notice</Badge>
+                              <Badge variant="outline" className="border-green-500/50 text-green-400 text-[10px]"><FileText className="w-2.5 h-2.5 mr-1" />GST Reply</Badge>
+                              <Badge variant="outline" className="border-yellow-500/50 text-yellow-400 text-[10px]"><Calculator className="w-2.5 h-2.5 mr-1" />Income Tax</Badge>
+                              <Badge variant="outline" className="border-purple-500/50 text-purple-400 text-[10px]"><Scale className="w-2.5 h-2.5 mr-1" />RBI FEMA</Badge>
+                              <Badge variant="outline" className="border-orange-500/50 text-orange-400 text-[10px]"><Shield className="w-2.5 h-2.5 mr-1" />SEBI</Badge>
+                              <Badge variant="outline" className="border-blue-500/50 text-blue-400 text-[10px]"><FileCheck className="w-2.5 h-2.5 mr-1" />Contracts</Badge>
                             </div>
                           </div>
-                        </CardContent>
-                      </Card>
-                    </motion.div>
-                  );
-                })}
-              </div>
-            )}
-          </motion.div>
-
-
-
-          {/* Daily Governance Brief */}
-          <DailyGovernanceBrief />
-
-          {/* Live AI Drafting Engine */}
-          <LiveAIDraftingEngine />
-
-          {/* Full AI Drafting Engine — Inline trigger button */}
-          <motion.div
-            id="ai-drafting-engine-full"
-            initial={{ opacity: 0, y: 20 }}
-            animate={{ opacity: 1, y: 0 }}
-            transition={{ delay: 0.12 }}
-            className="mb-16"
-          >
-            <button
-              onClick={() => setIsDrawerOpen(true)}
-              className="w-full group relative overflow-hidden rounded-2xl border border-purple-500/30 bg-gradient-to-r from-purple-900/20 via-indigo-900/20 to-cyan-900/20 p-6 hover:border-purple-500/60 hover:from-purple-900/30 hover:to-cyan-900/30 transition-all duration-300"
-            >
-              <div className="flex items-center justify-between flex-wrap gap-4">
-                <div className="flex items-center gap-4">
-                  <div className="relative">
-                    <div className="w-14 h-14 rounded-full bg-gradient-to-r from-purple-500 to-cyan-500 flex items-center justify-center shadow-[0_0_20px_rgba(139,92,246,0.4)]">
-                      <Cpu className="w-7 h-7 text-white" />
-                    </div>
-                    <div className="absolute -top-1 -right-1 w-4 h-4 bg-green-500 rounded-full border-2 border-background animate-pulse" />
-                  </div>
-                  <div className="text-left">
-                    <div className="flex items-center gap-2 mb-1">
-                      <h3 className="font-bold text-white text-lg">SANNIDH AI Drafting Engine</h3>
-                      <Badge className="bg-gradient-to-r from-purple-600 to-cyan-600 text-white text-xs">LIVE v3.0</Badge>
-                    </div>
-                    <p className="text-xs text-muted-foreground">Connected to Live AI Agent • Real-time Document Generation • CA Final Approval</p>
-                    <div className="flex flex-wrap gap-2 mt-3">
-                      <Badge variant="outline" className="border-cyan-500/50 text-cyan-400 text-[10px]"><Sparkles className="w-2.5 h-2.5 mr-1" />MCA Notice</Badge>
-                      <Badge variant="outline" className="border-green-500/50 text-green-400 text-[10px]"><FileText className="w-2.5 h-2.5 mr-1" />GST Reply</Badge>
-                      <Badge variant="outline" className="border-yellow-500/50 text-yellow-400 text-[10px]"><Calculator className="w-2.5 h-2.5 mr-1" />Income Tax</Badge>
-                      <Badge variant="outline" className="border-purple-500/50 text-purple-400 text-[10px]"><Scale className="w-2.5 h-2.5 mr-1" />RBI FEMA</Badge>
-                      <Badge variant="outline" className="border-orange-500/50 text-orange-400 text-[10px]"><Shield className="w-2.5 h-2.5 mr-1" />SEBI</Badge>
-                      <Badge variant="outline" className="border-blue-500/50 text-blue-400 text-[10px]"><FileCheck className="w-2.5 h-2.5 mr-1" />Contracts</Badge>
-                    </div>
-                  </div>
+                        </div>
+                        <div className="flex items-center gap-3 ml-auto">
+                          <div className="hidden sm:flex flex-col items-start gap-1 text-xs mr-4">
+                            <span className="flex items-center gap-1.5 text-green-400"><div className="w-1.5 h-1.5 bg-green-400 rounded-full animate-pulse" />Backend Connected</span>
+                            <span className="flex items-center gap-1.5 text-cyan-400"><Radio className="w-3 h-3 animate-pulse" />Real-time Sync Active</span>
+                            <span className="flex items-center gap-1.5 text-purple-400"><Shield className="w-3 h-3" />CA Approval Required</span>
+                          </div>
+                          <div className="flex items-center gap-2 px-5 py-3 rounded-xl bg-gradient-to-r from-purple-600 to-cyan-600 text-white font-semibold text-sm shadow-[0_4px_20px_rgba(139,92,246,0.4)] group-hover:shadow-[0_4px_30px_rgba(139,92,246,0.6)] transition-all duration-300">
+                            <Zap className="w-4 h-4 flex-shrink-0" />
+                            <span className="whitespace-nowrap">Open Engine</span>
+                            <ChevronUp className="w-4 h-4 flex-shrink-0" />
+                          </div>
+                        </div>
+                      </div>
+                    </button>
+                  </motion.div>
                 </div>
-                <div className="flex items-center gap-3">
-                  <div className="hidden sm:flex flex-col gap-1 text-xs">
-                    <span className="flex items-center gap-1.5 text-green-400"><div className="w-1.5 h-1.5 bg-green-400 rounded-full animate-pulse" />Backend Connected</span>
-                    <span className="flex items-center gap-1.5 text-cyan-400"><Radio className="w-3 h-3 animate-pulse" />Real-time Sync Active</span>
-                    <span className="flex items-center gap-1.5 text-purple-400"><Shield className="w-3 h-3" />CA Approval Required</span>
-                  </div>
-                  <div className="flex items-center gap-2 px-5 py-3 rounded-xl bg-gradient-to-r from-purple-600 to-cyan-600 text-white font-semibold text-sm shadow-[0_4px_20px_rgba(139,92,246,0.4)] group-hover:shadow-[0_4px_30px_rgba(139,92,246,0.6)] transition-all duration-300">
-                    <Zap className="w-4 h-4" />
-                    Open Engine
-                    <ChevronUp className="w-4 h-4" />
-                  </div>
+              </TabsContent>
+
+              {/* ZONE 2: CLIENT VAULT */}
+              <TabsContent value="clients" className="m-0 focus-visible:outline-none focus-visible:ring-0 space-y-8">
+                <div className="p-6 rounded-2xl bg-gradient-to-r from-indigo-500/10 to-transparent border border-indigo-500/20 mb-8">
+                  <h2 className="text-2xl font-bold text-indigo-400">Client Portfolio Vault</h2>
+                  <p className="text-sm text-muted-foreground">Manage multi-entity compliance status and secure documentation.</p>
                 </div>
-              </div>
-            </button>
-          </motion.div>
+                <MultiClientMasterHub />
+                <div className="flex flex-col space-y-8">
+                  <TaskFilingManagement isRealDashboard={true} apiEndpoint={`${CA_API}/api/v1/ca/inhouse-ca-001/tasks`} governmentIntegration={true} />
+                  <ClientDependencyTracker isRealDashboard={true} apiEndpoint={`${CA_API}/api/v1/ca/inhouse-ca-001/dependencies`} aiEnabled={true} />
+                  <ApprovalWorkflowHub />
+                </div>
+              </TabsContent>
+
+              {/* ZONE 3: FIRM OPERATIONS */}
+              <TabsContent value="operations" className="m-0 focus-visible:outline-none focus-visible:ring-0 space-y-8">
+                <div className="p-6 rounded-2xl bg-gradient-to-r from-emerald-500/10 to-transparent border border-emerald-500/20 mb-8">
+                  <h2 className="text-2xl font-bold text-emerald-400">Firm Operations & Practice Management</h2>
+                  <p className="text-sm text-muted-foreground">Billing and Invoices, AES 256 Vault, Audit, and Performance.</p>
+                </div>
+                <div className="flex flex-col space-y-8">
+                  <PracticeBillingPanel isRealDashboard={true} />
+                  <SecureFileSharingPanel isRealDashboard={true} />
+                  <AuditInspectionSupport isRealDashboard={true} caId="inhouse-ca-001" />
+                  <CAAnalyticsPerformance isRealDashboard={true} caId="inhouse-ca-001" />
+                  <CommunicationLogsLive isRealDashboard={true} caId="inhouse-ca-001" />
+                </div>
+              </TabsContent>
+
+              {/* ZONE 4: REGULATORY NEWS & CALENDAR */}
+              <TabsContent value="ai-swarm" className="m-0 focus-visible:outline-none focus-visible:ring-0 space-y-8">
+                <div className="p-6 rounded-2xl bg-gradient-to-r from-amber-500/10 to-transparent border border-amber-500/20 mb-8">
+                  <h2 className="text-2xl font-bold text-amber-400">Regulatory News & Statutory Calendar</h2>
+                  <p className="text-sm text-muted-foreground">Cross-department statutory deadlines and rule updates.</p>
+                </div>
+                <div className="flex flex-col space-y-8">
+                  <StatutoryDeadlineCalendar isRealDashboard={true} demoMode={false} />
+                  <RegulatoryNewsRuleImpact
+                    isRealDashboard={true}
+                    apiEndpoint={`${CA_API}/api/v1/ca/regulatory-news`}
+                    aiEnabled={true}
+                    caId="inhouse-ca-001"
+                  />
+                  <ComplianceHealthChangeLog
+                    isRealDashboard={true}
+                    apiEndpoint={`${CA_API}/api/v1/ca`}
+                    caId="inhouse-ca-001"
+                  />
+                </div>
+              </TabsContent>
+
+              {/* ZONE 5: CALCULATORS & FORMS */}
+              <TabsContent value="calculations" className="m-0 focus-visible:outline-none focus-visible:ring-0 space-y-8">
+                <div className="p-6 rounded-2xl bg-gradient-to-r from-rose-500/10 to-transparent border border-rose-500/20 mb-8">
+                  <h2 className="text-2xl font-bold text-rose-400">Calculators, Forms & Audits</h2>
+                  <p className="text-sm text-muted-foreground">Dedicated workspace for complex financial calculations, compliance forms, and audit logs.</p>
+                </div>
+                <div className="flex flex-col space-y-8">
+                  <ComplianceModulesHub />
+                </div>
+              </TabsContent>
+            </Tabs>
+          </div>
 
           {/* AI Drafting Engine Slide-up Overlay */}
           <AnimatePresence>
@@ -1756,664 +1788,7 @@ const InhouseCADashboardReal = () => {
               </>
             )}
           </AnimatePresence>
-
-          {/* Client Portfolio - Consent-Based Onboarding */}
-          <motion.div
-            initial={{ opacity: 0, y: 20 }}
-            animate={{ opacity: 1, y: 0 }}
-            transition={{ delay: 0.15 }}
-            className="mb-16 space-y-6"
-          >
-            <div className="flex items-center justify-between">
-              <div>
-                <h2 className="text-2xl font-bold text-cyan-400 flex items-center mb-1">
-                  <Users className="w-6 h-6 mr-2" />
-                  Client Portfolio
-                  <Badge className="ml-3 bg-purple-500/20 text-purple-400 border-purple-500/50">
-                    Consent-Based
-                  </Badge>
-                </h2>
-                <p className="text-sm text-muted-foreground">Manage clients with secure consent-based data access</p>
-              </div>
-              <Button 
-                className="bg-gradient-to-r from-cyan-600 to-purple-600 hover:from-cyan-700 hover:to-purple-700"
-                onClick={() => setShowOnboardModal(true)}
-              >
-                <Plus className="w-4 h-4 mr-1" />
-                Add Client
-              </Button>
-            </div>
-
-            {/* Pending Consent Requests */}
-            {pendingRequests.length > 0 && (
-              <Card className="border-yellow-500/30 bg-yellow-500/5">
-                <CardContent className="p-4">
-                  <h3 className="text-sm font-semibold text-yellow-400 mb-3 flex items-center">
-                    <Clock className="w-4 h-4 mr-2" />
-                    Pending Consent Requests ({pendingRequests.length})
-                  </h3>
-                  <div className="space-y-2">
-                    {pendingRequests.map((req, idx) => (
-                      <div key={idx} className="flex items-center justify-between p-3 rounded-lg bg-card/50 border border-yellow-500/20">
-                        <div className="flex items-center gap-3">
-                          <div className="w-10 h-10 rounded-full bg-yellow-500/20 flex items-center justify-center">
-                            <Clock className="w-5 h-5 text-yellow-400" />
-                          </div>
-                          <div>
-                            <p className="font-medium">{req.client_name}</p>
-                            <p className="text-xs text-muted-foreground">
-                              {req.identifiers?.gstin || req.identifiers?.pan || req.identifiers?.cin}
-                            </p>
-                          </div>
-                        </div>
-                        <div className="flex items-center gap-2">
-                          <Badge variant="outline" className="border-yellow-500/50 text-yellow-400">
-                            Awaiting Consent
-                          </Badge>
-                          <span className="text-xs text-muted-foreground">
-                            Expires: {new Date(req.expires_at).toLocaleDateString()}
-                          </span>
-                        </div>
-                      </div>
-                    ))}
-                  </div>
-                </CardContent>
-              </Card>
-            )}
-
-            {/* Client List */}
-            <Card className="glass-card border-border/50">
-              <CardContent className="p-6">
-                {companies.length === 0 && pendingRequests.length === 0 ? (
-                  <div className="text-center py-12 text-muted-foreground">
-                    <Building className="w-16 h-16 mx-auto mb-4 opacity-30" />
-                    <p className="text-lg font-medium">No companies added yet</p>
-                    <p className="text-sm mb-4">Add your first client using the consent-based workflow</p>
-                    <Button 
-                      variant="outline" 
-                      className="border-cyan-500/50 text-cyan-400"
-                      onClick={() => setShowOnboardModal(true)}
-                    >
-                      <Plus className="w-4 h-4 mr-1" />
-                      Onboard First Client
-                    </Button>
-                  </div>
-                ) : companies.length > 0 ? (
-                  <div className="space-y-4">
-                    {/* Search and Filter */}
-                    <div className="flex gap-2 mb-4">
-                      <Input
-                        placeholder="Search companies..."
-                        className="bg-card border-border/50 max-w-xs"
-                      />
-                      <Button variant="outline" size="sm">
-                        All
-                      </Button>
-                      <Button variant="outline" size="sm" className="text-green-400">
-                        Healthy
-                      </Button>
-                      <Button variant="outline" size="sm" className="text-yellow-400">
-                        Moderate
-                      </Button>
-                      <Button variant="outline" size="sm" className="text-red-400">
-                        Critical
-                      </Button>
-                    </div>
-
-                    {/* Company Cards */}
-                    <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
-                      {companies.map((company, idx) => (
-                        <motion.div
-                          key={company.id || idx}
-                          initial={{ opacity: 0, scale: 0.95 }}
-                          animate={{ opacity: 1, scale: 1 }}
-                          transition={{ delay: idx * 0.05 }}
-                          className="p-4 rounded-xl border border-border/50 bg-card/50 hover:bg-card/80 transition-all cursor-pointer group"
-                          onClick={() => handleViewCompany(company)}
-                        >
-                          <div className="flex items-start justify-between mb-3">
-                            <div className="flex items-center gap-3">
-                              <div className={`w-12 h-12 rounded-full ${getHealthColor(company.compliance_score || company.health)} flex items-center justify-center`}>
-                                <Building className="w-6 h-6 text-white" />
-                              </div>
-                              <div>
-                                <h4 className="font-semibold text-sm line-clamp-1">{company.company_name || company.name}</h4>
-                                <p className="text-xs text-muted-foreground">{company.gstin || company.pan || 'N/A'}</p>
-                                {company.industry && (
-                                  <Badge variant="outline" className="mt-1 text-[10px] px-1 py-0 border-cyan-500/30 text-cyan-400">
-                                    {company.industry}
-                                  </Badge>
-                                )}
-                              </div>
-                            </div>
-                            <Badge className={`${
-                              company.legal_status === 'Active' || company.status === 'Active' 
-                                ? 'bg-green-500/20 text-green-400' 
-                                : 'bg-red-500/20 text-red-400'
-                            }`}>
-                              {company.legal_status || company.status}
-                            </Badge>
-                          </div>
-                          
-                          {/* Health Score Bar */}
-                          <div className="mb-3">
-                            <div className="flex justify-between text-xs mb-1">
-                              <span className="text-muted-foreground">Compliance Health</span>
-                              <span className={`font-medium ${
-                                (company.compliance_score || company.health || 0) >= 85 ? 'text-green-400' :
-                                (company.compliance_score || company.health || 0) >= 70 ? 'text-yellow-400' : 'text-red-400'
-                              }`}>
-                                {company.compliance_score || company.health || 0}%
-                              </span>
-                            </div>
-                            <Progress 
-                              value={company.compliance_score || company.health || 0} 
-                              className="h-2"
-                            />
-                          </div>
-
-                          {/* Health Risks & Gaps */}
-                          {company.health_risks && company.health_risks.length > 0 && (
-                            <div className="mb-3 p-2 rounded-lg bg-card/30 border border-border/30">
-                              <p className="text-[10px] text-muted-foreground mb-1">Risk Overview</p>
-                              <div className="space-y-1">
-                                {company.health_risks.slice(0, 2).map((risk: any, idx: number) => (
-                                  <div key={idx} className="flex items-center gap-1 text-[10px]">
-                                    <span className={`w-1.5 h-1.5 rounded-full ${
-                                      risk.severity === 'critical' ? 'bg-red-500' :
-                                      risk.severity === 'high' ? 'bg-orange-500' :
-                                      risk.severity === 'medium' ? 'bg-yellow-500' :
-                                      risk.severity === 'low' ? 'bg-blue-500' : 'bg-green-500'
-                                    }`} />
-                                    <span className="text-muted-foreground truncate">{risk.title}</span>
-                                  </div>
-                                ))}
-                                {company.health_risks.length > 2 && (
-                                  <p className="text-[9px] text-muted-foreground/60 pl-2.5">
-                                    +{company.health_risks.length - 2} more
-                                  </p>
-                                )}
-                              </div>
-                            </div>
-                          )}
-
-                          {/* Next Deadline */}
-                          {company.next_deadline?.nearest && (
-                            <div className="mb-3 p-2 rounded-lg bg-gradient-to-r from-orange-500/10 to-red-500/10 border border-orange-500/30">
-                              <div className="flex items-center justify-between mb-1">
-                                <p className="text-[10px] text-orange-400 font-medium">Next Deadline</p>
-                                <Badge className={`text-[9px] px-1 py-0 ${
-                                  company.next_deadline.nearest.urgency === 'critical' ? 'bg-red-500/20 text-red-400' :
-                                  company.next_deadline.nearest.urgency === 'high' ? 'bg-orange-500/20 text-orange-400' :
-                                  'bg-yellow-500/20 text-yellow-400'
-                                }`}>
-                                  {company.next_deadline.nearest.urgency}
-                                </Badge>
-                              </div>
-                              <p className="text-xs font-medium">{company.next_deadline.nearest.file_type}</p>
-                              <div className="flex items-center justify-between mt-1">
-                                <p className="text-[10px] text-muted-foreground">
-                                  Due: {new Date(company.next_deadline.nearest.due_date).toLocaleDateString()}
-                                </p>
-                                <p className="text-[10px] font-medium text-orange-400">
-                                  {company.next_deadline.nearest.days_remaining} days left
-                                </p>
-                              </div>
-                            </div>
-                          )}
-
-                          {/* Quick Info */}
-                          <div className="grid grid-cols-2 gap-2 text-xs mb-3">
-                            <div className="p-2 rounded bg-card/50">
-                              <p className="text-muted-foreground">State</p>
-                              <p className="font-medium">{company.state || 'N/A'}</p>
-                            </div>
-                            <div className="p-2 rounded bg-card/50">
-                              <p className="text-muted-foreground">Last Sync</p>
-                              <p className="font-medium">{company.last_sync ? new Date(company.last_sync).toLocaleDateString() : company.lastFiling || 'Pending'}</p>
-                            </div>
-                          </div>
-
-                          {/* Action Buttons */}
-                          <div className="flex gap-2 mt-3 opacity-0 group-hover:opacity-100 transition-opacity">
-                            <Button 
-                              size="sm" 
-                              variant="outline" 
-                              className="flex-1 text-xs"
-                              onClick={(e) => {
-                                e.stopPropagation();
-                                handleRefreshCompany(company.id);
-                              }}
-                            >
-                              <RefreshCw className="w-3 h-3 mr-1" />
-                              Refresh
-                            </Button>
-                            <Button 
-                              size="sm" 
-                              variant="outline" 
-                              className="flex-1 text-xs text-cyan-400"
-                              onClick={(e) => {
-                                e.stopPropagation();
-                                handleViewCompany(company);
-                              }}
-                            >
-                              <Eye className="w-3 h-3 mr-1" />
-                              Details
-                            </Button>
-                          </div>
-                        </motion.div>
-                      ))}
-                    </div>
-                  </div>
-                ) : null}
-              </CardContent>
-            </Card>
-
-            {/* Onboard Client Modal */}
-            <AnimatePresence>
-              {showOnboardModal && (
-                <motion.div
-                  initial={{ opacity: 0 }}
-                  animate={{ opacity: 1 }}
-                  exit={{ opacity: 0 }}
-                  className="fixed inset-0 bg-black/70 backdrop-blur-sm z-50 flex items-center justify-center p-4"
-                  onClick={() => setShowOnboardModal(false)}
-                >
-                  <motion.div
-                    initial={{ scale: 0.9, opacity: 0 }}
-                    animate={{ scale: 1, opacity: 1 }}
-                    exit={{ scale: 0.9, opacity: 0 }}
-                    className="bg-card border border-border rounded-2xl p-6 w-full max-w-lg"
-                    onClick={(e) => e.stopPropagation()}
-                  >
-                    <div className="flex items-center justify-between mb-6">
-                      <div>
-                        <h3 className="text-xl font-bold">Onboard New Client</h3>
-                        <p className="text-sm text-muted-foreground">Consent-based secure data retrieval</p>
-                      </div>
-                      <Button 
-                        variant="ghost" 
-                        size="icon"
-                        onClick={() => setShowOnboardModal(false)}
-                      >
-                        <X className="w-5 h-5" />
-                      </Button>
-                    </div>
-
-                    {/* Workflow Steps */}
-                    <div className="flex items-center gap-2 mb-6 text-xs">
-                      <div className="flex items-center gap-1 text-cyan-400">
-                        <div className="w-6 h-6 rounded-full bg-cyan-500/20 flex items-center justify-center">1</div>
-                        <span>Enter Details</span>
-                      </div>
-                      <ChevronRight className="w-4 h-4 text-muted-foreground" />
-                      <div className="flex items-center gap-1 text-muted-foreground">
-                        <div className="w-6 h-6 rounded-full bg-muted/20 flex items-center justify-center">2</div>
-                        <span>Client Consent</span>
-                      </div>
-                      <ChevronRight className="w-4 h-4 text-muted-foreground" />
-                      <div className="flex items-center gap-1 text-muted-foreground">
-                        <div className="w-6 h-6 rounded-full bg-muted/20 flex items-center justify-center">3</div>
-                        <span>Data Fetch</span>
-                      </div>
-                      <ChevronRight className="w-4 h-4 text-muted-foreground" />
-                      <div className="flex items-center gap-1 text-muted-foreground">
-                        <div className="w-6 h-6 rounded-full bg-muted/20 flex items-center justify-center">4</div>
-                        <span>Health Score</span>
-                      </div>
-                    </div>
-
-                    <div className="space-y-4">
-                      {/* Identifiers */}
-                      <div className="p-4 rounded-lg bg-cyan-500/5 border border-cyan-500/20">
-                        <h4 className="text-sm font-semibold text-cyan-400 mb-3">Company Identifiers (at least one)</h4>
-                        <div className="grid grid-cols-1 gap-3">
-                          <div>
-                            <label className="text-xs text-muted-foreground mb-1 block">GSTIN</label>
-                            <Input
-                              placeholder="e.g., 27AABCA1234C1ZS"
-                              value={onboardForm.gstin}
-                              onChange={(e) => setOnboardForm(prev => ({ ...prev, gstin: e.target.value.toUpperCase() }))}
-                              className="bg-card border-border/50"
-                            />
-                          </div>
-                          <div className="grid grid-cols-2 gap-3">
-                            <div>
-                              <label className="text-xs text-muted-foreground mb-1 block">PAN</label>
-                              <Input
-                                placeholder="e.g., AABCA1234C"
-                                value={onboardForm.pan}
-                                onChange={(e) => setOnboardForm(prev => ({ ...prev, pan: e.target.value.toUpperCase() }))}
-                                className="bg-card border-border/50"
-                              />
-                            </div>
-                            <div>
-                              <label className="text-xs text-muted-foreground mb-1 block">CIN</label>
-                              <Input
-                                placeholder="e.g., U74999KA2020PTC..."
-                                value={onboardForm.cin}
-                                onChange={(e) => setOnboardForm(prev => ({ ...prev, cin: e.target.value.toUpperCase() }))}
-                                className="bg-card border-border/50"
-                              />
-                            </div>
-                          </div>
-                        </div>
-                      </div>
-
-                      {/* Client Info */}
-                      <div className="p-4 rounded-lg bg-purple-500/5 border border-purple-500/20">
-                        <h4 className="text-sm font-semibold text-purple-400 mb-3">Client Contact (for consent notification)</h4>
-                        <div className="space-y-3">
-                          <div>
-                            <label className="text-xs text-muted-foreground mb-1 block">Company Name *</label>
-                            <Input
-                              placeholder="e.g., Acme Technologies Pvt. Ltd."
-                              value={onboardForm.client_name}
-                              onChange={(e) => setOnboardForm(prev => ({ ...prev, client_name: e.target.value }))}
-                              className="bg-card border-border/50"
-                            />
-                          </div>
-                          <div className="grid grid-cols-2 gap-3">
-                            <div>
-                              <label className="text-xs text-muted-foreground mb-1 block">Email</label>
-                              <Input
-                                placeholder="finance@company.com"
-                                type="email"
-                                value={onboardForm.client_email}
-                                onChange={(e) => setOnboardForm(prev => ({ ...prev, client_email: e.target.value }))}
-                                className="bg-card border-border/50"
-                              />
-                            </div>
-                            <div>
-                              <label className="text-xs text-muted-foreground mb-1 block">Phone (WhatsApp)</label>
-                              <Input
-                                placeholder="+91 98765 43210"
-                                value={onboardForm.client_phone}
-                                onChange={(e) => setOnboardForm(prev => ({ ...prev, client_phone: e.target.value }))}
-                                className="bg-card border-border/50"
-                              />
-                            </div>
-                          </div>
-                        </div>
-                      </div>
-
-                      {/* Info Box */}
-                      <div className="p-3 rounded-lg bg-blue-500/10 border border-blue-500/20 text-xs text-blue-300">
-                        <p className="flex items-start gap-2">
-                          <Shield className="w-4 h-4 mt-0.5 flex-shrink-0" />
-                          <span>
-                            A secure consent link will be sent via WhatsApp & Email. 
-                            Data will only be fetched after client authorization.
-                          </span>
-                        </p>
-                      </div>
-
-                      {/* Action Buttons */}
-                      <div className="flex gap-3 pt-2">
-                        <Button 
-                          variant="outline" 
-                          className="flex-1"
-                          onClick={() => setShowOnboardModal(false)}
-                        >
-                          Cancel
-                        </Button>
-                        <Button 
-                          className="flex-1 bg-gradient-to-r from-cyan-600 to-purple-600"
-                          onClick={handleOnboardClient}
-                          disabled={isOnboarding}
-                        >
-                          {isOnboarding ? (
-                            <>
-                              <Loader className="w-4 h-4 mr-2 animate-spin" />
-                              Sending...
-                            </>
-                          ) : (
-                            <>
-                              <Send className="w-4 h-4 mr-2" />
-                              Send Consent Request
-                            </>
-                          )}
-                        </Button>
-                      </div>
-                    </div>
-                  </motion.div>
-                </motion.div>
-              )}
-            </AnimatePresence>
-
-            {/* Company Details Modal */}
-            <AnimatePresence>
-              {showCompanyDetails && selectedCompany && (
-                <motion.div
-                  initial={{ opacity: 0 }}
-                  animate={{ opacity: 1 }}
-                  exit={{ opacity: 0 }}
-                  className="fixed inset-0 bg-black/70 backdrop-blur-sm z-50 flex items-center justify-center p-4"
-                  onClick={() => setShowCompanyDetails(false)}
-                >
-                  <motion.div
-                    initial={{ scale: 0.9, opacity: 0 }}
-                    animate={{ scale: 1, opacity: 1 }}
-                    exit={{ scale: 0.9, opacity: 0 }}
-                    className="bg-card border border-border rounded-2xl p-6 w-full max-w-2xl max-h-[90vh] overflow-y-auto"
-                    onClick={(e) => e.stopPropagation()}
-                  >
-                    <div className="flex items-center justify-between mb-6">
-                      <div className="flex items-center gap-4">
-                        <div className={`w-14 h-14 rounded-full ${getHealthColor(selectedCompany.compliance_score)} flex items-center justify-center`}>
-                          <Building className="w-7 h-7 text-white" />
-                        </div>
-                        <div>
-                          <h3 className="text-xl font-bold">{selectedCompany.company_name}</h3>
-                          <p className="text-sm text-muted-foreground">{selectedCompany.trade_name || selectedCompany.company_type}</p>
-                        </div>
-                      </div>
-                      <Button variant="ghost" size="icon" onClick={() => setShowCompanyDetails(false)}>
-                        <X className="w-5 h-5" />
-                      </Button>
-                    </div>
-
-                    {/* Health Score */}
-                    <div className="p-4 rounded-xl bg-gradient-to-r from-cyan-500/10 to-purple-500/10 border border-cyan-500/20 mb-6">
-                      <div className="flex items-center justify-between mb-2">
-                        <span className="font-medium">Compliance Health Score</span>
-                        <span className={`text-2xl font-bold ${
-                          selectedCompany.compliance_score >= 85 ? 'text-green-400' :
-                          selectedCompany.compliance_score >= 70 ? 'text-yellow-400' : 'text-red-400'
-                        }`}>
-                          {selectedCompany.compliance_score || 0}%
-                        </span>
-                      </div>
-                      <Progress value={selectedCompany.compliance_score || 0} className="h-3" />
-                      <p className="text-xs text-muted-foreground mt-2">
-                        Status: {getHealthLabel(selectedCompany.compliance_score)}
-                      </p>
-                    </div>
-
-                    {/* Company Details Grid */}
-                    <div className="grid grid-cols-2 gap-4 mb-6">
-                      <div className="p-3 rounded-lg bg-card/50 border border-border/50">
-                        <p className="text-xs text-muted-foreground">GSTIN</p>
-                        <p className="font-mono">{selectedCompany.gstin || 'N/A'}</p>
-                      </div>
-                      <div className="p-3 rounded-lg bg-card/50 border border-border/50">
-                        <p className="text-xs text-muted-foreground">PAN</p>
-                        <p className="font-mono">{selectedCompany.pan || 'N/A'}</p>
-                      </div>
-                      <div className="p-3 rounded-lg bg-card/50 border border-border/50">
-                        <p className="text-xs text-muted-foreground">CIN</p>
-                        <p className="font-mono text-sm">{selectedCompany.cin || 'N/A'}</p>
-                      </div>
-                      <div className="p-3 rounded-lg bg-card/50 border border-border/50">
-                        <p className="text-xs text-muted-foreground">Status</p>
-                        <Badge className={selectedCompany.legal_status === 'Active' ? 'bg-green-500/20 text-green-400' : 'bg-red-500/20 text-red-400'}>
-                          {selectedCompany.legal_status}
-                        </Badge>
-                      </div>
-                      <div className="p-3 rounded-lg bg-card/50 border border-border/50">
-                        <p className="text-xs text-muted-foreground">State</p>
-                        <p>{selectedCompany.state || 'N/A'}</p>
-                      </div>
-                      <div className="p-3 rounded-lg bg-card/50 border border-border/50">
-                        <p className="text-xs text-muted-foreground">Company Type</p>
-                        <p>{selectedCompany.company_type || 'N/A'}</p>
-                      </div>
-                    </div>
-
-                    {/* Health Details */}
-                    {selectedCompany.health_details && (
-                      <div className="space-y-4 mb-6">
-                        <h4 className="font-semibold">Compliance Breakdown</h4>
-                        <div className="grid grid-cols-2 gap-4">
-                          {selectedCompany.health_details.gst && (
-                            <div className="p-4 rounded-lg bg-card/50 border border-border/50">
-                              <div className="flex items-center justify-between mb-2">
-                                <span className="text-sm font-medium">GST Compliance</span>
-                                <span className={`font-bold ${
-                                  selectedCompany.health_details.gst.score >= 85 ? 'text-green-400' : 'text-yellow-400'
-                                }`}>
-                                  {selectedCompany.health_details.gst.score}%
-                                </span>
-                              </div>
-                              <Progress value={selectedCompany.health_details.gst.score} className="h-2 mb-2" />
-                              <p className="text-xs text-muted-foreground">
-                                {selectedCompany.health_details.gst.on_time}/{selectedCompany.health_details.gst.total} returns on time
-                              </p>
-                            </div>
-                          )}
-                          {selectedCompany.health_details.mca && (
-                            <div className="p-4 rounded-lg bg-card/50 border border-border/50">
-                              <div className="flex items-center justify-between mb-2">
-                                <span className="text-sm font-medium">MCA Compliance</span>
-                                <span className={`font-bold ${
-                                  selectedCompany.health_details.mca.score >= 85 ? 'text-green-400' : 'text-yellow-400'
-                                }`}>
-                                  {selectedCompany.health_details.mca.score}%
-                                </span>
-                              </div>
-                              <Progress value={selectedCompany.health_details.mca.score} className="h-2 mb-2" />
-                              <p className="text-xs text-muted-foreground">
-                                {selectedCompany.health_details.mca.filed}/{selectedCompany.health_details.mca.total} filings complete
-                              </p>
-                            </div>
-                          )}
-                        </div>
-                      </div>
-                    )}
-
-                    {/* Directors */}
-                    {selectedCompany.directors && selectedCompany.directors.length > 0 && (
-                      <div className="mb-6">
-                        <h4 className="font-semibold mb-3">Directors ({selectedCompany.directors.length})</h4>
-                        <div className="space-y-2">
-                          {selectedCompany.directors.map((dir: any, idx: number) => (
-                            <div key={idx} className="flex items-center justify-between p-3 rounded-lg bg-card/50 border border-border/50">
-                              <div>
-                                <p className="font-medium">{dir.name}</p>
-                                <p className="text-xs text-muted-foreground">DIN: {dir.din}</p>
-                              </div>
-                              <Badge variant="outline">{dir.designation}</Badge>
-                            </div>
-                          ))}
-                        </div>
-                      </div>
-                    )}
-
-                    {/* Action Buttons */}
-                    <div className="flex gap-3">
-                      <Button 
-                        variant="outline" 
-                        className="flex-1"
-                        onClick={() => handleRefreshCompany(selectedCompany.id)}
-                      >
-                        <RefreshCw className="w-4 h-4 mr-2" />
-                        Refresh Data
-                      </Button>
-                      <Button className="flex-1 bg-cyan-600 hover:bg-cyan-700">
-                        <FileText className="w-4 h-4 mr-2" />
-                        Generate Report
-                      </Button>
-                    </div>
-                  </motion.div>
-                </motion.div>
-              )}
-            </AnimatePresence>
-          </motion.div>
-
-          {/* Task & Filing Management - Auto-synced from Client Portfolio */}
-          <TaskFilingManagement 
-            isRealDashboard={true}
-            apiEndpoint={`${(import.meta.env.VITE_CA_API_BASE_URL as string) || 'http://localhost:3001'}/api/v1/ca/inhouse-ca-001/tasks`}
-            governmentIntegration={true}
-          />
-
-          {/* Client Dependency Tracker - Document & Data Tracking */}
-          <ClientDependencyTracker 
-            isRealDashboard={true}
-            apiEndpoint={`${(import.meta.env.VITE_CA_API_BASE_URL as string) || 'http://localhost:3001'}/api/v1/ca/inhouse-ca-001/dependencies`}
-            aiEnabled={true}
-          />
-
-          {/* Regulatory News & Rule Impact - Live Section */}
-          <motion.div
-            initial={{ opacity: 0, y: 20 }}
-            animate={{ opacity: 1, y: 0 }}
-            transition={{ delay: 0.3 }}
-            className="mb-16"
-          >
-            <RegulatoryNewsRuleImpact
-              isRealDashboard={true}
-              apiEndpoint={`${(import.meta.env.VITE_CA_API_BASE_URL as string) || 'http://localhost:3001'}/api/v1/ca/regulatory-news`}
-              aiEnabled={true}
-              caId="inhouse-ca-001"
-            />
-          </motion.div>
-
-          {/* Compliance Health Log */}
-          <motion.div
-            initial={{ opacity: 0, y: 20 }}
-            animate={{ opacity: 1, y: 0 }}
-            transition={{ delay: 0.35 }}
-            className="mb-16 space-y-6"
-          >
-            {/* Live Compliance Health Change Log Component */}
-            <ComplianceHealthChangeLog
-              isRealDashboard={true}
-              apiEndpoint={`${(import.meta.env.VITE_CA_API_BASE_URL as string) || 'http://localhost:3001'}/api/v1/ca`}
-              caId={'inhouse-ca-001'}
-            />
-          </motion.div>
-
-          {/* Audit Support */}
-          <motion.div
-            initial={{ opacity: 0, y: 20 }}
-            animate={{ opacity: 1, y: 0 }}
-            transition={{ delay: 0.4 }}
-            className="mb-16 space-y-6"
-          >
-            <AuditInspectionSupport isRealDashboard={true} caId="inhouse-ca-001" />
-          </motion.div>
-
-          {/* Communication & Logs */}
-          <motion.div
-            initial={{ opacity: 0, y: 20 }}
-            animate={{ opacity: 1, y: 0 }}
-            transition={{ delay: 0.45 }}
-            className="mb-16 space-y-6"
-          >
-            <CommunicationLogsLive isRealDashboard={true} caId="inhouse-ca-001" />
-          </motion.div>
-
-          {/* CA Analytics & Performance */}
-          <motion.div
-            initial={{ opacity: 0, y: 20 }}
-            animate={{ opacity: 1, y: 0 }}
-            transition={{ delay: 0.5 }}
-            className="mb-16 space-y-6"
-          >
-            <CAAnalyticsPerformance isRealDashboard={true} caId="inhouse-ca-001" />
-          </motion.div>
-      </div>
+        </div>
       </main>
       
       <Footer />
