@@ -1,3 +1,4 @@
+// Force Vite HMR Cache Invalidation
 import { useState } from 'react';
 import { motion } from 'framer-motion';
 import { AlertTriangle, Bell, Plus, RefreshCw, CheckCircle, Clock, XCircle } from 'lucide-react';
