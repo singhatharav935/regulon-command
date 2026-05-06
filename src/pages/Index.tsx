@@ -101,30 +101,10 @@ const buildLocalAgentPayload = async () => {
     },
   ];
   
-  // Live regulatory announcements - enhanced for production readiness
-  const payload = useMemo(() => {
-    // In development/demo mode, use mock data
-    if (import.meta.env.DEV || import.meta.env.VITE_ENABLE_PREVIEW_BYPASS === "true") {
-      return mockAlerts;
-    }
-    
-    // TODO: Replace with real backend call when regulatory API is ready
-    // For now, use enhanced mock data that looks more realistic
-    return mockAlerts.map(alert => ({
-      ...alert,
-      updated_at: new Date().toISOString(), // Make it appear fresh
-      content: alert.content.replace(/\(mock\)/gi, '') // Remove mock labels
-    }));
-  }, []);
+  // Use mock alerts directly — no React hooks allowed in plain async functions
+  const payload = mockAlerts;
 
-  // TODO: Future implementation for production
-  // const { data: liveAlerts } = useQuery({
-  //   queryKey: ['regulatory-announcements'],
-  //   queryFn: () => fetch('/api/v1/regulatory/announcements').then(r => r.json()),
-  //   staleTime: 5 * 60 * 1000 // 5 minutes
-  // });
-  // const payload = liveAlerts || mockAlerts;
-  const statusPayload = { gstn: { status: "active" }, itd: { status: "active" }, epfo: { status: "active" }, mca: { status: "syncing" }, rbi: { status: "active" }, sebi: { status: "awaiting_feed" } };
+  const statusPayload: Record<string, { status: string }> = { gstn: { status: "active" }, itd: { status: "active" }, epfo: { status: "active" }, mca: { status: "syncing" }, rbi: { status: "active" }, sebi: { status: "awaiting_feed" } };
   const announcements = Array.isArray(payload) ? payload : [];
   const nowIso = new Date().toISOString();
   const sourceToLatest = new Map<string, { title: string; at: string }>();
@@ -189,6 +169,13 @@ const Index = () => {
   const { data: landingOverview } = useQuery({
     queryKey: ["landing-overview"],
     queryFn: async () => {
+      // The workspace-backend edge function for landing/overview is not deployed yet.
+      // Skip the network request entirely to avoid CORS errors in the console.
+      // When the edge function is deployed, set VITE_WORKSPACE_BACKEND_ENABLED=true
+      // in .env to enable fetching.
+      if (import.meta.env.VITE_WORKSPACE_BACKEND_ENABLED !== "true") {
+        return null;
+      }
       try {
         return await workspacePublicRequest<{
           title?: string;
@@ -309,10 +296,12 @@ const Index = () => {
             <AdvancedComplianceRadar
               view="universal"
               onSyncNow={async () => {
-                try {
-                  await workspacePublicRequest("/public/regulatory-announcements/sync-now", { method: "POST" });
-                } catch {
-                  await fetch("/agent/sync-now", { method: "POST" });
+                if (import.meta.env.VITE_WORKSPACE_BACKEND_ENABLED === "true") {
+                  try {
+                    await workspacePublicRequest("/public/regulatory-announcements/sync-now", { method: "POST" });
+                  } catch {
+                    // Edge function not available — silent fallback
+                  }
                 }
                 await refetchPublicAnnouncements();
               }}

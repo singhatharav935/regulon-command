@@ -1,4 +1,4 @@
-import { useState, useEffect, useRef, Suspense } from "react";
+import { useState, useEffect, useRef, useCallback, Suspense } from "react";
 import { motion, AnimatePresence } from "framer-motion";
 import { Canvas, useFrame } from "@react-three/fiber";
 import { Text, Center, Float } from "@react-three/drei";
@@ -31,7 +31,6 @@ const Logo3D = () => {
         <Center>
           <Text
             fontSize={1.2}
-            font="https://fonts.gstatic.com/s/inter/v13/UcCO3FwrK3iLTeHuS_fvQtMwCp50KnMw2boKoduKmMEVuLyfAZJhiJ-Ek-_EeA.woff2"
             letterSpacing={0.1}
             textAlign="center"
           >
@@ -120,6 +119,17 @@ const Logo2DFallback = () => (
 
 const CinematicEntry = ({ onComplete }: CinematicEntryProps) => {
   const [phase, setPhase] = useState<string>("logo");
+  const glRef = useRef<THREE.WebGLRenderer | null>(null);
+
+  // Memoize so the callback identity is stable across renders
+  const handleCanvasCreated = useCallback(({ gl }: { gl: THREE.WebGLRenderer }) => {
+    gl.setClearColor(new THREE.Color('#000000'), 0);
+    // Suppress browser-level WebGL context-lost events
+    gl.domElement.addEventListener('webglcontextlost', (e) => {
+      e.preventDefault();
+    });
+    glRef.current = gl;
+  }, []);
 
   useEffect(() => {
     const timer1 = setTimeout(() => setPhase("tagline"), 1200);
@@ -130,6 +140,14 @@ const CinematicEntry = ({ onComplete }: CinematicEntryProps) => {
       clearTimeout(timer1);
       clearTimeout(timer2);
       clearTimeout(timer3);
+      // Gracefully tear down the WebGL context before React removes the DOM.
+      // Dispose FIRST to remove THREE.js's internal webglcontextlost listener,
+      // then force context loss — this prevents the "Context lost" console warning.
+      if (glRef.current) {
+        glRef.current.dispose();
+        glRef.current.forceContextLoss();
+        glRef.current = null;
+      }
     };
   }, [onComplete]);
 
@@ -198,13 +216,7 @@ const CinematicEntry = ({ onComplete }: CinematicEntryProps) => {
               <Canvas
                 camera={{ position: [0, 0, 6], fov: 40 }}
                 dpr={[1, 2]}
-                onCreated={({ gl }) => {
-                  gl.setClearColor(new THREE.Color('#000000'), 0);
-                  // Suppress WebGL context lost errors on unmount
-                  gl.domElement.addEventListener('webglcontextlost', (e) => {
-                    e.preventDefault();
-                  });
-                }}
+                onCreated={handleCanvasCreated}
               >
                 <ambientLight intensity={0.4} />
                 <spotLight
