@@ -1,53 +1,11 @@
 import { useState, useEffect, useRef, useCallback, Suspense } from "react";
 import { motion, AnimatePresence } from "framer-motion";
 import { Canvas, useFrame } from "@react-three/fiber";
-import { Text, Center, Float } from "@react-three/drei";
 import * as THREE from "three";
 
 interface CinematicEntryProps {
   onComplete: () => void;
 }
-
-// 3D Text Component using Text (no font file needed)
-const Logo3D = () => {
-  const meshRef = useRef<THREE.Group>(null);
-
-  useFrame((state) => {
-    if (meshRef.current) {
-      // Subtle rotation
-      meshRef.current.rotation.y = Math.sin(state.clock.elapsedTime * 0.3) * 0.08;
-      meshRef.current.rotation.x = Math.sin(state.clock.elapsedTime * 0.2) * 0.03;
-    }
-  });
-
-  return (
-    <Float
-      speed={2}
-      rotationIntensity={0.15}
-      floatIntensity={0.4}
-      floatingRange={[-0.1, 0.1]}
-    >
-      <group ref={meshRef}>
-        <Center>
-          <Text
-            fontSize={1.2}
-            letterSpacing={0.1}
-            textAlign="center"
-          >
-            SANNIDH
-            <meshStandardMaterial
-              color="#00d4ff"
-              emissive="#006688"
-              emissiveIntensity={0.4}
-              metalness={0.9}
-              roughness={0.1}
-            />
-          </Text>
-        </Center>
-      </group>
-    </Float>
-  );
-};
 
 // Animated particles around the logo
 const Particles = () => {
@@ -108,14 +66,32 @@ const OrbitalRing = ({ radius, speed, color }: { radius: number; speed: number; 
   );
 };
 
-// Fallback for 3D loading
-const Logo2DFallback = () => (
-  <div className="absolute inset-0 flex items-center justify-center">
-    <h1 className="text-6xl md:text-8xl font-bold tracking-tight">
-      <span className="text-gradient-primary">SANNIDH</span>
-    </h1>
-  </div>
-);
+// Glowing center sphere
+const GlowSphere = () => {
+  const sphereRef = useRef<THREE.Mesh>(null);
+
+  useFrame((state) => {
+    if (sphereRef.current) {
+      const scale = 1 + Math.sin(state.clock.elapsedTime * 2) * 0.1;
+      sphereRef.current.scale.setScalar(scale);
+    }
+  });
+
+  return (
+    <mesh ref={sphereRef}>
+      <sphereGeometry args={[0.3, 32, 32]} />
+      <meshStandardMaterial
+        color="#00d4ff"
+        emissive="#006688"
+        emissiveIntensity={0.6}
+        metalness={0.9}
+        roughness={0.1}
+        transparent
+        opacity={0.4}
+      />
+    </mesh>
+  );
+};
 
 const CinematicEntry = ({ onComplete }: CinematicEntryProps) => {
   const [phase, setPhase] = useState<string>("logo");
@@ -140,12 +116,14 @@ const CinematicEntry = ({ onComplete }: CinematicEntryProps) => {
       clearTimeout(timer1);
       clearTimeout(timer2);
       clearTimeout(timer3);
-      // Gracefully tear down the WebGL context before React removes the DOM.
-      // Dispose FIRST to remove THREE.js's internal webglcontextlost listener,
-      // then force context loss — this prevents the "Context lost" console warning.
+      // Gracefully tear down the WebGL renderer before React removes the DOM.
+      // Wrap in try-catch to suppress any "context already lost" errors.
       if (glRef.current) {
-        glRef.current.dispose();
-        glRef.current.forceContextLoss();
+        try {
+          glRef.current.dispose();
+        } catch {
+          // Context may already be destroyed — safe to ignore
+        }
         glRef.current = null;
       }
     };
@@ -205,42 +183,60 @@ const CinematicEntry = ({ onComplete }: CinematicEntryProps) => {
             />
           </div>
 
-          {/* 3D Canvas */}
+          {/* 3D Canvas — particles and rings only (no Text = no troika = no jsdelivr fetch) */}
           <motion.div
             className="relative z-10 w-full h-[350px] md:h-[450px]"
             initial={{ opacity: 0, scale: 0.85 }}
             animate={{ opacity: 1, scale: 1 }}
             transition={{ duration: 1.2, ease: [0.22, 1, 0.36, 1] }}
           >
-            <Suspense fallback={<Logo2DFallback />}>
-              <Canvas
-                camera={{ position: [0, 0, 6], fov: 40 }}
-                dpr={[1, 2]}
-                onCreated={handleCanvasCreated}
+            <Canvas
+              camera={{ position: [0, 0, 6], fov: 40 }}
+              dpr={[1, 2]}
+              onCreated={handleCanvasCreated}
+            >
+              <ambientLight intensity={0.4} />
+              <spotLight
+                position={[10, 10, 10]}
+                angle={0.15}
+                penumbra={1}
+                intensity={1.5}
+                color="#00d4ff"
+              />
+              <spotLight
+                position={[-10, -5, 5]}
+                angle={0.2}
+                penumbra={1}
+                intensity={0.8}
+                color="#0088aa"
+              />
+              <pointLight position={[0, 0, 8]} intensity={0.5} color="#ffffff" />
+              
+              <GlowSphere />
+              <Particles />
+              <OrbitalRing radius={2.5} speed={0.3} color="#00d4ff" />
+              <OrbitalRing radius={3} speed={-0.2} color="#0088aa" />
+            </Canvas>
+
+            {/* CSS text overlay — replaces troika 3D Text to avoid font-loading errors */}
+            <div className="absolute inset-0 flex items-center justify-center pointer-events-none">
+              <motion.h1
+                className="text-6xl md:text-8xl font-bold tracking-[0.15em] select-none"
+                style={{
+                  background: "linear-gradient(135deg, #00d4ff 0%, #0088aa 50%, #00d4ff 100%)",
+                  WebkitBackgroundClip: "text",
+                  WebkitTextFillColor: "transparent",
+                  backgroundClip: "text",
+                  textShadow: "0 0 40px rgba(0, 212, 255, 0.3), 0 0 80px rgba(0, 136, 170, 0.15)",
+                  filter: "drop-shadow(0 0 20px rgba(0, 212, 255, 0.25))",
+                }}
+                initial={{ opacity: 0, scale: 0.8 }}
+                animate={{ opacity: 1, scale: 1 }}
+                transition={{ duration: 1, ease: [0.22, 1, 0.36, 1], delay: 0.2 }}
               >
-                <ambientLight intensity={0.4} />
-                <spotLight
-                  position={[10, 10, 10]}
-                  angle={0.15}
-                  penumbra={1}
-                  intensity={1.5}
-                  color="#00d4ff"
-                />
-                <spotLight
-                  position={[-10, -5, 5]}
-                  angle={0.2}
-                  penumbra={1}
-                  intensity={0.8}
-                  color="#0088aa"
-                />
-                <pointLight position={[0, 0, 8]} intensity={0.5} color="#ffffff" />
-                
-                <Logo3D />
-                <Particles />
-                <OrbitalRing radius={2.5} speed={0.3} color="#00d4ff" />
-                <OrbitalRing radius={3} speed={-0.2} color="#0088aa" />
-              </Canvas>
-            </Suspense>
+                SANNIDH
+              </motion.h1>
+            </div>
           </motion.div>
 
           {/* Tagline */}

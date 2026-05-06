@@ -50,11 +50,11 @@ export const PasswordStrengthMeter: React.FC<PasswordStrengthMeterProps> = ({
     >
       <div className="space-y-2">
         <div className="flex justify-between items-center">
-          <span className="text-sm text-gray-600">Password Strength</span>
+          <span className="text-sm text-gray-300">Password Strength</span>
           <span className={`text-sm font-medium ${
-            validation.score <= 2 ? 'text-red-500' : 
-            validation.score <= 3 ? 'text-yellow-500' : 
-            'text-green-500'
+            validation.score <= 2 ? 'text-red-400' : 
+            validation.score <= 3 ? 'text-yellow-400' : 
+            'text-green-400'
           }`}>
             {getStrengthText(validation.score)}
           </span>
@@ -70,7 +70,7 @@ export const PasswordStrengthMeter: React.FC<PasswordStrengthMeterProps> = ({
             <div
               key={level}
               className={`h-1 flex-1 rounded-full transition-colors ${
-                level <= validation.score ? getStrengthColor(validation.score) : 'bg-gray-200'
+                level <= validation.score ? getStrengthColor(validation.score) : 'bg-gray-600'
               }`}
             />
           ))}
@@ -82,11 +82,11 @@ export const PasswordStrengthMeter: React.FC<PasswordStrengthMeterProps> = ({
           {requirements.map((req, index) => (
             <div key={index} className="flex items-center space-x-2 text-sm">
               {req.met ? (
-                <Check className="w-4 h-4 text-green-500" />
+                <Check className="w-4 h-4 text-green-400" />
               ) : (
-                <X className="w-4 h-4 text-gray-400" />
+                <X className="w-4 h-4 text-gray-500" />
               )}
-              <span className={req.met ? 'text-green-600' : 'text-gray-500'}>
+              <span className={req.met ? 'text-green-400' : 'text-gray-400'}>
                 {req.text}
               </span>
             </div>
@@ -95,7 +95,7 @@ export const PasswordStrengthMeter: React.FC<PasswordStrengthMeterProps> = ({
       )}
 
       {validation.feedback.length > 0 && (
-        <div className="text-sm text-orange-600 space-y-1">
+        <div className="text-sm text-orange-400 space-y-1">
           {validation.feedback.map((feedback, index) => (
             <div key={index}>• {feedback}</div>
           ))}
@@ -124,7 +124,7 @@ export const SecurePasswordInput: React.FC<SecurePasswordInputProps> = ({
 
   return (
     <div className="space-y-2">
-      <label className="block text-sm font-medium text-gray-700">
+      <label className="block text-sm font-medium text-gray-200">
         {label}
       </label>
       
@@ -134,13 +134,18 @@ export const SecurePasswordInput: React.FC<SecurePasswordInputProps> = ({
           type={showPassword ? 'text' : 'password'}
           value={value}
           onChange={(e) => onValueChange(e.target.value)}
-          className={`w-full px-3 py-2 pr-10 border border-gray-300 rounded-lg focus:ring-2 focus:ring-purple-500 focus:border-transparent ${className}`}
+          className={`w-full px-3 py-2 pr-10 bg-white/10 border border-white/20 rounded-lg text-white placeholder:text-gray-400 focus:ring-2 focus:ring-primary focus:border-transparent ${className}`}
+          style={{
+            color: '#ffffff',
+            WebkitTextFillColor: '#ffffff',
+            caretColor: '#ffffff',
+          }}
         />
         
         <button
           type="button"
           onClick={() => setShowPassword(!showPassword)}
-          className="absolute inset-y-0 right-0 pr-3 flex items-center text-gray-400 hover:text-gray-600"
+          className="absolute inset-y-0 right-0 pr-3 flex items-center text-gray-400 hover:text-white transition-colors"
         >
           {showPassword ? (
             <EyeOff className="w-5 h-5" />

@@ -31,8 +31,9 @@ import { createLocalDemoUser } from "@/lib/local-demo-auth";
 import { SecurePasswordInput } from "@/components/auth/PasswordStrengthMeter";
 import { EmailVerificationFlow } from "@/components/auth/EmailVerificationFlow";
 import { MultiStepRegistration, type RegistrationFormData } from "@/components/auth/MultiStepRegistration";
+import { EmailWaitingPage } from "@/components/auth/EmailWaitingPage";
 
-type AuthMode = 'login' | 'forgot-password' | 'reset-password' | 'multi-step-register' | 'email-verification';
+type AuthMode = 'login' | 'forgot-password' | 'reset-password' | 'multi-step-register' | 'email-verification' | 'email-waiting';
 
 const AuthReal = () => {
   const [searchParams] = useSearchParams();
@@ -65,6 +66,11 @@ const AuthReal = () => {
   const [isLoading, setIsLoading] = useState(false);
   const [rememberMe, setRememberMe] = useState(false);
   const [trustDevice, setTrustDevice] = useState(false);
+
+  // State for email waiting page
+  const [waitingEmail, setWaitingEmail] = useState("");
+  const [waitingRole, setWaitingRole] = useState("");
+  const [waitingName, setWaitingName] = useState("");
 
   // User state for verification flow
   const [currentUser, setCurrentUser] = useState(enhancedAuth.getCurrentUser());
@@ -207,11 +213,12 @@ const AuthReal = () => {
       if (localResponse.requiresEmailConfirmation) {
         toast({
           title: "✅ Account Created!",
-          description: `We've sent a confirmation email to ${email}. Please confirm your email to sign in.`,
+          description: `We've sent a confirmation email to ${email}. Please check your inbox.`,
         });
-        setTimeout(() => {
-          setMode('login');
-        }, 2000);
+        setWaitingEmail(email.trim());
+        setWaitingRole(registrationRole);
+        setWaitingName(fullName.trim());
+        setMode('email-waiting');
         return;
       }
 
@@ -263,17 +270,18 @@ const AuthReal = () => {
       if (localResponse.requiresEmailConfirmation) {
         toast({
           title: "✅ Account Created!",
-          description: `We've sent a confirmation email to ${formData.email}. Please check your inbox and confirm your email to sign in.`,
+          description: `We've sent a confirmation email to ${formData.email}. Please check your inbox.`,
         });
 
         // Store role for after confirmation
         localStorage.setItem('pending_registration_role', formData.registrationRole);
         localStorage.setItem('current_user_role', formData.registrationRole);
 
-        // Redirect to login page after a short delay
-        setTimeout(() => {
-          navigate('/auth?mode=login');
-        }, 2000);
+        // Show the email waiting page instead of redirecting to login
+        setWaitingEmail(formData.email);
+        setWaitingRole(formData.registrationRole);
+        setWaitingName(formData.fullName);
+        setMode('email-waiting');
         return;
       }
 
@@ -441,6 +449,25 @@ const AuthReal = () => {
       </div>
     </motion.div>
   );
+
+  // Email waiting page mode — shown after signup when email confirmation is required
+  if (mode === 'email-waiting' && waitingEmail) {
+    return (
+      <EmailWaitingPage
+        email={waitingEmail}
+        registrationRole={waitingRole}
+        fullName={waitingName}
+        onUseAnotherAccount={() => {
+          enhancedAuth.logout();
+          setMode('login');
+          setCurrentUser(null);
+          setWaitingEmail('');
+          setWaitingRole('');
+          setWaitingName('');
+        }}
+      />
+    );
+  }
 
   // Multi-step registration mode
   if (mode === 'multi-step-register') {
