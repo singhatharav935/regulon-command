@@ -1,4 +1,5 @@
 import React, { useState, useEffect } from 'react';
+import { isCABackendConfigured } from '@/lib/ca-backend-guard';
 import { motion } from 'framer-motion';
 import { CalendarDays, BellRing, Clock, AlertTriangle, RefreshCw, Calendar } from 'lucide-react';
 import { Card, CardContent } from '@/components/ui/card';
@@ -27,6 +28,10 @@ export default function StatutoryDeadlineCalendar() {
   const [isLoading, setIsLoading] = useState(true);
 
   const fetchCalendar = async () => {
+    if (!isCABackendConfigured()) {
+      setIsLoading(false);
+      return;
+    }
     setIsLoading(true);
     try {
       const res = await fetch(`${CA_API}/api/v1/agent/deadlines`);
@@ -38,7 +43,7 @@ export default function StatutoryDeadlineCalendar() {
         setEscalations(data.escalations);
       }
     } catch (e) {
-      console.log('Backend not connected for calendar');
+      // Backend unavailable — silently use empty state
     } finally {
       setIsLoading(false);
     }

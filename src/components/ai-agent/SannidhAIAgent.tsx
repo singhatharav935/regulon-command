@@ -5,6 +5,7 @@
  */
 
 import { useState, useEffect, useRef, useCallback } from "react";
+import { isCABackendConfigured } from "@/lib/ca-backend-guard";
 import { motion, AnimatePresence } from "framer-motion";
 import {
   Card,
@@ -156,7 +157,7 @@ const SannidhAIAgent = () => {
               ca_id: "ca-001",
               responded_with_tts: true,
             }),
-          }).catch(err => console.error("Wake-word logging failed:", err));
+          }).catch(() => { /* Wake-word logging skipped — backend unavailable */ });
 
           // Extract command after "Hey Sannidh"
           const commandText = lowerTranscript
@@ -212,10 +213,11 @@ const SannidhAIAgent = () => {
 
   // Fetch Daily Brief from Backend
   const fetchDailyBrief = async () => {
+    // Skip network request when no CA backend is configured
+    if (!isCABackendConfigured()) return;
     try {
       const token = localStorage.getItem("token");
       if (!token) {
-        console.error("No auth token found");
         return;
       }
 
@@ -333,8 +335,7 @@ const SannidhAIAgent = () => {
       const briefText = `Good morning! I've analyzed your compliance calendar. You have ${allTasks.length} active tasks:\n\n${taskList}\n\nWould you like me to start working on any of these?`;
       setDailyBrief(briefText);
     } catch (error) {
-      console.error("Error fetching daily brief:", error);
-      toast.error("Failed to load daily brief from backend");
+      // Backend unavailable — silently use empty state
     }
   };
 

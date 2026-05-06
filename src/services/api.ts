@@ -53,7 +53,7 @@ const apiRequest = async (endpoint: string, options: RequestInit = {}) => {
 
     return await response.json();
   } catch (error) {
-    console.error(`API Request failed for ${endpoint}:`, error);
+    // Callers handle their own error state — no need to log here
     throw error;
   }
 };

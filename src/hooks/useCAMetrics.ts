@@ -5,6 +5,7 @@
 
 import { useState, useEffect, useCallback } from 'react';
 import { getCAMetrics } from '@/services/api';
+import { isCABackendConfigured } from '@/lib/ca-backend-guard';
 
 export interface CAMetrics {
   assigned_companies: number;
@@ -39,6 +40,13 @@ export const useCAMetrics = (): UseCAMetricsReturn => {
   const [error, setError] = useState<Error | null>(null);
 
   const fetchMetrics = useCallback(async () => {
+    // Skip network request entirely when no CA backend URL is configured
+    if (!isCABackendConfigured()) {
+      setMetrics(DEFAULT_METRICS);
+      setLoading(false);
+      return;
+    }
+
     try {
       setLoading(true);
       setError(null);
@@ -54,7 +62,6 @@ export const useCAMetrics = (): UseCAMetricsReturn => {
     } catch (err) {
       const error = err instanceof Error ? err : new Error('Failed to fetch metrics');
       setError(error);
-      console.error('Error fetching CA metrics:', error);
       
       // Use default metrics if API fails
       setMetrics(DEFAULT_METRICS);

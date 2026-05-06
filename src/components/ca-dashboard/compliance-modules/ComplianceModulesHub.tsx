@@ -5,6 +5,7 @@
  * No existing features modified.
  */
 import React, { useState, Suspense, lazy } from 'react';
+import { isCABackendConfigured } from '@/lib/ca-backend-guard';
 import { motion, AnimatePresence } from 'framer-motion';
 import {
   Calculator, FileText, Users, BarChart3, PieChart,
@@ -286,6 +287,11 @@ export default function ComplianceModulesHub({ demoClients }: { demoClients?: { 
       return;
     }
 
+    if (!isCABackendConfigured()) {
+      setLoading(false);
+      return;
+    }
+
     const fetchClients = async () => {
       try {
         const response = await fetch(`${CA_API}/api/v1/ca/clients/list`);
@@ -294,7 +300,7 @@ export default function ComplianceModulesHub({ demoClients }: { demoClients?: { 
           setClients(result.data);
         }
       } catch (error) {
-        console.error('Error fetching clients:', error);
+        // Backend unavailable — silently use empty state
       } finally {
         setLoading(false);
       }

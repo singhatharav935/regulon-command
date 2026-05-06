@@ -1,4 +1,5 @@
 import React, { useState, useEffect } from 'react';
+import { isCABackendConfigured } from '@/lib/ca-backend-guard';
 import { CASectionAgentBadge } from '../agents/CASectionAgentBadge';
 import { motion } from 'framer-motion';
 import {
@@ -88,7 +89,7 @@ export default function ClientDependencyTracker({
 
   // Fetch live data for real dashboard
   useEffect(() => {
-    if (!isRealDashboard) return;
+    if (!isRealDashboard || !isCABackendConfigured()) return;
 
     const fetchDependencies = async () => {
       try {
@@ -107,7 +108,7 @@ export default function ClientDependencyTracker({
           setLastSync(new Date());
         }
       } catch (error) {
-        console.error('Failed to fetch dependencies:', error);
+        // Backend unavailable — silently use local state
       } finally {
         setLoading(false);
         setIsAutoSyncing(false);

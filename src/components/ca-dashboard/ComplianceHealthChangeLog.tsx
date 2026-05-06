@@ -1,4 +1,5 @@
 import { useState, useEffect, useCallback } from 'react';
+import { isCABackendConfigured } from '@/lib/ca-backend-guard';
 import { CASectionAgentBadge } from '../agents/CASectionAgentBadge';
 import { motion, AnimatePresence } from 'framer-motion';
 import {
@@ -154,7 +155,7 @@ export default function ComplianceHealthChangeLog({
 
   // Fetch change logs from API (for real dashboard)
   const fetchChangeLogs = useCallback(async () => {
-    if (!isRealDashboard) return;
+    if (!isRealDashboard || !isCABackendConfigured()) return;
 
     setLoading(true);
     setAiAnalyzing(true);
@@ -168,7 +169,7 @@ export default function ComplianceHealthChangeLog({
         }
       }
     } catch (error) {
-      console.log('API fetch failed, using AI-generated data');
+      // Backend unavailable — silently use empty state
     } finally {
       setLoading(false);
       setLastSync(new Date());

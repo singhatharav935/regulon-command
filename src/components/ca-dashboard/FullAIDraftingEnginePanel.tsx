@@ -1,4 +1,5 @@
 import React, { useState, useEffect, useCallback } from 'react';
+import { isCABackendConfigured } from '@/lib/ca-backend-guard';
 import { motion, AnimatePresence } from 'framer-motion';
 import { 
   Bot, Cpu, Pause, Play, Sparkles, AlertTriangle, Activity, 
@@ -78,6 +79,10 @@ export const FullAIDraftingEnginePanel = () => {
 
   // Fetch Regulatory News
   const fetchRegulatoryNews = async () => {
+    if (!isCABackendConfigured()) {
+      setRegulatoryNews([]);
+      return;
+    }
     try {
       const response = await fetch(`${CA_API}/api/ai-engine/regulatory-news`);
       const data = await response.json();
@@ -86,13 +91,16 @@ export const FullAIDraftingEnginePanel = () => {
         addAgentLog('📰 Fetched latest regulatory news and circulars');
       }
     } catch (error) {
-      console.error('Failed to fetch regulatory news:', error);
       setRegulatoryNews([]);
     }
   };
 
   // Fetch Client Deadlines
   const fetchClientDeadlines = async () => {
+    if (!isCABackendConfigured()) {
+      setClientDeadlines([]);
+      return;
+    }
     try {
       const response = await fetch(`${CA_API}/api/ai-engine/client-deadlines`);
       const data = await response.json();
@@ -101,7 +109,6 @@ export const FullAIDraftingEnginePanel = () => {
         addAgentLog('📅 Scanned all client deadlines and compliance calendars');
       }
     } catch (error) {
-      console.error('Failed to fetch client deadlines:', error);
       setClientDeadlines([]);
     }
   };

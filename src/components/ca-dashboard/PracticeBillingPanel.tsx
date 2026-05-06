@@ -1,4 +1,5 @@
 import React, { useState, useEffect } from 'react';
+import { isCABackendConfigured } from '@/lib/ca-backend-guard';
 import { motion } from 'framer-motion';
 import {
   IndianRupee,
@@ -53,6 +54,12 @@ export default function PracticeBillingPanel() {
   const [loading, setLoading] = useState(true);
 
   const fetchBillingData = async () => {
+    if (!isCABackendConfigured()) {
+      setUnbilledTasks([]);
+      setStats(null);
+      setLoading(false);
+      return;
+    }
     setLoading(true);
     try {
       const [tasksRes, statsRes] = await Promise.all([

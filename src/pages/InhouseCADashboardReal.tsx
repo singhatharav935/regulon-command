@@ -1,4 +1,5 @@
 import { useState, useEffect, useRef, useCallback } from "react";
+import { isCABackendConfigured } from "@/lib/ca-backend-guard";
 import { useNavigate } from "react-router-dom";
 import { motion, AnimatePresence } from "framer-motion";
 import Navbar from "@/components/layout/Navbar";
@@ -86,6 +87,11 @@ const DailyGovernanceBrief = () => {
   const [lastRefresh, setLastRefresh] = useState(new Date());
 
   const fetchDailyBrief = async () => {
+    // Skip network request when no CA backend is configured
+    if (!isCABackendConfigured()) {
+      setLoading(false);
+      return;
+    }
     setLoading(true);
     try {
       const response = await fetch(`${CA_API}/api/ca/daily-governance`);
@@ -94,8 +100,7 @@ const DailyGovernanceBrief = () => {
       setLastRefresh(new Date());
       toast.success("AI analysis completed successfully");
     } catch (error) {
-      console.error('Error fetching daily brief:', error);
-      toast.error("Failed to fetch daily brief");
+      // Backend unavailable — silently use empty state
     } finally {
       setLoading(false);
     }
@@ -449,6 +454,11 @@ const LiveAIDraftingEngine = () => {
 
   // Fetch Regulatory News
   const fetchRegulatoryNews = async () => {
+    // Skip network request when no CA backend is configured
+    if (!isCABackendConfigured()) {
+      setRegulatoryNews([]);
+      return;
+    }
     try {
       const response = await fetch(`${CA_API}/api/ai-engine/regulatory-news`);
       const data = await response.json();
@@ -457,7 +467,6 @@ const LiveAIDraftingEngine = () => {
         addAgentLog('📰 Fetched latest regulatory news and circulars');
       }
     } catch (error) {
-      console.error('Failed to fetch regulatory news:', error);
       setRegulatoryNews([]);
       addAgentLog('⚠️ Unable to fetch regulatory news — backend unavailable');
     }
@@ -465,6 +474,11 @@ const LiveAIDraftingEngine = () => {
 
   // Fetch Client Deadlines
   const fetchClientDeadlines = async () => {
+    // Skip network request when no CA backend is configured
+    if (!isCABackendConfigured()) {
+      setClientDeadlines([]);
+      return;
+    }
     try {
       const response = await fetch(`${CA_API}/api/ai-engine/client-deadlines`);
       const data = await response.json();
@@ -473,7 +487,6 @@ const LiveAIDraftingEngine = () => {
         addAgentLog('📅 Scanned all client deadlines and compliance calendars');
       }
     } catch (error) {
-      console.error('Failed to fetch client deadlines:', error);
       setClientDeadlines([]);
       addAgentLog('⚠️ Unable to fetch client deadlines — backend unavailable');
     }
@@ -1296,6 +1309,8 @@ const InhouseCADashboardReal = () => {
 
   // Fetch CA's clients from compliance service
   const fetchClients = async () => {
+    // Skip network request when no CA backend is configured
+    if (!isCABackendConfigured()) return;
     try {
       const response = await fetch(`${COMPLIANCE_API}/ca/inhouse-ca-001/clients`);
       const data = await response.json();
@@ -1308,7 +1323,7 @@ const InhouseCADashboardReal = () => {
         })));
       }
     } catch (error) {
-      console.log('Compliance service not available, using local state');
+      // Backend unavailable — silently use local state
     }
   };
 

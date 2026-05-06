@@ -1,4 +1,5 @@
 import { useState, useEffect, useCallback } from 'react';
+import { isCABackendConfigured } from '@/lib/ca-backend-guard';
 import { CASectionAgentBadge } from '../agents/CASectionAgentBadge';
 import { motion, AnimatePresence } from 'framer-motion';
 import {
@@ -141,7 +142,7 @@ export default function CommunicationLogs({
 
   // Fetch logs from API
   const fetchLogs = useCallback(async () => {
-    if (!isRealDashboard) return;
+    if (!isRealDashboard || !isCABackendConfigured()) return;
 
     setLoading(true);
     setAiAnalyzing(true);
@@ -155,7 +156,7 @@ export default function CommunicationLogs({
         }
       }
     } catch (error) {
-      console.log('API fetch failed, using empty state');
+      // Backend unavailable — silently use empty state
     } finally {
       setLoading(false);
       setLastSync(new Date());

@@ -1,4 +1,5 @@
 import { useEffect, useMemo, useState } from "react";
+import { isCABackendConfigured } from "@/lib/ca-backend-guard";
 import { useNavigate, useSearchParams } from "react-router-dom";
 import Navbar from "@/components/layout/Navbar";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
@@ -76,6 +77,10 @@ const AgentWorkReview = () => {
 
   // Fetch real agent logs from production backend
   const loadAgentLogs = async () => {
+    if (!isCABackendConfigured()) {
+      setLoadingAgentLogs(false);
+      return;
+    }
     setLoadingAgentLogs(true);
     try {
       const CA_API = (import.meta.env.VITE_CA_API_BASE_URL as string) || 'http://localhost:3001';

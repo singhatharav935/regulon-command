@@ -1,4 +1,5 @@
 import React, { useState, useEffect, useRef } from 'react';
+import { isCABackendConfigured } from '@/lib/ca-backend-guard';
 import { motion } from 'framer-motion';
 import { Lock, Shield, Link2, Copy, FileText, Loader, RefreshCw, InboxIcon, Upload, AlertTriangle } from 'lucide-react';
 import { Card, CardContent } from '@/components/ui/card';
@@ -31,6 +32,11 @@ export default function SecureFileSharingPanel() {
   const fileInputRef = useRef<HTMLInputElement>(null);
 
   const fetchFiles = async () => {
+    if (!isCABackendConfigured()) {
+      setFiles([]);
+      setLoading(false);
+      return;
+    }
     setLoading(true);
     try {
       const res = await fetch(`${CA_API}/api/ca/vault/files`);
