@@ -58,6 +58,7 @@ const AdvancedSolutionsPage = lazy(() => import("./pages/AdvancedSolutionsPage")
 const AdvancedSecurityPage = lazy(() => import("./pages/AdvancedSecurityPage"));
 const AdvancedCustomersPage = lazy(() => import("./pages/AdvancedCustomersPage"));
 const AdvancedResourcesPage = lazy(() => import("./pages/AdvancedResourcesPage"));
+const ProfileSettings = lazy(() => import("./pages/ProfileSettings"));
 
 const queryClient = new QueryClient();
 
@@ -115,6 +116,7 @@ const App = () => (
             <Route path="/auth/reset-password" element={<ResetPassword />} />
             <Route path="/onboarding" element={<UserOnboardingFlow />} />
             <Route path="/settings/account" element={<AccountSettingsPage />} />
+            <Route path="/profile" element={<ProfileSettings />} />
             <Route path="/settings/agent-control-center" element={<AgentControlCenter />} />
             <Route path="/settings/company-agent-control-center" element={<CompanyAgentControlCenter />} />
             <Route path="/terms" element={<TermsOfService />} />

@@ -1,12 +1,22 @@
-import { useState } from "react";
+import { useState, useEffect } from "react";
 import { Link, useNavigate, useLocation } from "react-router-dom";
 import { motion, AnimatePresence } from "framer-motion";
-import { ChevronDown, Menu, X, Shield, Cpu, Building2, Users, Lock, LogIn, LogOut, Landmark, FileCheck, LayoutDashboard } from "lucide-react";
+import { ChevronDown, Menu, X, Shield, Cpu, Building2, Users, Lock, LogIn, LogOut, Landmark, FileCheck, LayoutDashboard, Settings } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { cn } from "@/lib/utils";
 import { useAuth } from "@/hooks/use-auth";
 import { getDashboardRoute } from "@/lib/dashboard-routes";
 import { supabase } from "@/integrations/supabase/client";
+import { Avatar, AvatarFallback, AvatarImage } from "@/components/ui/avatar";
+import {
+  DropdownMenu,
+  DropdownMenuContent,
+  DropdownMenuItem,
+  DropdownMenuLabel,
+  DropdownMenuSeparator,
+  DropdownMenuTrigger,
+} from "@/components/ui/dropdown-menu";
+import { useUserProfile } from "@/store/useUserProfile";
 
 type NavDropdownItem = {
   title: string;
@@ -45,6 +55,7 @@ const Navbar = () => {
   const navigate = useNavigate();
   const location = useLocation();
   const { user, persona, loading } = useAuth();
+  const { displayName, avatarUrl } = useUserProfile();
   const [mobileOpen, setMobileOpen] = useState(false);
   const [activeDropdown, setActiveDropdown] = useState<string | null>(null);
 
@@ -73,6 +84,14 @@ const Navbar = () => {
   const handleDropdownLeave = () => {
     setActiveDropdown(null);
   };
+
+  // Compute avatar initials
+  const userName = displayName || user?.user_metadata?.full_name || user?.email?.split("@")[0] || "U";
+  const initials = userName
+    .split(/[\s@]+/)
+    .map((s: string) => s[0]?.toUpperCase())
+    .slice(0, 2)
+    .join("");
 
   const renderDropdown = (items: NavDropdownItem[], heading: string, subheading: string, columns: "one" | "two" = "two") => (
     <div className="space-y-2">
@@ -209,15 +228,94 @@ const Navbar = () => {
           {/* Desktop Actions — auth-aware */}
           <div className="hidden lg:flex items-center gap-3">
             {isLoggedIn && isOnDashboard ? (
-              <Button variant="ghost" size="sm" onClick={handleLogout}>
-                <LogOut className="w-4 h-4 mr-2" />
-                Logout
-              </Button>
+              /* ── Avatar Dropdown (on dashboard pages) ── */
+              <DropdownMenu>
+                <DropdownMenuTrigger asChild>
+                  <button className="relative flex items-center gap-2.5 rounded-full border border-border/50 bg-card/50 hover:bg-card/80 pl-3 pr-1.5 py-1 transition-all cursor-pointer outline-none focus:ring-2 focus:ring-cyan-500/30">
+                    <span className="text-sm font-medium text-foreground/80 hidden xl:block max-w-[120px] truncate">
+                      {userName}
+                    </span>
+                    <Avatar className="w-8 h-8 border border-border/50">
+                      <AvatarImage src={avatarUrl || undefined} alt={userName} />
+                      <AvatarFallback className="text-xs font-bold bg-gradient-to-br from-cyan-500/30 to-blue-600/30 text-cyan-300">
+                        {initials}
+                      </AvatarFallback>
+                    </Avatar>
+                  </button>
+                </DropdownMenuTrigger>
+                <DropdownMenuContent
+                  align="end"
+                  className="w-56 bg-card border-border/50 backdrop-blur-xl shadow-2xl"
+                  sideOffset={8}
+                >
+                  <DropdownMenuLabel className="px-3 py-2">
+                    <p className="text-sm font-semibold text-foreground truncate">{userName}</p>
+                    <p className="text-xs text-muted-foreground truncate">{user?.email}</p>
+                  </DropdownMenuLabel>
+                  <DropdownMenuSeparator className="bg-border/30" />
+                  <DropdownMenuItem
+                    className="cursor-pointer px-3 py-2 hover:bg-accent/50"
+                    onClick={() => navigate("/profile")}
+                  >
+                    <Settings className="w-4 h-4 mr-2 text-muted-foreground" />
+                    Profile & Settings
+                  </DropdownMenuItem>
+                  <DropdownMenuSeparator className="bg-border/30" />
+                  <DropdownMenuItem
+                    className="cursor-pointer px-3 py-2 text-red-400 hover:text-red-300 hover:bg-red-500/10 focus:text-red-300 focus:bg-red-500/10"
+                    onClick={handleLogout}
+                  >
+                    <LogOut className="w-4 h-4 mr-2" />
+                    Logout
+                  </DropdownMenuItem>
+                </DropdownMenuContent>
+              </DropdownMenu>
             ) : isLoggedIn ? (
-              <Button size="sm" className="btn-glow" onClick={() => navigate(dashboardPath)}>
-                <LayoutDashboard className="w-4 h-4 mr-2" />
-                Return to Dashboard
-              </Button>
+              <div className="flex items-center gap-2">
+                <Button size="sm" className="btn-glow" onClick={() => navigate(dashboardPath)}>
+                  <LayoutDashboard className="w-4 h-4 mr-2" />
+                  Return to Dashboard
+                </Button>
+                {/* Small avatar for non-dashboard pages */}
+                <DropdownMenu>
+                  <DropdownMenuTrigger asChild>
+                    <button className="rounded-full outline-none focus:ring-2 focus:ring-cyan-500/30 cursor-pointer">
+                      <Avatar className="w-8 h-8 border border-border/50 hover:border-cyan-500/50 transition-colors">
+                        <AvatarImage src={avatarUrl || undefined} alt={userName} />
+                        <AvatarFallback className="text-xs font-bold bg-gradient-to-br from-cyan-500/30 to-blue-600/30 text-cyan-300">
+                          {initials}
+                        </AvatarFallback>
+                      </Avatar>
+                    </button>
+                  </DropdownMenuTrigger>
+                  <DropdownMenuContent
+                    align="end"
+                    className="w-56 bg-card border-border/50 backdrop-blur-xl shadow-2xl"
+                    sideOffset={8}
+                  >
+                    <DropdownMenuLabel className="px-3 py-2">
+                      <p className="text-sm font-semibold text-foreground truncate">{userName}</p>
+                      <p className="text-xs text-muted-foreground truncate">{user?.email}</p>
+                    </DropdownMenuLabel>
+                    <DropdownMenuSeparator className="bg-border/30" />
+                    <DropdownMenuItem
+                      className="cursor-pointer px-3 py-2 hover:bg-accent/50"
+                      onClick={() => navigate("/profile")}
+                    >
+                      <Settings className="w-4 h-4 mr-2 text-muted-foreground" />
+                      Profile & Settings
+                    </DropdownMenuItem>
+                    <DropdownMenuSeparator className="bg-border/30" />
+                    <DropdownMenuItem
+                      className="cursor-pointer px-3 py-2 text-red-400 hover:text-red-300 hover:bg-red-500/10 focus:text-red-300 focus:bg-red-500/10"
+                      onClick={handleLogout}
+                    >
+                      <LogOut className="w-4 h-4 mr-2" />
+                      Logout
+                    </DropdownMenuItem>
+                  </DropdownMenuContent>
+                </DropdownMenu>
+              </div>
             ) : (
               <>
                 <Button variant="ghost" size="sm" onClick={() => navigate("/auth?mode=login&role=company_owner")}>
@@ -291,16 +389,44 @@ const Navbar = () => {
                 ))}
               </div>
               <div className="pt-4 space-y-3 border-t border-border/50">
-                {isLoggedIn && isOnDashboard ? (
-                  <Button variant="outline" className="w-full" onClick={() => { handleLogout(); setMobileOpen(false); }}>
-                    <LogOut className="w-4 h-4 mr-2" />
-                    Logout
-                  </Button>
-                ) : isLoggedIn ? (
-                  <Button className="w-full" onClick={() => { navigate(dashboardPath); setMobileOpen(false); }}>
-                    <LayoutDashboard className="w-4 h-4 mr-2" />
-                    Return to Dashboard
-                  </Button>
+                {isLoggedIn ? (
+                  <>
+                    {/* Mobile user info */}
+                    <div className="flex items-center gap-3 px-3 py-2">
+                      <Avatar className="w-10 h-10 border border-border/50">
+                        <AvatarImage src={avatarUrl || undefined} alt={userName} />
+                        <AvatarFallback className="text-sm font-bold bg-gradient-to-br from-cyan-500/30 to-blue-600/30 text-cyan-300">
+                          {initials}
+                        </AvatarFallback>
+                      </Avatar>
+                      <div className="flex-1 min-w-0">
+                        <p className="text-sm font-medium text-foreground truncate">{userName}</p>
+                        <p className="text-xs text-muted-foreground truncate">{user?.email}</p>
+                      </div>
+                    </div>
+                    <Button
+                      variant="outline"
+                      className="w-full"
+                      onClick={() => { navigate("/profile"); setMobileOpen(false); }}
+                    >
+                      <Settings className="w-4 h-4 mr-2" />
+                      Profile & Settings
+                    </Button>
+                    {isOnDashboard ? null : (
+                      <Button className="w-full" onClick={() => { navigate(dashboardPath); setMobileOpen(false); }}>
+                        <LayoutDashboard className="w-4 h-4 mr-2" />
+                        Return to Dashboard
+                      </Button>
+                    )}
+                    <Button
+                      variant="outline"
+                      className="w-full text-red-400 border-red-500/30 hover:bg-red-500/10"
+                      onClick={() => { handleLogout(); setMobileOpen(false); }}
+                    >
+                      <LogOut className="w-4 h-4 mr-2" />
+                      Logout
+                    </Button>
+                  </>
                 ) : (
                   <>
                     <Button variant="outline" className="w-full" onClick={() => { navigate("/auth?mode=login&role=company_owner"); setMobileOpen(false); }}>
