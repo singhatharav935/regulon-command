@@ -1,7 +1,7 @@
 /**
  * Profile & Settings Page
  * Premium dark-mode design matching the CA Dashboard aesthetic.
- * Three sections: CA Details, Subscription & Billing, Danger Zone.
+ * Sections: CA Details, Subscription & Billing, and a Logout action.
  */
 import { useState, useRef, useEffect } from "react";
 import { useNavigate } from "react-router-dom";
@@ -21,7 +21,6 @@ import {
   LogOut,
   Camera,
   Shield,
-  AlertTriangle,
   Sparkles,
   Lock,
   ArrowLeft,
@@ -49,20 +48,43 @@ const ProfileSettings = () => {
 
   const fileInputRef = useRef<HTMLInputElement>(null);
   const [uploading, setUploading] = useState(false);
+  const [dbLoaded, setDbLoaded] = useState(false);
 
   // Local editable state
   const [localName, setLocalName] = useState(displayName || "");
   const [localFirm, setLocalFirm] = useState(firmName || "");
   const [localIcai, setLocalIcai] = useState(icaiNumber || "");
 
+  // ── Fetch full_name and other metadata from Supabase user_metadata ──
   useEffect(() => {
-    if (!localName && user?.user_metadata?.full_name) {
-      setLocalName(user.user_metadata.full_name);
+    if (dbLoaded) return;
+
+    const meta = user?.user_metadata;
+    if (meta) {
+      // full_name is set during signup
+      if (!localName && meta.full_name) {
+        setLocalName(meta.full_name);
+        setDisplayName(meta.full_name);
+      }
+      // entity name → firm name
+      if (!localFirm && meta.verification_entity_name) {
+        setLocalFirm(meta.verification_entity_name);
+        setFirmName(meta.verification_entity_name);
+      }
+      // ICAI number if stored
+      if (!localIcai && meta.icai_membership_number) {
+        setLocalIcai(meta.icai_membership_number);
+        setIcaiNumber(meta.icai_membership_number);
+      }
+      setDbLoaded(true);
     }
-    if (!localName && user?.email) {
-      setLocalName(user.email.split("@")[0]);
+
+    // Fallback: use email prefix as name
+    if (!localName && !meta?.full_name && user?.email) {
+      const fallbackName = user.email.split("@")[0];
+      setLocalName(fallbackName);
     }
-  }, [user]);
+  }, [user, dbLoaded]);
 
   const userEmail = user?.email || "user@sannidh.in";
   const initials = (localName || userEmail)
@@ -109,10 +131,24 @@ const ProfileSettings = () => {
     if (fileInputRef.current) fileInputRef.current.value = "";
   };
 
-  const handleSaveDetails = () => {
+  const handleSaveDetails = async () => {
     setDisplayName(localName);
     setFirmName(localFirm);
     setIcaiNumber(localIcai);
+
+    // Also persist full_name back to Supabase user_metadata
+    try {
+      await supabase.auth.updateUser({
+        data: {
+          full_name: localName,
+          verification_entity_name: localFirm,
+          icai_membership_number: localIcai,
+        },
+      });
+    } catch {
+      // Local save still succeeded
+    }
+
     toast.success("Profile details saved!");
   };
 
@@ -330,42 +366,20 @@ const ProfileSettings = () => {
             </Card>
           </motion.div>
 
-          {/* ─── Section 3: Danger Zone ─────────────────────────── */}
+          {/* ─── Logout Button ─────────────────────────────────── */}
           <motion.div
             initial={{ opacity: 0, y: 20 }}
             animate={{ opacity: 1, y: 0 }}
             transition={{ delay: 0.3 }}
           >
-            <Card className="bg-card/50 border-red-500/30 backdrop-blur-sm">
-              <CardHeader className="pb-4">
-                <CardTitle className="text-lg flex items-center gap-2 text-red-400">
-                  <div className="p-2 rounded-lg bg-red-500/10">
-                    <AlertTriangle className="w-5 h-5 text-red-400" />
-                  </div>
-                  Danger Zone
-                </CardTitle>
-              </CardHeader>
-              <CardContent>
-                <div className="flex items-center justify-between p-4 rounded-xl bg-red-500/5 border border-red-500/20">
-                  <div>
-                    <p className="text-sm font-medium text-foreground">
-                      Sign out of your account
-                    </p>
-                    <p className="text-xs text-muted-foreground mt-0.5">
-                      You will be redirected to the landing page.
-                    </p>
-                  </div>
-                  <Button
-                    variant="destructive"
-                    onClick={handleLogout}
-                    className="bg-red-600 hover:bg-red-700"
-                  >
-                    <LogOut className="w-4 h-4 mr-2" />
-                    Logout
-                  </Button>
-                </div>
-              </CardContent>
-            </Card>
+            <Button
+              variant="outline"
+              onClick={handleLogout}
+              className="w-full h-12 text-base border-red-500/30 text-red-400 hover:bg-red-500/10 hover:text-red-300 hover:border-red-500/50 transition-all"
+            >
+              <LogOut className="w-4 h-4 mr-2" />
+              Sign Out
+            </Button>
           </motion.div>
         </div>
       </main>

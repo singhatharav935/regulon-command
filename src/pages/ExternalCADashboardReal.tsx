@@ -1316,6 +1316,7 @@ const ExternalCADashboardReal = () => {
 
   // Fetch CA's clients from compliance service
   const fetchClients = async () => {
+    if (!isCABackendConfigured()) return;
     try {
       const response = await fetch(`${COMPLIANCE_API}/ca/ca-001/clients`);
       const data = await response.json();
@@ -1327,8 +1328,8 @@ const ExternalCADashboardReal = () => {
           lastFiling: c.last_sync ? new Date(c.last_sync).toLocaleDateString() : 'Pending'
         })));
       }
-    } catch (error) {
-      console.log('Compliance service not available, using local state');
+    } catch {
+      // Compliance service unavailable — silently use local state
     }
   };
 
