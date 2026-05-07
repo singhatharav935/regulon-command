@@ -1,7 +1,7 @@
 import { createPortal } from "react-dom";
 import { motion, AnimatePresence } from "framer-motion";
 import { useEffect, useState } from "react";
-import { Building2, AlertTriangle, Clock, CheckCircle2, Plus, X, ChevronRight, Input as LucideInput, Shield, Send, Loader } from "lucide-react";
+import { Building2, Clock, Plus, X, ChevronRight, Shield, Send, Loader } from "lucide-react";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
@@ -14,6 +14,7 @@ import {
   TableHeader,
   TableRow,
 } from "@/components/ui/table";
+import { addCAClient, loadCAClients, type CAClient, type CAClientForm } from "@/services/ca-supabase-service";
 
 const riskColors: Record<string, string> = {
   Low: "bg-green-500/20 text-green-400 border-green-500/30",
@@ -39,12 +40,11 @@ const ClientPortfolioSection = ({
   apiEndpoint, 
   governmentApiEnabled = false 
 }: ClientPortfolioSectionProps) => {
-  const [clients, setClients] = useState<any[]>([]);
+  const [clients, setClients] = useState<CAClient[]>([]);
   const [isLoading, setIsLoading] = useState(false);
   const [showOnboardModal, setShowOnboardModal] = useState(false);
   const [isOnboarding, setIsOnboarding] = useState(false);
-  const [backendOnline, setBackendOnline] = useState<boolean | null>(null);
-  const [onboardForm, setOnboardForm] = useState({
+  const [onboardForm, setOnboardForm] = useState<CAClientForm>({
     gstin: '',
     pan: '',
     cin: '',
@@ -53,15 +53,7 @@ const ClientPortfolioSection = ({
     client_phone: ''
   });
 
-  // Queue a consent request in localStorage when backend is offline
-  const queueRequestLocally = (form: typeof onboardForm) => {
-    const existing = JSON.parse(localStorage.getItem('sannidh_pending_onboards') || '[]');
-    const entry = { ...form, queued_at: new Date().toISOString(), status: 'pending' };
-    localStorage.setItem('sannidh_pending_onboards', JSON.stringify([...existing, entry]));
-  };
-
   const handleOnboardClient = async () => {
-    // Basic validation
     if (!onboardForm.gstin && !onboardForm.pan && !onboardForm.cin) {
       toast.error("Identifier Required", { description: "Please enter at least one of: GSTIN, PAN, or CIN." });
       return;
@@ -72,76 +64,30 @@ const ClientPortfolioSection = ({
     }
 
     setIsOnboarding(true);
-    try {
-      const controller = new AbortController();
-      const timeout = setTimeout(() => controller.abort(), 6000); // 6 s timeout
+    const result = await addCAClient(onboardForm);
+    setIsOnboarding(false);
 
-      const response = await fetch('http://localhost:3001/api/v1/ca/client/onboard-communication', {
-        method: 'POST',
-        headers: {
-          'Content-Type': 'application/json',
-          'Authorization': `Bearer ${localStorage.getItem('auth_token') || 'test-token'}`
-        },
-        body: JSON.stringify(onboardForm),
-        signal: controller.signal
-      });
-      clearTimeout(timeout);
-
-      const data = await response.json();
-
-      if (response.ok) {
-        setBackendOnline(true);
-        toast.success("Consent Request Sent", {
-          description: `Link sent via WhatsApp & Email to ${onboardForm.client_name}. Awaiting client authorization.`
-        });
-        if (isRealDashboard && apiEndpoint) loadRealClientData();
-        setShowOnboardModal(false);
-        setOnboardForm({ gstin: '', pan: '', cin: '', client_name: '', client_email: '', client_phone: '' });
-      } else {
-        toast.error("Request Failed", { description: data.error || "Server returned an error. Please try again." });
-      }
-    } catch {
-      // Backend is unreachable — save locally and inform the CA
-      setBackendOnline(false);
-      queueRequestLocally(onboardForm);
-      toast.success("Request Queued Locally", {
-        description: `Backend is currently offline. The consent request for "${onboardForm.client_name}" has been saved and will be sent automatically once the server reconnects.`,
-        duration: 6000
+    if (result.success && result.client) {
+      setClients(prev => [result.client!, ...prev]);
+      toast.success("Client Added Successfully", {
+        description: `${onboardForm.client_name} has been added to your portfolio and saved to the database.`
       });
       setShowOnboardModal(false);
       setOnboardForm({ gstin: '', pan: '', cin: '', client_name: '', client_email: '', client_phone: '' });
-    } finally {
-      setIsOnboarding(false);
+    } else {
+      toast.error("Failed to Add Client", { description: result.error || "Please try again." });
     }
   };
 
   useEffect(() => {
-    if (isRealDashboard && apiEndpoint) {
-      loadRealClientData();
-    }
-  }, [isRealDashboard, apiEndpoint]);
-
-  const loadRealClientData = async () => {
-    setIsLoading(true);
-    try {
-      const response = await fetch(apiEndpoint!);
-      if (response.ok) {
-        const result = await response.json();
-        const data = result.data || result; // Handle wrapped response
-        if (data.clients || Array.isArray(data)) {
-          setClients(data.clients || data);
-        } else {
-          setClients([]);
-        }
-      } else {
-        setClients([]);
-      }
-    } catch (error) {
-      setClients([]);
-    } finally {
+    const fetchClients = async () => {
+      setIsLoading(true);
+      const data = await loadCAClients();
+      setClients(data);
       setIsLoading(false);
-    }
-  };
+    };
+    fetchClients();
+  }, []);
   return (
     <motion.div
       initial={{ opacity: 0, y: 20 }}

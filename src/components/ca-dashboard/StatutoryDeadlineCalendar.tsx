@@ -28,30 +28,38 @@ export default function StatutoryDeadlineCalendar() {
   const [isLoading, setIsLoading] = useState(true);
 
   const fetchCalendar = async () => {
-    if (!isCABackendConfigured()) {
-      setIsLoading(false);
-      return;
-    }
     setIsLoading(true);
     try {
-      const res = await fetch(`${CA_API}/api/v1/agent/deadlines`);
-      const data = await res.json();
-      if (data.deadlines) {
-        setDeadlines(data.deadlines);
-      }
-      if (data.escalations) {
-        setEscalations(data.escalations);
-      }
-    } catch (e) {
-      // Backend unavailable — silently use empty state
+      const { getStatutoryDeadlines, loadCAClients } = await import('@/services/ca-supabase-service');
+      const [rawDeadlines, clients] = await Promise.all([Promise.resolve(getStatutoryDeadlines()), loadCAClients()]);
+
+      // Map to RealDeadline shape
+      const mapped: RealDeadline[] = rawDeadlines.map(d => ({
+        id: d.id,
+        date: d.deadline.split(' ').slice(0, 2).join(' '), // e.g. "20 Jun"
+        label: `${d.type} — ${d.regulator}`,
+        active: d.daysRemaining <= 10,
+        urgency: d.status === 'overdue' ? 'critical' : d.status === 'urgent' ? 'high' : 'normal',
+      }));
+      setDeadlines(mapped);
+
+      // Generate escalations from overdue clients
+      const overdue = clients.filter(c => c.risk === 'High');
+      const escList: ExternalEscalation[] = overdue.slice(0, 3).map((c, i) => ({
+        id: `esc-${i}`,
+        title: `${c.name} — Compliance Gap Detected`,
+        summary: `${c.gaps} pending filings. Health score: ${c.health}%. Immediate action required.`,
+        type: c.health < 60 ? 'funds' : 'warning',
+      }));
+      setEscalations(escList);
+    } catch {
+      // Silently fail — calendar remains empty
     } finally {
       setIsLoading(false);
     }
   };
 
-  useEffect(() => {
-    fetchCalendar();
-  }, []);
+  useEffect(() => { fetchCalendar(); }, []);
 
   return (
     <motion.div initial={{ opacity: 0, y: 20 }} animate={{ opacity: 1, y: 0 }} className="space-y-6 mb-12 max-w-[1400px]">

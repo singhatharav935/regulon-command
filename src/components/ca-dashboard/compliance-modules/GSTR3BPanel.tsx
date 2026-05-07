@@ -8,8 +8,7 @@ import { Input } from '@/components/ui/input';
 import { Badge } from '@/components/ui/badge';
 import { toast } from 'sonner';
 
-const CA_API = (import.meta.env.VITE_CA_API_BASE_URL as string) || 'http://localhost:3001';
-const API_BASE = `${CA_API}/api/v1/compliance`;
+// Backend API removed — calculations are performed client-side
 
 export default function GSTR3BPanel({ clientId, isDemo }: { clientId?: string; isDemo?: boolean }) {
   const [loading, setLoading] = useState(false);
@@ -19,42 +18,27 @@ export default function GSTR3BPanel({ clientId, isDemo }: { clientId?: string; i
   const handleCalc = async () => {
     if (!clientId) { toast.error('Select a client first'); return; }
     setLoading(true);
+    // All computation is client-side — no backend dependency
+    setTimeout(() => {
+      const out = parseFloat(form.outward_cgst || '0') + parseFloat(form.outward_sgst || '0') + parseFloat(form.outward_igst || '0');
+      const itc = parseFloat(form.itc_cgst || '0') + parseFloat(form.itc_sgst || '0') + parseFloat(form.itc_igst || '0');
+      const rcm = parseFloat(form.rcm_liability || '0');
+      const net = Math.max(0, out + rcm - itc);
 
-    if (isDemo) {
-      setTimeout(() => {
-        const out = parseFloat(form.outward_cgst || '0') + parseFloat(form.outward_sgst || '0') + parseFloat(form.outward_igst || '0');
-        const itc = parseFloat(form.itc_cgst || '0') + parseFloat(form.itc_sgst || '0') + parseFloat(form.itc_igst || '0');
-        const rcm = parseFloat(form.rcm_liability || '0');
-        const net = Math.max(0, out + rcm - itc);
-
-        setResult({
-          summary: 'GSTR-3B Final computation ready. System suggests cash payment of ' + net.toLocaleString(),
-          due_date: '20th of Next Month',
-          payment_mode: 'Online/Challan',
-          computation: {
-            outward_tax: { total: out },
-            itc_available: { total: itc },
-            net_tax_payable: { total: net }
-          },
-          alerts: itc > out * 0.8 ? [{ type: 'warning', message: 'ITC utilized is > 80% of liability. Ensure Rule 86B compliance.' }] : []
-        });
-        toast.success('GSTR-3B calculated (Demo Mode)');
-        setLoading(false);
-      }, 600);
-      return;
-    }
-
-    try {
-      const response = await fetch(`${API_BASE}/gstr3b/calculate`, {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ client_id: clientId, period_month: form.period_month, period_year: form.period_year, outward: { cgst: parseFloat(form.outward_cgst || '0'), sgst: parseFloat(form.outward_sgst || '0'), igst: parseFloat(form.outward_igst || '0') }, inward_itc: { cgst: parseFloat(form.itc_cgst || '0'), sgst: parseFloat(form.itc_sgst || '0'), igst: parseFloat(form.itc_igst || '0') }, rcm_liability: parseFloat(form.rcm_liability || '0') }),
+      setResult({
+        summary: `GSTR-3B computation complete. Net tax payable: ₹${net.toLocaleString()}`,
+        due_date: '20th of Next Month',
+        payment_mode: 'Online/Challan',
+        computation: {
+          outward_tax: { total: out },
+          itc_available: { total: itc },
+          net_tax_payable: { total: net }
+        },
+        alerts: itc > out * 0.8 ? [{ type: 'warning', message: 'ITC utilized is >80% of liability. Ensure Rule 86B compliance.' }] : []
       });
-      const data = await response.json();
-      if (data.success) { setResult(data.data); toast.success('GSTR-3B calculated'); }
-      else toast.error(data.error || 'Calculation failed');
-    } catch { toast.error('Backend connection error'); }
-    finally { setLoading(false); }
+      toast.success('GSTR-3B calculated successfully');
+      setLoading(false);
+    }, 600);
   };
 
   const [exporting, setExporting] = useState(false);

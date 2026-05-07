@@ -8,7 +8,7 @@
  * Updated to use the new Swarm Consensus API.
  */
 
-import { useMemo } from 'react';
+import { useMemo, useEffect, useState } from 'react';
 import { motion } from 'framer-motion';
 import { Button } from '@/components/ui/button';
 import { Badge } from '@/components/ui/badge';
@@ -17,6 +17,7 @@ import {
   Activity, Clock, AlertOctagon, Bot, Wifi, Building, Users, Briefcase
 } from 'lucide-react';
 import { useCAAgentOrchestrator, type CAAgentStatus } from './CAAgentOrchestrator';
+import { loadFirmBranding, type FirmBranding } from '@/components/ca-dashboard/FirmBrandingSettings';
 
 interface CACommandCenterHeaderProps {
   title?: string;
@@ -25,6 +26,14 @@ interface CACommandCenterHeaderProps {
 
 export const CACommandCenterHeader = ({ title, subtitle }: CACommandCenterHeaderProps) => {
   const { agents, messages, isRunning, systemStatus, startAllAgents, pauseAllAgents, emergencyStop } = useCAAgentOrchestrator();
+
+  // White-Label Branding — live update when CA saves settings
+  const [branding, setBranding] = useState<FirmBranding>(loadFirmBranding);
+  useEffect(() => {
+    const handler = (e: Event) => setBranding((e as CustomEvent).detail);
+    window.addEventListener('sannidh:branding-updated', handler);
+    return () => window.removeEventListener('sannidh:branding-updated', handler);
+  }, []);
 
   const activeAgentCount = agents.filter(a => 
     a.status === 'active' || a.status === 'working' || a.status === 'analyzing'
@@ -101,6 +110,24 @@ export const CACommandCenterHeader = ({ title, subtitle }: CACommandCenterHeader
           </div>
 
           <div>
+            {/* Firm Branding — shown when configured */}
+            {branding.firmName && (
+              <div className="flex items-center gap-2 mb-1.5">
+                {branding.logoDataUrl ? (
+                  <img src={branding.logoDataUrl} alt="Firm Logo" className="h-5 w-5 object-contain rounded" />
+                ) : (
+                  <div
+                    className="w-5 h-5 rounded flex items-center justify-center text-white text-[9px] font-bold"
+                    style={{ background: branding.primaryColor }}
+                  >
+                    {branding.firmName.charAt(0).toUpperCase()}
+                  </div>
+                )}
+                <span className="text-xs font-semibold" style={{ color: branding.primaryColor }}>
+                  {branding.firmName}
+                </span>
+              </div>
+            )}
             <h1 className="text-xl font-bold text-foreground tracking-tight">{title || 'CA Practice Command Center'}</h1>
             <p className="text-xs text-muted-foreground flex items-center gap-1.5 mt-0.5">
               <Briefcase className="w-3 h-3 text-cyan-400" />
