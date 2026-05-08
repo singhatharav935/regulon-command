@@ -1,198 +1,229 @@
-import { useState, useEffect } from 'react';
+import { useState, useEffect, useMemo } from 'react';
 import { usePersonaAuth } from '@/lib/persona-auth-context';
 import { useNavigate } from 'react-router-dom';
 import { motion, AnimatePresence } from 'framer-motion';
-import { Button } from '@/components/ui/button';
-import {
-  Activity, Users, FileText, ShieldCheck, FolderLock,
-  Building2, Menu, X, LogOut, ChevronDown
-} from 'lucide-react';
 import { supabase } from '@/integrations/supabase/client';
+import {
+  LayoutDashboard, Users, Building2, Receipt, ShieldCheck,
+  FileArchive, LogOut, Bell, Settings, ChevronRight, Menu, X,
+  TrendingUp, AlertTriangle, Clock, IndianRupee, Zap
+} from 'lucide-react';
+import { useFirmMembers, useFirmClients, useFirmInvoices } from '@/hooks/personas/useCAFirmData';
+import { getStatutoryDeadlines } from '@/services/ca-supabase-service';
 
-// Firm Dashboard Modules
-import FirmOverviewPulse from '@/components/ca-firm-dashboard/FirmOverviewPulse';
+// Lazy-load heavy modules
+import FirmPulseHome from '@/components/ca-firm-dashboard/FirmPulseHome';
+import FirmClientManagement from '@/components/ca-firm-dashboard/FirmClientManagement';
 import TeamResourceAllocation from '@/components/ca-firm-dashboard/TeamResourceAllocation';
 import PracticeBillingWIP from '@/components/ca-firm-dashboard/PracticeBillingWIP';
 import ICAIQualityControl from '@/components/ca-firm-dashboard/ICAIQualityControl';
 import FirmDocumentVault from '@/components/ca-firm-dashboard/FirmDocumentVault';
-import FirmClientManagement from '@/components/ca-firm-dashboard/FirmClientManagement';
 
-const menuItems = [
-  { id: 'pulse', label: 'Firm Overview', icon: Activity },
-  { id: 'clients', label: 'Client Management', icon: Building2 },
-  { id: 'team', label: 'Resource Allocation', icon: Users },
-  { id: 'billing', label: 'WIP & Billing', icon: FileText },
-  { id: 'quality', label: 'ICAI / SQC-1', icon: ShieldCheck },
-  { id: 'vault', label: 'Document Vault', icon: FolderLock },
+function getStableFirmId(email: string): string {
+  const key = `sfid_${email}`;
+  const cached = localStorage.getItem(key);
+  if (cached) return cached;
+  let h = 0x811c9dc5;
+  for (let i = 0; i < email.length; i++) { h ^= email.charCodeAt(i); h = (h * 0x01000193) >>> 0; }
+  const hex = h.toString(16).padStart(8, '0');
+  const pre = email.split('@')[0].replace(/[^a-z0-9]/gi, '').slice(0, 8).padEnd(8, '0').toLowerCase();
+  const id = `${pre.slice(0,4)}-${pre.slice(4,8)}-${hex.slice(0,4)}-${hex.slice(4,8)}-${hex}${hex}`;
+  localStorage.setItem(key, id);
+  return id;
+}
+
+const NAV = [
+  { id: 'home',     label: 'Dashboard',         icon: LayoutDashboard },
+  { id: 'clients',  label: 'Client Management',  icon: Building2 },
+  { id: 'team',     label: 'Team & Allocation',  icon: Users },
+  { id: 'billing',  label: 'Billing & WIP',      icon: Receipt },
+  { id: 'quality',  label: 'ICAI / SQC-1',       icon: ShieldCheck },
+  { id: 'vault',    label: 'Document Vault',      icon: FileArchive },
 ];
 
 export function CAFirmDashboardReal() {
   const { currentUser, logout } = usePersonaAuth();
   const navigate = useNavigate();
-  const [activeTab, setActiveTab] = useState('pulse');
-  const [isMobileMenuOpen, setIsMobileMenuOpen] = useState(false);
-  const [supabaseUserId, setSupabaseUserId] = useState<string | null>(null);
+  const [tab, setTab] = useState('home');
+  const [sidebarOpen, setSidebarOpen] = useState(true);
+  const [supabaseUid, setSupabaseUid] = useState<string | null>(null);
 
-  // Resolve actual Supabase user ID
   useEffect(() => {
     supabase.auth.getUser().then(({ data }) => {
-      if (data?.user?.id) {
-        setSupabaseUserId(data.user.id);
-      }
+      if (data?.user?.id) setSupabaseUid(data.user.id);
     });
   }, []);
 
-  // firmId: prefer real Supabase user ID, fall back to persona session ID
-  const firmId = supabaseUserId || currentUser?.id || currentUser?.companyId || '';
+  const email = currentUser?.email || '';
+  const firmId = supabaseUid || (email ? getStableFirmId(email) : '');
+  const firmName = currentUser?.companyName || 'My CA Firm';
 
-  const handleLogout = () => {
-    logout();
-    navigate('/');
+  const { data: members } = useFirmMembers(firmId);
+  const { data: clients } = useFirmClients(firmId);
+  const { data: invoices } = useFirmInvoices(firmId);
+  const deadlines = useMemo(() => getStatutoryDeadlines(), []);
+  const urgent = deadlines.filter(d => d.status === 'urgent' || d.status === 'overdue');
+
+  const totalRevenue = useMemo(() =>
+    (invoices || []).filter(i => i.status === 'paid').reduce((s, i) => s + (i.amount || 0), 0), [invoices]);
+  const unpaid = useMemo(() =>
+    (invoices || []).filter(i => i.status !== 'paid').reduce((s, i) => s + (i.amount || 0), 0), [invoices]);
+
+  const kpis = [
+    { label: 'Active Clients', value: (clients || []).length, sub: `${(clients||[]).filter(c=>c.status==='active').length} live`, icon: Building2, color: 'blue' },
+    { label: 'Team Members', value: (members || []).length, sub: `${(members||[]).filter(m=>m.status==='active').length} active`, icon: Users, color: 'violet' },
+    { label: 'Revenue Collected', value: `₹${(totalRevenue/100000).toFixed(1)}L`, sub: `₹${(unpaid/100000).toFixed(1)}L pending`, icon: IndianRupee, color: 'emerald' },
+    { label: 'Urgent Deadlines', value: urgent.length, sub: 'next 7 days', icon: AlertTriangle, color: urgent.length > 0 ? 'rose' : 'slate' },
+  ];
+
+  const colorMap: Record<string, string> = {
+    blue: 'from-blue-600 to-blue-400 shadow-blue-500/20',
+    violet: 'from-violet-600 to-violet-400 shadow-violet-500/20',
+    emerald: 'from-emerald-600 to-emerald-400 shadow-emerald-500/20',
+    rose: 'from-rose-600 to-rose-400 shadow-rose-500/20',
+    slate: 'from-slate-600 to-slate-400 shadow-slate-500/20',
   };
 
-  const firmName = currentUser?.companyName || 'CA Firm';
-  const userEmail = currentUser?.email || '';
-
   return (
-    <div className="min-h-screen bg-[#0a0a0f] text-slate-300 font-sans">
-      {/* Top Navigation Bar */}
-      <nav className="sticky top-0 z-40 w-full bg-[#0c0c14]/90 backdrop-blur-xl border-b border-white/5">
-        <div className="max-w-[1600px] mx-auto px-4 sm:px-6">
-          <div className="flex items-center justify-between h-16">
-            {/* Logo + Firm Name */}
-            <div className="flex items-center gap-3">
-              <div className="w-9 h-9 rounded-xl bg-indigo-500/20 border border-indigo-500/30 flex items-center justify-center shrink-0">
-                <Building2 className="w-5 h-5 text-indigo-400" />
-              </div>
-              <div className="hidden sm:block">
-                <span className="text-white font-bold text-base leading-none block">{firmName}</span>
-                <span className="text-[10px] text-indigo-400 font-medium uppercase tracking-wider">
-                  Sannidh FirmOS · CA Firm Dashboard
-                </span>
-              </div>
-            </div>
+    <div className="flex h-screen bg-[#07070f] overflow-hidden font-sans text-slate-300">
 
-            {/* Desktop Actions */}
-            <div className="hidden md:flex items-center gap-3">
-              <div className="flex items-center gap-2 bg-slate-900/50 rounded-full px-3 py-1.5 border border-white/5">
-                <div className="w-2 h-2 rounded-full bg-emerald-500 animate-pulse" />
-                <span className="text-xs text-slate-300 truncate max-w-[160px]">{userEmail}</span>
-              </div>
-              <Button
-                onClick={handleLogout}
-                variant="ghost"
-                size="sm"
-                className="text-slate-400 hover:text-white hover:bg-white/5"
-              >
-                <LogOut className="w-4 h-4 mr-1.5" />
-                Logout
-              </Button>
-            </div>
-
-            {/* Mobile Toggle */}
-            <Button
-              variant="ghost"
-              size="icon"
-              onClick={() => setIsMobileMenuOpen(!isMobileMenuOpen)}
-              className="md:hidden text-slate-400 hover:text-white"
-            >
-              {isMobileMenuOpen ? <X className="w-5 h-5" /> : <Menu className="w-5 h-5" />}
-            </Button>
-          </div>
-        </div>
-      </nav>
-
-      {/* Mobile Menu Overlay */}
-      <AnimatePresence>
-        {isMobileMenuOpen && (
-          <motion.div
-            initial={{ opacity: 0, height: 0 }}
-            animate={{ opacity: 1, height: 'auto' }}
-            exit={{ opacity: 0, height: 0 }}
-            className="md:hidden border-b border-white/5 bg-slate-900/80 backdrop-blur-lg z-30 overflow-hidden"
+      {/* ── Sidebar ─────────────────────────────────────────────────────── */}
+      <AnimatePresence initial={false}>
+        {sidebarOpen && (
+          <motion.aside
+            key="sidebar"
+            initial={{ width: 0, opacity: 0 }}
+            animate={{ width: 240, opacity: 1 }}
+            exit={{ width: 0, opacity: 0 }}
+            transition={{ duration: 0.22, ease: 'easeInOut' }}
+            className="flex flex-col bg-[#0d0d1a] border-r border-white/5 overflow-hidden shrink-0 z-30"
           >
-            <div className="px-4 py-3 space-y-1">
-              {menuItems.map(item => {
+            {/* Logo */}
+            <div className="px-5 py-5 border-b border-white/5">
+              <div className="flex items-center gap-3">
+                <div className="w-9 h-9 rounded-xl bg-gradient-to-br from-indigo-500 to-violet-600 flex items-center justify-center shadow-lg shadow-indigo-500/30">
+                  <Zap className="w-5 h-5 text-white" />
+                </div>
+                <div>
+                  <p className="text-white font-bold text-sm leading-tight truncate max-w-[140px]">{firmName}</p>
+                  <p className="text-[9px] text-indigo-400 uppercase tracking-widest font-semibold">FirmOS · Enterprise</p>
+                </div>
+              </div>
+            </div>
+
+            {/* KPI Mini Strip */}
+            <div className="px-3 py-3 border-b border-white/5 grid grid-cols-2 gap-2">
+              {kpis.map((k, i) => {
+                const Icon = k.icon;
+                return (
+                  <div key={i} className="bg-white/[0.04] rounded-lg p-2 text-center">
+                    <p className="text-white font-bold text-base leading-none">{k.value}</p>
+                    <p className="text-[9px] text-slate-500 mt-0.5 leading-tight">{k.label}</p>
+                  </div>
+                );
+              })}
+            </div>
+
+            {/* Nav */}
+            <nav className="flex-1 px-3 py-4 space-y-0.5 overflow-y-auto">
+              {NAV.map(item => {
                 const Icon = item.icon;
+                const active = tab === item.id;
                 return (
                   <button
                     key={item.id}
-                    onClick={() => { setActiveTab(item.id); setIsMobileMenuOpen(false); }}
-                    className={`w-full flex items-center gap-3 px-3 py-2.5 rounded-lg text-sm transition-colors ${
-                      activeTab === item.id
-                        ? 'bg-indigo-500/15 text-indigo-300'
-                        : 'text-slate-400 hover:text-white hover:bg-white/5'
+                    onClick={() => setTab(item.id)}
+                    className={`w-full flex items-center gap-3 px-3 py-2.5 rounded-xl text-sm font-medium transition-all group ${
+                      active
+                        ? 'bg-indigo-600 text-white shadow-lg shadow-indigo-600/30'
+                        : 'text-slate-400 hover:text-white hover:bg-white/[0.05]'
                     }`}
                   >
-                    <Icon className="w-4 h-4" />
-                    {item.label}
+                    <Icon className={`w-4 h-4 shrink-0 ${active ? 'text-white' : 'text-slate-500 group-hover:text-slate-300'}`} />
+                    <span className="truncate">{item.label}</span>
+                    {active && <ChevronRight className="w-3.5 h-3.5 ml-auto opacity-60" />}
                   </button>
                 );
               })}
-              <div className="border-t border-white/5 pt-2 mt-2">
-                <button
-                  onClick={handleLogout}
-                  className="w-full flex items-center gap-3 px-3 py-2.5 rounded-lg text-sm text-rose-400 hover:bg-rose-500/10"
-                >
-                  <LogOut className="w-4 h-4" />
-                  Logout
-                </button>
+            </nav>
+
+            {/* User Footer */}
+            <div className="px-3 py-4 border-t border-white/5">
+              <div className="flex items-center gap-2.5 px-3 py-2.5 rounded-xl bg-white/[0.04] mb-2">
+                <div className="w-7 h-7 rounded-full bg-indigo-600/30 border border-indigo-500/30 flex items-center justify-center text-xs font-bold text-indigo-300 shrink-0">
+                  {email?.[0]?.toUpperCase() || 'C'}
+                </div>
+                <div className="min-w-0">
+                  <p className="text-xs font-semibold text-white truncate">{email || 'CA Partner'}</p>
+                  <p className="text-[9px] text-slate-500">ca_firm · Admin</p>
+                </div>
               </div>
+              <button
+                onClick={() => { logout(); navigate('/'); }}
+                className="w-full flex items-center gap-2 px-3 py-2 rounded-lg text-xs text-slate-500 hover:text-rose-400 hover:bg-rose-500/10 transition-colors"
+              >
+                <LogOut className="w-3.5 h-3.5" /> Sign Out
+              </button>
             </div>
-          </motion.div>
+          </motion.aside>
         )}
       </AnimatePresence>
 
-      {/* Main Layout */}
-      <div className="max-w-[1600px] mx-auto px-4 sm:px-6 py-8 flex gap-8">
-        {/* Sidebar */}
-        <aside className="hidden md:block w-56 shrink-0">
-          <div className="sticky top-24 space-y-0.5">
-            {menuItems.map(item => {
-              const Icon = item.icon;
-              const isActive = activeTab === item.id;
-              return (
-                <button
-                  key={item.id}
-                  onClick={() => setActiveTab(item.id)}
-                  className={`w-full flex items-center gap-3 px-3.5 py-2.5 rounded-xl transition-all text-sm font-medium ${
-                    isActive
-                      ? 'bg-indigo-500/10 text-indigo-400 border border-indigo-500/20'
-                      : 'text-slate-400 hover:text-white hover:bg-white/5 border border-transparent'
-                  }`}
-                >
-                  <Icon className={`w-4 h-4 ${isActive ? 'text-indigo-400' : 'text-slate-500'}`} />
-                  {item.label}
-                </button>
-              );
-            })}
-          </div>
-        </aside>
+      {/* ── Main Area ───────────────────────────────────────────────────── */}
+      <div className="flex-1 flex flex-col min-w-0 overflow-hidden">
 
-        {/* Content */}
-        <main className="flex-1 min-w-0">
+        {/* Top Bar */}
+        <header className="flex items-center gap-4 px-6 h-14 bg-[#07070f]/80 backdrop-blur-xl border-b border-white/5 shrink-0">
+          <button
+            onClick={() => setSidebarOpen(s => !s)}
+            className="text-slate-500 hover:text-white transition-colors p-1"
+          >
+            {sidebarOpen ? <X className="w-5 h-5" /> : <Menu className="w-5 h-5" />}
+          </button>
+
+          <div className="flex-1 flex items-center gap-2">
+            <span className="text-xs text-slate-600 font-medium uppercase tracking-wider">
+              {NAV.find(n => n.id === tab)?.label}
+            </span>
+          </div>
+
+          {/* Urgent alert */}
+          {urgent.length > 0 && (
+            <div className="flex items-center gap-1.5 bg-rose-500/10 border border-rose-500/20 rounded-full px-3 py-1">
+              <div className="w-1.5 h-1.5 rounded-full bg-rose-500 animate-pulse" />
+              <span className="text-xs text-rose-400 font-medium">{urgent.length} Urgent Deadline{urgent.length > 1 ? 's' : ''}</span>
+            </div>
+          )}
+
+          <Bell className="w-4 h-4 text-slate-500 hover:text-white cursor-pointer" />
+          <Settings className="w-4 h-4 text-slate-500 hover:text-white cursor-pointer" />
+        </header>
+
+        {/* Page Content */}
+        <main className="flex-1 overflow-y-auto">
           {!firmId ? (
-            <div className="flex items-center justify-center h-64">
-              <div className="text-center">
-                <div className="w-8 h-8 border-2 border-indigo-500 border-t-transparent rounded-full animate-spin mx-auto mb-3" />
-                <p className="text-slate-400 text-sm">Loading your firm workspace...</p>
+            <div className="flex items-center justify-center h-full">
+              <div className="text-center space-y-3">
+                <div className="w-10 h-10 border-2 border-indigo-500 border-t-transparent rounded-full animate-spin mx-auto" />
+                <p className="text-slate-400 text-sm">Initialising your firm workspace...</p>
               </div>
             </div>
           ) : (
             <AnimatePresence mode="wait">
               <motion.div
-                key={activeTab}
-                initial={{ opacity: 0, y: 8 }}
-                animate={{ opacity: 1, y: 0 }}
-                exit={{ opacity: 0, y: -8 }}
-                transition={{ duration: 0.18 }}
+                key={tab}
+                initial={{ opacity: 0, x: 12 }}
+                animate={{ opacity: 1, x: 0 }}
+                exit={{ opacity: 0, x: -12 }}
+                transition={{ duration: 0.16 }}
+                className="h-full"
               >
-                {activeTab === 'pulse' && <FirmOverviewPulse firmId={firmId} />}
-                {activeTab === 'clients' && <FirmClientManagement firmId={firmId} />}
-                {activeTab === 'team' && <TeamResourceAllocation firmId={firmId} />}
-                {activeTab === 'billing' && <PracticeBillingWIP firmId={firmId} />}
-                {activeTab === 'quality' && <ICAIQualityControl firmId={firmId} />}
-                {activeTab === 'vault' && <FirmDocumentVault />}
+                {tab === 'home'    && <FirmPulseHome firmId={firmId} kpis={kpis} colorMap={colorMap} urgent={urgent} />}
+                {tab === 'clients' && <FirmClientManagement firmId={firmId} />}
+                {tab === 'team'    && <TeamResourceAllocation firmId={firmId} />}
+                {tab === 'billing' && <PracticeBillingWIP firmId={firmId} />}
+                {tab === 'quality' && <ICAIQualityControl firmId={firmId} />}
+                {tab === 'vault'   && <FirmDocumentVault />}
               </motion.div>
             </AnimatePresence>
           )}

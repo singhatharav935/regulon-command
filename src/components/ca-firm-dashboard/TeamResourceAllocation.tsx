@@ -1,363 +1,233 @@
-import { useState } from "react";
-import { motion, AnimatePresence } from "framer-motion";
-import { Users, Plus, X, Briefcase, Activity, Loader2, CheckCircle2, AlertTriangle } from "lucide-react";
-import { Card, CardContent } from "@/components/ui/card";
-import { Badge } from "@/components/ui/badge";
-import { Button } from "@/components/ui/button";
-import { Input } from "@/components/ui/input";
-import { Label } from "@/components/ui/label";
-import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
-import { useFirmMembers, useAddFirmMember, useFirmClients, useCAAssignments, useAssignCA, useUnassignCA } from "@/hooks/personas/useCAFirmData";
-import { toast } from "sonner";
+import { useState } from 'react';
+import { motion, AnimatePresence } from 'framer-motion';
+import { Users, Plus, X, Briefcase, Loader2, CheckCircle2 } from 'lucide-react';
+import { Input } from '@/components/ui/input';
+import { Button } from '@/components/ui/button';
+import { Badge } from '@/components/ui/badge';
+import { Label } from '@/components/ui/label';
+import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
+import { useFirmMembers, useAddFirmMember, useFirmClients, useCAAssignments, useAssignCA, useUnassignCA } from '@/hooks/personas/useCAFirmData';
+import { toast } from 'sonner';
 
-interface TeamResourceAllocationProps {
-  firmId: string;
-}
+interface Props { firmId: string; }
 
-const roleColors: Record<string, string> = {
-  partner: "bg-amber-500/20 text-amber-400 border-amber-500/30",
-  manager: "bg-blue-500/20 text-blue-400 border-blue-500/30",
-  article: "bg-slate-500/20 text-slate-400 border-slate-500/30",
-  senior_ca: "bg-violet-500/20 text-violet-400 border-violet-500/30",
+const ROLE_BADGE: Record<string, string> = {
+  partner: 'bg-amber-500/10 text-amber-400 border-amber-500/20',
+  senior_ca: 'bg-violet-500/10 text-violet-400 border-violet-500/20',
+  manager: 'bg-blue-500/10 text-blue-400 border-blue-500/20',
+  article: 'bg-slate-500/10 text-slate-400 border-slate-500/20',
 };
 
-export default function TeamResourceAllocation({ firmId }: TeamResourceAllocationProps) {
-  const { data: members, isLoading: membersLoading } = useFirmMembers(firmId);
-  const { data: clients, isLoading: clientsLoading } = useFirmClients(firmId);
+export default function TeamResourceAllocation({ firmId }: Props) {
+  const { data: members, isLoading } = useFirmMembers(firmId);
+  const { data: clients } = useFirmClients(firmId);
   const { data: assignments } = useCAAssignments(firmId);
   const addMember = useAddFirmMember();
   const assignCA = useAssignCA();
   const unassignCA = useUnassignCA();
 
-  const [showAddForm, setShowAddForm] = useState(false);
-  const [showAssignModal, setShowAssignModal] = useState<string | null>(null); // memberId
-  const [selectedClientId, setSelectedClientId] = useState("");
-  const [form, setForm] = useState({ name: "", email: "", role: "manager", specialization: "" });
+  const [panel, setPanel] = useState(false);
+  const [assignFor, setAssignFor] = useState<string | null>(null);
+  const [selClient, setSelClient] = useState('');
+  const [form, setForm] = useState({ name: '', email: '', role: 'manager', specialization: '' });
 
-  const handleAddMember = async () => {
-    if (!form.name || !form.email || !form.role) {
-      toast.error("Please fill in name, email and role.");
-      return;
-    }
+  const save = async () => {
+    if (!form.name || !form.email) { toast.error('Name and email required.'); return; }
     try {
-      await addMember.mutateAsync({
-        firm_id: firmId,
-        name: form.name,
-        email: form.email,
-        role: form.role,
-        specialization: form.specialization,
-        status: "active",
-      });
-      toast.success(`${form.name} added to your firm!`);
-      setForm({ name: "", email: "", role: "manager", specialization: "" });
-      setShowAddForm(false);
-    } catch (err: any) {
-      toast.error("Failed to add member: " + err.message);
-    }
+      await addMember.mutateAsync({ firm_id: firmId, name: form.name, email: form.email, role: form.role, specialization: form.specialization });
+      toast.success(`${form.name} added to the team!`);
+      setForm({ name: '', email: '', role: 'manager', specialization: '' });
+      setPanel(false);
+    } catch (e: any) { toast.error(e.message); }
   };
 
-  const handleAssign = async () => {
-    if (!showAssignModal || !selectedClientId) {
-      toast.error("Please select a client to assign.");
-      return;
-    }
-    // Check if already assigned
-    const alreadyAssigned = (assignments || []).some(
-      a => a.ca_id === showAssignModal && a.client_id === selectedClientId
-    );
-    if (alreadyAssigned) {
-      toast.warning("This member is already assigned to that client.");
-      return;
-    }
+  const doAssign = async () => {
+    if (!assignFor || !selClient) { toast.error('Select a client first.'); return; }
+    const already = (assignments || []).some(a => a.ca_id === assignFor && a.client_id === selClient);
+    if (already) { toast.warning('Already assigned.'); return; }
     try {
-      await assignCA.mutateAsync({
-        ca_id: showAssignModal,
-        client_id: selectedClientId,
-        assigned_date: new Date().toISOString().split("T")[0],
-        status: "active",
-      });
-      toast.success("Client assigned successfully!");
-      setShowAssignModal(null);
-      setSelectedClientId("");
-    } catch (err: any) {
-      toast.error("Assignment failed: " + err.message);
-    }
+      await assignCA.mutateAsync({ ca_id: assignFor, client_id: selClient, assigned_date: new Date().toISOString().split('T')[0] });
+      toast.success('Client assigned!');
+      setAssignFor(null); setSelClient('');
+    } catch (e: any) { toast.error(e.message); }
   };
 
-  const handleUnassign = async (assignmentId: string) => {
-    try {
-      await unassignCA.mutateAsync(assignmentId);
-      toast.success("Assignment removed.");
-    } catch (err: any) {
-      toast.error("Failed to remove assignment: " + err.message);
-    }
-  };
+  const memberAssignments = (id: string) => (assignments || []).filter(a => a.ca_id === id);
+  const clientName = (id: string) => (clients || []).find(c => c.id === id)?.company_name || 'Client';
 
-  const getMemberAssignments = (memberId: string) =>
-    (assignments || []).filter(a => a.ca_id === memberId);
-
-  const getClientName = (clientId: string) => {
-    const c = (clients || []).find(cl => cl.id === clientId);
-    return c?.company_name || "Unknown Client";
+  const loadPct = (id: string) => {
+    const n = memberAssignments(id).length;
+    return Math.min(100, n * 10);
   };
 
   return (
-    <div className="space-y-6">
+    <div className="p-6 space-y-4">
       <div className="flex items-center justify-between">
         <div>
-          <h2 className="text-2xl font-bold text-white">Team & Resource Allocation</h2>
-          <p className="text-sm text-slate-400 mt-1">Manage team members and assign clients to CAs.</p>
+          <h2 className="text-xl font-bold text-white">Team & Resource Allocation</h2>
+          <p className="text-xs text-slate-500 mt-0.5">{(members || []).length} members · assign clients to team</p>
         </div>
-        <Button
-          onClick={() => setShowAddForm(true)}
-          className="bg-indigo-600 hover:bg-indigo-700 text-white"
-        >
-          <Plus className="w-4 h-4 mr-2" />
-          Add Team Member
+        <Button onClick={() => setPanel(true)} className="bg-indigo-600 hover:bg-indigo-700 text-white shadow-lg shadow-indigo-600/20">
+          <Plus className="w-4 h-4 mr-1.5" /> Add Member
         </Button>
       </div>
 
-      {/* Add Member Form */}
-      <AnimatePresence>
-        {showAddForm && (
-          <motion.div
-            initial={{ opacity: 0, y: -10 }}
-            animate={{ opacity: 1, y: 0 }}
-            exit={{ opacity: 0, y: -10 }}
-          >
-            <Card className="bg-slate-800/80 border-indigo-500/30">
-              <CardContent className="p-6">
-                <div className="flex justify-between items-center mb-4">
-                  <h3 className="font-semibold text-white">New Team Member</h3>
-                  <Button variant="ghost" size="icon" onClick={() => setShowAddForm(false)} className="text-slate-400">
-                    <X className="w-4 h-4" />
-                  </Button>
-                </div>
-                <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-                  <div className="space-y-1">
-                    <Label className="text-slate-300">Full Name *</Label>
-                    <Input
-                      placeholder="e.g. CA Rajesh Kumar"
-                      value={form.name}
-                      onChange={e => setForm(f => ({ ...f, name: e.target.value }))}
-                      className="bg-slate-900/50 border-slate-700 text-white"
-                    />
-                  </div>
-                  <div className="space-y-1">
-                    <Label className="text-slate-300">Email *</Label>
-                    <Input
-                      placeholder="rajesh@yourfirm.com"
-                      type="email"
-                      value={form.email}
-                      onChange={e => setForm(f => ({ ...f, email: e.target.value }))}
-                      className="bg-slate-900/50 border-slate-700 text-white"
-                    />
-                  </div>
-                  <div className="space-y-1">
-                    <Label className="text-slate-300">Role *</Label>
-                    <Select value={form.role} onValueChange={v => setForm(f => ({ ...f, role: v }))}>
-                      <SelectTrigger className="bg-slate-900/50 border-slate-700 text-white">
-                        <SelectValue />
-                      </SelectTrigger>
-                      <SelectContent className="bg-slate-800 border-slate-700 text-white">
-                        <SelectItem value="partner">Partner</SelectItem>
-                        <SelectItem value="senior_ca">Senior CA</SelectItem>
-                        <SelectItem value="manager">Manager</SelectItem>
-                        <SelectItem value="article">Article Assistant</SelectItem>
-                      </SelectContent>
-                    </Select>
-                  </div>
-                  <div className="space-y-1">
-                    <Label className="text-slate-300">Specialization</Label>
-                    <Input
-                      placeholder="e.g. GST, Income Tax, Audit"
-                      value={form.specialization}
-                      onChange={e => setForm(f => ({ ...f, specialization: e.target.value }))}
-                      className="bg-slate-900/50 border-slate-700 text-white"
-                    />
-                  </div>
-                </div>
-                <div className="flex gap-3 mt-5">
-                  <Button
-                    onClick={handleAddMember}
-                    disabled={addMember.isPending}
-                    className="bg-indigo-600 hover:bg-indigo-700 text-white"
-                  >
-                    {addMember.isPending ? <Loader2 className="w-4 h-4 mr-2 animate-spin" /> : <CheckCircle2 className="w-4 h-4 mr-2" />}
-                    {addMember.isPending ? "Adding..." : "Add Member"}
-                  </Button>
-                  <Button variant="outline" onClick={() => setShowAddForm(false)} className="border-slate-700 text-slate-300">
-                    Cancel
-                  </Button>
-                </div>
-              </CardContent>
-            </Card>
-          </motion.div>
-        )}
-      </AnimatePresence>
-
       {/* Assign Modal */}
       <AnimatePresence>
-        {showAssignModal && (
-          <motion.div
-            initial={{ opacity: 0 }}
-            animate={{ opacity: 1 }}
-            exit={{ opacity: 0 }}
-            className="fixed inset-0 z-50 flex items-center justify-center bg-black/60 backdrop-blur-sm"
-            onClick={() => setShowAssignModal(null)}
-          >
-            <motion.div
-              initial={{ scale: 0.95, opacity: 0 }}
-              animate={{ scale: 1, opacity: 1 }}
-              exit={{ scale: 0.95, opacity: 0 }}
+        {assignFor && (
+          <motion.div initial={{ opacity: 0 }} animate={{ opacity: 1 }} exit={{ opacity: 0 }}
+            className="fixed inset-0 bg-black/60 z-50 flex items-center justify-center p-4" onClick={() => setAssignFor(null)}>
+            <motion.div initial={{ scale: 0.96 }} animate={{ scale: 1 }} exit={{ scale: 0.96 }}
               onClick={e => e.stopPropagation()}
-              className="bg-slate-800 border border-slate-700 rounded-2xl p-6 w-full max-w-md shadow-2xl"
-            >
-              <h3 className="text-lg font-semibold text-white mb-1">Assign Client</h3>
-              <p className="text-sm text-slate-400 mb-4">
-                Select a client to assign to this team member.
-              </p>
-              {clientsLoading ? (
-                <div className="text-slate-400 text-sm flex items-center gap-2">
-                  <Loader2 className="w-4 h-4 animate-spin" /> Loading clients...
-                </div>
-              ) : (clients || []).length === 0 ? (
+              className="bg-[#0d0d1a] border border-white/[0.08] rounded-2xl p-6 w-full max-w-sm shadow-2xl">
+              <h3 className="font-bold text-white mb-1">Assign Client</h3>
+              <p className="text-xs text-slate-500 mb-4">Pick a client to assign to this team member.</p>
+              {(clients || []).length === 0 ? (
                 <p className="text-slate-500 text-sm">No clients found. Add clients first.</p>
               ) : (
-                <Select value={selectedClientId} onValueChange={setSelectedClientId}>
-                  <SelectTrigger className="bg-slate-900/50 border-slate-700 text-white">
-                    <SelectValue placeholder="Select a client..." />
+                <Select value={selClient} onValueChange={setSelClient}>
+                  <SelectTrigger className="bg-white/[0.04] border-white/[0.07] text-white rounded-xl">
+                    <SelectValue placeholder="Select client…" />
                   </SelectTrigger>
-                  <SelectContent className="bg-slate-800 border-slate-700 text-white">
-                    {(clients || []).map(c => (
-                      <SelectItem key={c.id} value={c.id}>{c.company_name}</SelectItem>
-                    ))}
+                  <SelectContent className="bg-[#0d0d1a] border-white/[0.08] text-white">
+                    {(clients || []).map(c => <SelectItem key={c.id} value={c.id}>{c.company_name}</SelectItem>)}
                   </SelectContent>
                 </Select>
               )}
-              <div className="flex gap-3 mt-5">
-                <Button
-                  onClick={handleAssign}
-                  disabled={assignCA.isPending || !selectedClientId}
-                  className="bg-indigo-600 hover:bg-indigo-700 text-white flex-1"
-                >
-                  {assignCA.isPending ? <Loader2 className="w-4 h-4 mr-2 animate-spin" /> : null}
-                  Assign
+              <div className="flex gap-3 mt-4">
+                <Button onClick={doAssign} disabled={assignCA.isPending || !selClient} className="flex-1 bg-indigo-600 hover:bg-indigo-700 text-white">
+                  {assignCA.isPending ? <Loader2 className="w-4 h-4 animate-spin mr-1" /> : null} Assign
                 </Button>
-                <Button variant="outline" onClick={() => setShowAssignModal(null)} className="border-slate-700 text-slate-300">
-                  Cancel
-                </Button>
+                <Button variant="outline" onClick={() => setAssignFor(null)} className="border-white/[0.07] text-slate-400">Cancel</Button>
               </div>
             </motion.div>
           </motion.div>
         )}
       </AnimatePresence>
 
-      {/* Team List */}
-      {membersLoading ? (
-        <div className="space-y-3">
-          {[1, 2, 3].map(i => (
-            <Card key={i} className="bg-slate-800/50 border-gray-700/50">
-              <CardContent className="p-4">
-                <div className="flex items-center gap-4">
-                  <div className="w-12 h-12 rounded-full bg-slate-700 animate-pulse" />
-                  <div className="space-y-2 flex-1">
-                    <div className="h-4 w-32 bg-slate-700 rounded animate-pulse" />
-                    <div className="h-3 w-24 bg-slate-700/60 rounded animate-pulse" />
-                  </div>
-                </div>
-              </CardContent>
-            </Card>
-          ))}
-        </div>
+      {isLoading ? (
+        <div className="space-y-3">{[1,2,3].map(i => <div key={i} className="h-24 rounded-2xl bg-white/[0.03] animate-pulse" />)}</div>
       ) : (members || []).length === 0 ? (
-        <Card className="bg-slate-800/30 border-dashed border-slate-700/50">
-          <CardContent className="p-10 text-center">
-            <Users className="w-10 h-10 text-slate-500 mx-auto mb-3" />
-            <p className="text-slate-300 font-medium">No team members yet</p>
-            <p className="text-slate-500 text-sm mt-1">Add your Partners, Managers, and Article Assistants to get started.</p>
-          </CardContent>
-        </Card>
+        <div className="flex flex-col items-center justify-center py-20 gap-3 text-center">
+          <div className="w-16 h-16 rounded-2xl bg-white/[0.04] flex items-center justify-center">
+            <Users className="w-7 h-7 text-slate-600" />
+          </div>
+          <p className="text-slate-300 font-medium">No team members yet</p>
+          <p className="text-slate-600 text-sm">Add Partners, Managers, and Articles to get started.</p>
+        </div>
       ) : (
         <div className="space-y-3">
-          {(members || []).map((member, i) => {
-            const memberAssignments = getMemberAssignments(member.id);
+          {(members || []).map((m, i) => {
+            const pct = loadPct(m.id);
+            const assigns = memberAssignments(m.id);
             return (
-              <motion.div
-                key={member.id}
-                initial={{ opacity: 0, x: -20 }}
-                animate={{ opacity: 1, x: 0 }}
-                transition={{ delay: i * 0.07 }}
-              >
-                <Card className="bg-slate-800/50 border-gray-700/50 hover:border-gray-600 transition-all">
-                  <CardContent className="p-4">
-                    <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4">
-                      <div className="flex items-center gap-3">
-                        <div className="w-11 h-11 rounded-full bg-indigo-500/10 border border-indigo-500/20 flex items-center justify-center font-bold text-indigo-400 text-sm shrink-0">
-                          {member.name.split(" ").map((n: string) => n[0]).join("").slice(0, 2).toUpperCase()}
-                        </div>
-                        <div>
-                          <h3 className="font-semibold text-white">{member.name}</h3>
-                          <div className="flex items-center gap-2 mt-0.5">
-                            <Badge className={`${roleColors[member.role] || roleColors.manager} border text-[10px] px-1.5 py-0`}>
-                              {member.role?.replace("_", " ").toUpperCase()}
-                            </Badge>
-                            {member.specialization && (
-                              <span className="text-xs text-slate-400">{member.specialization}</span>
-                            )}
-                          </div>
-                        </div>
-                      </div>
-
-                      <div className="flex items-center gap-2 flex-wrap">
-                        {/* Show assigned clients */}
-                        {memberAssignments.map(a => (
-                          <div key={a.id} className="flex items-center gap-1 bg-slate-900/50 border border-slate-700/50 rounded-full px-2.5 py-1 text-xs text-slate-300">
-                            {getClientName(a.client_id)}
-                            <button
-                              onClick={() => handleUnassign(a.id)}
-                              className="ml-1 text-slate-500 hover:text-rose-400 transition-colors"
-                            >
-                              <X className="w-3 h-3" />
-                            </button>
-                          </div>
-                        ))}
-                        <Button
-                          size="sm"
-                          variant="outline"
-                          onClick={() => setShowAssignModal(member.id)}
-                          className="border-slate-700 text-slate-300 hover:text-white hover:border-indigo-500/50 text-xs h-7"
-                        >
-                          <Briefcase className="w-3 h-3 mr-1" />
-                          Assign Client
-                        </Button>
+              <motion.div key={m.id} initial={{ opacity: 0, x: -12 }} animate={{ opacity: 1, x: 0 }} transition={{ delay: i * 0.06 }}
+                className="bg-[#0f0f1e] border border-white/[0.06] rounded-2xl p-5 hover:border-indigo-500/20 transition-all">
+                <div className="flex items-center justify-between gap-4 flex-wrap">
+                  <div className="flex items-center gap-3">
+                    <div className="w-10 h-10 rounded-xl bg-indigo-600/20 border border-indigo-500/20 flex items-center justify-center font-bold text-indigo-300 text-sm">
+                      {m.name?.split(' ').map((n: string) => n[0]).join('').slice(0,2).toUpperCase()}
+                    </div>
+                    <div>
+                      <h3 className="font-semibold text-white text-sm">{m.name}</h3>
+                      <div className="flex items-center gap-2 mt-0.5">
+                        <Badge className={`border text-[9px] ${ROLE_BADGE[m.role] || ROLE_BADGE.manager}`}>
+                          {m.role?.replace('_',' ').toUpperCase()}
+                        </Badge>
+                        {m.specialization && <span className="text-xs text-slate-500">{m.specialization}</span>}
                       </div>
                     </div>
+                  </div>
 
-                    {/* Workload indicator */}
-                    {memberAssignments.length > 0 && (
-                      <div className="mt-3 pt-3 border-t border-slate-700/30">
-                        <div className="flex justify-between text-xs mb-1">
-                          <span className="text-slate-500">Assigned Clients</span>
-                          <span className={`font-medium ${memberAssignments.length > 8 ? 'text-rose-400' : memberAssignments.length > 4 ? 'text-amber-400' : 'text-emerald-400'}`}>
-                            {memberAssignments.length} {memberAssignments.length === 1 ? 'client' : 'clients'}
-                          </span>
-                        </div>
-                        <div className="h-1.5 w-full bg-slate-700 rounded-full overflow-hidden">
-                          <div
-                            className={`h-full rounded-full ${memberAssignments.length > 8 ? 'bg-rose-500' : memberAssignments.length > 4 ? 'bg-amber-500' : 'bg-emerald-500'}`}
-                            style={{ width: `${Math.min(100, (memberAssignments.length / 10) * 100)}%` }}
-                          />
-                        </div>
+                  <div className="flex items-center gap-2 flex-wrap">
+                    {assigns.map(a => (
+                      <div key={a.id} className="flex items-center gap-1 bg-white/[0.04] border border-white/[0.06] rounded-full px-2.5 py-1 text-xs text-slate-300">
+                        {clientName(a.client_id)}
+                        <button onClick={() => unassignCA.mutateAsync(a.id).then(() => toast.success('Removed'))} className="ml-1 text-slate-600 hover:text-rose-400">
+                          <X className="w-3 h-3" />
+                        </button>
                       </div>
-                    )}
-                  </CardContent>
-                </Card>
+                    ))}
+                    <Button size="sm" variant="outline" onClick={() => setAssignFor(m.id)}
+                      className="h-7 text-xs border-indigo-500/30 text-indigo-400 hover:bg-indigo-500/10 rounded-full">
+                      <Briefcase className="w-3 h-3 mr-1" /> Assign
+                    </Button>
+                  </div>
+                </div>
+
+                {assigns.length > 0 && (
+                  <div className="mt-4 pt-3 border-t border-white/[0.04]">
+                    <div className="flex justify-between text-xs mb-1.5">
+                      <span className="text-slate-500">Workload</span>
+                      <span className={pct > 80 ? 'text-rose-400 font-semibold' : pct > 50 ? 'text-amber-400 font-semibold' : 'text-emerald-400 font-semibold'}>
+                        {assigns.length} clients
+                      </span>
+                    </div>
+                    <div className="h-1.5 rounded-full bg-slate-800 overflow-hidden">
+                      <div className={`h-full rounded-full transition-all ${pct > 80 ? 'bg-rose-500' : pct > 50 ? 'bg-amber-500' : 'bg-emerald-500'}`}
+                        style={{ width: `${pct}%` }} />
+                    </div>
+                  </div>
+                )}
               </motion.div>
             );
           })}
         </div>
       )}
+
+      {/* Add Member Slide Panel */}
+      <AnimatePresence>
+        {panel && (
+          <>
+            <motion.div initial={{ opacity: 0 }} animate={{ opacity: 1 }} exit={{ opacity: 0 }}
+              className="fixed inset-0 bg-black/50 z-40" onClick={() => setPanel(false)} />
+            <motion.div initial={{ x: '100%' }} animate={{ x: 0 }} exit={{ x: '100%' }}
+              transition={{ type: 'spring', damping: 28, stiffness: 280 }}
+              className="fixed right-0 top-0 h-full w-full max-w-md bg-[#0d0d1a] border-l border-white/[0.07] z-50 flex flex-col shadow-2xl">
+              <div className="flex items-center justify-between px-6 py-5 border-b border-white/[0.06]">
+                <h3 className="font-bold text-white">New Team Member</h3>
+                <button onClick={() => setPanel(false)} className="text-slate-400 hover:text-white"><X className="w-5 h-5" /></button>
+              </div>
+              <div className="flex-1 overflow-y-auto px-6 py-5 space-y-4">
+                {[
+                  { label: 'Full Name *', key: 'name', placeholder: 'CA Rajesh Kumar' },
+                  { label: 'Email *', key: 'email', placeholder: 'rajesh@yourfirm.com', type: 'email' },
+                  { label: 'Specialization', key: 'specialization', placeholder: 'GST, Income Tax, Audit…' },
+                ].map(f => (
+                  <div key={f.key} className="space-y-1.5">
+                    <Label className="text-xs text-slate-400">{f.label}</Label>
+                    <Input type={f.type || 'text'} placeholder={f.placeholder}
+                      value={(form as any)[f.key]}
+                      onChange={e => setForm(p => ({ ...p, [f.key]: e.target.value }))}
+                      className="bg-white/[0.04] border-white/[0.07] text-white placeholder:text-slate-600 rounded-xl focus:border-indigo-500/50" />
+                  </div>
+                ))}
+                <div className="space-y-1.5">
+                  <Label className="text-xs text-slate-400">Role *</Label>
+                  <Select value={form.role} onValueChange={v => setForm(f => ({ ...f, role: v }))}>
+                    <SelectTrigger className="bg-white/[0.04] border-white/[0.07] text-white rounded-xl">
+                      <SelectValue />
+                    </SelectTrigger>
+                    <SelectContent className="bg-[#0d0d1a] border-white/[0.08] text-white">
+                      <SelectItem value="partner">Partner</SelectItem>
+                      <SelectItem value="senior_ca">Senior CA</SelectItem>
+                      <SelectItem value="manager">Manager</SelectItem>
+                      <SelectItem value="article">Article Assistant</SelectItem>
+                    </SelectContent>
+                  </Select>
+                </div>
+              </div>
+              <div className="px-6 py-5 border-t border-white/[0.06] flex gap-3">
+                <Button onClick={save} disabled={addMember.isPending} className="flex-1 bg-indigo-600 hover:bg-indigo-700 text-white">
+                  {addMember.isPending ? <Loader2 className="w-4 h-4 mr-2 animate-spin" /> : <CheckCircle2 className="w-4 h-4 mr-2" />}
+                  {addMember.isPending ? 'Adding…' : 'Add Member'}
+                </Button>
+                <Button variant="outline" onClick={() => setPanel(false)} className="border-white/[0.07] text-slate-400">Cancel</Button>
+              </div>
+            </motion.div>
+          </>
+        )}
+      </AnimatePresence>
     </div>
   );
 }
