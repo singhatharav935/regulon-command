@@ -77,6 +77,7 @@ import { addCompany as addCompanyAPI } from "@/services/api";
 import { CAAgentProvider } from "@/components/agents/CAAgentOrchestrator";
 import { CACommandCenterHeader } from "@/components/agents/CACommandCenterHeader";
 import { CAActionInbox } from "@/components/agents/CAActionInbox";
+import { useCAIdentity } from "@/hooks/useCAIdentity";
 
 // Daily Governance Brief Component
 const CA_API = (import.meta.env.VITE_CA_API_BASE_URL as string);
@@ -1266,10 +1267,18 @@ Generated: ${new Date().toLocaleString()}
 };
 
 const InhouseCADashboardReal = () => {
+  const navigate = useNavigate();
   const { metrics, loading, refetch } = useCAMetrics();
+  const { caId, caFirmId } = useCAIdentity?.() || { caId: 'inhouse-ca-001', caFirmId: 'firm-001' };
 
-  // Role-based access control — disabled for now (registration optional)
-  // Will re-enable when auth flow for inhouse_ca is built
+  // Role-based access control
+  useEffect(() => {
+    const userRole = localStorage.getItem("current_user_role");
+    if (userRole !== "in_house_ca") {
+      navigate("/dashboard");
+      return;
+    }
+  }, [navigate]);
 
   const [activeZone, setActiveZone] = useState<'command' | 'clients' | 'operations' | 'ai-swarm' | 'calculations'>('command');
 
@@ -1312,7 +1321,7 @@ const InhouseCADashboardReal = () => {
     // Skip network request when no CA backend is configured
     if (!isCABackendConfigured()) return;
     try {
-      const response = await fetch(`${COMPLIANCE_API}/ca/inhouse-ca-001/clients`);
+      const response = await fetch(`${COMPLIANCE_API}/ca/${caId}/clients`);
       const data = await response.json();
       if (data.success && data.clients) {
         setCompanies(data.clients.map((c: any) => ({
@@ -1360,7 +1369,7 @@ const InhouseCADashboardReal = () => {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({
-          ca_id: 'inhouse-ca-001',
+          ca_id: caId,
           ca_name: 'In-House Compliance Team',
           ca_email: 'inhouse-ca@sannidh.ai',
           ...onboardForm
@@ -1665,8 +1674,8 @@ const InhouseCADashboardReal = () => {
                 </div>
                 <MultiClientMasterHub />
                 <div className="flex flex-col space-y-8">
-                  <TaskFilingManagement isRealDashboard={true} apiEndpoint={`${CA_API}/api/v1/ca/inhouse-ca-001/tasks`} governmentIntegration={true} />
-                  <ClientDependencyTracker isRealDashboard={true} apiEndpoint={`${CA_API}/api/v1/ca/inhouse-ca-001/dependencies`} aiEnabled={true} />
+                  <TaskFilingManagement isRealDashboard={true} apiEndpoint={`${CA_API}/api/v1/ca/${caId}/tasks`} governmentIntegration={true} />
+                  <ClientDependencyTracker isRealDashboard={true} apiEndpoint={`${CA_API}/api/v1/ca/${caId}/dependencies`} aiEnabled={true} />
                   <ApprovalWorkflowHub />
                 </div>
               </TabsContent>
@@ -1680,9 +1689,9 @@ const InhouseCADashboardReal = () => {
                 <div className="flex flex-col space-y-8">
                   <PracticeBillingPanel isRealDashboard={true} />
                   <SecureFileSharingPanel isRealDashboard={true} />
-                  <AuditInspectionSupport isRealDashboard={true} caId="inhouse-ca-001" />
-                  <CAAnalyticsPerformance isRealDashboard={true} caId="inhouse-ca-001" />
-                  <CommunicationLogsLive isRealDashboard={true} caId="inhouse-ca-001" />
+                  <AuditInspectionSupport isRealDashboard={true} caId={caId} />
+                  <CAAnalyticsPerformance isRealDashboard={true} caId={caId} />
+                  <CommunicationLogsLive isRealDashboard={true} caId={caId} />
                 </div>
               </TabsContent>
 
@@ -1698,12 +1707,12 @@ const InhouseCADashboardReal = () => {
                     isRealDashboard={true}
                     apiEndpoint={`${CA_API}/api/v1/ca/regulatory-news`}
                     aiEnabled={true}
-                    caId="inhouse-ca-001"
+                    caId={caId}
                   />
                   <ComplianceHealthChangeLog
                     isRealDashboard={true}
                     apiEndpoint={`${CA_API}/api/v1/ca`}
-                    caId="inhouse-ca-001"
+                    caId={caId}
                   />
                 </div>
               </TabsContent>

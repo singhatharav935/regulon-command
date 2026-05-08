@@ -464,6 +464,8 @@ class APIService {
  * Performance Monitoring
  */
 async function logPerformanceMetric(metricName, value, unit, tags = {}) {
+  // Skip when no backend is configured (BASE_URL would be "undefined/api/v1")
+  if (!API_BASE_URL || API_BASE_URL === 'undefined') return;
   try {
     await axios.post(`${BASE_URL}/monitoring/metrics`, {
       metric_name: metricName,
@@ -471,8 +473,8 @@ async function logPerformanceMetric(metricName, value, unit, tags = {}) {
       metric_unit: unit,
       tags
     });
-  } catch (error) {
-    console.error('Failed to log performance metric:', error);
+  } catch {
+    // Silently ignore — backend monitoring endpoint unavailable
   }
 }
 
@@ -480,13 +482,15 @@ async function logPerformanceMetric(metricName, value, unit, tags = {}) {
  * Error Logging
  */
 async function logError(errorData) {
+  // Skip when no backend is configured (BASE_URL would be "undefined/api/v1")
+  if (!API_BASE_URL || API_BASE_URL === 'undefined') return;
   try {
     await axios.post(`${BASE_URL}/security/errors`, {
       ...errorData,
       user_agent: navigator.userAgent
     });
-  } catch (error) {
-    console.error('Failed to log error:', error);
+  } catch {
+    // Silently ignore — backend error logging endpoint unavailable
   }
 }
 
