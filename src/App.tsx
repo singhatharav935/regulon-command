@@ -29,7 +29,7 @@ import { PersonaSelector } from "./components/auth/PersonaSelector";
 import { ExternalCADashboardFull } from "./pages/dashboards/phases/ExternalCADashboardFull";
 // import { CAFirmDashboardFull } from "./pages/dashboards/phases/CAFirmDashboardFull";
 import { InhouseCADashboard } from "./pages/dashboards/InhouseCADashboard";
-import { CAFirmDashboard } from "./pages/dashboards/CAFirmDashboard";
+import { CAFirmDashboardReal } from "./pages/dashboards/CAFirmDashboardReal";
 import { LawyerDashboard } from "./pages/dashboards/LawyerDashboard";
 import { OwnerDashboard } from "./pages/dashboards/OwnerDashboard";
 import { AdminDashboard as PersonaAdminDashboard } from "./pages/dashboards/AdminDashboard";
@@ -183,7 +183,7 @@ const App = () => (
               path="/dashboards/ca-firm"
               element={
                 <PersonaRoute allowedPersonas={["ca_firm"]}>
-                  <CAFirmDashboard />
+                  <CAFirmDashboardReal />
                 </PersonaRoute>
               }
             />
