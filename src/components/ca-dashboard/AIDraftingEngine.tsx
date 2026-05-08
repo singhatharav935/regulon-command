@@ -2317,6 +2317,16 @@ const AIDraftingEngine = ({
   };
 
   useEffect(() => {
+    // Skip health-check polling when running against the real dashboard
+    // because the ai-draft edge function is not yet deployed — the OPTIONS
+    // preflight would fail with a CORS error.
+    if (isRealDashboard) {
+      setDraftServiceStatus("offline");
+      setDraftServiceMessage("Live drafting backend is not yet deployed.");
+      setIsCheckingDraftService(false);
+      return;
+    }
+
     let mounted = true;
     const run = async () => {
       if (!mounted) return;
@@ -2332,7 +2342,7 @@ const AIDraftingEngine = ({
       mounted = false;
       clearInterval(interval);
     };
-  }, [DRAFT_URL, hasDraftEndpoint]);
+  }, [DRAFT_URL, hasDraftEndpoint, isRealDashboard]);
   useEffect(() => {
     if (!promptPackOverride || promptPackOverride === "auto") return;
     const valid = promptPackOptions.some((item) => item.id === promptPackOverride);
@@ -4177,7 +4187,7 @@ const AIDraftingEngine = ({
   };
 
   const loadDraftHistory = async () => {
-    if (demoMode || clientSource !== "live") {
+    if (demoMode || clientSource !== "live" || isRealDashboard) {
       setDraftHistory([]);
       return;
     }
@@ -4466,7 +4476,8 @@ const AIDraftingEngine = ({
   }, [demoMode, allowLiveDemoFallback]);
 
   useEffect(() => {
-    if (demoMode) return;
+    // Skip when the workspace-backend edge function is not deployed
+    if (demoMode || isRealDashboard) return;
 
     let mounted = true;
     const loadPreferences = async () => {
@@ -4488,10 +4499,11 @@ const AIDraftingEngine = ({
     return () => {
       mounted = false;
     };
-  }, [demoMode]);
+  }, [demoMode, isRealDashboard]);
 
   useEffect(() => {
-    if (demoMode) {
+    // Skip when the workspace-backend edge function is not deployed
+    if (demoMode || isRealDashboard) {
       setDraftingCapabilities(null);
       return;
     }
@@ -4512,7 +4524,7 @@ const AIDraftingEngine = ({
     return () => {
       mounted = false;
     };
-  }, [demoMode]);
+  }, [demoMode, isRealDashboard]);
 
   useEffect(() => {
     if (!selectedClient) return;

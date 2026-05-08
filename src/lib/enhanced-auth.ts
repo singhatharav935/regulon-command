@@ -385,11 +385,12 @@ class EnhancedAuthService {
   /**
    * Store authentication data securely
    */
-  private storeAuthData(response: AuthResponse, remember: boolean): void {
-    const storage = remember ? localStorage : sessionStorage;
-    
-    storage.setItem('sannidh_auth_token', response.token);
-    storage.setItem('sannidh_refresh_token', response.refresh_token);
+  private storeAuthData(response: AuthResponse, _remember: boolean): void {
+    // Always persist to localStorage so sessions survive browser restarts
+    // (device-level persistence). Supabase's own persistSession: true already
+    // stores the real session in localStorage; this keeps the wrapper consistent.
+    localStorage.setItem('sannidh_auth_token', response.token);
+    localStorage.setItem('sannidh_refresh_token', response.refresh_token);
     localStorage.setItem('sannidh_user', JSON.stringify(response.user));
     localStorage.setItem('sannidh_session', JSON.stringify(response.session));
     // Also store in localStorage so the api.ts service can read it

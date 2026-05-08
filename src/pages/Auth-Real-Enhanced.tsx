@@ -32,6 +32,7 @@ import { SecurePasswordInput } from "@/components/auth/PasswordStrengthMeter";
 import { EmailVerificationFlow } from "@/components/auth/EmailVerificationFlow";
 import { MultiStepRegistration, type RegistrationFormData } from "@/components/auth/MultiStepRegistration";
 import { EmailWaitingPage } from "@/components/auth/EmailWaitingPage";
+import { supabase } from "@/integrations/supabase/client";
 
 type AuthMode = 'login' | 'forgot-password' | 'reset-password' | 'multi-step-register' | 'email-verification' | 'email-waiting';
 
@@ -107,6 +108,32 @@ const AuthReal = () => {
     }
   }, [mode, searchParams]);
 
+  // Persistent device login: auto-redirect to dashboard if already authenticated
+  useEffect(() => {
+    const urlMode = searchParams.get("mode");
+    // Don't auto-redirect if user is explicitly navigating to signup/register/reset flows
+    if (urlMode === "signup" || urlMode === "register" || urlMode === "multi-step" || urlMode === "forgot-password" || urlMode === "reset-password" || urlMode === "verify-email") return;
+
+    let cancelled = false;
+    const checkExistingSession = async () => {
+      try {
+        const { data: { session } } = await supabase.auth.getSession();
+        if (cancelled || !session?.user) return;
+
+        // User has a valid persisted session — redirect to their dashboard
+        const role = session.user.user_metadata?.registration_role || localStorage.getItem('current_user_role') || 'company_owner';
+        // Keep localStorage in sync
+        localStorage.setItem('current_user_role', role);
+        localStorage.setItem('pending_registration_role', role);
+        navigate(getDashboardRoute(role), { replace: true });
+      } catch {
+        // Session check failed — stay on auth page
+      }
+    };
+    checkExistingSession();
+    return () => { cancelled = true; };
+  }, [searchParams, navigate]);
+
   const roleOptions = [
     { value: "company_owner", label: "Company Owner", icon: Building2, description: "Business owner needing compliance management" },
     { value: "external_ca", label: "External CA", icon: UserCheck, description: "Chartered Accountant providing services" },
@@ -118,7 +145,6 @@ const AuthReal = () => {
 
   // Dashboard route mapper - defined early so it can be used in handlers
   const getDashboardRoute = (role: string): string => {
-    console.log('getDashboardRoute called with role:', role);
     switch (role) {
       case "external_ca":
         return "/real-external-ca-dashboard";
@@ -127,16 +153,12 @@ const AuthReal = () => {
       case "ca_firm":
         return "/ca-firm-dashboard";
       case "admin":
-        console.log('  -> returning /admin-dashboard');
         return "/admin-dashboard";
       case "in_house_lawyer":
-        console.log('  -> returning /lawyer-dashboard');
         return "/lawyer-dashboard";
       case "company_owner":
-        console.log('  -> returning /dashboard');
         return "/real-company-dashboard";
       default:
-        console.log('  -> returning /dashboard (default)');
         return "/real-company-dashboard";
     }
   };
