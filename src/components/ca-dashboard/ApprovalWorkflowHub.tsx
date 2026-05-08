@@ -27,7 +27,7 @@ const STATE_CONFIG: Record<string, Pick<ApprovalItem, 'label' | 'color' | 'bg' |
   ready_file: { step: 5, label: 'Ready for Portal Filing', color: 'text-purple-500', bg: 'bg-purple-500/10', border: 'border-purple-500/30' },
 };
 
-const CA_API = (import.meta.env.VITE_CA_API_BASE_URL as string) || 'http://localhost:3001';
+const CA_API = (import.meta.env.VITE_CA_API_BASE_URL as string);
 
 export default function ApprovalWorkflowHub() {
   const [items, setItems] = useState<ApprovalItem[]>([]);

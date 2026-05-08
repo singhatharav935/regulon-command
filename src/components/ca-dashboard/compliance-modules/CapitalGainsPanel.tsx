@@ -9,7 +9,7 @@ import { Badge } from '@/components/ui/badge';
 import { Button } from '@/components/ui/button';
 import { toast } from 'sonner';
 
-const CA_API = (import.meta.env.VITE_CA_API_BASE_URL as string) || 'http://localhost:3001';
+const CA_API = (import.meta.env.VITE_CA_API_BASE_URL as string);
 const fmt = (n: number) => `₹${Math.round(n).toLocaleString('en-IN')}`;
 
 const CII: Record<string, number> = {

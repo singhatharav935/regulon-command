@@ -8,7 +8,7 @@ import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@
 import { Badge } from '@/components/ui/badge';
 import { toast } from 'sonner';
 
-const CA_API = (import.meta.env.VITE_CA_API_BASE_URL as string) || 'http://localhost:3001';
+const CA_API = (import.meta.env.VITE_CA_API_BASE_URL as string);
 const API_BASE = `${CA_API}/api/v1/corporate`;
 
 const DEPARTMENTS = ['GST', 'Income Tax', 'MCA', 'EPFO', 'ESI', 'Customs', 'Labour', 'RBI', 'SEBI'];
@@ -65,10 +65,10 @@ export default function NoticeTrackerPanel({ clientId, isDemo }: { clientId?: st
       toast.error('Fill in all required fields'); return;
     }
     
-    if (isDemo) {
+    if (CA_API?.includes('localhost:3001')) {
       const added = { ...newNotice, id: Date.now().toString(), status: 'received', traffic_light: 'yellow', days_left: 15, amount_involved: parseFloat(newNotice.amount_involved || '0') };
       setNotices([added, ...notices]);
-      toast.success('Notice added (Demo)');
+      toast.success('Notice added (Local)');
       setShowAddForm(false);
       return;
     }

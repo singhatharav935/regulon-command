@@ -1314,7 +1314,7 @@ const ExternalCADashboardReal = () => {
   const { metrics, loading, refetch } = useCAMetrics();
   const { caId, caFirmId } = useCAIdentity?.() || { caId: 'ca-001', caFirmId: 'firm-001' };
   const [activeZone, setActiveZone] = useState<CADashboardZone>("command");
-  const CA_API = (import.meta.env.VITE_CA_API_BASE_URL as string) || 'http://localhost:3001';
+  const CA_API = (import.meta.env.VITE_CA_API_BASE_URL as string);
   // Role-based access control
   useEffect(() => {
     const userRole = localStorage.getItem("current_user_role");

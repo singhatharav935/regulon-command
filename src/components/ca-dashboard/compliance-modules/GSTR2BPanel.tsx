@@ -8,7 +8,7 @@ import { Badge } from '@/components/ui/badge';
 import { toast } from 'sonner';
 import { useAICommunication } from '@/store/useAICommunication';
 
-const CA_API = (import.meta.env.VITE_CA_API_BASE_URL as string) || 'http://localhost:3001';
+const CA_API = (import.meta.env.VITE_CA_API_BASE_URL as string);
 const API_BASE = `${CA_API}/api/v1/compliance`;
 
 /**

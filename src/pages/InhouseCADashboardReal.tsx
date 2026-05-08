@@ -79,7 +79,7 @@ import { CACommandCenterHeader } from "@/components/agents/CACommandCenterHeader
 import { CAActionInbox } from "@/components/agents/CAActionInbox";
 
 // Daily Governance Brief Component
-const CA_API = (import.meta.env.VITE_CA_API_BASE_URL as string) || 'http://localhost:3001';
+const CA_API = (import.meta.env.VITE_CA_API_BASE_URL as string);
 
 const DailyGovernanceBrief = () => {
   const [briefData, setBriefData] = useState(null);
@@ -1305,7 +1305,7 @@ const InhouseCADashboardReal = () => {
   const [chatDrawerOpen, setChatDrawerOpen] = useState(false);
 
   // Compliance Service API URL
-  const COMPLIANCE_API = (import.meta.env.VITE_CA_API_BASE_URL as string) || 'http://localhost:3001';
+  const COMPLIANCE_API = (import.meta.env.VITE_CA_API_BASE_URL as string);
 
   // Fetch CA's clients from compliance service
   const fetchClients = async () => {

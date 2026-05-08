@@ -8,7 +8,7 @@ import { Input } from '@/components/ui/input';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
 import { toast } from 'sonner';
 
-const CA_API = (import.meta.env.VITE_CA_API_BASE_URL as string) || 'http://localhost:3001';
+const CA_API = (import.meta.env.VITE_CA_API_BASE_URL as string);
 const API_BASE = `${CA_API}/api/v1/corporate`;
 
 const DOCS = ['balance_sheet','pl_statement','cash_flow','gl_trial_balance','fixed_assets_schedule','debtors_schedule','creditors_schedule','bank_reconciliation','audit_report','board_resolutions','agm_minutes','shareholders_list','management_representation','rpt_disclosure','contingent_liabilities','notes_to_accounts','investments_schedule'];

@@ -50,7 +50,7 @@ const CapitalGainsPanel          = lazy(() => import('./CapitalGainsPanel'));
 const AdvanceTaxRadarPanel       = lazy(() => import('./AdvanceTaxRadarPanel'));
 const DeferredTaxDepreciationPanel = lazy(() => import('./DeferredTaxDepreciationPanel'));
 
-const CA_API = (import.meta.env.VITE_CA_API_BASE_URL as string) || 'http://localhost:3001';
+const CA_API = (import.meta.env.VITE_CA_API_BASE_URL as string);
 
 interface Module {
   id: string;

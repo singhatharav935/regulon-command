@@ -1,6 +1,6 @@
 import { motion } from "framer-motion";
 import { CASectionAgentBadge } from '../agents/CASectionAgentBadge';
-import { useEffect, useState } from "react";
+import { useEffect, useState, useCallback } from "react";
 import { 
   FileText, 
   AlertTriangle, 
@@ -33,7 +33,7 @@ import {
 } from "@/components/ui/table";
 
 
-const CA_API = (import.meta.env.VITE_CA_API_BASE_URL as string) || 'http://localhost:3001';
+const CA_API = (import.meta.env.VITE_CA_API_BASE_URL as string);
 
 interface TaskFilingManagementProps {
   isRealDashboard?: boolean;
@@ -101,9 +101,32 @@ const TaskFilingManagement = ({
     setFilteredTasks(filtered);
   }, [tasks, filterAuthority, filterUrgency, searchQuery, sortBy]);
 
-  const loadRealTaskData = async () => {
+  const loadRealTaskData = useCallback(async () => {
+    if (!isRealDashboard) return;
     setIsLoading(true);
     try {
+      if (!CA_API || CA_API.includes('localhost:3001')) {
+        const { loadCAClients } = await import('@/services/ca-supabase-service');
+        const clients = await loadCAClients();
+        const mockTasks: any[] = clients.slice(0, 5).map((c: any, i: number) => ({
+          id: `task-${i}`,
+          company: c.name,
+          company_id: c.id.substring(0, 8),
+          task: i % 2 === 0 ? 'GSTR-3B Filing' : 'ITR-6 Filing',
+          authority: i % 2 === 0 ? 'GST' : 'Income Tax',
+          filing_type: i % 2 === 0 ? 'GSTR-3B' : 'ITR-6',
+          dueDate: new Date(Date.now() + (5 + i) * 24 * 60 * 60 * 1000).toLocaleDateString(),
+          days_remaining: 5 + i,
+          status: i % 3 === 0 ? 'completed' : 'pending',
+          urgency: i % 2 === 0 ? 'critical' : 'high',
+          penalty: 'N/A'
+        }));
+        setTasks(mockTasks);
+        setFilteredTasks(mockTasks);
+        setIsLoading(false);
+        return;
+      }
+
       const { loadCAClients, getStatutoryDeadlines } = await import('@/services/ca-supabase-service');
       const [clients, deadlines] = await Promise.all([loadCAClients(), Promise.resolve(getStatutoryDeadlines())]);
 
@@ -149,7 +172,7 @@ const TaskFilingManagement = ({
     } finally {
       setIsLoading(false);
     }
-  };
+  }, [isRealDashboard]);
 
   // Action Handlers
   const handleSendReminder = async (task: any) => {

@@ -9,7 +9,7 @@ import { Badge } from '@/components/ui/badge';
 import { Button } from '@/components/ui/button';
 import { toast } from 'sonner';
 
-const CA_API = (import.meta.env.VITE_CA_API_BASE_URL as string) || 'http://localhost:3001';
+const CA_API = (import.meta.env.VITE_CA_API_BASE_URL as string);
 
 interface RegimeResult {
   old_regime: { gross_salary: number; hra_exemption: number; standard_deduction: number; total_deductions: number; taxable_income: number; tax_liability: number };

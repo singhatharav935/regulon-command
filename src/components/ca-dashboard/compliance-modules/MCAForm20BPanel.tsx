@@ -6,7 +6,7 @@ import { Button } from '@/components/ui/button';
 import { toast } from 'sonner';
 import { jsPDF } from 'jspdf';
 
-const CA_API = (import.meta.env.VITE_CA_API_BASE_URL as string) || 'http://localhost:3001';
+const CA_API = (import.meta.env.VITE_CA_API_BASE_URL as string);
 const API_BASE = `${CA_API}/api/v1/corporate`;
 
 export default function MCAForm20BPanel({ clientId, isDemo }: { clientId?: string; isDemo?: boolean }) {

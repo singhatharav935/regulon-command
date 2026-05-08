@@ -3,32 +3,32 @@ import { Award, CheckCircle2 } from "lucide-react";
 
 const teamMembers = [
   {
-    name: "Rajesh Kumar, CA",
-    role: "Senior Compliance Partner",
-    specialization: "Corporate Law & MCA",
-    experience: "15+ years",
-    image: "https://images.unsplash.com/photo-1560250097-0b93528c311a?w=400&h=400&fit=crop&crop=face",
+    name: "CA Arpit Jain",
+    role: "Senior Tax Consultant",
+    specialization: "Corporate Taxation & Audits",
+    experience: "5+ years",
+    initials: "AJ"
   },
   {
-    name: "Priya Sharma, CA",
-    role: "Tax Compliance Head",
-    specialization: "GST & Income Tax",
-    experience: "12+ years",
-    image: "https://images.unsplash.com/photo-1573496359142-b8d87734a5a2?w=400&h=400&fit=crop&crop=face",
+    name: "CA Sangeeta Gupta",
+    role: "GST & Indirect Tax Expert",
+    specialization: "GST Compliance & Litigation",
+    experience: "4+ years",
+    initials: "SG"
   },
   {
-    name: "Amit Patel, CA",
-    role: "Financial Regulations Lead",
-    specialization: "RBI & SEBI Compliance",
-    experience: "18+ years",
-    image: "https://images.unsplash.com/photo-1472099645785-5658abf4ff4e?w=400&h=400&fit=crop&crop=face",
+    name: "CA Varun Mehta",
+    role: "Corporate Governance Lead",
+    specialization: "MCA & Secretarial Audits",
+    experience: "5+ years",
+    initials: "VM"
   },
   {
-    name: "Sunita Reddy, LLB",
-    role: "Legal Review Partner",
-    specialization: "Contract & Corporate Law",
-    experience: "14+ years",
-    image: "https://images.unsplash.com/photo-1580489944761-15a19d654956?w=400&h=400&fit=crop&crop=face",
+    name: "CA Anjali Verma",
+    role: "Advisory & Regulatory Head",
+    specialization: "FEMA & RBI Compliance",
+    experience: "3+ years",
+    initials: "AV"
   },
 ];
 
@@ -66,12 +66,10 @@ const TeamSection = () => {
               transition={{ duration: 0.5, delay: index * 0.1 }}
               className="glass-card-hover p-6 text-center"
             >
-              <div className="relative w-24 h-24 mx-auto mb-4">
-                <img
-                  src={member.image}
-                  alt={member.name}
-                  className="w-full h-full rounded-full object-cover border-2 border-primary/30"
-                />
+              <div className="relative w-20 h-20 mx-auto mb-4">
+                <div className="w-full h-full rounded-full bg-primary/10 flex items-center justify-center border-2 border-primary/30 text-primary font-bold text-xl">
+                  {member.initials}
+                </div>
                 <div className="absolute -bottom-1 -right-1 w-6 h-6 rounded-full bg-primary flex items-center justify-center">
                   <CheckCircle2 className="w-4 h-4 text-primary-foreground" />
                 </div>

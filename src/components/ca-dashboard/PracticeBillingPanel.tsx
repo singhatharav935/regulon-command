@@ -45,7 +45,7 @@ interface BillingStats {
   collected_change_pct: number;
 }
 
-const CA_API = (import.meta.env.VITE_CA_API_BASE_URL as string) || 'http://localhost:3001';
+const CA_API = (import.meta.env.VITE_CA_API_BASE_URL as string);
 
 export default function PracticeBillingPanel() {
   const { setActivePrompt, setDrawerOpen } = useAICommunication();

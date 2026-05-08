@@ -83,7 +83,7 @@ const AgentWorkReview = () => {
     }
     setLoadingAgentLogs(true);
     try {
-      const CA_API = (import.meta.env.VITE_CA_API_BASE_URL as string) || 'http://localhost:3001';
+      const CA_API = (import.meta.env.VITE_CA_API_BASE_URL as string);
       const token = user?.id ? localStorage.getItem(`sb-${user.id}-auth-token`) : null;
       const headers: Record<string, string> = { 'Content-Type': 'application/json' };
       if (token) headers['Authorization'] = `Bearer ${token}`;

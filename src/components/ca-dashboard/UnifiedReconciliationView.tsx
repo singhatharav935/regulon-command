@@ -39,7 +39,7 @@ interface UnifiedReconciliationProps {
   caId?: string;
 }
 
-const CA_API = (import.meta.env.VITE_CA_API_BASE_URL as string) || 'http://localhost:3001';
+const CA_API = (import.meta.env.VITE_CA_API_BASE_URL as string);
 
 export default function UnifiedReconciliationView({
   isRealDashboard = false,

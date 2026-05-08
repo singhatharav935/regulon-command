@@ -26,5 +26,5 @@ export function isCABackendConfigured(): boolean {
  * Use this instead of repeating the env-var + fallback pattern everywhere.
  */
 export function getCAAPIBaseURL(): string {
-  return (import.meta.env.VITE_CA_API_BASE_URL as string) || 'http://localhost:3001';
+  return (import.meta.env.VITE_CA_API_BASE_URL as string);
 }

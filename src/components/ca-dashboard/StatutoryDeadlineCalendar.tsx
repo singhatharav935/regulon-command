@@ -1,11 +1,11 @@
-import React, { useState, useEffect } from 'react';
+import React, { useState, useEffect, useCallback } from 'react';
 import { isCABackendConfigured } from '@/lib/ca-backend-guard';
 import { motion } from 'framer-motion';
 import { CalendarDays, BellRing, Clock, AlertTriangle, RefreshCw, Calendar } from 'lucide-react';
 import { Card, CardContent } from '@/components/ui/card';
 import { Badge } from '@/components/ui/badge';
 import { Button } from '@/components/ui/button';
-const CA_API = (import.meta.env.VITE_CA_API_BASE_URL as string) || 'http://localhost:3001';
+const CA_API = (import.meta.env.VITE_CA_API_BASE_URL as string);
 
 interface RealDeadline {
   id: string;
@@ -27,9 +27,20 @@ export default function StatutoryDeadlineCalendar() {
   const [escalations, setEscalations] = useState<ExternalEscalation[]>([]);
   const [isLoading, setIsLoading] = useState(true);
 
-  const fetchCalendar = async () => {
+  const fetchCalendar = useCallback(async () => {
     setIsLoading(true);
     try {
+      if (!CA_API || CA_API.includes('localhost:3001')) {
+        const year = new Date().getFullYear();
+        setDeadlines([
+          { id: '1', date: `11 ${new Date().toLocaleString('default', { month: 'short' })}`, label: 'GSTR-1 — GST', active: true, urgency: 'high' },
+          { id: '2', date: `20 ${new Date().toLocaleString('default', { month: 'short' })}`, label: 'GSTR-3B — GST', active: true, urgency: 'critical' },
+          { id: '3', date: `07 ${new Date().toLocaleString('default', { month: 'short' })}`, label: 'TDS — Income Tax', active: false, urgency: 'normal' },
+        ]);
+        setEscalations([]);
+        return;
+      }
+
       const { getStatutoryDeadlines, loadCAClients } = await import('@/services/ca-supabase-service');
       const [rawDeadlines, clients] = await Promise.all([Promise.resolve(getStatutoryDeadlines()), loadCAClients()]);
 
@@ -57,7 +68,7 @@ export default function StatutoryDeadlineCalendar() {
     } finally {
       setIsLoading(false);
     }
-  };
+  }, []);
 
   useEffect(() => { fetchCalendar(); }, []);
 
