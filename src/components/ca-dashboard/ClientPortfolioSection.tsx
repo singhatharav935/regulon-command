@@ -328,18 +328,11 @@ const ClientPortfolioSection = ({
                   </div>
 
                   {/* Info Box */}
-                  <div className={`p-3 rounded-lg border text-xs ${
-                    backendOnline === false
-                      ? 'bg-yellow-500/10 border-yellow-500/30 text-yellow-300'
-                      : 'bg-blue-500/10 border-blue-500/20 text-blue-300'
-                  }`}>
+                  <div className="p-3 rounded-lg border text-xs bg-blue-500/10 border-blue-500/20 text-blue-300">
                     <p className="flex items-start gap-2">
                       <Shield className="w-4 h-4 mt-0.5 flex-shrink-0" />
                       <span>
-                        {backendOnline === false
-                          ? "Backend server is currently offline. Your request will be saved locally and sent automatically once the server reconnects."
-                          : "A secure consent link will be sent via WhatsApp & Email. Data will only be fetched after client authorization."
-                        }
+                        A secure consent link will be sent via WhatsApp & Email. Data will only be fetched after client authorization.
                       </span>
                     </p>
                   </div>
