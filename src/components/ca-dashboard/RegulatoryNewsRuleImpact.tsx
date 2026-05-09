@@ -552,6 +552,8 @@ const GOVERNMENT_PORTALS = [
   { code: 'MSME', name: 'Ministry of MSME', url: 'https://msme.gov.in', icon: '🏭' },
 ];
 
+import { getLiveRegulatoryNews } from '@/services/ca-supabase-service';
+
 export default function RegulatoryNewsRuleImpact({
   isRealDashboard = false,
   apiEndpoint = `${(import.meta.env.VITE_CA_API_BASE_URL as string)}/api/v1/ca/regulatory-news`,
@@ -577,8 +579,9 @@ export default function RegulatoryNewsRuleImpact({
   useEffect(() => {
     if (isRealDashboard) {
       // Real mode - use live regulatory data immediately
-      setNews(LIVE_REGULATORY_NEWS);
-      setFilteredNews(LIVE_REGULATORY_NEWS);
+      const initialNews = getLiveRegulatoryNews();
+      setNews(initialNews as any);
+      setFilteredNews(initialNews as any);
       setLastSync(new Date());
       // Also try to fetch from backend for any updates
       fetchRegulatoryNews();
@@ -598,19 +601,6 @@ export default function RegulatoryNewsRuleImpact({
       setAiFetchingStatus('scanning');
 
       // AI scanning government portals animation
-      const CA_API = (import.meta.env.VITE_CA_API_BASE_URL as string);
-      if (!CA_API || CA_API.includes('localhost:3001')) {
-        // Fallback to high-quality live regulatory news already included in the component
-        setTimeout(() => {
-          setNews(LIVE_REGULATORY_NEWS);
-          setFilteredNews(LIVE_REGULATORY_NEWS);
-          setLastSync(new Date());
-          setLoading(false);
-          setAiFetchingStatus('complete');
-        }, 1200);
-        return;
-      }
-      
       await new Promise(resolve => setTimeout(resolve, 800));
       setAiFetchingStatus('analyzing');
 
@@ -626,24 +616,30 @@ export default function RegulatoryNewsRuleImpact({
 
       if (response.ok) {
         const data = await response.json();
-        // If API returns data, use it; otherwise keep LIVE_REGULATORY_NEWS
+        // If API returns data, use it; otherwise use centralized service fallback
         if (data.news && data.news.length > 0) {
           setNews(data.news);
           setFilteredNews(data.news);
+        } else {
+          const fallbackNews = getLiveRegulatoryNews();
+          setNews(fallbackNews as any);
+          setFilteredNews(fallbackNews as any);
         }
         setLastSync(new Date());
       } else {
-        // API failed, ensure we still have live data
-        setNews(LIVE_REGULATORY_NEWS);
-        setFilteredNews(LIVE_REGULATORY_NEWS);
+        // API failed, use centralized service fallback
+        const fallbackNews = getLiveRegulatoryNews();
+        setNews(fallbackNews as any);
+        setFilteredNews(fallbackNews as any);
         setLastSync(new Date());
       }
     } catch (error) {
       console.error('Failed to fetch regulatory news:', error);
-      // Ensure live data is shown even on error
+      // Ensure live data is shown even on error using centralized service
       if (news.length === 0) {
-        setNews(LIVE_REGULATORY_NEWS);
-        setFilteredNews(LIVE_REGULATORY_NEWS);
+        const fallbackNews = getLiveRegulatoryNews();
+        setNews(fallbackNews as any);
+        setFilteredNews(fallbackNews as any);
       }
       setLastSync(new Date());
       setAiFetchingStatus('complete');

@@ -40,7 +40,7 @@ export const PERSONA_CONFIG: Record<PersonaType, PersonaConfig> = {
     description: 'Firm Management - Manage CAs and clients',
     icon: '🏢',
     color: 'bg-purple-500',
-    dashboardRoute: '/ca-firm-dashboard',
+    dashboardRoute: '/dashboards/ca-firm',
   },
   inhouse_lawyer: {
     id: 'inhouse_lawyer',

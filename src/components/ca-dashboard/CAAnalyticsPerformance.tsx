@@ -162,50 +162,55 @@ export default function CAAnalyticsPerformance({
     setLoading(true);
     setAiAnalyzing(true);
     try {
-      const { loadCAClients } = await import('@/services/ca-supabase-service');
-      const clients = await loadCAClients();
+      const { loadCAClients, getCAMetricsFromDB } = await import('@/services/ca-supabase-service');
+      const [clients, metrics] = await Promise.all([loadCAClients(), getCAMetricsFromDB()]);
 
       if (clients.length === 0) {
-        setAnalytics(null);
+        setAnalytics({
+          tasks_completed: 0, tasks_pending: 0, tasks_delayed: 0, tasks_on_time_percentage: 0, avg_closure_time_days: 0,
+          total_clients: 0, active_clients: 0, new_clients_this_month: 0, client_retention_rate: 0,
+          avg_compliance_score: 0, score_improvement: 0, risk_reduction_percentage: 0, critical_alerts_resolved: 0,
+          total_earnings: 0, this_month_earnings: 0, pending_invoices: 0, avg_billing_per_client: 0,
+          efficiency_score: 0, client_satisfaction_rating: 0, response_time_hours: 0, queries_resolved: 0,
+          ai_insights: ['Awaiting client data to generate insights'], ai_recommendations: ['Add your first client to start tracking compliance'], performance_trend: 'stable'
+        });
+        setLastSync(new Date());
         return;
       }
 
       const n = clients.length;
-      const avgHealth = Math.round(clients.reduce((s, c) => s + c.health, 0) / n);
+      const avgHealth = Math.round(clients.reduce((s, c) => s + c.health, 0) / n) || 0;
       const highRisk = clients.filter(c => c.risk === 'High').length;
-      const feePerClient = 12500;
-      const total = n * feePerClient * 3;
 
       const generated: CAAnalytics = {
-        tasks_completed: n * 3,
-        tasks_pending: n,
-        tasks_delayed: highRisk,
-        tasks_on_time_percentage: Math.max(60, avgHealth),
-        avg_closure_time_days: parseFloat((3.5 - highRisk * 0.2).toFixed(1)),
-        total_clients: n,
-        active_clients: Math.max(1, n - highRisk),
-        new_clients_this_month: Math.max(0, Math.floor(n * 0.15)),
-        client_retention_rate: Math.min(98, 100 - highRisk * 3),
+        tasks_completed: metrics.active_tasks, // In a full implementation, use separate completed count
+        tasks_pending: metrics.active_tasks,
+        tasks_delayed: metrics.overdue_dependencies,
+        tasks_on_time_percentage: Math.max(0, avgHealth),
+        avg_closure_time_days: 0, // Would come from DB
+        total_clients: metrics.assigned_companies,
+        active_clients: metrics.assigned_companies,
+        new_clients_this_month: 0, // Would come from DB date logic
+        client_retention_rate: 100,
         avg_compliance_score: avgHealth,
-        score_improvement: Math.round((avgHealth - 75) * 0.8),
-        risk_reduction_percentage: Math.max(8, 25 - highRisk * 3),
-        critical_alerts_resolved: highRisk * 4,
-        total_earnings: total,
-        this_month_earnings: Math.round(total * 0.2),
-        pending_invoices: Math.round(total * 0.08),
-        avg_billing_per_client: feePerClient * 3,
-        efficiency_score: Math.min(98, avgHealth + 5),
-        client_satisfaction_rating: parseFloat(Math.min(5, 4.2 + (avgHealth / 100) * 0.8).toFixed(1)),
-        response_time_hours: parseFloat((6 - avgHealth / 25).toFixed(1)),
-        queries_resolved: n * 12,
+        score_improvement: 0,
+        risk_reduction_percentage: 0,
+        critical_alerts_resolved: 0,
+        total_earnings: metrics.monthly_revenue,
+        this_month_earnings: metrics.monthly_revenue,
+        pending_invoices: 0, // Would come from invoices table
+        avg_billing_per_client: n > 0 ? metrics.monthly_revenue / n : 0,
+        efficiency_score: avgHealth,
+        client_satisfaction_rating: 0,
+        response_time_hours: 0,
+        queries_resolved: 0,
         ai_insights: [
-          `Task completion rate: ${Math.max(60, avgHealth)}% — ${avgHealth >= 80 ? 'excellent' : 'needs improvement'}`,
-          `${highRisk} client${highRisk !== 1 ? 's' : ''} require${highRisk === 1 ? 's' : ''} immediate compliance attention`,
-          `Average portfolio health score: ${avgHealth}% — ${avgHealth >= 80 ? 'healthy' : 'below target'}`,
+          `Task completion tracking active for ${n} clients`,
+          `${highRisk} client(s) marked as high risk`,
+          `Average portfolio health score: ${avgHealth}%`,
         ],
         ai_recommendations: [
-          highRisk > 0 ? `Schedule priority review for ${highRisk} high-risk client${highRisk > 1 ? 's' : ''}` : 'All clients on track — schedule quarterly health reviews',
-          'Automate GSTR-3B reminders 7 days before due date to improve on-time rate',
+          highRisk > 0 ? `Schedule priority review for ${highRisk} high-risk client(s)` : 'All clients on track — schedule quarterly health reviews',
         ],
         performance_trend: avgHealth >= 80 ? 'improving' : avgHealth >= 65 ? 'stable' : 'declining',
       };

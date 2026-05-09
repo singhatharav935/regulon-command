@@ -30,16 +30,6 @@ export default function StatutoryDeadlineCalendar() {
   const fetchCalendar = useCallback(async () => {
     setIsLoading(true);
     try {
-      if (!CA_API || CA_API.includes('localhost:3001')) {
-        const year = new Date().getFullYear();
-        setDeadlines([
-          { id: '1', date: `11 ${new Date().toLocaleString('default', { month: 'short' })}`, label: 'GSTR-1 — GST', active: true, urgency: 'high' },
-          { id: '2', date: `20 ${new Date().toLocaleString('default', { month: 'short' })}`, label: 'GSTR-3B — GST', active: true, urgency: 'critical' },
-          { id: '3', date: `07 ${new Date().toLocaleString('default', { month: 'short' })}`, label: 'TDS — Income Tax', active: false, urgency: 'normal' },
-        ]);
-        setEscalations([]);
-        return;
-      }
 
       const { getStatutoryDeadlines, loadCAClients } = await import('@/services/ca-supabase-service');
       const [rawDeadlines, clients] = await Promise.all([Promise.resolve(getStatutoryDeadlines()), loadCAClients()]);
