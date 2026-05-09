@@ -179,14 +179,7 @@ const App = () => (
                 </PersonaRoute>
               }
             />
-            <Route
-              path="/dashboards/ca-firm"
-              element={
-                <PersonaRoute allowedPersonas={["ca_firm"]}>
-                  <CAFirmDashboardReal />
-                </PersonaRoute>
-              }
-            />
+            <Route path="/dashboards/ca-firm" element={<CAFirmDashboardReal />} />
             {/* Phase 3: Full CA Firm Dashboard (coming soon) */}
             {/* <Route
               path="/dashboards/ca-firm/full"

@@ -42,21 +42,33 @@ const NAV = [
 ];
 
 export function CAFirmDashboardReal() {
-  const { currentUser, logout } = usePersonaAuth();
+  const { currentUser, logout: personaLogout } = usePersonaAuth();
   const navigate = useNavigate();
   const [tab, setTab] = useState('home');
   const [sidebarOpen, setSidebarOpen] = useState(true);
-  const [supabaseUid, setSupabaseUid] = useState<string | null>(null);
+  const [supabaseUser, setSupabaseUser] = useState<any>(null);
 
+  // Fetch Supabase user on mount (primary auth source)
   useEffect(() => {
     supabase.auth.getUser().then(({ data }) => {
-      if (data?.user?.id) setSupabaseUid(data.user.id);
+      if (data?.user) setSupabaseUser(data.user);
     });
   }, []);
 
-  const email = currentUser?.email || '';
+  // Role-based access control — redirect if not ca_firm
+  useEffect(() => {
+    const userRole = localStorage.getItem("current_user_role");
+    if (userRole && userRole !== "ca_firm") {
+      navigate("/dashboard");
+      return;
+    }
+  }, [navigate]);
+
+  // Use Supabase user email/id first, fallback to persona auth
+  const email = supabaseUser?.email || currentUser?.email || '';
+  const supabaseUid = supabaseUser?.id || null;
   const firmId = supabaseUid || (email ? getStableFirmId(email) : '');
-  const firmName = currentUser?.companyName || 'My CA Firm';
+  const firmName = supabaseUser?.user_metadata?.verification_entity_name || currentUser?.companyName || 'My CA Firm';
 
   const { data: members } = useFirmMembers(firmId);
   const { data: clients } = useFirmClients(firmId);
@@ -159,7 +171,16 @@ export function CAFirmDashboardReal() {
                 </div>
               </div>
               <button
-                onClick={() => { logout(); navigate('/'); }}
+                onClick={async () => {
+                  // Clear Supabase session
+                  await supabase.auth.signOut();
+                  // Clear persona auth
+                  personaLogout();
+                  // Clear role keys
+                  localStorage.removeItem('current_user_role');
+                  localStorage.removeItem('pending_registration_role');
+                  navigate('/');
+                }}
                 className="w-full flex items-center gap-2 px-3 py-2 rounded-lg text-xs text-slate-500 hover:text-rose-400 hover:bg-rose-500/10 transition-colors"
               >
                 <LogOut className="w-3.5 h-3.5" /> Sign Out
