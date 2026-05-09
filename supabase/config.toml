@@ -19,3 +19,7 @@ verify_jwt = false
 [functions.send-consent]
 enabled = true
 verify_jwt = false
+
+[functions.verify-identifier]
+enabled = true
+verify_jwt = false

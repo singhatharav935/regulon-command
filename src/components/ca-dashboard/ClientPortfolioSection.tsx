@@ -1,6 +1,6 @@
 import { createPortal } from "react-dom";
 import { motion, AnimatePresence } from "framer-motion";
-import { useEffect, useState, useCallback } from "react";
+import { useEffect, useState, useCallback, useRef } from "react";
 import {
   Building2, Clock, Plus, X, ChevronRight, Shield, Send, Loader,
   CheckCircle, XCircle, AlertCircle, RefreshCw, Mail, MessageSquare,
@@ -56,7 +56,40 @@ const ClientPortfolioSection = ({
     gstin: '', pan: '', cin: '', client_name: '', client_email: '', client_phone: '',
   });
 
-  // GSTIN validation state
+  // ── Government verification state ───────────────────────────────────────
+  type VerifyState = null | 'checking' | { ok: boolean; data: Record<string, string> };
+  const [gstinVerify, setGstinVerify] = useState<VerifyState>(null);
+  const [panVerify,   setPanVerify]   = useState<VerifyState>(null);
+  const [cinVerify,   setCinVerify]   = useState<VerifyState>(null);
+  const debounceRef = useRef<Record<string, ReturnType<typeof setTimeout>>>({});
+
+  const VERIFY_URL = `${import.meta.env.VITE_SUPABASE_URL}/functions/v1/verify-identifier`;
+
+  const verifyField = useCallback(
+    (type: 'gstin' | 'pan' | 'cin', value: string, setter: (s: VerifyState) => void) => {
+      clearTimeout(debounceRef.current[type]);
+      if (!value || value.length < 10) { setter(null); return; }
+      debounceRef.current[type] = setTimeout(async () => {
+        setter('checking');
+        try {
+          const res = await fetch(`${VERIFY_URL}?type=${type}&value=${encodeURIComponent(value)}`);
+          const d = await res.json();
+          setter({ ok: d.success === true, data: d });
+          // Auto-fill company name from GSTIN lookup
+          if (type === 'gstin' && d.success && (d.legal_name || d.trade_name)) {
+            setOnboardForm(prev =>
+              prev.client_name ? prev : { ...prev, client_name: d.legal_name || d.trade_name }
+            );
+          }
+        } catch {
+          setter({ ok: false, data: { error: 'Verification service unavailable' } });
+        }
+      }, 700);
+    },
+    [VERIFY_URL]
+  );
+
+  // GSTIN checksum validation (instant, no network)
   const gstinValidation = onboardForm.gstin
     ? (onboardForm.gstin.length === 15 ? validateGSTIN(onboardForm.gstin) : null)
     : null;
@@ -321,53 +354,131 @@ const ClientPortfolioSection = ({
                   <div className="p-4 rounded-lg bg-cyan-500/5 border border-cyan-500/20">
                     <h4 className="text-sm font-semibold text-cyan-400 mb-3">Company Identifiers (at least one)</h4>
                     <div className="space-y-3">
+
+                      {/* GSTIN with real-time GST Portal lookup */}
                       <div>
                         <label className="text-xs text-muted-foreground mb-1 block">GSTIN</label>
                         <div className="relative">
                           <Input
                             placeholder="e.g., 27AABCA1234C1ZS"
                             value={onboardForm.gstin}
-                            onChange={e => setOnboardForm(prev => ({ ...prev, gstin: e.target.value.toUpperCase() }))}
+                            onChange={e => {
+                              const v = e.target.value.toUpperCase();
+                              setOnboardForm(prev => ({ ...prev, gstin: v }));
+                              if (v.length === 15 && validateGSTIN(v).valid) {
+                                verifyField('gstin', v, setGstinVerify);
+                              } else {
+                                setGstinVerify(null);
+                              }
+                            }}
                             className={`bg-card border-border/50 pr-9 font-mono ${
                               gstinValidation?.valid ? 'border-green-500/50' :
                               gstinValidation !== null ? 'border-red-500/50' : ''
                             }`}
                           />
-                          {onboardForm.gstin.length > 0 && (
-                            <div className="absolute right-3 top-1/2 -translate-y-1/2">
-                              {gstinValidation?.valid
-                                ? <CheckCircle className="w-4 h-4 text-green-400" />
-                                : onboardForm.gstin.length === 15
-                                  ? <XCircle className="w-4 h-4 text-red-400" />
-                                  : <AlertCircle className="w-4 h-4 text-amber-400" />}
-                            </div>
-                          )}
+                          <div className="absolute right-3 top-1/2 -translate-y-1/2">
+                            {gstinVerify === 'checking'
+                              ? <Loader className="w-4 h-4 text-cyan-400 animate-spin" />
+                              : gstinVerify && typeof gstinVerify === 'object'
+                                ? gstinVerify.ok
+                                  ? <CheckCircle className="w-4 h-4 text-green-400" />
+                                  : <AlertCircle className="w-4 h-4 text-amber-400" />
+                                : onboardForm.gstin.length > 0
+                                  ? gstinValidation?.valid
+                                    ? <CheckCircle className="w-4 h-4 text-green-400" />
+                                    : onboardForm.gstin.length === 15
+                                      ? <XCircle className="w-4 h-4 text-red-400" />
+                                      : <AlertCircle className="w-4 h-4 text-amber-400" />
+                                  : null}
+                          </div>
                         </div>
-                        {gstinValidation?.valid && (
-                          <p className="text-xs text-green-400 mt-1">✓ Valid — {gstinValidation.stateName} · PAN: {gstinValidation.pan}</p>
+                        {/* Verification result badges */}
+                        {gstinVerify === 'checking' && (
+                          <p className="text-xs text-cyan-400 mt-1 flex items-center gap-1">
+                            <Loader className="w-3 h-3 animate-spin" />
+                            Verifying with Government GST Records...
+                          </p>
+                        )}
+                        {gstinVerify && typeof gstinVerify === 'object' && gstinVerify.ok && (
+                          <div className="mt-1.5 p-2 rounded-lg bg-green-500/10 border border-green-500/20 text-xs space-y-0.5">
+                            <p className="text-green-400 font-semibold">✅ Verified — {gstinVerify.data.legal_name || gstinVerify.data.trade_name}</p>
+                            {gstinVerify.data.trade_name && gstinVerify.data.trade_name !== gstinVerify.data.legal_name && (
+                              <p className="text-green-300/70">Trade Name: {gstinVerify.data.trade_name}</p>
+                            )}
+                            <div className="flex gap-3 mt-1 flex-wrap">
+                              {gstinVerify.data.status && <span className="text-green-300/70">Status: {gstinVerify.data.status}</span>}
+                              {gstinVerify.data.registration_date && <span className="text-green-300/70">Since: {gstinVerify.data.registration_date}</span>}
+                              {gstinVerify.data.business_type && <span className="text-green-300/70">{gstinVerify.data.business_type}</span>}
+                            </div>
+                            {gstinVerify.data.source && <p className="text-green-300/40 text-[10px]">Source: {gstinVerify.data.source}</p>}
+                          </div>
+                        )}
+                        {gstinVerify && typeof gstinVerify === 'object' && !gstinVerify.ok && (
+                          <p className="text-xs text-amber-400 mt-1">⚠️ {gstinVerify.data.error || 'Not found in government records'}</p>
+                        )}
+                        {!gstinVerify && gstinValidation?.valid && (
+                          <p className="text-xs text-green-400 mt-1">✓ Format Valid — {gstinValidation.stateName} · PAN: {gstinValidation.pan}</p>
                         )}
                         {gstinValidation && !gstinValidation.valid && (
                           <p className="text-xs text-red-400 mt-1">✗ {gstinValidation.error}</p>
                         )}
                       </div>
+
+                      {/* PAN with entity-type decode */}
                       <div className="grid grid-cols-2 gap-3">
                         <div>
                           <label className="text-xs text-muted-foreground mb-1 block">PAN</label>
                           <Input
                             placeholder="e.g., AABCA1234C"
                             value={onboardForm.pan}
-                            onChange={e => setOnboardForm(prev => ({ ...prev, pan: e.target.value.toUpperCase() }))}
-                            className="bg-card border-border/50 font-mono"
+                            onChange={e => {
+                              const v = e.target.value.toUpperCase();
+                              setOnboardForm(prev => ({ ...prev, pan: v }));
+                              verifyField('pan', v, setPanVerify);
+                            }}
+                            className={`bg-card border-border/50 font-mono ${
+                              panVerify && typeof panVerify === 'object'
+                                ? panVerify.ok ? 'border-green-500/50' : 'border-red-500/50'
+                                : ''
+                            }`}
                           />
+                          {panVerify === 'checking' && (
+                            <p className="text-xs text-cyan-400 mt-1 flex items-center gap-1"><Loader className="w-3 h-3 animate-spin" />Checking...</p>
+                          )}
+                          {panVerify && typeof panVerify === 'object' && panVerify.ok && (
+                            <p className="text-xs text-green-400 mt-1">✅ {panVerify.data.entity_type}</p>
+                          )}
+                          {panVerify && typeof panVerify === 'object' && !panVerify.ok && (
+                            <p className="text-xs text-red-400 mt-1">✗ Invalid PAN format</p>
+                          )}
                         </div>
+
+                        {/* CIN with company metadata decode */}
                         <div>
                           <label className="text-xs text-muted-foreground mb-1 block">CIN</label>
                           <Input
                             placeholder="e.g., U74999KA2020PTC..."
                             value={onboardForm.cin}
-                            onChange={e => setOnboardForm(prev => ({ ...prev, cin: e.target.value.toUpperCase() }))}
-                            className="bg-card border-border/50 font-mono"
+                            onChange={e => {
+                              const v = e.target.value.toUpperCase();
+                              setOnboardForm(prev => ({ ...prev, cin: v }));
+                              verifyField('cin', v, setCinVerify);
+                            }}
+                            className={`bg-card border-border/50 font-mono ${
+                              cinVerify && typeof cinVerify === 'object'
+                                ? cinVerify.ok ? 'border-green-500/50' : 'border-red-500/50'
+                                : ''
+                            }`}
                           />
+                          {cinVerify === 'checking' && (
+                            <p className="text-xs text-cyan-400 mt-1 flex items-center gap-1"><Loader className="w-3 h-3 animate-spin" />Checking...</p>
+                          )}
+                          {cinVerify && typeof cinVerify === 'object' && cinVerify.ok && (
+                            <p className="text-xs text-green-400 mt-1">✅ {cinVerify.data.entity_type} · {cinVerify.data.state} · Est. {cinVerify.data.incorporated_year}</p>
+                          )}
+                          {cinVerify && typeof cinVerify === 'object' && !cinVerify.ok && (
+                            <p className="text-xs text-red-400 mt-1">✗ Invalid CIN format</p>
+                          )}
                         </div>
                       </div>
                     </div>
