@@ -44,6 +44,7 @@ const ProfileSettings = () => {
     setAvatarUrl,
     setFirmName,
     setIcaiNumber,
+    clearProfile,
   } = useUserProfile();
 
   const fileInputRef = useRef<HTMLInputElement>(null);
@@ -153,6 +154,7 @@ const ProfileSettings = () => {
   };
 
   const handleLogout = async () => {
+    clearProfile(); // Wipe stale avatar/name before navigating
     await supabase.auth.signOut();
     localStorage.removeItem("current_user_role");
     localStorage.removeItem("pending_registration_role");

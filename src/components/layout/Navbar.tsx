@@ -55,7 +55,7 @@ const Navbar = () => {
   const navigate = useNavigate();
   const location = useLocation();
   const { user, persona, loading } = useAuth();
-  const { displayName, avatarUrl } = useUserProfile();
+  const { displayName, avatarUrl, clearProfile } = useUserProfile();
   const [mobileOpen, setMobileOpen] = useState(false);
   const [activeDropdown, setActiveDropdown] = useState<string | null>(null);
 
@@ -71,6 +71,7 @@ const Navbar = () => {
   const isOnDashboard = dashboardPrefixes.some(prefix => location.pathname.startsWith(prefix));
 
   const handleLogout = async () => {
+    clearProfile(); // Wipe stale avatar/name before navigating
     await supabase.auth.signOut();
     localStorage.removeItem("current_user_role");
     localStorage.removeItem("pending_registration_role");

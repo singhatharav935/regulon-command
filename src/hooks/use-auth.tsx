@@ -2,6 +2,7 @@ import { createContext, useContext, useEffect, useMemo, useState } from "react";
 import type { ReactNode } from "react";
 import type { Session, User } from "@supabase/supabase-js";
 import { supabase } from "@/integrations/supabase/client";
+import { useUserProfile } from "@/store/useUserProfile";
 import type { Database } from "@/integrations/supabase/types";
 
 type AppRole = Database["public"]["Enums"]["app_role"];
@@ -152,11 +153,14 @@ export const AuthProvider = ({ children }: { children: ReactNode }) => {
 
         if (initialSession?.user) {
           await loadIdentity(initialSession.user);
+          // Bind profile store to this user so the correct avatar/name loads
+          useUserProfile.getState().bindToUser(initialSession.user.id);
         } else {
           setRoles([]);
           setPersona(null);
           setVerificationStatus(null);
           setIsVerified(false);
+          useUserProfile.getState().clearProfile();
         }
       } catch (error) {
         if (!mounted) return;
@@ -187,11 +191,15 @@ export const AuthProvider = ({ children }: { children: ReactNode }) => {
       if (nextSession?.user) {
         // Do not block auth state propagation on profile/role fetches.
         void loadIdentity(nextSession.user);
+        // Bind profile store to the new user
+        useUserProfile.getState().bindToUser(nextSession.user.id);
       } else {
         setRoles([]);
         setPersona(null);
         setVerificationStatus(null);
         setIsVerified(false);
+        // Clear stale profile data from previous user
+        useUserProfile.getState().clearProfile();
       }
     });
 

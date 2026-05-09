@@ -2,6 +2,9 @@
  * Global user profile store — shared across all dashboards.
  * Persists avatar URL and display name to localStorage so the
  * avatar appears consistently in every navbar and profile page.
+ *
+ * IMPORTANT: Data is scoped to the authenticated user ID so that
+ * profiles never leak between different accounts on the same device.
  */
 import { create } from "zustand";
 
@@ -10,18 +13,31 @@ interface UserProfileState {
   avatarUrl: string | null;
   firmName: string;
   icaiNumber: string;
+  /** Currently bound user id – used to scope localStorage reads/writes */
+  _boundUserId: string | null;
   setDisplayName: (name: string) => void;
   setAvatarUrl: (url: string | null) => void;
   setFirmName: (name: string) => void;
   setIcaiNumber: (num: string) => void;
+  /**
+   * Bind the store to a specific user.  Call this whenever the
+   * authenticated user changes (login / auth state change).
+   * It loads that user's profile from localStorage and resets
+   * any stale data from a previous user.
+   */
+  bindToUser: (userId: string) => void;
+  /** Wipe the in-memory state (called on logout). */
+  clearProfile: () => void;
+  /** @deprecated Use bindToUser instead */
   loadFromStorage: () => void;
 }
 
-const STORAGE_KEY = "sannidh:user-profile";
+const STORAGE_PREFIX = "sannidh:user-profile:";
 
-const loadProfile = (): Partial<UserProfileState> => {
+/** Load profile data for a specific user id from localStorage */
+const loadProfileForUser = (userId: string): Record<string, any> => {
   try {
-    const raw = localStorage.getItem(STORAGE_KEY);
+    const raw = localStorage.getItem(`${STORAGE_PREFIX}${userId}`);
     if (raw) return JSON.parse(raw);
   } catch {
     // ignore
@@ -29,46 +45,66 @@ const loadProfile = (): Partial<UserProfileState> => {
   return {};
 };
 
-const persist = (state: Partial<UserProfileState>) => {
+/** Persist a partial update for the currently bound user */
+const persistForUser = (userId: string | null, patch: Record<string, any>) => {
+  if (!userId) return; // not bound yet — nothing to persist
   try {
-    const prev = loadProfile();
+    const prev = loadProfileForUser(userId);
     localStorage.setItem(
-      STORAGE_KEY,
-      JSON.stringify({ ...prev, ...state })
+      `${STORAGE_PREFIX}${userId}`,
+      JSON.stringify({ ...prev, ...patch })
     );
   } catch {
     // ignore
   }
 };
 
-export const useUserProfile = create<UserProfileState>((set) => ({
-  displayName: loadProfile().displayName ?? "",
-  avatarUrl: (loadProfile() as any).avatarUrl ?? null,
-  firmName: (loadProfile() as any).firmName ?? "",
-  icaiNumber: (loadProfile() as any).icaiNumber ?? "",
+const emptyProfile = {
+  displayName: "",
+  avatarUrl: null as string | null,
+  firmName: "",
+  icaiNumber: "",
+};
+
+export const useUserProfile = create<UserProfileState>((set, get) => ({
+  ...emptyProfile,
+  _boundUserId: null,
+
   setDisplayName: (name) => {
     set({ displayName: name });
-    persist({ displayName: name } as any);
+    persistForUser(get()._boundUserId, { displayName: name });
   },
   setAvatarUrl: (url) => {
     set({ avatarUrl: url });
-    persist({ avatarUrl: url } as any);
+    persistForUser(get()._boundUserId, { avatarUrl: url });
   },
   setFirmName: (name) => {
     set({ firmName: name });
-    persist({ firmName: name } as any);
+    persistForUser(get()._boundUserId, { firmName: name });
   },
   setIcaiNumber: (num) => {
     set({ icaiNumber: num });
-    persist({ icaiNumber: num } as any);
+    persistForUser(get()._boundUserId, { icaiNumber: num });
   },
-  loadFromStorage: () => {
-    const p = loadProfile();
+
+  bindToUser: (userId: string) => {
+    const current = get()._boundUserId;
+    if (current === userId) return; // already bound
+
+    const p = loadProfileForUser(userId);
     set({
-      displayName: (p as any).displayName ?? "",
-      avatarUrl: (p as any).avatarUrl ?? null,
-      firmName: (p as any).firmName ?? "",
-      icaiNumber: (p as any).icaiNumber ?? "",
+      _boundUserId: userId,
+      displayName: p.displayName ?? "",
+      avatarUrl: p.avatarUrl ?? null,
+      firmName: p.firmName ?? "",
+      icaiNumber: p.icaiNumber ?? "",
     });
   },
+
+  clearProfile: () => {
+    set({ ...emptyProfile, _boundUserId: null });
+  },
+
+  // Legacy compat — no-op; real binding happens in bindToUser
+  loadFromStorage: () => {},
 }));

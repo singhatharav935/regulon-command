@@ -109,29 +109,51 @@ const AuthReal = () => {
   }, [mode, searchParams]);
 
   // Persistent device login: auto-redirect to dashboard if already authenticated
+  // Also handles email-verification callbacks (Supabase redirects here with a hash token)
   useEffect(() => {
     const urlMode = searchParams.get("mode");
     // Don't auto-redirect if user is explicitly navigating to signup/register/reset flows
     if (urlMode === "signup" || urlMode === "register" || urlMode === "multi-step" || urlMode === "forgot-password" || urlMode === "reset-password" || urlMode === "verify-email") return;
 
     let cancelled = false;
+
+    const redirectToDashboard = (userOrSession: any) => {
+      if (cancelled) return;
+      // Determine role: URL param > user_metadata > localStorage > default
+      const urlRole = searchParams.get("role");
+      const role = urlRole || userOrSession?.user_metadata?.registration_role || localStorage.getItem('current_user_role') || 'company_owner';
+      // Keep localStorage in sync
+      localStorage.setItem('current_user_role', role);
+      localStorage.setItem('pending_registration_role', role);
+      navigate(getDashboardRoute(role), { replace: true });
+    };
+
+    // 1) Check existing session first (covers "already logged in" case)
     const checkExistingSession = async () => {
       try {
         const { data: { session } } = await supabase.auth.getSession();
         if (cancelled || !session?.user) return;
-
-        // User has a valid persisted session — redirect to their dashboard
-        const role = session.user.user_metadata?.registration_role || localStorage.getItem('current_user_role') || 'company_owner';
-        // Keep localStorage in sync
-        localStorage.setItem('current_user_role', role);
-        localStorage.setItem('pending_registration_role', role);
-        navigate(getDashboardRoute(role), { replace: true });
+        redirectToDashboard(session.user);
       } catch {
         // Session check failed — stay on auth page
       }
     };
     checkExistingSession();
-    return () => { cancelled = true; };
+
+    // 2) Also listen for auth state changes — covers the email-verification
+    //    callback where Supabase is still processing the hash token when
+    //    getSession() runs above.
+    const { data: { subscription } } = supabase.auth.onAuthStateChange((event, session) => {
+      if (cancelled || !session?.user) return;
+      if (event === 'SIGNED_IN' || event === 'TOKEN_REFRESHED') {
+        redirectToDashboard(session.user);
+      }
+    });
+
+    return () => {
+      cancelled = true;
+      subscription.unsubscribe();
+    };
   }, [searchParams, navigate]);
 
   const roleOptions = [
