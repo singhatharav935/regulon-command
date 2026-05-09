@@ -38,7 +38,8 @@ export const resolveLandingPath = ({
   if (effectivePersona === "in_house_lawyer") return "/lawyer-dashboard";
   if (effectivePersona === "external_ca") return "/real-external-ca-dashboard";
   if (effectivePersona === "in_house_ca") return "/real-inhouse-ca-dashboard";
-  if (effectivePersona === "ca_firm") return "/ca-firm-dashboard";
+  if (effectivePersona === "ca_firm") return "/dashboards/ca-firm";
+
   if (effectivePersona === "company_owner") return "/real-company-dashboard";
 
   if (roles.includes("admin")) return "/admin-dashboard";

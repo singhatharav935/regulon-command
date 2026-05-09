@@ -387,7 +387,8 @@ export const UserOnboardingFlow: React.FC = () => {
       case 'in_house_ca':
         return '/real-inhouse-ca-dashboard';
       case 'ca_firm':
-        return '/ca-firm-dashboard';
+        return '/dashboards/ca-firm';
+
       case 'admin':
         return '/admin-dashboard';
       case 'in_house_lawyer':

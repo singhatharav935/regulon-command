@@ -6,7 +6,7 @@ describe("RoleLandingRoute contract", () => {
     expect(resolveLandingPath({ persona: "admin", roles: [], metadataPersona: null })).toBe("/app/admin-dashboard");
     expect(resolveLandingPath({ persona: "in_house_lawyer", roles: [], metadataPersona: null })).toBe("/app/legal-dashboard");
     expect(resolveLandingPath({ persona: "external_ca", roles: [], metadataPersona: null })).toBe("/app/ca-dashboard");
-    expect(resolveLandingPath({ persona: "ca_firm", roles: [], metadataPersona: null })).toBe("/app/ca-firm-dashboard");
+    expect(resolveLandingPath({ persona: "ca_firm", roles: [], metadataPersona: null })).toBe("/dashboards/ca-firm");
     expect(resolveLandingPath({ persona: "company_owner", roles: [], metadataPersona: null })).toBe("/app/dashboard");
   });
 
