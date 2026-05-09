@@ -47,7 +47,7 @@ export default function LawyerContractManagement({
   contracts, companyId, userId,
 }: LawyerContractManagementProps) {
   const [search, setSearch] = useState("");
-  const [statusFilter, setStatusFilter] = useState("");
+  const [statusFilter, setStatusFilter] = useState("all");
   const [showAddModal, setShowAddModal] = useState(false);
   const [form, setForm] = useState({
     title: "", vendor_name: "", contract_type: "service_agreement",
@@ -62,7 +62,7 @@ export default function LawyerContractManagement({
   const filtered = contracts.filter(c => {
     const matchSearch = c.title.toLowerCase().includes(search.toLowerCase()) ||
                         c.vendor_name.toLowerCase().includes(search.toLowerCase());
-    const matchStatus = !statusFilter || c.status === statusFilter;
+    const matchStatus = statusFilter === "all" || !statusFilter || c.status === statusFilter;
     return matchSearch && matchStatus;
   });
 
@@ -112,7 +112,7 @@ export default function LawyerContractManagement({
             <SelectValue placeholder="All statuses" />
           </SelectTrigger>
           <SelectContent>
-            <SelectItem value="">All Statuses</SelectItem>
+            <SelectItem value="all">All Statuses</SelectItem>
             <SelectItem value="draft">Draft</SelectItem>
             <SelectItem value="negotiation">Negotiation</SelectItem>
             <SelectItem value="active">Active</SelectItem>

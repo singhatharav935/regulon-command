@@ -190,14 +190,7 @@ const App = () => (
                 </PersonaRoute>
               }
             /> */}
-            <Route
-              path="/dashboards/lawyer"
-              element={
-                <PersonaRoute allowedPersonas={["in_house_lawyer", "inhouse_lawyer"]}>
-                  <InhouseLawyerDashboardReal />
-                </PersonaRoute>
-              }
-            />
+            <Route path="/dashboards/lawyer" element={<InhouseLawyerDashboardReal />} />
             <Route
               path="/dashboards/owner"
               element={

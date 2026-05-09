@@ -33,7 +33,7 @@ interface LawyerLitigationTrackerProps {
 
 export default function LawyerLitigationTracker({ cases, companyId, userId }: LawyerLitigationTrackerProps) {
   const [search, setSearch] = useState("");
-  const [filter, setFilter] = useState("");
+  const [filter, setFilter] = useState("all");
   const [showAdd, setShowAdd] = useState(false);
   const [form, setForm] = useState({
     case_title: "", case_number: "", case_type: "civil",
@@ -46,7 +46,7 @@ export default function LawyerLitigationTracker({ cases, companyId, userId }: La
   const filtered = cases.filter(c => {
     const matchSearch = c.case_title.toLowerCase().includes(search.toLowerCase()) ||
                         c.case_number.toLowerCase().includes(search.toLowerCase());
-    const matchStatus = !filter || c.status === filter;
+    const matchStatus = filter === "all" || !filter || c.status === filter;
     return matchSearch && matchStatus;
   });
 
@@ -63,6 +63,7 @@ export default function LawyerLitigationTracker({ cases, companyId, userId }: La
     try {
       await addCase.mutateAsync({
         company_id: companyId,
+        created_by: userId,
         case_title: form.case_title,
         case_number: form.case_number,
         case_type: form.case_type,
@@ -125,7 +126,7 @@ export default function LawyerLitigationTracker({ cases, companyId, userId }: La
             <SelectValue placeholder="All statuses" />
           </SelectTrigger>
           <SelectContent>
-            <SelectItem value="">All Statuses</SelectItem>
+            <SelectItem value="all">All Statuses</SelectItem>
             <SelectItem value="ongoing">Ongoing</SelectItem>
             <SelectItem value="settled">Settled</SelectItem>
             <SelectItem value="completed">Completed</SelectItem>

@@ -97,9 +97,16 @@ function useUserCompanyId(userId: string | undefined): {
 
 export default function InhouseLawyerDashboardReal() {
   const navigate = useNavigate();
-  const { user } = useAuth();
+  const { user, loading: authLoading } = useAuth();
   const [activeTab, setActiveTab] = useState<TabId>("home");
   const [sidebarCollapsed, setSidebarCollapsed] = useState(false);
+
+  // Auth guard — redirect unauthenticated users
+  useEffect(() => {
+    if (!authLoading && !user) {
+      navigate("/auth", { replace: true });
+    }
+  }, [authLoading, user, navigate]);
 
   // Resolve company ID: company_members → user-scoped fallback
   const userId = user?.id || "";
@@ -120,15 +127,28 @@ export default function InhouseLawyerDashboardReal() {
   const pendingReviews = reviews.filter(r => r.review_status === "pending").length;
   const pendingNotices = notices.filter(n => n.status === "pending").length;
 
-  const BADGE_VALUES: Record<string, number> = {
-    pendingReviews,
-    pendingNotices,
-  };
+  const BADGE_VALUES: Record<string, number> = { pendingReviews, pendingNotices };
 
   const handleLogout = async () => {
     await supabase.auth.signOut();
     navigate("/auth");
   };
+
+  // Loading screen
+  if (authLoading) {
+    return (
+      <div className="min-h-screen flex items-center justify-center" style={{ background: "#060B18" }}>
+        <div className="flex flex-col items-center gap-4">
+          <div className="w-12 h-12 rounded-2xl bg-gradient-to-br from-indigo-500 to-violet-600 flex items-center justify-center animate-pulse">
+            <Scale className="w-6 h-6 text-white" />
+          </div>
+          <p className="text-slate-400 text-sm">Loading Legal Hub…</p>
+        </div>
+      </div>
+    );
+  }
+
+  if (!user) return null; // Redirect handled by useEffect above
 
   // Render active tab content
   const renderContent = () => {
