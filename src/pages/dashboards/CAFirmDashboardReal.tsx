@@ -7,19 +7,21 @@ import Navbar from '@/components/layout/Navbar';
 import Footer from '@/components/layout/Footer';
 import {
   LayoutDashboard, Users, Building2, Receipt, ShieldCheck,
-  FileArchive, LogOut, Bell, Settings, ChevronRight, Menu, X,
-  TrendingUp, AlertTriangle, Clock, IndianRupee, Zap
+  FileArchive, ChevronRight, Menu, X,
+  AlertTriangle, IndianRupee, Bot, Radar, Zap
 } from 'lucide-react';
-import { useFirmMembers, useFirmClients, useFirmInvoices } from '@/hooks/personas/useCAFirmData';
+import { useFirmMembers, useFirmClients, useFirmInvoices, useCAAssignments } from '@/hooks/personas/useCAFirmData';
 import { getStatutoryDeadlines } from '@/services/ca-supabase-service';
 
-// Lazy-load heavy modules
+// Dashboard tab components
 import FirmPulseHome from '@/components/ca-firm-dashboard/FirmPulseHome';
 import FirmClientManagement from '@/components/ca-firm-dashboard/FirmClientManagement';
 import TeamResourceAllocation from '@/components/ca-firm-dashboard/TeamResourceAllocation';
 import PracticeBillingWIP from '@/components/ca-firm-dashboard/PracticeBillingWIP';
 import ICAIQualityControl from '@/components/ca-firm-dashboard/ICAIQualityControl';
 import FirmDocumentVault from '@/components/ca-firm-dashboard/FirmDocumentVault';
+import FirmAutopilot from '@/components/ca-firm-dashboard/FirmAutopilot';
+import FirmScenarioLab from '@/components/ca-firm-dashboard/FirmScenarioLab';
 
 function getStableFirmId(email: string): string {
   const key = `sfid_${email}`;
@@ -35,12 +37,14 @@ function getStableFirmId(email: string): string {
 }
 
 const NAV = [
-  { id: 'home',     label: 'Dashboard',         icon: LayoutDashboard },
-  { id: 'clients',  label: 'Client Management',  icon: Building2 },
-  { id: 'team',     label: 'Team & Allocation',  icon: Users },
-  { id: 'billing',  label: 'Billing & WIP',      icon: Receipt },
-  { id: 'quality',  label: 'ICAI / SQC-1',       icon: ShieldCheck },
-  { id: 'vault',    label: 'Document Vault',      icon: FileArchive },
+  { id: 'home',      label: 'Dashboard',          icon: LayoutDashboard },
+  { id: 'autopilot', label: 'AI Command Centre',  icon: Bot },
+  { id: 'scenario',  label: 'Scenario Lab',       icon: Radar },
+  { id: 'clients',   label: 'Client Management',  icon: Building2 },
+  { id: 'team',      label: 'Team & Allocation',  icon: Users },
+  { id: 'billing',   label: 'Billing & WIP',      icon: Receipt },
+  { id: 'quality',   label: 'ICAI / SQC-1',       icon: ShieldCheck },
+  { id: 'vault',     label: 'Document Vault',      icon: FileArchive },
 ];
 
 export function CAFirmDashboardReal() {
@@ -75,6 +79,7 @@ export function CAFirmDashboardReal() {
   const { data: members } = useFirmMembers(firmId);
   const { data: clients } = useFirmClients(firmId);
   const { data: invoices } = useFirmInvoices(firmId);
+  const { data: assignments } = useCAAssignments(firmId);
   const deadlines = useMemo(() => getStatutoryDeadlines(), []);
   const urgent = deadlines.filter(d => d.status === 'urgent' || d.status === 'overdue');
 
@@ -112,23 +117,32 @@ export function CAFirmDashboardReal() {
             <motion.aside
               key="sidebar"
               initial={{ width: 0, opacity: 0 }}
-              animate={{ width: 240, opacity: 1 }}
+              animate={{ width: 250, opacity: 1 }}
               exit={{ width: 0, opacity: 0 }}
               transition={{ duration: 0.22, ease: 'easeInOut' }}
               className="flex flex-col bg-card/60 backdrop-blur-md border-r border-border/40 overflow-hidden shrink-0 z-30"
             >
+              {/* Firm Name Header */}
+              <div className="px-4 py-4 border-b border-border/30">
+                <div className="flex items-center gap-3">
+                  <div className="w-9 h-9 rounded-xl bg-gradient-to-br from-indigo-500 to-violet-600 flex items-center justify-center shadow-lg shadow-indigo-500/30">
+                    <Zap className="w-5 h-5 text-white" />
+                  </div>
+                  <div className="min-w-0">
+                    <p className="text-foreground font-bold text-sm leading-tight truncate">{firmName}</p>
+                    <p className="text-[9px] text-indigo-400 uppercase tracking-widest font-semibold">FirmOS · Enterprise</p>
+                  </div>
+                </div>
+              </div>
 
               {/* KPI Mini Strip */}
               <div className="px-3 py-3 border-b border-border/30 grid grid-cols-2 gap-2">
-                {kpis.map((k, i) => {
-                  const Icon = k.icon;
-                  return (
-                    <div key={i} className="bg-background/40 rounded-lg p-2 text-center border border-border/20">
-                      <p className="text-foreground font-bold text-base leading-none">{k.value}</p>
-                      <p className="text-[9px] text-muted-foreground mt-0.5 leading-tight">{k.label}</p>
-                    </div>
-                  );
-                })}
+                {kpis.map((k, i) => (
+                  <div key={i} className="bg-background/40 rounded-lg p-2 text-center border border-border/20">
+                    <p className="text-foreground font-bold text-base leading-none">{k.value}</p>
+                    <p className="text-[9px] text-muted-foreground mt-0.5 leading-tight">{k.label}</p>
+                  </div>
+                ))}
               </div>
 
               {/* Nav */}
@@ -204,12 +218,14 @@ export function CAFirmDashboardReal() {
                   transition={{ duration: 0.16 }}
                   className="h-full"
                 >
-                  {tab === 'home'    && <FirmPulseHome firmId={firmId} kpis={kpis} colorMap={colorMap} urgent={urgent} />}
-                  {tab === 'clients' && <FirmClientManagement firmId={firmId} />}
-                  {tab === 'team'    && <TeamResourceAllocation firmId={firmId} />}
-                  {tab === 'billing' && <PracticeBillingWIP firmId={firmId} />}
-                  {tab === 'quality' && <ICAIQualityControl firmId={firmId} />}
-                  {tab === 'vault'   && <FirmDocumentVault />}
+                  {tab === 'home'      && <FirmPulseHome firmId={firmId} kpis={kpis} colorMap={colorMap} urgent={urgent} />}
+                  {tab === 'autopilot' && <FirmAutopilot firmId={firmId} firmName={firmName} members={members || []} clients={clients || []} assignments={assignments || []} />}
+                  {tab === 'scenario'  && <FirmScenarioLab firmId={firmId} members={members || []} clients={clients || []} assignments={assignments || []} />}
+                  {tab === 'clients'   && <FirmClientManagement firmId={firmId} />}
+                  {tab === 'team'      && <TeamResourceAllocation firmId={firmId} />}
+                  {tab === 'billing'   && <PracticeBillingWIP firmId={firmId} />}
+                  {tab === 'quality'   && <ICAIQualityControl firmId={firmId} />}
+                  {tab === 'vault'     && <FirmDocumentVault />}
                 </motion.div>
               </AnimatePresence>
             )}

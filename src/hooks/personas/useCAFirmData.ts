@@ -379,12 +379,83 @@ export const useFirmAnalytics = (firmId: string | null) => {
   });
 };
 
+export const useDeleteFirmClient = () => {
+  const queryClient = useQueryClient();
+  return useMutation({
+    mutationFn: async ({ id, firmId }: { id: string; firmId: string }) => {
+      // Remove related assignments first
+      await supabase.from("ca_assignments").delete().eq("firm_client_id", id);
+      const { error } = await supabase.from("ca_firm_clients").delete().eq("id", id);
+      if (error) throw new Error(error.message);
+      return firmId;
+    },
+    onSuccess: (firmId) => {
+      queryClient.invalidateQueries({ queryKey: ["firm-clients", firmId] });
+      queryClient.invalidateQueries({ queryKey: ["ca-assignments"] });
+    },
+  });
+};
+
+export const useUpdateFirmClient = () => {
+  const queryClient = useQueryClient();
+  return useMutation({
+    mutationFn: async (client: {
+      id: string;
+      firm_id: string;
+      company_name?: string;
+      contact_person?: string;
+      email?: string;
+      industry?: string;
+      status?: string;
+    }) => {
+      const update: any = {};
+      if (client.company_name) update.company_name = client.company_name;
+      if (client.contact_person !== undefined) update.contact_person = client.contact_person;
+      if (client.email !== undefined) update.contact_email = client.email;
+      if (client.industry !== undefined) update.industry = client.industry;
+      if (client.status) update.status = client.status;
+      const { error } = await supabase
+        .from("ca_firm_clients")
+        .update(update)
+        .eq("id", client.id);
+      if (error) throw new Error(error.message);
+      return client.firm_id;
+    },
+    onSuccess: (firmId) => {
+      queryClient.invalidateQueries({ queryKey: ["firm-clients", firmId] });
+    },
+  });
+};
+
 export const useTeamUtilization = (firmId: string | null) => {
   return useQuery({
     queryKey: ["team-utilization", firmId],
     queryFn: async () => {
       if (!firmId) return [];
-      return [];
+      // Get members + their assignment counts
+      const { data: members } = await supabase
+        .from("ca_firm_members")
+        .select("id, member_name, role, status, specialization, email")
+        .eq("firm_id", firmId);
+      if (!members?.length) return [];
+      const memberIds = members.map((m: any) => m.id);
+      const { data: assignments } = await supabase
+        .from("ca_assignments")
+        .select("ca_member_id, status")
+        .in("ca_member_id", memberIds);
+      return members.map((m: any) => {
+        const count = (assignments || []).filter((a: any) => a.ca_member_id === m.id).length;
+        return {
+          id: m.id,
+          name: m.member_name || m.name || "Unknown",
+          role: m.role,
+          status: m.status,
+          specialization: m.specialization || "",
+          email: m.email || "",
+          assignedClients: count,
+          utilization: Math.min(100, count * 12),
+        };
+      });
     },
     enabled: !!firmId,
   });
