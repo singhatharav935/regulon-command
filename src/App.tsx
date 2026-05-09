@@ -31,6 +31,7 @@ import { ExternalCADashboardFull } from "./pages/dashboards/phases/ExternalCADas
 import { InhouseCADashboard } from "./pages/dashboards/InhouseCADashboard";
 import { CAFirmDashboardReal } from "./pages/dashboards/CAFirmDashboardReal";
 import { LawyerDashboard } from "./pages/dashboards/LawyerDashboard";
+import InhouseLawyerDashboardReal from "./pages/dashboards/InhouseLawyerDashboardReal";
 import { OwnerDashboard } from "./pages/dashboards/OwnerDashboard";
 import { AdminDashboard as PersonaAdminDashboard } from "./pages/dashboards/AdminDashboard";
 
@@ -192,8 +193,8 @@ const App = () => (
             <Route
               path="/dashboards/lawyer"
               element={
-                <PersonaRoute allowedPersonas={["inhouse_lawyer"]}>
-                  <LawyerDashboard />
+                <PersonaRoute allowedPersonas={["in_house_lawyer", "inhouse_lawyer"]}>
+                  <InhouseLawyerDashboardReal />
                 </PersonaRoute>
               }
             />

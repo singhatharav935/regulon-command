@@ -26,7 +26,7 @@ const getDashboardRoute = (role: string): string => {
     case "admin":
       return "/admin-dashboard";
     case "in_house_lawyer":
-      return "/lawyer-dashboard";
+      return "/dashboards/lawyer";
     case "company_owner":
     default:
       return "/real-company-dashboard";

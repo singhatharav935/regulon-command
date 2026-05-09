@@ -16,7 +16,7 @@ export function getDashboardRoute(persona: AppPersona | string | null): string {
     case "admin":
       return "/admin-dashboard";
     case "in_house_lawyer":
-      return "/lawyer-dashboard";
+      return "/dashboards/lawyer";
     case "company_owner":
     default:
       return "/real-company-dashboard";

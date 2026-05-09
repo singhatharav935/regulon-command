@@ -35,7 +35,7 @@ export const resolveLandingPath = ({
   const effectivePersona = persona ?? metadataPersona ?? (localRole as AppPersona);
 
   if (effectivePersona === "admin") return "/admin-dashboard";
-  if (effectivePersona === "in_house_lawyer") return "/lawyer-dashboard";
+  if (effectivePersona === "in_house_lawyer") return "/dashboards/lawyer";
   if (effectivePersona === "external_ca") return "/real-external-ca-dashboard";
   if (effectivePersona === "in_house_ca") return "/real-inhouse-ca-dashboard";
   if (effectivePersona === "ca_firm") return "/dashboards/ca-firm";

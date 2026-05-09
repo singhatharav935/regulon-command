@@ -4415,6 +4415,61 @@ const AIDraftingEngine = ({
     );
   };
 
+  // ── Send to In-House Legal Review ───────────────────────────────────────────
+  const [isSendingToLawyer, setIsSendingToLawyer] = useState(false);
+  const [sentToLawyerDraftId, setSentToLawyerDraftId] = useState<string | null>(null);
+
+  const handleSendToLegalReview = async () => {
+    if (!draftGenerated || !draftContent.trim()) {
+      toast.error("Generate a draft first before sending for legal review.");
+      return;
+    }
+    if (!currentDraftRunId || currentDraftRunId.startsWith("demo-")) {
+      toast.error("Save the draft first (non-demo mode) to send for legal review.");
+      return;
+    }
+    const { data: { user } } = await supabase.auth.getUser();
+    if (!user) { toast.error("Not authenticated."); return; }
+
+    // Company ID from client selection or user metadata
+    const companyId = selectedClient || user.user_metadata?.company_id;
+    if (!companyId) {
+      toast.error("Select a company/client before sending for legal review.");
+      return;
+    }
+
+    setIsSendingToLawyer(true);
+    try {
+      // 1. Create the review request
+      const { error: reqErr } = await supabase
+        .from("lawyer_review_requests")
+        .insert([{
+          draft_run_id: currentDraftRunId,
+          company_id: companyId,
+          sent_by: user.id,
+          priority: "normal",
+          ca_notes: `Sent for legal review — ${selectedDocLabel}`,
+          review_status: "pending",
+        }]);
+      if (reqErr) throw new Error(reqErr.message);
+
+      // 2. Update draft status to under_review
+      await supabase
+        .from("draft_runs")
+        .update({ status: "under_review" })
+        .eq("id", currentDraftRunId);
+
+      setSentToLawyerDraftId(currentDraftRunId);
+      toast.success("✅ Draft sent to In-house Legal team for review!", {
+        description: "The lawyer will be notified in their Legal Hub dashboard.",
+      });
+    } catch (err: any) {
+      toast.error("Failed to send for legal review: " + (err?.message || "Unknown error"));
+    } finally {
+      setIsSendingToLawyer(false);
+    }
+  };
+
   useEffect(() => {
     if (demoMode) {
       setClientOptions(demoClients);
@@ -8408,6 +8463,24 @@ Return only revised final draft text.`);
                   >
                     Submit for Review
                   </Button>
+                  {/* ── Send to In-House Legal Review ── */}
+                  {!demoMode && currentDraftRunId && !currentDraftRunId.startsWith("demo-") && draftGenerated && (
+                    <Button
+                      size="sm"
+                      variant="outline"
+                      disabled={isSendingToLawyer || sentToLawyerDraftId === currentDraftRunId}
+                      onClick={handleSendToLegalReview}
+                      className="border-indigo-500/40 text-indigo-400 hover:bg-indigo-500/10 hover:border-indigo-500"
+                    >
+                      {isSendingToLawyer ? (
+                        <span className="flex items-center gap-1.5"><span className="w-3 h-3 border border-indigo-400 border-t-transparent rounded-full animate-spin" />Sending…</span>
+                      ) : sentToLawyerDraftId === currentDraftRunId ? (
+                        <span className="flex items-center gap-1.5">✅ Sent to Legal</span>
+                      ) : (
+                        <span className="flex items-center gap-1.5">⚖️ Send to Legal Review</span>
+                      )}
+                    </Button>
+                  )}
                   <Button
                     size="sm"
                     variant="outline"
