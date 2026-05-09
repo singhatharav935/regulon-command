@@ -7,6 +7,90 @@
 import { supabase } from "@/integrations/supabase/client";
 
 // ─────────────────────────────────────────
+// CONSENT REQUESTS
+// ─────────────────────────────────────────
+
+export interface ConsentRequest {
+  id: string;
+  client_name: string;
+  client_email?: string;
+  client_phone?: string;
+  gstin?: string;
+  pan?: string;
+  cin?: string;
+  ca_name?: string;
+  consent_status: 'pending' | 'approved' | 'rejected';
+  consent_token: string;
+  email_sent: boolean;
+  whatsapp_sent: boolean;
+  created_at: string;
+  responded_at?: string;
+}
+
+/** Real flow: creates company in DB, then calls Edge Function to send Email + WhatsApp. */
+export async function initiateConsentRequest(form: {
+  gstin?: string; pan?: string; cin?: string;
+  client_name: string; client_email?: string; client_phone?: string;
+}): Promise<{ success: boolean; error?: string; client?: CAClient; emailSent?: boolean; whatsappSent?: boolean }> {
+  try {
+    const { data: { user } } = await supabase.auth.getUser();
+    if (!user) return { success: false, error: 'Not authenticated' };
+
+    const { data: profile } = await supabase
+      .from('profiles').select('full_name').eq('user_id', user.id).maybeSingle();
+    const caName = profile?.full_name || user.email?.split('@')[0] || 'Your CA';
+
+    // 1. Insert company (visible immediately in CA portfolio as "Waiting for Client")
+    const { data: company, error: companyErr } = await supabase
+      .from('companies')
+      .insert({ name: form.client_name, industry: detectIndustry(form.gstin), compliance_health: 50 })
+      .select().single();
+    if (companyErr) return { success: false, error: companyErr.message };
+
+    // 2. Link CA as manager
+    await supabase.from('company_members').insert({ company_id: company.id, user_id: user.id, role: 'manager' });
+
+    // 3. Call Edge Function → creates consent_request row + sends Email + WhatsApp
+    const supabaseUrl = import.meta.env.VITE_SUPABASE_URL as string;
+    const { data: { session } } = await supabase.auth.getSession();
+    const fnRes = await fetch(`${supabaseUrl}/functions/v1/send-consent?action=initiate`, {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json', Authorization: `Bearer ${session?.access_token}` },
+      body: JSON.stringify({ company_id: company.id, ca_name: caName, ...form }),
+    });
+    const fn = await fnRes.json().catch(() => ({}));
+
+    // Store GSTIN/PAN metadata locally as backup
+    const meta = JSON.parse(localStorage.getItem('ca_client_meta') || '{}');
+    meta[company.id] = { gstin: form.gstin, pan: form.pan, cin: form.cin, phone: form.client_phone, email: form.client_email };
+    localStorage.setItem('ca_client_meta', JSON.stringify(meta));
+
+    const client: CAClient = {
+      id: company.id, name: company.name, industry: company.industry || 'General',
+      health: 50, risk: 'Medium', gaps: 3, deadline: getNextGSTDeadline(),
+      status: 'Waiting for Client', gstin: form.gstin, pan: form.pan, created_at: company.created_at,
+    };
+
+    return { success: true, client, emailSent: fn.email_sent ?? false, whatsappSent: fn.whatsapp_sent ?? false };
+  } catch (err: any) {
+    return { success: false, error: err.message };
+  }
+}
+
+/** Fetch all consent requests for the logged-in CA. */
+export async function getPendingConsentRequests(): Promise<ConsentRequest[]> {
+  try {
+    const { data: { user } } = await supabase.auth.getUser();
+    if (!user) return [];
+    const { data } = await supabase
+      .from('consent_requests').select('*')
+      .eq('ca_user_id', user.id).order('created_at', { ascending: false });
+    return (data || []) as ConsentRequest[];
+  } catch { return []; }
+}
+
+
+// ─────────────────────────────────────────
 // CLIENT PORTFOLIO (Add + Load)
 // ─────────────────────────────────────────
 

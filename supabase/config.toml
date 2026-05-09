@@ -15,3 +15,7 @@ verify_jwt = false
 [functions.workspace-backend]
 enabled = true
 verify_jwt = false
+
+[functions.send-consent]
+enabled = true
+verify_jwt = false

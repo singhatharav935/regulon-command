@@ -60,6 +60,7 @@ const AdvancedSecurityPage = lazy(() => import("./pages/AdvancedSecurityPage"));
 const AdvancedCustomersPage = lazy(() => import("./pages/AdvancedCustomersPage"));
 const AdvancedResourcesPage = lazy(() => import("./pages/AdvancedResourcesPage"));
 const ProfileSettings = lazy(() => import("./pages/ProfileSettings"));
+const ConsentApprovalPage = lazy(() => import("./pages/ConsentApprovalPage")); // Public — CA client consent
 
 const queryClient = new QueryClient();
 
@@ -191,6 +192,8 @@ const App = () => (
               }
             /> */}
             <Route path="/dashboards/lawyer" element={<InhouseLawyerDashboardReal />} />
+            {/* Public: CA client consent page — no auth required */}
+            <Route path="/consent/:token" element={<ConsentApprovalPage />} />
             <Route
               path="/dashboards/owner"
               element={
