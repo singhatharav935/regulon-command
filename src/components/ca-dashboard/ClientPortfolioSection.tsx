@@ -3,7 +3,7 @@ import { motion, AnimatePresence } from "framer-motion";
 import { useEffect, useState, useCallback, useRef } from "react";
 import {
   Building2, Clock, Plus, X, ChevronRight, Shield, Send, Loader,
-  CheckCircle, XCircle, AlertCircle, RefreshCw, Mail, MessageSquare,
+  CheckCircle, XCircle, AlertCircle, RefreshCw, Mail, MessageSquare, Zap,
 } from "lucide-react";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
@@ -15,6 +15,7 @@ import {
 import {
   loadCAClients, type CAClient, type CAClientForm,
   initiateConsentRequest, getPendingConsentRequests, type ConsentRequest,
+  triggerSync,
 } from "@/services/ca-supabase-service";
 import { validateGSTIN, isGSTINFormatValid } from "@/lib/gstin-validator";
 
@@ -52,6 +53,8 @@ const ClientPortfolioSection = ({
   const [showOnboardModal, setShowOnboardModal] = useState(false);
   const [isOnboarding, setIsOnboarding] = useState(false);
   const [showPending, setShowPending] = useState(true);
+  const [syncingIds, setSyncingIds] = useState<Set<string>>(new Set());
+  const [syncedIds, setSyncedIds] = useState<Set<string>>(new Set());
   const [onboardForm, setOnboardForm] = useState<CAClientForm>({
     gstin: '', pan: '', cin: '', client_name: '', client_email: '', client_phone: '',
   });
@@ -158,7 +161,27 @@ const ClientPortfolioSection = ({
     }
   };
 
+  const handleSync = async (clientId: string, clientName: string) => {
+    setSyncingIds(prev => new Set(prev).add(clientId));
+    const result = await triggerSync(clientId);
+    if (result.success) {
+      toast.success(`Syncing ${clientName}`, {
+        description: '⚡ Fetching compliance data from GST Portal & MCA. Dashboard will update in ~30 seconds.',
+      });
+      // Mark as synced after 35s (enough time for the edge function to complete)
+      setTimeout(() => {
+        setSyncingIds(prev => { const s = new Set(prev); s.delete(clientId); return s; });
+        setSyncedIds(prev => new Set(prev).add(clientId));
+        fetchData(); // Refresh client list with new health score
+      }, 35000);
+    } else {
+      setSyncingIds(prev => { const s = new Set(prev); s.delete(clientId); return s; });
+      toast.error('Sync failed', { description: result.error || 'No pending sync job found for this client.' });
+    }
+  };
+
   const pendingCount = consentRequests.filter(r => r.consent_status === 'pending').length;
+
 
   return (
     <motion.div
@@ -275,6 +298,7 @@ const ClientPortfolioSection = ({
                 <TableHead className="text-muted-foreground font-semibold">Gaps</TableHead>
                 <TableHead className="text-muted-foreground font-semibold">Next Deadline</TableHead>
                 <TableHead className="text-muted-foreground font-semibold">Status</TableHead>
+                <TableHead className="text-muted-foreground font-semibold">Gov Sync</TableHead>
               </TableRow>
             </TableHeader>
             <TableBody>
@@ -305,6 +329,28 @@ const ClientPortfolioSection = ({
                     </div>
                   </TableCell>
                   <TableCell className={statusColors[client.status] || 'text-muted-foreground'}>{client.status}</TableCell>
+                  <TableCell>
+                    {syncingIds.has(client.id) ? (
+                      <div className="flex items-center gap-1.5 text-cyan-400 text-xs">
+                        <Loader className="w-3 h-3 animate-spin" />Syncing...
+                      </div>
+                    ) : syncedIds.has(client.id) ? (
+                      <div className="flex items-center gap-1.5 text-green-400 text-xs">
+                        <CheckCircle className="w-3 h-3" />Synced
+                      </div>
+                    ) : (
+                      <Button
+                        size="sm"
+                        variant="ghost"
+                        onClick={() => handleSync(client.id, client.name)}
+                        className="h-7 px-2 text-xs text-cyan-400 hover:text-cyan-300 hover:bg-cyan-500/10"
+                        title="Fetch real compliance data from GST Portal & MCA"
+                      >
+                        <Zap className="w-3 h-3 mr-1" />Sync
+                      </Button>
+                    )}
+                  </TableCell>
+
                 </TableRow>
               ))}
             </TableBody>

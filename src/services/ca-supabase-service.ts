@@ -89,6 +89,55 @@ export async function getPendingConsentRequests(): Promise<ConsentRequest[]> {
   } catch { return []; }
 }
 
+// ─────────────────────────────────────────
+// REGULATORY SYNC ENGINE
+// ─────────────────────────────────────────
+
+export interface SyncJob {
+  id: string;
+  status: 'pending' | 'running' | 'completed' | 'failed';
+  compliance_score: number | null;
+  total_returns_due: number | null;
+  total_filed_on_time: number | null;
+  total_filed_late: number | null;
+  total_missing: number | null;
+  gaps_found: Array<{ type: string; description: string; severity: string; period?: string }> | null;
+  error_message: string | null;
+  completed_at: string | null;
+  started_at: string | null;
+  created_at: string;
+}
+
+/** Trigger a regulatory sync for a specific company (after consent approval). */
+export async function triggerSync(companyId: string): Promise<{ success: boolean; job_id?: string; error?: string }> {
+  try {
+    const supabaseUrl = import.meta.env.VITE_SUPABASE_URL as string;
+    const { data: { session } } = await supabase.auth.getSession();
+    const res = await fetch(`${supabaseUrl}/functions/v1/regulatory-sync?action=trigger`, {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json', Authorization: `Bearer ${session?.access_token}` },
+      body: JSON.stringify({ company_id: companyId }),
+    });
+    const d = await res.json();
+    return res.ok ? { success: true, job_id: d.job_id } : { success: false, error: d.error };
+  } catch (err: unknown) {
+    return { success: false, error: err instanceof Error ? err.message : 'Failed to trigger sync' };
+  }
+}
+
+/** Poll the latest sync job status for a company. */
+export async function getSyncStatus(companyId: string): Promise<SyncJob | null> {
+  try {
+    const supabaseUrl = import.meta.env.VITE_SUPABASE_URL as string;
+    const { data: { session } } = await supabase.auth.getSession();
+    const res = await fetch(`${supabaseUrl}/functions/v1/regulatory-sync?action=status&company_id=${companyId}`, {
+      headers: { Authorization: `Bearer ${session?.access_token}` },
+    });
+    if (!res.ok) return null;
+    const d = await res.json();
+    return d.success ? (d as SyncJob) : null;
+  } catch { return null; }
+}
 
 // ─────────────────────────────────────────
 // CLIENT PORTFOLIO (Add + Load)
