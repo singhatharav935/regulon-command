@@ -177,7 +177,7 @@ const AuthReal = () => {
       case "admin":
         return "/admin-dashboard";
       case "in_house_lawyer":
-        return "/lawyer-dashboard";
+        return "/dashboards/lawyer";
       case "company_owner":
         return "/real-company-dashboard";
       default:

@@ -65,7 +65,7 @@ const Navbar = () => {
   // Hide "Return to Dashboard" when user is already on a dashboard page
   const dashboardPrefixes = [
     "/real-company-dashboard", "/real-external-ca-dashboard", "/real-inhouse-ca-dashboard",
-    "/ca-firm-dashboard", "/dashboards/ca-firm", "/lawyer-dashboard", "/admin-dashboard", "/dashboard",
+    "/ca-firm-dashboard", "/dashboards/ca-firm", "/dashboards/lawyer", "/lawyer-dashboard", "/admin-dashboard", "/dashboard",
     "/app/", "/agent-control", "/drafting"
   ];
   const isOnDashboard = dashboardPrefixes.some(prefix => location.pathname.startsWith(prefix));
