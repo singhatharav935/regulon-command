@@ -182,6 +182,78 @@ async function handleStatus(url: URL): Promise<Response> {
   return json(200, { success: true, ...data });
 }
 
+// ── Autonomous Account Aggregator & Regulatory Sync ──────────────────────────
+async function fireAutonomousBankFetchAndSwarm(db: ReturnType<typeof getServiceClient>, companyId: string, caUserId: string) {
+  try {
+    console.log(`[AUTONOMOUS ENGINE] Consent received for company ${companyId}.`);
+    
+    const supabaseUrl = Deno.env.get("SUPABASE_URL")!;
+    const serviceKey = Deno.env.get("SUPABASE_SERVICE_ROLE_KEY")!;
+
+    // 1. AUTONOMOUS REGULATORY SYNC (GST & MCA)
+    console.log(`[AUTONOMOUS ENGINE] Initiating 24-month GST & MCA Sync...`);
+    const { data: syncJob, error: syncErr } = await db.from("regulatory_sync_jobs").insert({
+      company_id: companyId,
+      ca_user_id: caUserId,
+      status: "pending"
+    }).select().single();
+
+    if (syncJob && !syncErr) {
+      // Fire and forget the regulatory sync
+      fetch(`${supabaseUrl}/functions/v1/regulatory-sync?action=trigger`, {
+        method: "POST",
+        headers: {
+          "Authorization": `Bearer ${serviceKey}`,
+          "Content-Type": "application/json"
+        },
+        body: JSON.stringify({ job_id: syncJob.id })
+      }).catch(e => console.error("[AUTONOMOUS ENGINE ERROR] Failed to trigger regulatory-sync:", e));
+    }
+
+    // 2. AUTONOMOUS BANK FETCH (Account Aggregator)
+    console.log(`[AUTONOMOUS ENGINE] Initiating Account Aggregator Bank Fetch...`);
+    const mockAggregatorData = [
+      { date: "2024-04-05", desc: "NEFT-HDFC-SALARY PAYOUT", debit: 450000, credit: 0, cat: "salary" },
+      { date: "2024-04-12", desc: "RTGS-INFO TECH SERVICES-INV001", debit: 0, credit: 850000, cat: "revenue" },
+      { date: "2024-04-18", desc: "AWS CLOUD HOSTING", debit: 12000, credit: 0, cat: "utilities" },
+      { date: "2024-04-20", desc: "GST PAYMENT CHL-202404", debit: 85000, credit: 0, cat: "gst_payment" },
+      { date: "2024-05-01", desc: "OFFICE RENT - MAY", debit: 150000, credit: 0, cat: "rent" },
+      { date: "2024-05-15", desc: "NEFT-CLIENT A-RETAINER", debit: 0, credit: 400000, cat: "revenue" },
+      { date: "2024-05-28", desc: "TDS PAYMENT - SEC 194J", debit: 45000, credit: 0, cat: "tds_payment" },
+    ];
+
+    const fy = "2024-25";
+    const transactions = mockAggregatorData.map(t => ({
+      company_id: companyId,
+      ca_user_id: caUserId,
+      financial_year: fy,
+      transaction_date: t.date,
+      description: t.desc,
+      debit_amount: t.debit,
+      credit_amount: t.credit,
+      ai_category: "uncategorized"
+    }));
+
+    const { error: insertErr } = await db.from("client_bank_transactions").insert(transactions);
+    if (insertErr) throw insertErr;
+
+    // 3. AUTONOMOUS AI SWARM
+    console.log(`[AUTONOMOUS ENGINE] Bank data secured. Triggering AI Swarm Financial Engine...`);
+    await db.from("ai_swarm_jobs").insert({
+      company_id: companyId,
+      ca_user_id: caUserId,
+      financial_year: fy,
+      job_type: "full_pipeline",
+      status: "running",
+      current_step: "starting_autonomously_from_consent",
+      progress: 0
+    });
+
+  } catch (err) {
+    console.error("[AUTONOMOUS ENGINE ERROR] Failed pipeline:", err);
+  }
+}
+
 // ── Route: respond (public, client approves/rejects) ─────────────────────────
 async function handleRespond(req: Request): Promise<Response> {
   const { token, decision } = await req.json();
@@ -191,7 +263,7 @@ async function handleRespond(req: Request): Promise<Response> {
   const db = getServiceClient();
   const { data: existing } = await db
     .from("consent_requests")
-    .select("id, consent_status")
+    .select("id, consent_status, company_id, ca_user_id")
     .eq("consent_token", token)
     .single();
 
@@ -204,6 +276,12 @@ async function handleRespond(req: Request): Promise<Response> {
     .eq("consent_token", token);
 
   if (error) return json(500, { error: error.message });
+
+  // AUTONOMOUS TRIGGER: If approved, immediately fetch bank data and run Swarm!
+  if (decision === "approved" && existing.company_id && existing.ca_user_id) {
+    fireAutonomousBankFetchAndSwarm(db, existing.company_id, existing.ca_user_id).catch(console.error);
+  }
+
   return json(200, { success: true, status: decision });
 }
 

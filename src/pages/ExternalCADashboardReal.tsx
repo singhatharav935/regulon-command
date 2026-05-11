@@ -23,6 +23,7 @@ import FirmBrandingSettings from "@/components/ca-dashboard/FirmBrandingSettings
 import ComplianceModulesHub from "@/components/ca-dashboard/compliance-modules/ComplianceModulesHub";
 import ApprovalWorkflowHub from "@/components/ca-dashboard/ApprovalWorkflowHub";
 import ClientPortfolioSection from "@/components/ca-dashboard/ClientPortfolioSection";
+import ClientFinancialVault from "@/components/ca-dashboard/ClientFinancialVault";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
@@ -1709,7 +1710,9 @@ const ExternalCADashboardReal = () => {
                   <p className="text-sm text-muted-foreground">Manage multi-entity compliance status and secure documentation.</p>
                 </div>
                 <MultiClientMasterHub />
-                
+                <div className="my-8">
+                  <ClientFinancialVault />
+                </div>
                 
                 <div className="flex flex-col space-y-8">
                   <TaskFilingManagement isRealDashboard={true} apiEndpoint={`${CA_API}/api/v1/ca/tasks`} governmentIntegration={true} />

@@ -18,6 +18,46 @@ export default function ITRPanel({ clientId, isDemo }: { clientId?: string; isDe
   const [itr3Form, setItr3Form] = useState({ gross_profit: '', depreciation: '', rent: '', salary: '', audit_fees: '', entertainment: '', foreign_travel: '', advance_tax: '', tds: '' });
   const [itr4Form, setItr4Form] = useState({ turnover: '', business_type: 'service', advance_tax: '', tds: '' });
 
+  useEffect(() => {
+    if (clientId) {
+      fetchSwarmData();
+    }
+  }, [clientId]);
+
+  const fetchSwarmData = async () => {
+    try {
+      const { data, error } = await supabase
+        .from('client_module_calculations')
+        .select('*')
+        .eq('company_id', clientId)
+        .eq('module_id', 'itr')
+        .order('created_at', { ascending: false })
+        .limit(1)
+        .maybeSingle();
+
+      if (data && data.calculation_data) {
+        const calc = data.calculation_data as any;
+        setItrType('itr3');
+        setResult({
+          summary: `AI Swarm Assessment for Assessment Year 2025-26.`,
+          assessment_year: '2025-26',
+          computation: {
+            net_taxable_income: Math.round(calc.taxable_income),
+            tax_at_slab: Math.round(calc.tax_at_slab),
+            surcharge: 0,
+            health_education_cess: Math.round(calc.cess),
+            total_tax_liability: Math.round(calc.total_liability),
+            tax_payable: Math.round(calc.total_liability)
+          }
+        });
+        toast.info("ITR data synced from AI Swarm.");
+      }
+    } catch (e) {
+      console.error("Failed to fetch ITR swarm data", e);
+    }
+  };
+
+
   const handleCalculate = async () => {
     if (!clientId) { toast.error('Select a client first'); return; }
     setLoading(true);
