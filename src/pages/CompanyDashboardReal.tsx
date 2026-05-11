@@ -184,135 +184,140 @@ interface Document {
 
 const API_BASE = import.meta.env.VITE_API_URL || 'http://localhost:8001/api/v1';
 
+// Local fallback IDs are created when the backend is unreachable during signup.
+// API calls with these IDs will always fail (400), so we skip them entirely.
+const isLocalFallbackId = (id: string) => id.startsWith('local-');
+
 const companyAPI = {
   // Get company profile
   getProfile: async (companyId: string): Promise<CompanyData | null> => {
+    if (isLocalFallbackId(companyId)) return null;
     try {
       const response = await fetch(`${API_BASE}/company/${companyId}/profile`);
       if (response.ok) {
         return await response.json();
       }
       return null;
-    } catch (error) {
-      console.error('Error fetching company profile:', error);
+    } catch {
       return null;
     }
   },
 
   // Get AI messages/notifications
   getAIMessages: async (companyId: string): Promise<AIMessage[]> => {
+    if (isLocalFallbackId(companyId)) return [];
     try {
       const response = await fetch(`${API_BASE}/company/${companyId}/ai-messages`);
       if (response.ok) {
         return await response.json();
       }
       return [];
-    } catch (error) {
-      console.error('Error fetching AI messages:', error);
+    } catch {
       return [];
     }
   },
 
   // Get regulatory exposures
   getExposures: async (companyId: string): Promise<RegulatoryExposure[]> => {
+    if (isLocalFallbackId(companyId)) return [];
     try {
       const response = await fetch(`${API_BASE}/company/${companyId}/regulatory-exposures`);
       if (response.ok) {
         return await response.json();
       }
       return [];
-    } catch (error) {
-      console.error('Error fetching exposures:', error);
+    } catch {
       return [];
     }
   },
 
   // Get business insights
   getBusinessInsights: async (companyId: string): Promise<BusinessInsight[]> => {
+    if (isLocalFallbackId(companyId)) return [];
     try {
       const response = await fetch(`${API_BASE}/company/${companyId}/business-insights`);
       if (response.ok) {
         return await response.json();
       }
       return [];
-    } catch (error) {
-      console.error('Error fetching business insights:', error);
+    } catch {
       return [];
     }
   },
 
   // Get compliance gaps
   getComplianceGaps: async (companyId: string): Promise<ComplianceGap[]> => {
+    if (isLocalFallbackId(companyId)) return [];
     try {
       const response = await fetch(`${API_BASE}/company/${companyId}/compliance-gaps`);
       if (response.ok) {
         return await response.json();
       }
       return [];
-    } catch (error) {
-      console.error('Error fetching compliance gaps:', error);
+    } catch {
       return [];
     }
   },
 
   // Get regulatory impacts
   getRegulatoryImpacts: async (companyId: string): Promise<RegulatoryImpact[]> => {
+    if (isLocalFallbackId(companyId)) return [];
     try {
       const response = await fetch(`${API_BASE}/company/${companyId}/regulatory-impacts`);
       if (response.ok) {
         return await response.json();
       }
       return [];
-    } catch (error) {
-      console.error('Error fetching regulatory impacts:', error);
+    } catch {
       return [];
     }
   },
 
   // Get audit records
   getAuditRecords: async (companyId: string): Promise<AuditRecord[]> => {
+    if (isLocalFallbackId(companyId)) return [];
     try {
       const response = await fetch(`${API_BASE}/company/${companyId}/audit-records`);
       if (response.ok) {
         return await response.json();
       }
       return [];
-    } catch (error) {
-      console.error('Error fetching audit records:', error);
+    } catch {
       return [];
     }
   },
 
   // Get compliance tasks
   getTasks: async (companyId: string): Promise<ComplianceTask[]> => {
+    if (isLocalFallbackId(companyId)) return [];
     try {
       const response = await fetch(`${API_BASE}/company/${companyId}/tasks`);
       if (response.ok) {
         return await response.json();
       }
       return [];
-    } catch (error) {
-      console.error('Error fetching tasks:', error);
+    } catch {
       return [];
     }
   },
 
   // Get documents
   getDocuments: async (companyId: string): Promise<Document[]> => {
+    if (isLocalFallbackId(companyId)) return [];
     try {
       const response = await fetch(`${API_BASE}/company/${companyId}/documents`);
       if (response.ok) {
         return await response.json();
       }
       return [];
-    } catch (error) {
-      console.error('Error fetching documents:', error);
+    } catch {
       return [];
     }
   },
 
   // Send message to CA
   sendMessageToCA: async (companyId: string, message: string, urgent: boolean): Promise<boolean> => {
+    if (isLocalFallbackId(companyId)) return false;
     try {
       const response = await fetch(`${API_BASE}/company/${companyId}/send-ca-message`, {
         method: 'POST',
@@ -320,14 +325,14 @@ const companyAPI = {
         body: JSON.stringify({ message, urgent, timestamp: new Date().toISOString() })
       });
       return response.ok;
-    } catch (error) {
-      console.error('Error sending message:', error);
+    } catch {
       return false;
     }
   },
 
   // Upload document
   uploadDocument: async (companyId: string, file: File, category: string): Promise<boolean> => {
+    if (isLocalFallbackId(companyId)) return false;
     try {
       const formData = new FormData();
       formData.append('file', file);
@@ -338,8 +343,7 @@ const companyAPI = {
         body: formData
       });
       return response.ok;
-    } catch (error) {
-      console.error('Error uploading document:', error);
+    } catch {
       return false;
     }
   }
