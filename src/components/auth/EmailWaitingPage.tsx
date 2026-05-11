@@ -46,35 +46,53 @@ export const EmailWaitingPage: React.FC<EmailWaitingPageProps> = ({
   const [countdown, setCountdown] = useState(60); // Start with a 60s cooldown since we just sent one
   const [pollCount, setPollCount] = useState(0);
 
-  // Poll Supabase for session confirmation
+  // Shared handler for when verification is confirmed — prevents duplicate toasts/redirects
+  const handleVerified = useCallback(() => {
+    if (isVerified) return; // guard against duplicate calls
+    setIsVerified(true);
+
+    // Store role info
+    localStorage.setItem('pending_registration_role', registrationRole);
+    localStorage.setItem('current_user_role', registrationRole);
+
+    toast({
+      title: "✅ Email Verified!",
+      description: `Welcome to SANNIDH, ${fullName}! Redirecting to your dashboard...`,
+    });
+
+    // Navigate to dashboard after short delay for the success animation
+    setTimeout(() => {
+      const dashboardRoute = getDashboardRoute(registrationRole);
+      navigate(dashboardRoute);
+    }, 2000);
+  }, [isVerified, registrationRole, fullName, navigate, toast]);
+
+  // Poll Supabase for session confirmation.
+  // Uses refreshSession() to force a fresh read from Supabase instead of relying
+  // on the in-memory cached session (which won't update when verification
+  // happens in a different browser tab).
   const checkVerification = useCallback(async () => {
     try {
+      // First try a lightweight getSession (reads localStorage)
       const { data: { session } } = await supabase.auth.getSession();
       if (session?.user?.email_confirmed_at) {
-        setIsVerified(true);
-
-        // Store role info
-        localStorage.setItem('pending_registration_role', registrationRole);
-        localStorage.setItem('current_user_role', registrationRole);
-
-        toast({
-          title: "✅ Email Verified!",
-          description: `Welcome to SANNIDH, ${fullName}! Redirecting to your dashboard...`,
-        });
-
-        // Navigate to dashboard after short delay for the success animation
-        setTimeout(() => {
-          const dashboardRoute = getDashboardRoute(registrationRole);
-          navigate(dashboardRoute);
-        }, 2000);
-
+        handleVerified();
         return true;
       }
-    } catch (error) {
+
+      // If no confirmed session yet, try refreshing — this forces Supabase to
+      // fetch fresh user data from the server, picking up verification done in
+      // another tab.
+      const { data: refreshed } = await supabase.auth.refreshSession();
+      if (refreshed?.session?.user?.email_confirmed_at) {
+        handleVerified();
+        return true;
+      }
+    } catch {
       // Silently ignore — we'll try again on next poll
     }
     return false;
-  }, [registrationRole, fullName, navigate, toast]);
+  }, [handleVerified]);
 
   // Set up polling interval
   useEffect(() => {
@@ -82,38 +100,61 @@ export const EmailWaitingPage: React.FC<EmailWaitingPageProps> = ({
 
     const interval = setInterval(async () => {
       setPollCount(prev => prev + 1);
-      const verified = await checkVerification();
-      if (verified) {
-        clearInterval(interval);
-      }
-    }, 3000); // Poll every 3 seconds
+      await checkVerification();
+    }, 4000); // Poll every 4 seconds
 
     return () => clearInterval(interval);
   }, [isVerified, checkVerification]);
 
-  // Also listen for Supabase auth state changes (fires when user clicks the email link)
+  // Listen for Supabase auth state changes (fires when verification link is
+  // opened in the SAME tab or when Supabase processes a cross-tab token update)
   useEffect(() => {
+    if (isVerified) return;
+
     const { data: { subscription } } = supabase.auth.onAuthStateChange((event, session) => {
-      if (event === 'SIGNED_IN' && session?.user?.email_confirmed_at) {
-        setIsVerified(true);
-
-        localStorage.setItem('pending_registration_role', registrationRole);
-        localStorage.setItem('current_user_role', registrationRole);
-
-        toast({
-          title: "✅ Email Verified!",
-          description: `Welcome to SANNIDH, ${fullName}! Redirecting to your dashboard...`,
-        });
-
-        setTimeout(() => {
-          const dashboardRoute = getDashboardRoute(registrationRole);
-          navigate(dashboardRoute);
-        }, 2000);
+      if (
+        (event === 'SIGNED_IN' || event === 'TOKEN_REFRESHED') &&
+        session?.user?.email_confirmed_at
+      ) {
+        handleVerified();
       }
     });
 
     return () => subscription.unsubscribe();
-  }, [registrationRole, fullName, navigate, toast]);
+  }, [isVerified, handleVerified]);
+
+  // Cross-tab detection: listen for localStorage changes made by the other tab
+  // where the user clicked the verification link. Supabase stores the session
+  // in localStorage, so when the new tab writes it, this event fires here.
+  useEffect(() => {
+    if (isVerified) return;
+
+    const handleStorageChange = (e: StorageEvent) => {
+      // Supabase stores session under a key containing "auth-token"
+      if (e.key && (e.key.includes('auth-token') || e.key.includes('supabase'))) {
+        // Session was updated in another tab — check if user is now verified
+        checkVerification();
+      }
+    };
+
+    window.addEventListener('storage', handleStorageChange);
+    return () => window.removeEventListener('storage', handleStorageChange);
+  }, [isVerified, checkVerification]);
+
+  // Visibility change: when user switches back to this tab after clicking the
+  // verification link in another tab, immediately check for verification.
+  useEffect(() => {
+    if (isVerified) return;
+
+    const handleVisibilityChange = () => {
+      if (document.visibilityState === 'visible') {
+        checkVerification();
+      }
+    };
+
+    document.addEventListener('visibilitychange', handleVisibilityChange);
+    return () => document.removeEventListener('visibilitychange', handleVisibilityChange);
+  }, [isVerified, checkVerification]);
 
   // Countdown timer for resend button
   useEffect(() => {
