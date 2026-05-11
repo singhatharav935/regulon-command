@@ -123,19 +123,6 @@ npm run dev
 
 The dev server starts at `http://localhost:8080` by default.
 
-### Environment Variables
-
-| Variable | Required | Description |
-|----------|----------|-------------|
-| `VITE_SUPABASE_URL` | ✅ | Your Supabase project URL |
-| `VITE_SUPABASE_ANON_KEY` | ✅ | Your Supabase anonymous/public key |
-| `VITE_API_URL` | ❌ | Backend API URL (defaults to `http://localhost:8001/api/v1`) |
-| `VITE_SENTRY_DSN` | ❌ | Sentry error tracking DSN |
-| `VITE_ENABLE_DEMO_MODE` | ❌ | Enable demo mode with fallback data |
-| `VITE_APP_VERSION` | ❌ | App version string |
-
-> **Note:** See `.env.example` for the complete list with descriptions.
-
 ---
 
 ## 🚀 Deployment

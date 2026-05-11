@@ -2,17 +2,17 @@ import React, { useState, useEffect } from "react";
 import { useNavigate, useSearchParams, useLocation } from "react-router-dom";
 import { motion, AnimatePresence } from "framer-motion";
 import BackgroundEffects from "@/components/BackgroundEffects";
-import { 
-  Mail, 
-  Lock, 
-  User, 
-  Eye, 
-  EyeOff, 
-  Shield, 
-  Briefcase, 
-  Building2, 
-  Users, 
-  Gavel, 
+import {
+  Mail,
+  Lock,
+  User,
+  Eye,
+  EyeOff,
+  Shield,
+  Briefcase,
+  Building2,
+  Users,
+  Gavel,
   UserCheck,
   ArrowLeft,
   Loader2,
@@ -38,7 +38,7 @@ type AuthMode = 'login' | 'forgot-password' | 'reset-password' | 'multi-step-reg
 
 const AuthReal = () => {
   const [searchParams] = useSearchParams();
-  
+
   // Initialize mode from URL params IMMEDIATELY (not in useEffect)
   const getInitialMode = (): AuthMode => {
     const urlMode = searchParams.get("mode");
@@ -50,7 +50,7 @@ const AuthReal = () => {
     if (urlMode === "verify-email") return "email-verification";
     return "login";
   };
-  
+
   const [mode, setMode] = useState<AuthMode>(getInitialMode);
   const navigate = useNavigate();
   const location = useLocation();
@@ -81,7 +81,7 @@ const AuthReal = () => {
     const urlMode = searchParams.get("mode");
     const role = searchParams.get("role");
     const token = searchParams.get("token");
-    
+
     // Support both 'register' and 'signup' modes - go directly to multi-step
     if (urlMode === "register" || urlMode === "signup") setMode("multi-step-register");
     if (urlMode === "forgot-password") setMode("forgot-password");
@@ -91,7 +91,7 @@ const AuthReal = () => {
     }
     if (urlMode === "verify-email") setMode("email-verification");
     if (urlMode === "multi-step") setMode("multi-step-register");
-    
+
     if (role) setRegistrationRole(role);
   }, [searchParams]);
 
@@ -203,7 +203,7 @@ const AuthReal = () => {
 
       // Check if user needs email verification
       if (!response.user.email_verified) {
-        setCurrentUser({...response.user, registration_role: effectiveRole});
+        setCurrentUser({ ...response.user, registration_role: effectiveRole });
         setMode('email-verification');
         toast({
           title: "Email Not Verified",
@@ -350,7 +350,7 @@ const AuthReal = () => {
               password: formData.password
             })
           });
-          
+
           if (companyResponse.ok) {
             const companyData = await companyResponse.json();
             localStorage.setItem('sannidh_company_id', companyData.company_id);
@@ -405,12 +405,12 @@ const AuthReal = () => {
 
     try {
       await enhancedAuth.requestPasswordReset(email.trim());
-      
+
       toast({
         title: "Reset Email Sent",
         description: "Please check your email for password reset instructions.",
       });
-      
+
       setMode('login');
     } catch (error: any) {
       console.error("Password reset error:", error);
@@ -430,12 +430,12 @@ const AuthReal = () => {
 
     try {
       await enhancedAuth.resetPassword(resetToken, password);
-      
+
       toast({
         title: "Password Reset",
         description: "Your password has been reset successfully. Please log in.",
       });
-      
+
       setMode('login');
       setPassword('');
     } catch (error: any) {
@@ -516,7 +516,7 @@ const AuthReal = () => {
   // Multi-step registration mode
   if (mode === 'multi-step-register') {
     return (
-      <MultiStepRegistration 
+      <MultiStepRegistration
         onComplete={handleMultiStepRegistration}
         initialRole={registrationRole}
       />
@@ -589,13 +589,13 @@ const AuthReal = () => {
               >
                 <Shield className="w-8 h-8 text-white" />
               </motion.div>
-              
+
               <h1 className="text-3xl font-bold text-white mb-2">
                 {mode === 'login' && 'Welcome Back'}
                 {mode === 'forgot-password' && 'Reset Password'}
                 {mode === 'reset-password' && 'New Password'}
               </h1>
-              
+
               <p className="text-gray-300">
                 {mode === 'login' && 'Sign in to your compliance workspace'}
                 {mode === 'forgot-password' && 'Enter your email to reset your password'}
