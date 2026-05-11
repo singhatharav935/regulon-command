@@ -27,3 +27,7 @@ verify_jwt = false
 [functions.regulatory-sync]
 enabled = true
 verify_jwt = false
+
+[functions.ai-financial-swarm]
+enabled = true
+verify_jwt = false

@@ -15,7 +15,7 @@ import {
 import {
   loadCAClients, type CAClient, type CAClientForm,
   initiateConsentRequest, getPendingConsentRequests, type ConsentRequest,
-  triggerSync,
+  triggerSync, triggerSwarm, getSwarmStatus,
 } from "@/services/ca-supabase-service";
 import { validateGSTIN, isGSTINFormatValid } from "@/lib/gstin-validator";
 
@@ -55,6 +55,9 @@ const ClientPortfolioSection = ({
   const [showPending, setShowPending] = useState(true);
   const [syncingIds, setSyncingIds] = useState<Set<string>>(new Set());
   const [syncedIds, setSyncedIds] = useState<Set<string>>(new Set());
+  const [swarmingIds, setSwarmingIds] = useState<Set<string>>(new Set());
+  const [swarmProgress, setSwarmProgress] = useState<Record<string, { progress: number; step: string }>>({}); 
+  const [swarmDoneIds, setSwarmDoneIds] = useState<Set<string>>(new Set());
   const [onboardForm, setOnboardForm] = useState<CAClientForm>({
     gstin: '', pan: '', cin: '', client_name: '', client_email: '', client_phone: '',
   });
@@ -182,6 +185,44 @@ const ClientPortfolioSection = ({
 
   const pendingCount = consentRequests.filter(r => r.consent_status === 'pending').length;
 
+  const getCurrentFY = () => {
+    const now = new Date();
+    const y = now.getMonth() >= 3 ? now.getFullYear() : now.getFullYear() - 1;
+    return `${y}-${String(y + 1).slice(-2)}`;
+  };
+
+  const handleSwarm = async (clientId: string, clientName: string) => {
+    const fy = getCurrentFY();
+    setSwarmingIds(prev => new Set(prev).add(clientId));
+    setSwarmProgress(prev => ({ ...prev, [clientId]: { progress: 0, step: 'starting' } }));
+    const result = await triggerSwarm(clientId, fy);
+    if (result.success) {
+      toast.success(`AI Swarm started for ${clientName}`, {
+        description: `Processing FY ${fy}: bank categorization → books → 26 modules → data room`,
+      });
+      // Poll progress every 3s
+      const pollId = setInterval(async () => {
+        const status = await getSwarmStatus(clientId);
+        if (status) {
+          setSwarmProgress(prev => ({ ...prev, [clientId]: { progress: status.progress, step: status.current_step || '' } }));
+          if (status.status === 'completed' || status.status === 'failed') {
+            clearInterval(pollId);
+            setSwarmingIds(prev => { const s = new Set(prev); s.delete(clientId); return s; });
+            if (status.status === 'completed') {
+              setSwarmDoneIds(prev => new Set(prev).add(clientId));
+              toast.success(`AI Swarm complete for ${clientName}`, { description: 'Data Room is ready!' });
+            } else {
+              toast.error(`Swarm failed for ${clientName}`, { description: status.error_message || 'Unknown error' });
+            }
+          }
+        }
+      }, 3000);
+    } else {
+      setSwarmingIds(prev => { const s = new Set(prev); s.delete(clientId); return s; });
+      toast.error('Swarm failed', { description: result.error });
+    }
+  };
+
 
   return (
     <motion.div
@@ -299,6 +340,8 @@ const ClientPortfolioSection = ({
                 <TableHead className="text-muted-foreground font-semibold">Next Deadline</TableHead>
                 <TableHead className="text-muted-foreground font-semibold">Status</TableHead>
                 <TableHead className="text-muted-foreground font-semibold">Gov Sync</TableHead>
+                <TableHead className="text-muted-foreground font-semibold">AI Swarm</TableHead>
+                <TableHead className="text-muted-foreground font-semibold">Data Room</TableHead>
               </TableRow>
             </TableHeader>
             <TableBody>
@@ -350,7 +393,42 @@ const ClientPortfolioSection = ({
                       </Button>
                     )}
                   </TableCell>
-
+                  <TableCell>
+                    {swarmingIds.has(client.id) ? (
+                      <div className="flex flex-col gap-0.5">
+                        <div className="flex items-center gap-1.5 text-purple-400 text-xs">
+                          <Loader className="w-3 h-3 animate-spin" />
+                          {swarmProgress[client.id]?.step || 'Starting...'}
+                        </div>
+                        <div className="w-full h-1.5 bg-muted rounded-full overflow-hidden">
+                          <div className="h-full bg-gradient-to-r from-purple-500 to-cyan-500 rounded-full transition-all duration-500" style={{ width: `${swarmProgress[client.id]?.progress || 0}%` }} />
+                        </div>
+                      </div>
+                    ) : swarmDoneIds.has(client.id) ? (
+                      <div className="flex items-center gap-1.5 text-green-400 text-xs">
+                        <CheckCircle className="w-3 h-3" />Done
+                      </div>
+                    ) : (
+                      <Button
+                        size="sm"
+                        variant="ghost"
+                        onClick={() => handleSwarm(client.id, client.name)}
+                        className="h-7 px-2 text-xs text-purple-400 hover:text-purple-300 hover:bg-purple-500/10"
+                        title="Run AI financial pipeline: categorize → books → 26 modules → data room"
+                      >
+                        <Zap className="w-3 h-3 mr-1" />Run Swarm
+                      </Button>
+                    )}
+                  </TableCell>
+                  <TableCell>
+                    {swarmDoneIds.has(client.id) ? (
+                      <Badge className="bg-green-500/20 text-green-400 border-green-500/30 border text-xs">Ready</Badge>
+                    ) : swarmingIds.has(client.id) ? (
+                      <Badge className="bg-purple-500/20 text-purple-400 border-purple-500/30 border text-xs">Building...</Badge>
+                    ) : (
+                      <Badge className="bg-muted/30 text-muted-foreground border-border/30 border text-xs">—</Badge>
+                    )}
+                  </TableCell>
                 </TableRow>
               ))}
             </TableBody>

@@ -7,6 +7,8 @@ import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { Badge } from '@/components/ui/badge';
 import { toast } from 'sonner';
+import { supabase } from '@/integrations/supabase/client';
+import { useEffect } from 'react';
 
 // Backend API removed — calculations are performed client-side
 
@@ -14,6 +16,55 @@ export default function GSTR3BPanel({ clientId, isDemo }: { clientId?: string; i
   const [loading, setLoading] = useState(false);
   const [result, setResult] = useState<any>(null);
   const [form, setForm] = useState({ period_month: new Date().getMonth() + 1, period_year: new Date().getFullYear(), outward_cgst: '', outward_sgst: '', outward_igst: '', itc_cgst: '', itc_sgst: '', itc_igst: '', rcm_liability: '' });
+
+  useEffect(() => {
+    if (clientId) {
+      fetchSwarmData();
+    }
+  }, [clientId]);
+
+  const fetchSwarmData = async () => {
+    try {
+      const { data, error } = await supabase
+        .from('client_module_calculations')
+        .select('*')
+        .eq('company_id', clientId)
+        .eq('module_id', 'gstr3b')
+        .order('created_at', { ascending: false })
+        .limit(1)
+        .maybeSingle();
+
+      if (data && data.calculation_data) {
+        const calc = data.calculation_data as any;
+        setForm(prev => ({
+          ...prev,
+          outward_cgst: (calc.outward / 3).toString(),
+          outward_sgst: (calc.outward / 3).toString(),
+          outward_igst: (calc.outward / 3).toString(),
+          itc_cgst: (calc.itc / 3).toString(),
+          itc_sgst: (calc.itc / 3).toString(),
+          itc_igst: (calc.itc / 3).toString(),
+        }));
+        
+        // Auto-trigger calculation to show result
+        setResult({
+          summary: `AI Swarm Data Loaded. Net tax payable: ₹${calc.net_payable?.toLocaleString()}`,
+          due_date: '20th of Next Month',
+          payment_mode: 'Online/Challan',
+          computation: {
+            outward_tax: { total: calc.outward },
+            itc_available: { total: calc.itc },
+            net_tax_payable: { total: calc.net_payable }
+          },
+          alerts: calc.rule_86b ? [{ type: 'warning', message: 'ITC utilized is >80% of liability. Ensure Rule 86B compliance.' }] : []
+        });
+        toast.info("GSTR-3B data synced from AI Swarm.");
+      }
+    } catch (e) {
+      console.error("Failed to fetch swarm data", e);
+    }
+  };
+
 
   const handleCalc = async () => {
     if (!clientId) { toast.error('Select a client first'); return; }

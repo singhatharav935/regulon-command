@@ -140,6 +140,92 @@ export async function getSyncStatus(companyId: string): Promise<SyncJob | null> 
 }
 
 // ─────────────────────────────────────────
+// AI SWARM FINANCIAL ENGINE
+// ─────────────────────────────────────────
+
+export interface SwarmJob {
+  id: string;
+  status: 'pending' | 'running' | 'completed' | 'failed';
+  progress: number;
+  current_step: string | null;
+  job_type: string;
+  error_message: string | null;
+  started_at: string | null;
+  completed_at: string | null;
+  created_at: string;
+}
+
+export interface ClientFinancials {
+  books: {
+    book_type: string;
+    book_data: Record<string, unknown>;
+    summary_metrics: Record<string, unknown>;
+  }[];
+  modules: {
+    module_id: string;
+    module_label: string;
+    calculation_data: Record<string, unknown>;
+    summary: string | null;
+    status: string;
+  }[];
+  dataRoom: {
+    readiness_score: number;
+    total_modules_completed: number;
+    executive_summary: string | null;
+    key_financials: Record<string, unknown>;
+  } | null;
+}
+
+/** Trigger the AI Swarm pipeline for a company + financial year. */
+export async function triggerSwarm(companyId: string, financialYear: string): Promise<{ success: boolean; job_id?: string; error?: string }> {
+  try {
+    const supabaseUrl = import.meta.env.VITE_SUPABASE_URL as string;
+    const { data: { session } } = await supabase.auth.getSession();
+    const res = await fetch(`${supabaseUrl}/functions/v1/ai-financial-swarm?action=trigger`, {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json', Authorization: `Bearer ${session?.access_token}` },
+      body: JSON.stringify({ company_id: companyId, financial_year: financialYear }),
+    });
+    const d = await res.json();
+    return res.ok ? { success: true, job_id: d.job_id } : { success: false, error: d.error };
+  } catch (err: unknown) {
+    return { success: false, error: err instanceof Error ? err.message : 'Failed to trigger swarm' };
+  }
+}
+
+/** Poll the latest swarm job status for a company. */
+export async function getSwarmStatus(companyId: string): Promise<SwarmJob | null> {
+  try {
+    const supabaseUrl = import.meta.env.VITE_SUPABASE_URL as string;
+    const { data: { session } } = await supabase.auth.getSession();
+    const res = await fetch(`${supabaseUrl}/functions/v1/ai-financial-swarm?action=status&company_id=${companyId}`, {
+      headers: { Authorization: `Bearer ${session?.access_token}` },
+    });
+    if (!res.ok) return null;
+    const d = await res.json();
+    return d.success ? (d as SwarmJob) : null;
+  } catch { return null; }
+}
+
+/** Fetch all generated financial data for a company + FY (books, modules, data room). */
+export async function getClientFinancials(companyId: string, financialYear: string): Promise<ClientFinancials> {
+  try {
+    const [booksRes, modsRes, roomRes] = await Promise.all([
+      supabase.from('client_financial_books').select('book_type,book_data,summary_metrics').eq('company_id', companyId).eq('financial_year', financialYear),
+      supabase.from('client_module_calculations').select('module_id,module_label,calculation_data,summary,status').eq('company_id', companyId).eq('financial_year', financialYear),
+      supabase.from('client_notice_data_room').select('readiness_score,total_modules_completed,executive_summary,key_financials').eq('company_id', companyId).eq('financial_year', financialYear).maybeSingle(),
+    ]);
+    return {
+      books: (booksRes.data || []) as ClientFinancials['books'],
+      modules: (modsRes.data || []) as ClientFinancials['modules'],
+      dataRoom: roomRes.data as ClientFinancials['dataRoom'] || null,
+    };
+  } catch {
+    return { books: [], modules: [], dataRoom: null };
+  }
+}
+
+// ─────────────────────────────────────────
 // CLIENT PORTFOLIO (Add + Load)
 // ─────────────────────────────────────────
 
