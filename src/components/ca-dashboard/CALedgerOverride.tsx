@@ -1,5 +1,5 @@
 import React, { useState, useEffect } from 'react';
-import { supabase } from '@/lib/supabase';
+import { supabase } from '@/integrations/supabase/client';
 import { Card, CardHeader, CardTitle, CardContent } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
@@ -190,7 +190,7 @@ export function CALedgerOverride({ companyId, financialYear, onMathFinalized }: 
               <Input type="number" value={inputs.total_receivables} onChange={e => setInputs({...inputs, total_receivables: Number(e.target.value)})} className="bg-slate-900 border-slate-800" />
             </div>
             <div className="space-y-2">
-              <label className="text-xs text-slate-400">Receivables > 90 Days (₹)</label>
+              <label className="text-xs text-slate-400">Receivables &gt; 90 Days (₹)</label>
               <Input type="number" value={inputs.receivables_over_90_days} onChange={e => setInputs({...inputs, receivables_over_90_days: Number(e.target.value)})} className="bg-slate-900 border-slate-800" />
             </div>
             <div className="space-y-2">

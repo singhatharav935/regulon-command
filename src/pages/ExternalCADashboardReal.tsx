@@ -750,7 +750,7 @@ const LiveAIDraftingEngine = () => {
 
       // 2. Create the Notice record in the database
       addAgentLog(`🏦 Registering Notice in SANNIDH Database...`);
-      const { supabase } = await import('@/lib/supabase');
+      const { supabase } = await import('@/integrations/supabase/client');
       const { data: caUser } = await supabase.auth.getUser();
       
       // We'll just attach it to the first active company for the CA for demo purposes
