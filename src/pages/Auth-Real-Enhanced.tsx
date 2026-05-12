@@ -585,9 +585,9 @@ const AuthReal = () => {
                 initial={{ scale: 0 }}
                 animate={{ scale: 1 }}
                 transition={{ type: "spring", stiffness: 260, damping: 20 }}
-                className="mx-auto w-16 h-16 bg-gradient-to-r from-primary to-cyan-500 rounded-full flex items-center justify-center mb-4"
+                className="mx-auto w-16 h-16 rounded-full flex items-center justify-center mb-4 overflow-hidden border-2 border-white/20 shadow-lg shadow-primary/20"
               >
-                <Shield className="w-8 h-8 text-white" />
+                <img src="/favicon.ico" alt="Sannidh" className="w-full h-full object-cover" />
               </motion.div>
 
               <h1 className="text-3xl font-bold text-white mb-2">

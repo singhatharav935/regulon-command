@@ -8,7 +8,8 @@ const Footer = () => {
         <div className="grid grid-cols-2 md:grid-cols-4 lg:grid-cols-5 gap-8 lg:gap-12">
           {/* Brand */}
           <div className="col-span-2 lg:col-span-1">
-            <Link to="/" className="inline-flex items-center gap-2 mb-4">
+            <Link to="/" className="inline-flex items-center gap-2.5 mb-4">
+              <img src="/favicon.ico" alt="Sannidh" className="w-8 h-8 rounded-lg" />
               <span className="text-xl font-bold text-gradient-primary">SANNIDH</span>
             </Link>
             <p className="text-sm text-muted-foreground leading-relaxed">
