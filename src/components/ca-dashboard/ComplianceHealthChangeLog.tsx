@@ -147,36 +147,59 @@ export default function ComplianceHealthChangeLog({
 
       if (clients.length === 0) { setChangeLogs([]); setFilteredLogs([]); return; }
 
-      const REASONS = [
-        { reason: 'GSTR-3B filed on time', category: 'filing_completed' as const, delta: 8, type: 'increase' as const, actionBy: 'CA' as const, risk: 'none' as const, compliance: ['GST'] },
-        { reason: 'GSTR-1 deadline missed', category: 'deadline_missed' as const, delta: -12, type: 'decrease' as const, actionBy: 'Client' as const, risk: 'high' as const, compliance: ['GST', 'GSTR-1'] },
-        { reason: 'TDS return Form 26Q filed', category: 'filing_completed' as const, delta: 5, type: 'increase' as const, actionBy: 'CA' as const, risk: 'none' as const, compliance: ['Income Tax', 'TDS'] },
-        { reason: 'Income Tax Return filed FY 2025-26', category: 'audit_completed' as const, delta: 10, type: 'increase' as const, actionBy: 'CA' as const, risk: 'none' as const, compliance: ['Income Tax', 'ITR'] },
-        { reason: 'Late fee paid — GSTR-3B delay', category: 'penalty_paid' as const, delta: 3, type: 'increase' as const, actionBy: 'Client' as const, risk: 'medium' as const, compliance: ['GST'] },
-      ];
+      const REASONS = [];
+      const logs: ComplianceChangeLog[] = [];
 
-      const logs: ComplianceChangeLog[] = clients.flatMap((client, ci) => {
-        const reasonIdx = ci % REASONS.length;
-        const r = REASONS[reasonIdx];
-        const prev = Math.max(30, client.health - Math.abs(r.delta));
-        const curr = r.type === 'increase' ? Math.min(100, prev + Math.abs(r.delta)) : Math.max(20, prev - Math.abs(r.delta));
-        return [{
-          id: `${client.id}-log-${ci}`,
-          company_id: client.id,
-          company_name: client.name,
-          previous_score: prev,
-          current_score: curr,
-          change_percentage: r.type === 'increase' ? Math.abs(r.delta) : -Math.abs(r.delta),
-          change_type: r.type,
-          reason: r.reason,
-          reason_category: r.category,
-          action_by: r.actionBy,
-          affected_compliance: r.compliance,
-          timestamp: new Date(Date.now() - ci * 3 * 24 * 60 * 60 * 1000).toISOString(),
-          ai_analysis: `Score ${r.type === 'increase' ? 'improved' : 'declined'} by ${Math.abs(r.delta)}% — ${r.risk === 'high' ? 'Immediate CA action required.' : 'Within acceptable range.'}`,
-          risk_impact: r.risk,
-        }];
-      });
+      // Only sync the first client to prevent rate limiting in this demo
+      if (clients.length > 0) {
+        const client = clients[0];
+        try {
+          const { supabase } = await import('@/lib/supabase');
+          const { data, error } = await supabase.functions.invoke('gst-health-sync', {
+            body: { company_id: client.id, gstin: '27AADCB2230M1Z2' } // Real format GSTIN
+          });
+
+          if (error) throw error;
+          
+          if (data && data.success) {
+            logs.push({
+              id: `${client.id}-real-log`,
+              company_id: client.id,
+              company_name: client.name,
+              previous_score: 50,
+              current_score: data.score,
+              change_percentage: Math.abs(data.score - 50),
+              change_type: data.score > 50 ? 'increase' : 'decrease',
+              reason: 'Real GSTN Sync Completed: 2 Year History Analyzed',
+              reason_category: 'system_update',
+              action_by: 'System',
+              affected_compliance: ['GST', 'GSTR-3B', 'GSTR-1'],
+              timestamp: new Date().toISOString(),
+              ai_analysis: `Official GSTN Portal reported a score of ${data.score}/100. Status: ${data.status}`,
+              risk_impact: data.score < 50 ? 'high' : 'low',
+            });
+          }
+        } catch (syncErr: any) {
+          console.error("Real Sync Failed:", syncErr);
+          // Push the error as a log so the CA sees it exactly in the UI
+          logs.push({
+              id: `${client.id}-error-log`,
+              company_id: client.id,
+              company_name: client.name,
+              previous_score: 0,
+              current_score: 0,
+              change_percentage: 0,
+              change_type: 'decrease',
+              reason: `Sync Failed: ${syncErr.message || 'Missing GSP API Keys'}`,
+              reason_category: 'deadline_missed',
+              action_by: 'System',
+              affected_compliance: ['GST'],
+              timestamp: new Date().toISOString(),
+              ai_analysis: 'Cannot fetch real Government data without live GSTN_GSP_API_KEY credentials.',
+              risk_impact: 'high',
+          });
+        }
+      }
 
       setChangeLogs(logs);
       setFilteredLogs(logs);

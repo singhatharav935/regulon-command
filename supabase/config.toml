@@ -31,3 +31,58 @@ verify_jwt = false
 [functions.ai-financial-swarm]
 enabled = true
 verify_jwt = false
+
+[functions.ai-drafting-engine]
+enabled = true
+verify_jwt = true
+import_map = "./functions/ai-drafting-engine/deno.json"
+# Uncomment to specify a custom file path to the entrypoint.
+# Supported file extensions are: .ts, .js, .mjs, .jsx, .tsx
+entrypoint = "./functions/ai-drafting-engine/index.ts"
+# Specifies static files to be bundled with the function. Supports glob patterns.
+# For example, if you want to serve static HTML pages in your function:
+# static_files = [ "./functions/ai-drafting-engine/*.html" ]
+
+[functions.gst-health-sync]
+enabled = true
+verify_jwt = true
+import_map = "./functions/gst-health-sync/deno.json"
+# Uncomment to specify a custom file path to the entrypoint.
+# Supported file extensions are: .ts, .js, .mjs, .jsx, .tsx
+entrypoint = "./functions/gst-health-sync/index.ts"
+# Specifies static files to be bundled with the function. Supports glob patterns.
+# For example, if you want to serve static HTML pages in your function:
+# static_files = [ "./functions/gst-health-sync/*.html" ]
+
+[functions.auto-deadline-engine]
+enabled = true
+verify_jwt = true
+import_map = "./functions/auto-deadline-engine/deno.json"
+# Uncomment to specify a custom file path to the entrypoint.
+# Supported file extensions are: .ts, .js, .mjs, .jsx, .tsx
+entrypoint = "./functions/auto-deadline-engine/index.ts"
+# Specifies static files to be bundled with the function. Supports glob patterns.
+# For example, if you want to serve static HTML pages in your function:
+# static_files = [ "./functions/auto-deadline-engine/*.html" ]
+
+[functions.gst-scraper-bot]
+enabled = true
+verify_jwt = true
+import_map = "./functions/gst-scraper-bot/deno.json"
+# Uncomment to specify a custom file path to the entrypoint.
+# Supported file extensions are: .ts, .js, .mjs, .jsx, .tsx
+entrypoint = "./functions/gst-scraper-bot/index.ts"
+# Specifies static files to be bundled with the function. Supports glob patterns.
+# For example, if you want to serve static HTML pages in your function:
+# static_files = [ "./functions/gst-scraper-bot/*.html" ]
+
+[functions.gstn-otp-auth]
+enabled = true
+verify_jwt = true
+import_map = "./functions/gstn-otp-auth/deno.json"
+# Uncomment to specify a custom file path to the entrypoint.
+# Supported file extensions are: .ts, .js, .mjs, .jsx, .tsx
+entrypoint = "./functions/gstn-otp-auth/index.ts"
+# Specifies static files to be bundled with the function. Supports glob patterns.
+# For example, if you want to serve static HTML pages in your function:
+# static_files = [ "./functions/gstn-otp-auth/*.html" ]

@@ -1,8 +1,9 @@
 import { useEffect, useState } from "react";
 import { useParams } from "react-router-dom";
 import { motion } from "framer-motion";
-import { Shield, CheckCircle, XCircle, Loader, Building2, User, FileText } from "lucide-react";
+import { Shield, CheckCircle, XCircle, Loader, Building2, User, FileText, Smartphone } from "lucide-react";
 import { Button } from "@/components/ui/button";
+import { Input } from "@/components/ui/input";
 import { supabase } from "@/integrations/supabase/client";
 
 interface ConsentInfo {
@@ -25,6 +26,12 @@ export default function ConsentApprovalPage() {
   const [info, setInfo] = useState<ConsentInfo | null>(null);
   const [state, setState] = useState<PageState>("loading");
 
+  // New states for Unified Consent Flow
+  const [authStep, setAuthStep] = useState<"initial" | "gst_otp">("initial");
+  const [otp, setOtp] = useState("");
+  const [isOtpLoading, setIsOtpLoading] = useState(false);
+  const [gstinInput, setGstinInput] = useState("");
+
   useEffect(() => {
     if (!token) { setState("not_found"); return; }
     (async () => {
@@ -32,6 +39,8 @@ export default function ConsentApprovalPage() {
       const data = await res.json();
       if (!res.ok || !data.success) { setState("not_found"); return; }
       setInfo(data);
+      if (data.gstin) setGstinInput(data.gstin);
+      
       if (data.consent_status === "approved") setState("already_responded");
       else if (data.consent_status === "rejected") setState("already_responded");
       else setState("pending");
@@ -48,6 +57,49 @@ export default function ConsentApprovalPage() {
     const data = await res.json();
     if (res.ok && data.success) setState(decision);
     else setState("error");
+  };
+
+  const sendGstOtp = async () => {
+    setIsOtpLoading(true);
+    try {
+      const actualGstin = info?.gstin || gstinInput;
+      if (!actualGstin || actualGstin.length !== 15) {
+        alert("Please provide a valid 15-digit GSTIN.");
+        setIsOtpLoading(false);
+        return;
+      }
+      
+      // Make real call to GSTN API
+      const res = await supabase.functions.invoke('gstn-otp-auth', {
+        body: { action: 'send_otp', gstin: actualGstin }
+      });
+      if (res.error) throw res.error;
+      
+      setAuthStep("gst_otp");
+    } catch (err: any) {
+      alert("Error sending OTP: " + (err.message || JSON.stringify(err)));
+    } finally {
+      setIsOtpLoading(false);
+    }
+  };
+
+  const verifyGstOtpAndApprove = async () => {
+    setIsOtpLoading(true);
+    try {
+      const actualGstin = info?.gstin || gstinInput;
+      
+      // Verify real OTP with GSTN API
+      const res = await supabase.functions.invoke('gstn-otp-auth', {
+        body: { action: 'verify_otp', gstin: actualGstin, otp: otp }
+      });
+      if (res.error) throw res.error;
+      
+      // If OTP succeeds, Government token is received. Now fully approve consent.
+      await respond("approved");
+    } catch (err: any) {
+      alert("Invalid OTP or Error: " + (err.message || JSON.stringify(err)));
+      setIsOtpLoading(false);
+    }
   };
 
   // ── Loading ──
@@ -112,13 +164,8 @@ export default function ConsentApprovalPage() {
           </h1>
           <p className="text-slate-300 text-lg mb-2">
             {approved
-              ? `${info?.ca_name || "Your CA"} can now manage your compliance filings on SANNIDH.`
+              ? `${info?.ca_name || "Your CA"} can now securely sync your Bank and GSTN data.`
               : "No data will be accessed. Your CA has been notified."}
-          </p>
-          <p className="text-slate-500 text-sm mt-4">
-            {approved
-              ? "You can revoke this access at any time by contacting your CA."
-              : "You can always authorize later by requesting a new link from your CA."}
           </p>
           <div className="mt-8 p-4 rounded-xl border border-slate-700 bg-slate-900/50 text-xs text-slate-500">
             🔒 Powered by SANNIDH — India's Compliance AI Platform
@@ -145,7 +192,7 @@ export default function ConsentApprovalPage() {
   }
 
   // ── Main consent page (pending) ──
-  const isSubmitting = state === "submitting";
+  const isSubmitting = state === "submitting" || isOtpLoading;
   const formattedDate = info ? new Date(info.created_at).toLocaleDateString("en-IN", { day: "2-digit", month: "long", year: "numeric" }) : "";
 
   return (
@@ -153,95 +200,115 @@ export default function ConsentApprovalPage() {
       <motion.div
         initial={{ opacity: 0, y: 20 }}
         animate={{ opacity: 1, y: 0 }}
-        className="w-full max-w-lg"
+        className="w-full max-w-xl"
       >
         {/* Header */}
         <div className="text-center mb-8">
           <div className="inline-flex items-center gap-2 px-4 py-2 rounded-full bg-indigo-500/10 border border-indigo-500/20 mb-4">
             <Shield className="w-4 h-4 text-indigo-400" />
-            <span className="text-indigo-400 text-sm font-medium">SANNIDH Secure Authorization</span>
+            <span className="text-indigo-400 text-sm font-medium">SANNIDH Unified Authorization</span>
           </div>
-          <h1 className="text-3xl font-bold text-white mb-2">Data Access Request</h1>
-          <p className="text-slate-400">Review and respond to your CA's authorization request</p>
+          <h1 className="text-3xl font-bold text-white mb-2">Connect Statutory Data</h1>
+          <p className="text-slate-400">Securely sync your Bank and GSTN history with {info?.ca_name || "your CA"}.</p>
         </div>
 
         {/* Card */}
         <div className="bg-slate-900 border border-slate-700 rounded-2xl p-6 mb-6">
-          {/* CA Info */}
-          <div className="flex items-center gap-4 p-4 rounded-xl bg-indigo-500/10 border border-indigo-500/20 mb-6">
-            <div className="w-12 h-12 rounded-full bg-indigo-500/20 flex items-center justify-center">
-              <User className="w-6 h-6 text-indigo-400" />
-            </div>
-            <div>
-              <p className="text-white font-semibold">{info?.ca_name || "Your CA"}</p>
-              {info?.ca_firm_name && <p className="text-slate-400 text-sm">{info.ca_firm_name}</p>}
-              <p className="text-slate-500 text-xs mt-0.5">Requested on {formattedDate}</p>
-            </div>
-          </div>
-
-          {/* Client info */}
-          <div className="mb-6">
-            <p className="text-slate-400 text-xs uppercase tracking-wider mb-3">Request Details</p>
-            <div className="space-y-3">
-              <div className="flex items-center gap-3 p-3 rounded-lg bg-slate-800/50">
-                <Building2 className="w-4 h-4 text-slate-400 shrink-0" />
-                <div>
-                  <p className="text-xs text-slate-500">Company</p>
-                  <p className="text-white text-sm font-medium">{info?.client_name}</p>
+          
+          {authStep === "initial" ? (
+            <div className="space-y-6">
+              <div className="p-4 rounded-xl bg-slate-800/50 border border-slate-700/50 text-sm text-slate-300 space-y-2">
+                <p className="font-semibold text-white mb-3 flex items-center gap-2">
+                  <Building2 className="w-4 h-4 text-indigo-400" />
+                  What this will connect:
+                </p>
+                <div className="flex items-center gap-3">
+                  <CheckCircle className="w-4 h-4 text-green-400" />
+                  <span><strong className="text-white">Bank Account:</strong> Auto-fetch statements via RBI Account Aggregator</span>
+                </div>
+                <div className="flex items-center gap-3">
+                  <CheckCircle className="w-4 h-4 text-green-400" />
+                  <span><strong className="text-white">GSTN Portal:</strong> Fetch 2-year filing history & notices via secure OTP</span>
+                </div>
+                <div className="flex items-center gap-3">
+                  <CheckCircle className="w-4 h-4 text-green-400" />
+                  <span><strong className="text-white">MCA Portal:</strong> Public director & balance sheet records</span>
                 </div>
               </div>
-              {info?.gstin && (
-                <div className="flex items-center gap-3 p-3 rounded-lg bg-slate-800/50">
-                  <FileText className="w-4 h-4 text-slate-400 shrink-0" />
-                  <div>
-                    <p className="text-xs text-slate-500">GSTIN</p>
-                    <p className="text-white text-sm font-mono">{info.gstin}</p>
-                  </div>
-                </div>
-              )}
-              {info?.pan && (
-                <div className="flex items-center gap-3 p-3 rounded-lg bg-slate-800/50">
-                  <FileText className="w-4 h-4 text-slate-400 shrink-0" />
-                  <div>
-                    <p className="text-xs text-slate-500">PAN</p>
-                    <p className="text-white text-sm font-mono">{info.pan}</p>
-                  </div>
-                </div>
-              )}
+
+              <div className="space-y-3">
+                <label className="text-sm text-slate-400 font-medium ml-1">Confirm your GSTIN</label>
+                <Input 
+                  value={gstinInput} 
+                  onChange={(e) => setGstinInput(e.target.value)} 
+                  placeholder="e.g. 27AADCB2230M1Z2"
+                  className="bg-slate-950 border-slate-700 text-white font-mono h-12 text-lg"
+                />
+              </div>
+
+              <div className="grid grid-cols-2 gap-3 pt-2">
+                <Button
+                  onClick={() => respond("rejected")}
+                  disabled={isSubmitting}
+                  variant="outline"
+                  className="border-slate-700 text-slate-300 hover:bg-slate-800 py-6 text-base"
+                >
+                  <XCircle className="w-4 h-4 mr-2" /> Decline
+                </Button>
+                <Button
+                  onClick={sendGstOtp}
+                  disabled={isSubmitting || gstinInput.length !== 15}
+                  className="bg-gradient-to-r from-indigo-600 to-blue-600 hover:from-indigo-700 hover:to-blue-700 text-white py-6 text-base shadow-lg shadow-indigo-500/25"
+                >
+                  {isSubmitting ? <Loader className="w-5 h-5 animate-spin" /> : <><Smartphone className="w-5 h-5 mr-2" /> Request GST OTP</>}
+                </Button>
+              </div>
             </div>
-          </div>
+          ) : (
+            <div className="space-y-6 animate-in fade-in slide-in-from-right-4 duration-300">
+              <div className="text-center mb-6">
+                <div className="w-16 h-16 bg-blue-500/20 rounded-full flex items-center justify-center mx-auto mb-4 border border-blue-500/30">
+                  <Smartphone className="w-8 h-8 text-blue-400" />
+                </div>
+                <h3 className="text-xl font-semibold text-white">Enter GST OTP</h3>
+                <p className="text-slate-400 text-sm mt-2">
+                  An OTP has been sent to the mobile number registered with GSTIN <strong>{info?.gstin || gstinInput}</strong>.
+                </p>
+              </div>
 
-          {/* What access means */}
-          <div className="p-4 rounded-xl bg-slate-800/50 border border-slate-700/50 mb-6 text-sm text-slate-400 space-y-1.5">
-            <p className="text-slate-300 font-medium mb-2">What this authorization allows:</p>
-            <p>✅ Monitor GST, MCA, Income Tax compliance status</p>
-            <p>✅ Prepare and review filings on your behalf</p>
-            <p>✅ Receive compliance deadline reminders</p>
-            <p className="text-slate-500 text-xs mt-2">❌ Does not allow filing submissions without your approval</p>
-          </div>
+              <div className="space-y-4 px-6">
+                <Input 
+                  value={otp} 
+                  onChange={(e) => setOtp(e.target.value)} 
+                  placeholder="Enter 6-digit OTP"
+                  className="bg-slate-950 border-slate-700 text-white font-mono h-14 text-2xl text-center tracking-widest"
+                  maxLength={6}
+                />
+                
+                <Button
+                  onClick={verifyGstOtpAndApprove}
+                  disabled={isSubmitting || otp.length < 4}
+                  className="w-full bg-green-600 hover:bg-green-700 text-white py-6 text-lg shadow-lg shadow-green-500/25"
+                >
+                  {isSubmitting ? <Loader className="w-5 h-5 animate-spin" /> : <><Shield className="w-5 h-5 mr-2" /> Verify & Authorize Access</>}
+                </Button>
 
-          {/* Action buttons */}
-          <div className="grid grid-cols-2 gap-3">
-            <Button
-              onClick={() => respond("rejected")}
-              disabled={isSubmitting}
-              variant="outline"
-              className="border-red-500/30 text-red-400 hover:bg-red-500/10 py-3"
-            >
-              {isSubmitting ? <Loader className="w-4 h-4 animate-spin" /> : <><XCircle className="w-4 h-4 mr-2" />Decline</>}
-            </Button>
-            <Button
-              onClick={() => respond("approved")}
-              disabled={isSubmitting}
-              className="bg-gradient-to-r from-indigo-600 to-cyan-600 hover:from-indigo-700 hover:to-cyan-700 text-white py-3"
-            >
-              {isSubmitting ? <Loader className="w-4 h-4 animate-spin" /> : <><CheckCircle className="w-4 h-4 mr-2" />Authorize</>}
-            </Button>
-          </div>
+                <Button
+                  onClick={() => setAuthStep("initial")}
+                  disabled={isSubmitting}
+                  variant="ghost"
+                  className="w-full text-slate-400 hover:text-white"
+                >
+                  Back
+                </Button>
+              </div>
+            </div>
+          )}
+
         </div>
 
         <p className="text-center text-slate-600 text-xs">
-          🔒 Secured by SANNIDH · Your decision is recorded and encrypted · sannidh.in
+          🔒 Secured by SANNIDH · 100% API Driven · Zero Passwords Stored
         </p>
       </motion.div>
     </div>

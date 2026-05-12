@@ -10,6 +10,7 @@ import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@
 import { Badge } from '@/components/ui/badge';
 import { toast } from 'sonner';
 import { supabase } from '@/integrations/supabase/client';
+import { CALedgerOverride } from './CALedgerOverride';
 
 const CA_API = import.meta.env.VITE_CA_API_BASE_URL as string;
 
@@ -243,10 +244,21 @@ export default function ClientFinancialVault() {
           <p className="text-sm text-muted-foreground max-w-sm mt-2">Select a client from the dropdown above to access their AI-generated financial books and compliance Data Room.</p>
         </div>
       ) : (
-        <div className="grid grid-cols-1 lg:grid-cols-3 gap-6">
-          
-          {/* Left Column: Swarm Control */}
-          <div className="lg:col-span-1 space-y-6">
+        <>
+          {swarmJob?.status === 'pending_ca_review' && (
+            <CALedgerOverride 
+              companyId={selectedClient} 
+              financialYear={financialYear} 
+              onMathFinalized={() => {
+                fetchSwarmStatus();
+                fetchDataRoom();
+              }} 
+            />
+          )}
+          <div className="grid grid-cols-1 lg:grid-cols-3 gap-6">
+            
+            {/* Left Column: Swarm Control */}
+            <div className="lg:col-span-1 space-y-6">
             <div className="p-5 bg-card/40 border border-border/40 rounded-2xl space-y-4 relative overflow-hidden">
               <div className="absolute top-0 right-0 p-4 opacity-5 pointer-events-none">
                 <Activity className="w-32 h-32" />
@@ -471,7 +483,8 @@ export default function ClientFinancialVault() {
               </div>
             )}
           </div>
-        </div>
+          </div>
+        </>
       )}
     </div>
   );
