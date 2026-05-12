@@ -30,7 +30,7 @@ export default function StatutoryDeadlineCalendar() {
   const fetchCalendar = useCallback(async () => {
     setIsLoading(true);
     try {
-      const { supabase } = await import('@/lib/supabase');
+      const { supabase } = await import('@/integrations/supabase/client');
       const { data: caUser } = await supabase.auth.getUser();
 
       if (!caUser?.user) return;

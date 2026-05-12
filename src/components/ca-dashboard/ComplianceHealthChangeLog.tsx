@@ -154,7 +154,7 @@ export default function ComplianceHealthChangeLog({
       if (clients.length > 0) {
         const client = clients[0];
         try {
-          const { supabase } = await import('@/lib/supabase');
+          const { supabase } = await import('@/integrations/supabase/client');
           const { data, error } = await supabase.functions.invoke('gst-health-sync', {
             body: { company_id: client.id, gstin: '27AADCB2230M1Z2' } // Real format GSTIN
           });
