@@ -30,37 +30,40 @@ export default function StatutoryDeadlineCalendar() {
   const fetchCalendar = useCallback(async () => {
     setIsLoading(true);
     try {
+      const { supabase } = await import('@/lib/supabase');
+      const { data: caUser } = await supabase.auth.getUser();
 
-      const { getStatutoryDeadlines, loadCAClients } = await import('@/services/ca-supabase-service');
-      const [rawDeadlines, clients] = await Promise.all([Promise.resolve(getStatutoryDeadlines()), loadCAClients()]);
+      if (!caUser?.user) return;
 
-      // Map to RealDeadline shape
-      const mapped: RealDeadline[] = rawDeadlines.map(d => ({
-        id: d.id,
-        date: d.deadline.split(' ').slice(0, 2).join(' '), // e.g. "20 Jun"
-        label: `${d.type} — ${d.regulator}`,
-        active: d.daysRemaining <= 10,
-        urgency: d.status === 'overdue' ? 'critical' : d.status === 'urgent' ? 'high' : 'normal',
-      }));
-      setDeadlines(mapped);
+      const { data, error } = await supabase.functions.invoke('auto-deadline-engine', {
+        body: { ca_user_id: caUser.user.id }
+      });
 
-      // Generate escalations from overdue clients
-      const overdue = clients.filter(c => c.risk === 'High');
-      const escList: ExternalEscalation[] = overdue.slice(0, 3).map((c, i) => ({
-        id: `esc-${i}`,
-        title: `${c.name} — Compliance Gap Detected`,
-        summary: `${c.gaps} pending filings. Health score: ${c.health}%. Immediate action required.`,
-        type: c.health < 60 ? 'funds' : 'warning',
-      }));
-      setEscalations(escList);
-    } catch {
-      // Silently fail — calendar remains empty
+      if (error) throw error;
+
+      if (data && data.success) {
+        // Map to RealDeadline shape
+        const mapped: RealDeadline[] = data.deadlines.map((d: any) => ({
+          id: d.id,
+          date: d.deadline.split(' ').slice(0, 2).join(' '), // e.g. "20 Jun"
+          label: d.title,
+          active: d.daysRemaining <= 10,
+          urgency: d.status === 'overdue' ? 'critical' : d.status === 'urgent' ? 'high' : 'normal',
+        }));
+        setDeadlines(mapped);
+        setEscalations(data.escalations || []);
+      }
+    } catch (error) {
+      console.error("Failed to fetch dynamic deadlines:", error);
+      // Let it remain empty so it shows "No active deadlines" rather than fake ones
+      setDeadlines([]);
+      setEscalations([]);
     } finally {
       setIsLoading(false);
     }
   }, []);
 
-  useEffect(() => { fetchCalendar(); }, []);
+  useEffect(() => { fetchCalendar(); }, [fetchCalendar]);
 
   return (
     <motion.div initial={{ opacity: 0, y: 20 }} animate={{ opacity: 1, y: 0 }} className="space-y-6 mb-12 max-w-[1400px]">
