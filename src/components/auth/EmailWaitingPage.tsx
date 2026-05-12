@@ -245,6 +245,10 @@ export const EmailWaitingPage: React.FC<EmailWaitingPageProps> = ({
               transition={{ duration: 0.6, ease: "easeOut" }}
             >
               <Card className="p-8 bg-white/10 backdrop-blur-lg border border-white/20 shadow-2xl">
+                {/* Brand logo */}
+                <div className="flex justify-center mb-4">
+                  <img src="/favicon.ico" alt="Sannidh" className="w-12 h-12 rounded-xl border border-white/10 shadow-md" />
+                </div>
                 {/* Animated mail icon */}
                 <div className="text-center mb-8">
                   <motion.div

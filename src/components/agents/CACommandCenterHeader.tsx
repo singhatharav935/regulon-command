@@ -110,8 +110,8 @@ export const CACommandCenterHeader = ({ title, subtitle }: CACommandCenterHeader
           </div>
 
           <div>
-            {/* Firm Branding — shown when configured */}
-            {branding.firmName && (
+            {/* Firm Branding — shown when configured, otherwise show Sannidh logo */}
+            {branding.firmName ? (
               <div className="flex items-center gap-2 mb-1.5">
                 {branding.logoDataUrl ? (
                   <img src={branding.logoDataUrl} alt="Firm Logo" className="h-5 w-5 object-contain rounded" />
@@ -126,6 +126,11 @@ export const CACommandCenterHeader = ({ title, subtitle }: CACommandCenterHeader
                 <span className="text-xs font-semibold" style={{ color: branding.primaryColor }}>
                   {branding.firmName}
                 </span>
+              </div>
+            ) : (
+              <div className="flex items-center gap-2 mb-1.5">
+                <img src="/favicon.ico" alt="Sannidh" className="h-5 w-5 rounded object-contain" />
+                <span className="text-xs font-semibold text-cyan-400">Sannidh Platform</span>
               </div>
             )}
             <h1 className="text-xl font-bold text-foreground tracking-tight">{title || 'CA Practice Command Center'}</h1>
