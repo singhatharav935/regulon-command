@@ -28,47 +28,6 @@ export default function StatutoryDeadlineCalendar() {
   const fetchCalendar = useCallback(async () => {
     setIsLoading(true);
     try {
-      const { supabase } = await import('@/integrations/supabase/client');
-      const { data: caUser } = await supabase.auth.getUser();
-
-      if (!caUser?.user) {
-        // No authenticated user — use local statutory deadlines
-        await loadFallbackDeadlines();
-        return;
-      }
-
-      const { data, error } = await supabase.functions.invoke('auto-deadline-engine', {
-        body: { ca_user_id: caUser.user.id }
-      });
-
-      if (error) throw error;
-
-      if (data && data.success && data.deadlines?.length > 0) {
-        // Map to RealDeadline shape
-        const mapped: RealDeadline[] = data.deadlines.map((d: any) => ({
-          id: d.id,
-          date: d.deadline.split(' ').slice(0, 2).join(' '), // e.g. "20 Jun"
-          label: d.title,
-          active: d.daysRemaining <= 10,
-          urgency: d.status === 'overdue' ? 'critical' : d.status === 'urgent' ? 'high' : 'normal',
-        }));
-        setDeadlines(mapped);
-        setEscalations(data.escalations || []);
-      } else {
-        // Edge function returned no deadlines — use local statutory data
-        await loadFallbackDeadlines();
-      }
-    } catch {
-      // Edge function not deployed or returned error — use local statutory data
-      await loadFallbackDeadlines();
-    } finally {
-      setIsLoading(false);
-    }
-  }, []);
-
-  // Fallback: use locally-computed statutory deadlines from ca-supabase-service
-  const loadFallbackDeadlines = async () => {
-    try {
       const { getStatutoryDeadlines } = await import('@/services/ca-supabase-service');
       const statutoryDeadlines = getStatutoryDeadlines();
       const mapped: RealDeadline[] = statutoryDeadlines.map((d: any) => ({
@@ -83,8 +42,10 @@ export default function StatutoryDeadlineCalendar() {
     } catch {
       setDeadlines([]);
       setEscalations([]);
+    } finally {
+      setIsLoading(false);
     }
-  };
+  }, []);
 
   useEffect(() => { fetchCalendar(); }, [fetchCalendar]);
 
