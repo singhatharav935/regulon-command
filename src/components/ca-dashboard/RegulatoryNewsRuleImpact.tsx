@@ -596,6 +596,12 @@ export default function RegulatoryNewsRuleImpact({
   const fetchRegulatoryNews = useCallback(async () => {
     if (!isRealDashboard) return;
 
+    // If no backend is configured, skip network request — local data is already loaded
+    if (!apiEndpoint || apiEndpoint.includes('undefined')) {
+      setLastSync(new Date());
+      return;
+    }
+
     try {
       setLoading(true);
       setAiFetchingStatus('scanning');
@@ -620,34 +626,18 @@ export default function RegulatoryNewsRuleImpact({
         if (data.news && data.news.length > 0) {
           setNews(data.news);
           setFilteredNews(data.news);
-        } else {
-          const fallbackNews = getLiveRegulatoryNews();
-          setNews(fallbackNews as any);
-          setFilteredNews(fallbackNews as any);
         }
         setLastSync(new Date());
-      } else {
-        // API failed, use centralized service fallback
-        const fallbackNews = getLiveRegulatoryNews();
-        setNews(fallbackNews as any);
-        setFilteredNews(fallbackNews as any);
-        setLastSync(new Date());
       }
-    } catch (error) {
-      console.error('Failed to fetch regulatory news:', error);
-      // Ensure live data is shown even on error using centralized service
-      if (news.length === 0) {
-        const fallbackNews = getLiveRegulatoryNews();
-        setNews(fallbackNews as any);
-        setFilteredNews(fallbackNews as any);
-      }
+    } catch {
+      // Backend not available — silently use already-loaded local data
       setLastSync(new Date());
       setAiFetchingStatus('complete');
     } finally {
       setLoading(false);
       setTimeout(() => setAiFetchingStatus('idle'), 2000);
     }
-  }, [isRealDashboard, apiEndpoint, caId, news.length]);
+  }, [isRealDashboard, apiEndpoint, caId]);
 
   // Auto-refresh for real dashboard
   useEffect(() => {

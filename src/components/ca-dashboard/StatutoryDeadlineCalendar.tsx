@@ -1,11 +1,9 @@
 import React, { useState, useEffect, useCallback } from 'react';
-import { isCABackendConfigured } from '@/lib/ca-backend-guard';
 import { motion } from 'framer-motion';
 import { CalendarDays, BellRing, Clock, AlertTriangle, RefreshCw, Calendar } from 'lucide-react';
 import { Card, CardContent } from '@/components/ui/card';
 import { Badge } from '@/components/ui/badge';
 import { Button } from '@/components/ui/button';
-const CA_API = (import.meta.env.VITE_CA_API_BASE_URL as string);
 
 interface RealDeadline {
   id: string;
@@ -33,7 +31,11 @@ export default function StatutoryDeadlineCalendar() {
       const { supabase } = await import('@/integrations/supabase/client');
       const { data: caUser } = await supabase.auth.getUser();
 
-      if (!caUser?.user) return;
+      if (!caUser?.user) {
+        // No authenticated user — use local statutory deadlines
+        await loadFallbackDeadlines();
+        return;
+      }
 
       const { data, error } = await supabase.functions.invoke('auto-deadline-engine', {
         body: { ca_user_id: caUser.user.id }
@@ -41,7 +43,7 @@ export default function StatutoryDeadlineCalendar() {
 
       if (error) throw error;
 
-      if (data && data.success) {
+      if (data && data.success && data.deadlines?.length > 0) {
         // Map to RealDeadline shape
         const mapped: RealDeadline[] = data.deadlines.map((d: any) => ({
           id: d.id,
@@ -52,16 +54,37 @@ export default function StatutoryDeadlineCalendar() {
         }));
         setDeadlines(mapped);
         setEscalations(data.escalations || []);
+      } else {
+        // Edge function returned no deadlines — use local statutory data
+        await loadFallbackDeadlines();
       }
-    } catch (error) {
-      console.error("Failed to fetch dynamic deadlines:", error);
-      // Let it remain empty so it shows "No active deadlines" rather than fake ones
-      setDeadlines([]);
-      setEscalations([]);
+    } catch {
+      // Edge function not deployed or returned error — use local statutory data
+      await loadFallbackDeadlines();
     } finally {
       setIsLoading(false);
     }
   }, []);
+
+  // Fallback: use locally-computed statutory deadlines from ca-supabase-service
+  const loadFallbackDeadlines = async () => {
+    try {
+      const { getStatutoryDeadlines } = await import('@/services/ca-supabase-service');
+      const statutoryDeadlines = getStatutoryDeadlines();
+      const mapped: RealDeadline[] = statutoryDeadlines.map((d: any) => ({
+        id: d.id,
+        date: d.deadline.split(' ').slice(0, 2).join(' '),
+        label: d.title || d.type,
+        active: d.daysRemaining <= 10,
+        urgency: d.status === 'overdue' ? 'critical' : d.status === 'urgent' ? 'high' : 'normal',
+      }));
+      setDeadlines(mapped);
+      setEscalations([]);
+    } catch {
+      setDeadlines([]);
+      setEscalations([]);
+    }
+  };
 
   useEffect(() => { fetchCalendar(); }, [fetchCalendar]);
 
