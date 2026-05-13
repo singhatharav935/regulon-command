@@ -186,7 +186,7 @@ async function handleStatus(url: URL): Promise<Response> {
 async function fireAutonomousBankFetchAndSwarm(db: ReturnType<typeof getServiceClient>, companyId: string, caUserId: string) {
   try {
     console.log(`[AUTONOMOUS ENGINE] Consent received for company ${companyId}.`);
-    
+
     const supabaseUrl = Deno.env.get("SUPABASE_URL")!;
     const serviceKey = Deno.env.get("SUPABASE_SERVICE_ROLE_KEY")!;
 
