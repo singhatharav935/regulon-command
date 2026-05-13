@@ -12,8 +12,6 @@ import { toast } from 'sonner';
 import { supabase } from '@/integrations/supabase/client';
 import { CALedgerOverride } from './CALedgerOverride';
 
-const CA_API = import.meta.env.VITE_CA_API_BASE_URL as string;
-
 export default function ClientFinancialVault() {
   const [clients, setClients] = useState<{ id: string, name: string }[]>([]);
   const [selectedClient, setSelectedClient] = useState<string>('');
@@ -43,9 +41,9 @@ export default function ClientFinancialVault() {
 
   const fetchClients = async () => {
     try {
-      const response = await fetch(`${CA_API}/api/v1/ca/clients/list`);
-      const result = await response.json();
-      if (result.success) setClients(result.data);
+      const { loadCAClients } = await import('@/services/ca-supabase-service');
+      const caClients = await loadCAClients();
+      setClients(caClients.map(c => ({ id: c.id, name: c.name })));
     } catch (error) {
       console.error("Failed to load clients", error);
     } finally {
@@ -56,40 +54,38 @@ export default function ClientFinancialVault() {
   const fetchSwarmStatus = async () => {
     if (!selectedClient) return;
     try {
-      const { data: { session } } = await supabase.auth.getSession();
-      const res = await fetch(`${CA_API}/api/v1/functions/v1/ai-financial-swarm`, {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json', Authorization: `Bearer ${session?.access_token}` },
-        body: JSON.stringify({ action: 'status', company_id: selectedClient, financial_year: financialYear })
+      const { data, error } = await supabase.functions.invoke('ai-financial-swarm', {
+        body: { action: 'status', company_id: selectedClient, financial_year: financialYear }
       });
-      const result = await res.json();
-      if (result.success && result.data) {
-        setSwarmJob(result.data);
-        if (result.data.status === 'running') {
+      if (!error && data?.success && data?.data) {
+        setSwarmJob(data.data);
+        if (data.data.status === 'running') {
           setTimeout(fetchSwarmStatus, 3000); // poll if running
         }
       } else {
         setSwarmJob(null);
       }
-    } catch (e) {}
+    } catch (e) {
+      // Edge function may not be deployed — silently handle
+      setSwarmJob(null);
+    }
   };
 
   const fetchDataRoom = async () => {
     if (!selectedClient) return;
     try {
-      const { data: { session } } = await supabase.auth.getSession();
-      const res = await fetch(`${CA_API}/api/v1/functions/v1/ai-financial-swarm`, {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json', Authorization: `Bearer ${session?.access_token}` },
-        body: JSON.stringify({ action: 'get_data_room', company_id: selectedClient, financial_year: financialYear })
+      const { data, error } = await supabase.functions.invoke('ai-financial-swarm', {
+        body: { action: 'get_data_room', company_id: selectedClient, financial_year: financialYear }
       });
-      const result = await res.json();
-      if (result.success && result.data) {
-        setDataRoom(result.data);
+      if (!error && data?.success && data?.data) {
+        setDataRoom(data.data);
       } else {
         setDataRoom(null);
       }
-    } catch (e) {}
+    } catch (e) {
+      // Edge function may not be deployed — silently handle
+      setDataRoom(null);
+    }
   };
 
   const handleTriggerSwarm = async () => {
@@ -103,20 +99,17 @@ export default function ClientFinancialVault() {
     
     try {
       const { data: { user } } = await supabase.auth.getUser();
-      const { data: { session } } = await supabase.auth.getSession();
 
-      const res = await fetch(`${CA_API}/api/v1/functions/v1/ai-financial-swarm`, {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json', Authorization: `Bearer ${session?.access_token}` },
-        body: JSON.stringify({
+      const { data: result, error: invokeError } = await supabase.functions.invoke('ai-financial-swarm', {
+        body: {
           action: 'trigger_swarm',
           company_id: selectedClient,
           ca_user_id: user?.id,
           financial_year: financialYear
-        })
+        }
       });
-      
-      const result = await res.json();
+
+      if (invokeError) throw invokeError;
       if (result.success) {
         toast.success("AI Swarm Activated", { description: "Background agents are now processing data." });
         fetchSwarmStatus();
