@@ -21,7 +21,7 @@ serve(async (req) => {
     if (!action) throw new Error("Action is required");
 
     const openaiKey = Deno.env.get("OPENAI_API_KEY");
-    if (!openaiKey) throw new Error("OpenAI API Key is completely missing. System halted.");
+    if (!openaiKey) throw new Error("OpenAI API Key is missing. System halted.");
 
     if (action === "generate_draft") {
       // 1. Fetch Notice Content
@@ -36,7 +36,9 @@ serve(async (req) => {
       // Update notice status
       await supabase.from('client_govt_notices').update({ status: 'analyzing' }).eq('id', notice_id);
 
-      // 2. Fetch Data Room (The verified autonomous math)
+      // 2. WIRING TO AI SWARM FINANCIAL ENGINE: Fetch Data Room & Books & Inputs
+      console.log(`[Drafting Engine] Connecting to Swarm Data Room for company ${company_id}...`);
+
       const { data: dataRoom } = await supabase
         .from('client_notice_data_room')
         .select('compiled_bs, compiled_pl, executive_summary')
@@ -50,11 +52,26 @@ serve(async (req) => {
         .eq('company_id', company_id)
         .eq('financial_year', financial_year);
 
+      // Fetch the RAW financial ledgers (Balance Sheet & P&L Books)
+      const { data: finBooks } = await supabase
+        .from('client_financial_books')
+        .select('book_type, book_data, summary_metrics')
+        .eq('company_id', company_id)
+        .eq('financial_year', financial_year);
+
+      // Fetch CA override inputs (verified math)
+      const { data: statInputs } = await supabase
+        .from('client_statutory_inputs')
+        .select('*')
+        .eq('company_id', company_id)
+        .eq('financial_year', financial_year)
+        .maybeSingle();
+
       await supabase.from('client_govt_notices').update({ status: 'drafting_reply' }).eq('id', notice_id);
 
       // 3. Construct the Legal LLM Prompt
       const systemPrompt = `You are an elite Indian Chartered Accountant and Legal Counsel. You are writing an official response to a ${notice.department} Notice (${notice.notice_type}).
-You have access to the exact verified financial data of the client.
+You have direct backend access to the exact verified financial ledgers and compliance math calculated by the AI Financial Swarm.
 You MUST draft a highly professional, legal response referencing the exact sections of the CGST Act, 2017, Income Tax Act, 1961, or Companies Act, 2013 where applicable.
 
 Notice Context:
@@ -63,10 +80,12 @@ Type: ${notice.notice_type}
 Issue Date: ${notice.issue_date}
 Raw Notice Text (if any): ${notice.raw_text_content || 'Notice uploaded via PDF. Address general compliance for ' + notice.notice_type}
 
-Verified Client Data (Use these EXACT numbers to defend the client):
+--- REAL-TIME SWARM DATA ROOM (Use these EXACT numbers to defend the client) ---
 Financial Summary: ${dataRoom?.executive_summary || 'N/A'}
-Balance Sheet: ${JSON.stringify(dataRoom?.compiled_bs)}
+Statutory Verified Inputs (ITC, Advance Tax, TDS): ${JSON.stringify(statInputs)}
+Financial Books (P&L, Balance Sheet Summary): ${JSON.stringify(finBooks?.map(b => b.summary_metrics))}
 Calculated Compliance Modules: ${JSON.stringify(modules)}
+--------------------------------------------------------------------------------
 
 ${custom_prompt ? `CA Specific Instructions: ${custom_prompt}` : ''}
 
@@ -74,7 +93,7 @@ Output exactly 5 sections:
 1. INTRODUCTION
 2. FACTUAL BACKGROUND
 3. LEGAL ARGUMENTS (Cite specific Sections/Rules)
-4. FINANCIAL RECONCILIATION (Reference the client data provided)
+4. FINANCIAL RECONCILIATION (Cross-reference the exact Swarm Data Room numbers provided above)
 5. PRAYER`;
 
       // 4. Hit OpenAI
@@ -98,16 +117,16 @@ Output exactly 5 sections:
       const llmData = await llmRes.json();
       const draftedText = llmData.choices[0].message.content;
 
-      // 5. Update Status to Review Pending
+      // 5. Update Status to Review Pending and save draft
       await supabase.from('client_govt_notices').update({ 
         status: 'review_pending',
+        draft_content: draftedText
       }).eq('id', notice_id);
 
-      // We could store the draft in a dedicated table, or return it to the frontend.
       return new Response(JSON.stringify({ 
         success: true, 
         draft: draftedText,
-        message: "Legal Draft generated successfully using verified Data Room."
+        message: "Legal Draft generated successfully using verified Financial Ledgers & Data Room."
       }), {
         headers: { ...corsHeaders, "Content-Type": "application/json" },
       });
