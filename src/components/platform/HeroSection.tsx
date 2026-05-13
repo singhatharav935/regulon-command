@@ -92,10 +92,37 @@ const HeroSection = ({ content }: HeroSectionProps) => {
 
       <div className="relative z-10 max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-24">
         <div className="text-center">
+          {/* ── Sannidh Logo ── */}
+          <motion.div
+            initial={{ opacity: 0, scale: 0.6 }}
+            animate={{ opacity: 1, scale: 1 }}
+            transition={{ duration: 0.8, ease: [0.22, 1, 0.36, 1] }}
+            className="relative mb-8"
+          >
+            {/* Glowing backdrop */}
+            <motion.div
+              className="absolute inset-0 -m-6 rounded-full"
+              style={{
+                background: "radial-gradient(circle, rgba(0, 212, 255, 0.15) 0%, rgba(0, 136, 170, 0.05) 50%, transparent 70%)",
+              }}
+              animate={{
+                scale: [1, 1.15, 1],
+                opacity: [0.5, 0.8, 0.5],
+              }}
+              transition={{ duration: 3, repeat: Infinity, ease: "easeInOut" }}
+            />
+            {/* Logo image */}
+            <img
+              src="/favicon.ico"
+              alt="Sannidh Logo"
+              className="relative w-24 h-24 md:w-28 md:h-28 rounded-2xl border border-white/10 shadow-[0_0_40px_rgba(0,212,255,0.2),0_0_80px_rgba(0,136,170,0.1)] mx-auto"
+            />
+          </motion.div>
+
           <motion.div
             initial={{ opacity: 0, y: 20 }}
             animate={{ opacity: 1, y: 0 }}
-            transition={{ duration: 0.5 }}
+            transition={{ duration: 0.5, delay: 0.15 }}
             className="inline-flex items-center gap-2 px-4 py-2 rounded-full bg-primary/10 border border-primary/20 mb-8"
           >
             <Shield className="w-4 h-4 text-primary" />
