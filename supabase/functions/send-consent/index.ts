@@ -8,6 +8,7 @@
 
 import { serve } from "https://deno.land/std@0.168.0/http/server.ts";
 import { createClient } from "https://esm.sh/@supabase/supabase-js@2";
+import { handleOnboardingLead } from "./onboarding-lead.ts";
 
 const cors = {
   "Access-Control-Allow-Origin": "*",
@@ -296,7 +297,12 @@ serve(async (req) => {
     if (action === "initiate" && req.method === "POST") return await handleInitiate(req);
     if (action === "status" && req.method === "GET") return await handleStatus(url);
     if (action === "respond" && req.method === "POST") return await handleRespond(req);
-    return json(404, { error: "Unknown action. Use: initiate | status | respond" });
+    if (action === "onboarding_lead" && req.method === "POST") {
+      const body = await req.json();
+      const result = await handleOnboardingLead(body);
+      return json(result.success ? 200 : 400, result);
+    }
+    return json(404, { error: "Unknown action. Use: initiate | status | respond | onboarding_lead" });
   } catch (err: unknown) {
     const msg = err instanceof Error ? err.message : "Internal error";
     if (msg === "Unauthorized") return json(401, { error: "Unauthorized" });
