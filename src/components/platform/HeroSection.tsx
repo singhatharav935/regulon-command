@@ -9,7 +9,6 @@ import { Dialog, DialogContent, DialogDescription, DialogFooter, DialogHeader, D
 import { Label } from "@/components/ui/label";
 import { Input } from "@/components/ui/input";
 import { Textarea } from "@/components/ui/textarea";
-import { workspacePublicRequest } from "@/lib/workspace-backend";
 import { toast } from "sonner";
 
 type HeroSectionProps = {
@@ -32,7 +31,6 @@ const HeroSection = ({ content }: HeroSectionProps) => {
   const isLoggedIn = !loading && !!user;
   const dashboardPath = isLoggedIn ? getDashboardRoute(persona) : "/auth?mode=signup&role=company_owner";
   const [leadDialogOpen, setLeadDialogOpen] = useState(false);
-  const [leadType, setLeadType] = useState<"onboarding" | "expert">("onboarding");
   const [isSubmittingLead, setIsSubmittingLead] = useState(false);
   const [leadForm, setLeadForm] = useState({
     name: "",
@@ -52,23 +50,71 @@ const HeroSection = ({ content }: HeroSectionProps) => {
   const statPrompts = content?.stat_reasoning_prompts || "5K+";
   const statReview = content?.stat_review_model || "CA+Law";
 
-  const openLeadDialog = (type: "onboarding" | "expert") => {
-    setLeadType(type);
+  const openLeadDialog = () => {
     setLeadDialogOpen(true);
   };
 
+  // Rate limiting: max 2 requests per day per browser
+  const checkRateLimit = (): boolean => {
+    const key = "sannidh_onboarding_requests";
+    const stored = localStorage.getItem(key);
+    const today = new Date().toISOString().split("T")[0]; // YYYY-MM-DD
+    let data: { date: string; count: number } = { date: today, count: 0 };
+    if (stored) {
+      try {
+        data = JSON.parse(stored);
+        if (data.date !== today) {
+          data = { date: today, count: 0 };
+        }
+      } catch {
+        data = { date: today, count: 0 };
+      }
+    }
+    if (data.count >= 2) {
+      return false; // Rate limit exceeded
+    }
+    data.count += 1;
+    localStorage.setItem(key, JSON.stringify(data));
+    return true;
+  };
+
   const submitLead = async () => {
+    if (!leadForm.name.trim() || !leadForm.email.trim()) {
+      toast.error("Please provide your name and email.");
+      return;
+    }
+
+    if (!checkRateLimit()) {
+      toast.error("You've reached the maximum of 2 onboarding requests per day. Please try again tomorrow.");
+      return;
+    }
+
     try {
       setIsSubmittingLead(true);
-      await workspacePublicRequest<{ id: string }>("/public/landing/lead", {
+
+      // The edge function uses query params, so let's call it directly
+      const supabaseUrl = import.meta.env.VITE_SUPABASE_URL as string;
+      const res = await fetch(`${supabaseUrl}/functions/v1/send-consent?action=onboarding_lead`, {
         method: "POST",
+        headers: { "Content-Type": "application/json" },
         body: JSON.stringify({
-          ...leadForm,
-          inquiryType: leadType,
-          source: "landing-hero",
+          name: leadForm.name,
+          email: leadForm.email,
+          phone: leadForm.phone,
+          companyName: leadForm.companyName,
+          message: leadForm.message,
         }),
       });
-      toast.success("Request submitted. Our team will contact you.");
+
+      const result = await res.json().catch(() => ({}));
+
+      if (!res.ok || !result.success) {
+        throw new Error(result.error || "Failed to submit request");
+      }
+
+      toast.success("The SANNIDH team has been notified and will reach out to you as soon as possible! 🚀", {
+        duration: 6000,
+      });
       setLeadDialogOpen(false);
       setLeadForm({
         name: "",
@@ -78,7 +124,7 @@ const HeroSection = ({ content }: HeroSectionProps) => {
         message: "",
       });
     } catch (error) {
-      toast.error(error instanceof Error ? error.message : "Failed to submit request");
+      toast.error(error instanceof Error ? error.message : "Failed to submit request. Please try again.");
     } finally {
       setIsSubmittingLead(false);
     }
@@ -185,11 +231,8 @@ const HeroSection = ({ content }: HeroSectionProps) => {
                   <LayoutDashboard className="w-4 h-4 mr-2" />
                   Go to Dashboard
                 </Button>
-                <Button size="lg" variant="ghost" className="h-12 px-8" onClick={() => openLeadDialog("onboarding")}>
+                <Button size="lg" variant="ghost" className="h-12 px-8" onClick={() => openLeadDialog()}>
                   Request Onboarding
-                </Button>
-                <Button size="lg" variant="ghost" className="h-12 px-8" onClick={() => openLeadDialog("expert")}>
-                  Talk to Expert
                 </Button>
               </>
             ) : (
@@ -201,11 +244,8 @@ const HeroSection = ({ content }: HeroSectionProps) => {
                 <Button size="lg" variant="outline" className="h-12 px-8" onClick={() => navigate("/auth?mode=login&role=company_owner")}>
                   {ctaSecondary}
                 </Button>
-                <Button size="lg" variant="ghost" className="h-12 px-8" onClick={() => openLeadDialog("onboarding")}>
+                <Button size="lg" variant="ghost" className="h-12 px-8" onClick={() => openLeadDialog()}>
                   Request Onboarding
-                </Button>
-                <Button size="lg" variant="ghost" className="h-12 px-8" onClick={() => openLeadDialog("expert")}>
-                  Talk to Expert
                 </Button>
               </>
             )}
@@ -252,9 +292,9 @@ const HeroSection = ({ content }: HeroSectionProps) => {
       <Dialog open={leadDialogOpen} onOpenChange={setLeadDialogOpen}>
         <DialogContent>
           <DialogHeader>
-            <DialogTitle>{leadType === "expert" ? "Talk to Expert" : "Request Onboarding"}</DialogTitle>
+            <DialogTitle>Request Onboarding</DialogTitle>
             <DialogDescription>
-              Fill details and SANNIDH team will contact you.
+              Fill in your details and the SANNIDH team will reach out to you.
             </DialogDescription>
           </DialogHeader>
           <div className="space-y-3">

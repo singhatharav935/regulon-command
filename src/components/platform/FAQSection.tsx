@@ -310,9 +310,9 @@ const FAQSection = () => {
             <p className="text-muted-foreground mb-4">
               Our compliance experts are ready to help you understand how SANNIDH can protect your business.
             </p>
-            <button className="btn-glow px-6 py-3 rounded-lg font-medium">
-              Talk to an Expert
-            </button>
+            <a href="/auth?mode=signup&role=company_owner" className="btn-glow px-6 py-3 rounded-lg font-medium inline-block">
+              Get Started
+            </a>
           </div>
         </motion.div>
       </div>
