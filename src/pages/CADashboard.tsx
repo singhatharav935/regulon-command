@@ -19,7 +19,7 @@ import SannidhLiveAgent from "@/components/ai/SannidhLiveAgent";
 import ComplianceModulesHub from "@/components/ca-dashboard/compliance-modules/ComplianceModulesHub";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Calculator } from "lucide-react";
-import { CAAgentProvider } from "@/components/agents/CAAgentOrchestrator";
+// CAAgentProvider is now global — provided at App.tsx level
 
 const CADashboard = () => {
   const [isLoading, setIsLoading] = useState(true);
@@ -41,7 +41,6 @@ const CADashboard = () => {
   }
 
   return (
-    <CAAgentProvider>
       <div className="min-h-screen bg-background">
         <Navbar />
         
@@ -171,7 +170,6 @@ const CADashboard = () => {
         {/* Compliance Chatbot - Floating */}
         <ComplianceChatbot />
       </div>
-    </CAAgentProvider>
   );
 };
 
