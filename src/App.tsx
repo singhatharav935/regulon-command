@@ -4,6 +4,7 @@ import { TooltipProvider } from "@/components/ui/tooltip";
 import { QueryClient, QueryClientProvider } from "@tanstack/react-query";
 import { BrowserRouter, Routes, Route, Navigate } from "react-router-dom";
 import { Suspense, lazy } from "react";
+import { CAAgentProvider } from "./components/agents/CAAgentOrchestrator";
 import Index from "./pages/Index";
 import AuthReal from "./pages/Auth-Real-Enhanced";
 import AccountSettingsPage from "./pages/AccountSettings";
@@ -78,6 +79,7 @@ const App = () => (
     <AuthProvider>
       <EnhancedAuthProvider>
         <PersonaAuthProvider>
+          <CAAgentProvider>
           <TooltipProvider>
           <Toaster />
           <Sonner />
@@ -217,6 +219,7 @@ const App = () => (
           </Suspense>
         </BrowserRouter>
       </TooltipProvider>
+      </CAAgentProvider>
       </PersonaAuthProvider>
       </EnhancedAuthProvider>
     </AuthProvider>

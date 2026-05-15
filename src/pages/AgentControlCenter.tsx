@@ -30,7 +30,7 @@ import {
   Clock, Bell, FileWarning
 } from 'lucide-react';
 import { 
-  CAAgentProvider, useCAAgentOrchestrator, 
+  useCAAgentOrchestrator, 
   type CAAgentId, type CAAgentDefinition, type CAAgentStatus, type CAAgentMessage,
   type CAAgentGroupId
 } from '@/components/agents/CAAgentOrchestrator';
@@ -469,11 +469,7 @@ const AgentControlCenterContent = () => {
 // ================================================================
 
 const AgentControlCenter = () => {
-  return (
-    <CAAgentProvider>
-      <AgentControlCenterContent />
-    </CAAgentProvider>
-  );
+  return <AgentControlCenterContent />;
 };
 
 export default AgentControlCenter;

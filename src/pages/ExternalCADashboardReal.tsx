@@ -79,7 +79,7 @@ import { toast } from "sonner";
 import useCAMetrics from "@/hooks/useCAMetrics";
 import { useCAIdentity } from "@/hooks/useCAIdentity";
 import { addCompany as addCompanyAPI } from "@/services/api";
-import { CAAgentProvider } from "@/components/agents/CAAgentOrchestrator";
+// CAAgentProvider is now global — provided at App.tsx level
 import { CACommandCenterHeader } from "@/components/agents/CACommandCenterHeader";
 import { CAActionInbox } from "@/components/agents/CAActionInbox";
 
@@ -1629,7 +1629,6 @@ const ExternalCADashboardReal = () => {
   };
 
   return (
-    <CAAgentProvider>
     <div className="min-h-screen bg-background">
       <Navbar />
       
@@ -1890,7 +1889,6 @@ const ExternalCADashboardReal = () => {
       </main>
       <Footer />
     </div>
-    </CAAgentProvider>
   );
 };
 

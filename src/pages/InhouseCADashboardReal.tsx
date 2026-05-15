@@ -76,7 +76,7 @@ import {
 import { toast } from "sonner";
 import useCAMetrics from "@/hooks/useCAMetrics";
 import { addCompany as addCompanyAPI } from "@/services/api";
-import { CAAgentProvider } from "@/components/agents/CAAgentOrchestrator";
+// CAAgentProvider is now global — provided at App.tsx level
 import { CACommandCenterHeader } from "@/components/agents/CACommandCenterHeader";
 import { CAActionInbox } from "@/components/agents/CAActionInbox";
 import { useCAIdentity } from "@/hooks/useCAIdentity";
@@ -1600,7 +1600,6 @@ const InhouseCADashboardReal = () => {
   };
 
   return (
-    <CAAgentProvider>
       <div className="min-h-screen bg-background">
         <Navbar />
 
@@ -1936,7 +1935,6 @@ const InhouseCADashboardReal = () => {
           </motion.button>
         )}
       </div>
-    </CAAgentProvider>
   );
 };
 
