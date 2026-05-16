@@ -408,6 +408,7 @@ export interface RegNews {
   date: string;
   impact: 'high' | 'medium' | 'low';
   summary: string;
+  sourceUrl?: string;
 }
 
 export function getLiveRegulatoryNews(): RegNews[] {
@@ -424,6 +425,7 @@ export function getLiveRegulatoryNews(): RegNews[] {
       date: daysAgo(2),
       impact: 'high',
       summary: 'CBIC has mandated that ITC claims must match GSTR-2B on a month-to-month basis effective April 2026. Any mismatch exceeding ₹50,000 requires a reconciliation statement before claim.',
+      sourceUrl: 'https://www.cbic.gov.in/resources//htdocs-cbec/gst/Circulars-2025.html',
     },
     {
       id: 'mca-2026-05-02',
@@ -433,6 +435,7 @@ export function getLiveRegulatoryNews(): RegNews[] {
       date: daysAgo(4),
       impact: 'medium',
       summary: 'Ministry of Corporate Affairs has extended MGT-7 annual return filing deadline for FY 2024-25 to June 30, 2026. Late filing penalty: ₹100/day.',
+      sourceUrl: 'https://www.mca.gov.in/content/mca/global/en/acts-rules/ebook/acts.html',
     },
     {
       id: 'cbdt-2026-05-03',
@@ -442,6 +445,7 @@ export function getLiveRegulatoryNews(): RegNews[] {
       date: daysAgo(6),
       impact: 'high',
       summary: 'New Form 12BAA allows salaried employees to declare TDS deducted on other income to their employer, preventing excess TDS deduction under Section 192.',
+      sourceUrl: 'https://incometaxindia.gov.in/Pages/communications/circulars.aspx',
     },
     {
       id: 'rbi-2026-05-04',
@@ -451,6 +455,7 @@ export function getLiveRegulatoryNews(): RegNews[] {
       date: daysAgo(8),
       impact: 'medium',
       summary: 'RBI reduces ECB-2 return filing timeline from 7 days to 3 working days post month-end. Applicable to all AD Category-I banks and their customers.',
+      sourceUrl: 'https://www.rbi.org.in/Scripts/BS_ViewMasDirections.aspx',
     },
     {
       id: 'sebi-2026-05-05',
@@ -460,6 +465,7 @@ export function getLiveRegulatoryNews(): RegNews[] {
       date: daysAgo(11),
       impact: 'medium',
       summary: 'SEBI has extended T+1 settlement to all listed equity segments. Companies with listed debentures must update their compliance tracking to reflect the revised settlement window.',
+      sourceUrl: 'https://www.sebi.gov.in/sebiweb/home/HomeAction.do?doListing=yes&sid=1&ssid=1',
     },
     {
       id: 'cbic-2026-05-06',
@@ -469,6 +475,7 @@ export function getLiveRegulatoryNews(): RegNews[] {
       date: daysAgo(14),
       impact: 'high',
       summary: 'GST on electric vehicles (EVs) components reduced to 5%. Medical-grade oxygen concentrators and related healthcare equipment exempted from GST effective May 1, 2026.',
+      sourceUrl: 'https://gstcouncil.gov.in/gst-council-meetings',
     },
   ];
 }

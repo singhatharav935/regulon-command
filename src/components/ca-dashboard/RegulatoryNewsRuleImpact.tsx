@@ -86,7 +86,7 @@ const DEMO_REGULATORY_NEWS: RegulatoryNews[] = [
     effectiveDate: '2026-04-01',
     publishedDate: '2026-03-15',
     summary: 'New data protection regulations requiring explicit consent mechanisms, data portability rights, and right to erasure for all data principals.',
-    sourceUrl: 'https://meity.gov.in/dpdp-act-2023',
+    sourceUrl: 'https://www.meity.gov.in/data-protection-framework',
     impactLevel: 'critical',
     affectedSectors: ['IT Services', 'E-commerce', 'Healthcare', 'BFSI'],
     affectedCompanyTypes: ['Private Limited', 'LLP', 'Public Limited'],
@@ -113,7 +113,7 @@ const DEMO_REGULATORY_NEWS: RegulatoryNews[] = [
     effectiveDate: '2026-07-01',
     publishedDate: '2026-03-10',
     summary: 'Mandatory ESG (Environmental, Social, Governance) reporting for all listed companies and large unlisted companies with turnover exceeding ₹500 Cr.',
-    sourceUrl: 'https://mca.gov.in/esg-disclosure-2026',
+    sourceUrl: 'https://www.mca.gov.in/content/mca/global/en/acts-rules/ebook/acts.html',
     impactLevel: 'high',
     affectedSectors: ['Manufacturing', 'Energy', 'Mining', 'All Listed'],
     affectedCompanyTypes: ['Public Listed', 'Large Private'],
@@ -139,7 +139,7 @@ const DEMO_REGULATORY_NEWS: RegulatoryNews[] = [
     effectiveDate: '2026-03-01',
     publishedDate: '2026-02-20',
     summary: 'Revised GST rates for IT services: SaaS products now at 12% (down from 18%), while consulting services remain at 18%. New compliance requirements for e-invoicing.',
-    sourceUrl: 'https://cbic.gov.in/gst-circular-2026',
+    sourceUrl: 'https://www.cbic.gov.in/resources//htdocs-cbec/gst/Circulars-2025.html',
     impactLevel: 'medium',
     affectedSectors: ['IT Services', 'Software Development', 'Consulting'],
     affectedCompanyTypes: ['All'],
@@ -166,7 +166,7 @@ const DEMO_REGULATORY_NEWS: RegulatoryNews[] = [
     effectiveDate: '2026-05-15',
     publishedDate: '2026-03-01',
     summary: 'Enhanced KYC requirements for digital lending platforms. All NBFC-connected apps must implement Video KYC and real-time consent tracking.',
-    sourceUrl: 'https://rbi.org.in/digital-lending-2026',
+    sourceUrl: 'https://www.rbi.org.in/Scripts/BS_ViewMasDirections.aspx',
     impactLevel: 'high',
     affectedSectors: ['FinTech', 'NBFC', 'Digital Lending'],
     affectedCompanyTypes: ['NBFC', 'FinTech Companies'],
@@ -196,7 +196,7 @@ const LIVE_REGULATORY_NEWS: RegulatoryNews[] = [
     effectiveDate: '2026-04-01',
     publishedDate: '2026-03-15',
     summary: 'Digital Personal Data Protection Act requires all data fiduciaries to implement consent mechanisms, appoint Data Protection Officers, and establish grievance redressal. Applies to all companies processing personal data of Indian citizens.',
-    sourceUrl: 'https://meity.gov.in/dpdp-rules-2024',
+    sourceUrl: 'https://www.meity.gov.in/data-protection-framework',
     impactLevel: 'critical',
     affectedSectors: ['IT Services', 'E-commerce', 'Healthcare', 'BFSI', 'EdTech', 'FinTech'],
     affectedCompanyTypes: ['Private Limited', 'LLP', 'Public Limited', 'OPC'],
@@ -224,7 +224,7 @@ const LIVE_REGULATORY_NEWS: RegulatoryNews[] = [
     effectiveDate: '2026-07-01',
     publishedDate: '2026-03-10',
     summary: 'Mandatory BRSR Core reporting for top 1000 listed companies and unlisted companies with turnover exceeding ₹500 Cr. Includes climate-related financial disclosures, Scope 1, 2, 3 emissions reporting.',
-    sourceUrl: 'https://mca.gov.in/esg-brsr-2026',
+    sourceUrl: 'https://www.mca.gov.in/content/mca/global/en/acts-rules/ebook/acts.html',
     impactLevel: 'high',
     affectedSectors: ['Manufacturing', 'Energy', 'Mining', 'Infrastructure', 'All Listed Companies'],
     affectedCompanyTypes: ['Public Listed', 'Large Private Limited'],
@@ -251,7 +251,7 @@ const LIVE_REGULATORY_NEWS: RegulatoryNews[] = [
     effectiveDate: '2026-04-01',
     publishedDate: '2026-03-20',
     summary: 'Revised GST rates: SaaS/Cloud services reduced to 12% (from 18%), Online gaming 28% on full face value, Insurance premiums reduced to 12%. E-invoicing mandatory for turnover above ₹5 Cr from April 2026.',
-    sourceUrl: 'https://cbic.gov.in/gst-council-53',
+    sourceUrl: 'https://gstcouncil.gov.in/gst-council-meetings',
     impactLevel: 'high',
     affectedSectors: ['IT Services', 'Gaming', 'Insurance', 'All Businesses'],
     affectedCompanyTypes: ['All'],
@@ -279,7 +279,7 @@ const LIVE_REGULATORY_NEWS: RegulatoryNews[] = [
     effectiveDate: '2026-05-01',
     publishedDate: '2026-03-01',
     summary: 'Enhanced KYC requirements for digital lending. Mandatory Video KYC, real-time consent tracking, interest rate caps, and cooling-off period for loans. All lending service providers must be registered.',
-    sourceUrl: 'https://rbi.org.in/digital-lending-2026',
+    sourceUrl: 'https://www.rbi.org.in/Scripts/BS_ViewMasDirections.aspx',
     impactLevel: 'critical',
     affectedSectors: ['FinTech', 'NBFC', 'Digital Lending', 'Banks'],
     affectedCompanyTypes: ['NBFC', 'FinTech Companies', 'Banks'],
@@ -306,7 +306,7 @@ const LIVE_REGULATORY_NEWS: RegulatoryNews[] = [
     effectiveDate: '2026-04-01',
     publishedDate: '2026-02-01',
     summary: 'Revised TDS rates under Section 194Q (purchase of goods) reduced to 0.05%. New TCS provisions for foreign remittances above ₹7 Lakh. Updated Form 26AS with expanded transaction reporting.',
-    sourceUrl: 'https://incometax.gov.in/tds-tcs-2026',
+    sourceUrl: 'https://incometaxindia.gov.in/Pages/communications/notifications.aspx',
     impactLevel: 'medium',
     affectedSectors: ['All Businesses', 'Import/Export', 'Trading'],
     affectedCompanyTypes: ['All'],
@@ -333,7 +333,7 @@ const LIVE_REGULATORY_NEWS: RegulatoryNews[] = [
     effectiveDate: '2026-04-01',
     publishedDate: '2026-03-05',
     summary: 'Enhanced disclosure requirements for Related Party Transactions (RPTs). Lower materiality threshold of ₹100 Cr or 2% of turnover. Mandatory prior approval for all RPTs with promoter group entities.',
-    sourceUrl: 'https://sebi.gov.in/lodr-rpt-2026',
+    sourceUrl: 'https://www.sebi.gov.in/sebiweb/home/HomeAction.do?doListing=yes&sid=1&ssid=1',
     impactLevel: 'high',
     affectedSectors: ['All Listed Companies'],
     affectedCompanyTypes: ['Public Listed'],
@@ -360,7 +360,7 @@ const LIVE_REGULATORY_NEWS: RegulatoryNews[] = [
     effectiveDate: '2026-06-01',
     publishedDate: '2026-03-15',
     summary: 'New UAN 2.0 system with Aadhaar-based authentication. Mandatory for all establishments with 20+ employees. Real-time PF contribution tracking and instant withdrawal facility for members.',
-    sourceUrl: 'https://epfindia.gov.in/uan-2.0',
+    sourceUrl: 'https://www.epfindia.gov.in/site_en/index.php',
     impactLevel: 'medium',
     affectedSectors: ['All Employers with 20+ employees'],
     affectedCompanyTypes: ['All'],
@@ -387,7 +387,7 @@ const LIVE_REGULATORY_NEWS: RegulatoryNews[] = [
     effectiveDate: '2026-04-01',
     publishedDate: '2026-03-01',
     summary: 'ESIC wage ceiling increased to ₹25,000/month. Coverage extended to all establishments with 5+ employees in notified areas. New super-specialty treatment coverage added.',
-    sourceUrl: 'https://esic.nic.in/wage-ceiling-2026',
+    sourceUrl: 'https://www.esic.gov.in/web/esic/home',
     impactLevel: 'medium',
     affectedSectors: ['All Establishments in ESIC Areas'],
     affectedCompanyTypes: ['All'],
@@ -414,7 +414,7 @@ const LIVE_REGULATORY_NEWS: RegulatoryNews[] = [
     effectiveDate: '2026-05-01',
     publishedDate: '2026-03-12',
     summary: 'Enhanced beneficial ownership disclosure. Companies must identify and report all individuals holding 10%+ voting rights or significant influence. Annual declaration mandatory in Form BEN-2.',
-    sourceUrl: 'https://mca.gov.in/beneficial-owner-2026',
+    sourceUrl: 'https://www.mca.gov.in/content/mca/global/en/acts-rules/ebook/acts.html',
     impactLevel: 'high',
     affectedSectors: ['All Companies'],
     affectedCompanyTypes: ['Private Limited', 'Public Limited', 'OPC'],
@@ -441,7 +441,7 @@ const LIVE_REGULATORY_NEWS: RegulatoryNews[] = [
     effectiveDate: '2026-04-15',
     publishedDate: '2026-03-08',
     summary: 'New overseas investment framework under FEMA. Simplified ODI (Overseas Direct Investment) process. Enhanced limits for round-tripping structures. Real-time reporting through new FEM portal.',
-    sourceUrl: 'https://rbi.org.in/fema-odi-2026',
+    sourceUrl: 'https://www.rbi.org.in/Scripts/BS_FemaNotifications.aspx',
     impactLevel: 'medium',
     affectedSectors: ['Companies with Overseas Investments', 'Export-Import'],
     affectedCompanyTypes: ['All with Foreign Transactions'],
@@ -493,7 +493,7 @@ const LIVE_REGULATORY_NEWS: RegulatoryNews[] = [
     effectiveDate: '2026-04-01',
     publishedDate: '2026-04-05',
     summary: 'Edge-Case Enforcement: Stricter enforcement of Section 43B(h) of Income Tax Act regarding payments to Micro and Small enterprises. Audit trail tracking now strictly monitored via AI flags by Income Tax Dept.',
-    sourceUrl: 'https://msme.gov.in',
+    sourceUrl: 'https://msme.gov.in/all-schemes',
     impactLevel: 'high',
     affectedSectors: ['Manufacturing', 'Retail', 'Wholesale'],
     affectedCompanyTypes: ['All Limited Liability'],
@@ -518,7 +518,7 @@ const LIVE_REGULATORY_NEWS: RegulatoryNews[] = [
     effectiveDate: '2026-04-20',
     publishedDate: '2026-04-12',
     summary: 'Edge-Case Directive: Specialized limits imposed on Alternative Investment Funds (AIFs) regarding co-investment structures and pari-passu rights for sponsor entities. Affects Category II AIFs primarily.',
-    sourceUrl: 'https://sebi.gov.in',
+    sourceUrl: 'https://www.sebi.gov.in/sebiweb/home/HomeAction.do?doListing=yes&sid=3&ssid=26',
     impactLevel: 'critical',
     affectedSectors: ['Venture Capital', 'Private Equity'],
     affectedCompanyTypes: ['AIFs', 'Asset Management Companies'],
@@ -1051,7 +1051,14 @@ export default function RegulatoryNewsRuleImpact({
                             className="text-xs h-8 px-2 bg-green-500/10 border-green-500/30 text-green-400 hover:bg-green-500/20"
                             onClick={(e) => {
                               e.stopPropagation();
-                              window.open(item.sourceUrl, '_blank', 'noopener,noreferrer');
+                              // Use sourceUrl if available, otherwise fall back to the authority's main portal
+                              const url = item.sourceUrl
+                                || GOVERNMENT_PORTALS.find(p => p.code === item.authorityCode)?.url
+                                || (item as any).source && GOVERNMENT_PORTALS.find(p => p.code === (item as any).source || p.name.includes((item as any).source))?.url
+                                || '#';
+                              if (url && url !== '#') {
+                                window.open(url, '_blank', 'noopener,noreferrer');
+                              }
                             }}
                           >
                             <ExternalLink className="w-3 h-3 mr-1" />
