@@ -69,7 +69,7 @@ const buildLocalAgentPayload = async () => {
       deadline: "2024-03-20",
       impact_level: "High",
       summary: "New GSTR-3B filing format with automatic population from GSTR-2B",
-      source_url: "https://www.gstn.org/news"
+      source_url: "https://www.gst.gov.in"
     },
     {
       id: "alert-002",
@@ -97,7 +97,7 @@ const buildLocalAgentPayload = async () => {
       deadline: "2024-04-15",
       impact_level: "Medium",
       summary: "Employee EPF contribution increased by 0.5%",
-      source_url: "https://www.epfo.gov.in"
+      source_url: "https://www.epfindia.gov.in"
     },
   ];
   
