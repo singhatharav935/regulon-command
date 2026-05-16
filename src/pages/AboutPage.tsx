@@ -282,7 +282,7 @@ export default function AboutPage() {
                         <Button 
                           variant="outline" 
                           className="border-slate-600 text-white hover:bg-slate-700"
-                          onClick={() => window.open(`mailto:${member.email}`, '_self')}
+                          onClick={() => { window.location.href = `mailto:${member.email}`; }}
                         >
                           <Mail className="w-4 h-4" />
                         </Button>
@@ -405,7 +405,7 @@ export default function AboutPage() {
               size="lg" 
               variant="outline" 
               className="border-slate-600 text-white hover:bg-slate-800 px-10 py-4 text-lg"
-              onClick={() => window.open('mailto:rishabhshukla2510@gmail.com', '_self')}
+              onClick={() => { window.location.href = 'mailto:rishabhshukla2510@gmail.com'; }}
             >
               <Mail className="w-5 h-5 mr-2" />
               Contact Us
