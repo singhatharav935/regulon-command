@@ -219,9 +219,7 @@ const Navbar = () => {
             <Link to="/customers" className="px-4 py-2 text-sm text-muted-foreground hover:text-foreground transition-colors">
               Customers
             </Link>
-            <Link to="/resources" className="px-4 py-2 text-sm text-muted-foreground hover:text-foreground transition-colors">
-              Resources
-            </Link>
+
             <Link to="/about" className="px-4 py-2 text-sm text-muted-foreground hover:text-foreground transition-colors">
               About
             </Link>
