@@ -59,7 +59,7 @@ const AdvancedPlatformPage = lazy(() => import("./pages/AdvancedPlatformPage"));
 const AdvancedSolutionsPage = lazy(() => import("./pages/AdvancedSolutionsPage"));
 const AdvancedSecurityPage = lazy(() => import("./pages/AdvancedSecurityPage"));
 const AdvancedCustomersPage = lazy(() => import("./pages/AdvancedCustomersPage"));
-const AdvancedResourcesPage = lazy(() => import("./pages/AdvancedResourcesPage"));
+
 const ProfileSettings = lazy(() => import("./pages/ProfileSettings"));
 const ConsentApprovalPage = lazy(() => import("./pages/ConsentApprovalPage")); // Public — CA client consent
 
@@ -108,7 +108,7 @@ const App = () => (
             <Route path="/security/encryption-standards" element={<AdvancedSecurityPage />} />
             <Route path="/security/dpdp-2026" element={<AdvancedSecurityPage />} />
             <Route path="/security/soc2-type-ii" element={<AdvancedSecurityPage />} />
-            <Route path="/resources" element={<AdvancedResourcesPage />} />
+
             <Route path="/about" element={<AboutPage />} />
             <Route path="/privacy" element={<PrivacyPolicy />} />
             <Route path="/terms" element={<TermsOfService />} />

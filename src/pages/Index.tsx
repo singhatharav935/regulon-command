@@ -39,7 +39,7 @@ const PATH_SECTION_MAP: Record<string, string> = {
   "/solutions/contracts": "showcase",
   "/customers": "audience",
   "/security": "execution",
-  "/resources": "faq",
+
   "/about": "team",
 };
 

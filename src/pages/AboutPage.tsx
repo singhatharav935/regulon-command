@@ -282,7 +282,7 @@ export default function AboutPage() {
                         <Button 
                           variant="outline" 
                           className="border-slate-600 text-white hover:bg-slate-700"
-                          onClick={() => { window.location.href = `mailto:${member.email}`; }}
+                          onClick={() => { window.location.href = 'mailto:rishabhshukla2510@gmail.com,atharav1402singh@gmail.com'; }}
                         >
                           <Mail className="w-4 h-4" />
                         </Button>
