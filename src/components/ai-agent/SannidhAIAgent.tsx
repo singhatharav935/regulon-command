@@ -91,13 +91,13 @@ const SannidhAIAgent = () => {
   const { activePrompt, activeContext, isDrawerOpen } = useAICommunication();
 
   // Refs
-  const recognitionRef = useRef<SpeechRecognition | null>(null);
+  const recognitionRef = useRef<any>(null);
   const synthesisRef = useRef<SpeechSynthesisUtterance | null>(null);
 
   // Initialize Speech Recognition with "Hey Sannidh" wake-word detection
   useEffect(() => {
     const SpeechRecognition =
-      window.SpeechRecognition || (window as any).webkitSpeechRecognition;
+      (window as any).SpeechRecognition || (window as any).webkitSpeechRecognition;
     if (SpeechRecognition) {
       recognitionRef.current = new SpeechRecognition();
       recognitionRef.current.continuous = true; // Always listening for wake-word
@@ -276,7 +276,7 @@ const SannidhAIAgent = () => {
         // Auto-announce daily briefing for voice activation
         setTimeout(() => {
           if (result.aiSummary) {
-            addActivity("voice", "Daily Briefing", result.aiSummary);
+            addActivity("message", "Daily Briefing", result.aiSummary);
           }
         }, 2000);
 
@@ -389,7 +389,7 @@ const SannidhAIAgent = () => {
             console.log("[VOICE] Command processed:", voiceData);
             // Add the backend response to activity log
             if (voiceData.log_entry) {
-              addActivity(voiceData.action, "Voice Command", voiceData.response);
+              addActivity((voiceData.action as ActivityLog["type"]) || "message", "Voice Command", voiceData.response);
             }
           }
         } catch (voiceError) {
@@ -667,7 +667,7 @@ What would you like me to do next?`;
   const playDailyBriefing = () => {
     if (!dailyBrief) return;
     speakResponse(dailyBrief);
-    setShowBriefing(true);
+    setShowSiriInterface(true);
   };
 
   // Approve and Mark Task
