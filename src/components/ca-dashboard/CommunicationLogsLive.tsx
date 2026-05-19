@@ -134,41 +134,20 @@ export default function CommunicationLogs({
     setLoading(true);
     setAiAnalyzing(true);
     try {
-      const { loadCAClients } = await import('@/services/ca-supabase-service');
-      const clients = await loadCAClients();
+      const { loadCAClients, getCommunicationLogs } = await import('@/services/ca-supabase-service');
+      const [clients, dbLogs] = await Promise.all([
+        loadCAClients(),
+        getCommunicationLogs()
+      ]);
 
-      if (clients.length === 0) { setLogs([]); setFilteredLogs([]); return; }
+      if (clients.length === 0 && dbLogs.length === 0) { 
+        setLogs([]); 
+        setFilteredLogs([]); 
+        return; 
+      }
 
-      const COMM_TEMPLATES = [
-        { type: 'reminder' as const, direction: 'outgoing' as const, subject: 'GSTR-3B Due Date Reminder', content: 'Friendly reminder: GSTR-3B for this month is due in 7 days. Please share purchase data at the earliest.', priority: 'high' as const, category: 'filing' as const, status: 'read' as const },
-        { type: 'email' as const, direction: 'incoming' as const, subject: 'Query: TDS Deduction on Professional Fees', content: 'Please advise on the applicable TDS rate for professional service payments exceeding ₹30,000 per annum.', priority: 'medium' as const, category: 'query' as const, status: 'unread' as const },
-        { type: 'notification' as const, direction: 'system' as const, subject: 'AI Compliance Alert: Health Score Drop', content: 'Compliance health score dropped by 12 points due to pending GSTR-1 filing. Auto-escalated to priority queue.', priority: 'high' as const, category: 'alert' as const, status: 'unread' as const },
-        { type: 'message' as const, direction: 'outgoing' as const, subject: 'Documents Received — ITR Preparation Started', content: 'We have received all required documents. Income Tax Return preparation is now underway. ETA: 3 working days.', priority: 'low' as const, category: 'compliance' as const, status: 'replied' as const },
-        { type: 'system' as const, direction: 'system' as const, subject: 'Auto-Reminder: MCA Annual Return Due', content: 'System auto-dispatched reminder for MGT-7 & AOC-4 filing. Deadline in 14 days.', priority: 'medium' as const, category: 'reminder' as const, status: 'read' as const },
-      ];
-
-      const generated: CommunicationLog[] = clients.flatMap((client, ci) => {
-        const tmpl = COMM_TEMPLATES[ci % COMM_TEMPLATES.length];
-        return [{
-          id: `${client.id}-comm-${ci}`,
-          type: tmpl.type,
-          direction: tmpl.direction,
-          company_id: client.id,
-          company_name: client.name,
-          subject: tmpl.subject,
-          content: tmpl.content,
-          sender: tmpl.direction === 'incoming' ? `${client.name} Finance Manager` : 'Sannidh AI',
-          recipient: tmpl.direction === 'outgoing' ? `${client.name} Finance Manager` : 'CA (You)',
-          status: tmpl.status,
-          priority: tmpl.priority,
-          category: tmpl.category,
-          timestamp: new Date(Date.now() - ci * 6 * 60 * 60 * 1000).toISOString(),
-          ai_summary: `Auto-categorized as ${tmpl.category} communication for ${client.name}.`,
-        }];
-      });
-
-      setLogs(generated);
-      setFilteredLogs(generated);
+      setLogs(dbLogs);
+      setFilteredLogs(dbLogs);
       setLastSync(new Date());
     } catch {
       setLogs([]);

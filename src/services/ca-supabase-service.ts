@@ -196,14 +196,20 @@ export async function triggerSwarm(companyId: string, financialYear: string): Pr
 /** Poll the latest swarm job status for a company. */
 export async function getSwarmStatus(companyId: string): Promise<SwarmJob | null> {
   try {
+    const now = new Date();
+    const y = now.getMonth() >= 3 ? now.getFullYear() : now.getFullYear() - 1;
+    const fy = `${y}-${String(y + 1).slice(-2)}`;
+    
     const supabaseUrl = import.meta.env.VITE_SUPABASE_URL as string;
     const { data: { session } } = await supabase.auth.getSession();
-    const res = await fetch(`${supabaseUrl}/functions/v1/ai-financial-swarm?action=status&company_id=${companyId}`, {
-      headers: { Authorization: `Bearer ${session?.access_token}` },
+    const res = await fetch(`${supabaseUrl}/functions/v1/ai-financial-swarm`, {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json', Authorization: `Bearer ${session?.access_token}` },
+      body: JSON.stringify({ action: 'status', company_id: companyId, financial_year: fy }),
     });
     if (!res.ok) return null;
     const d = await res.json();
-    return d.success ? (d as SwarmJob) : null;
+    return d.success ? (d.data as SwarmJob) : null;
   } catch { return null; }
 }
 
@@ -481,8 +487,191 @@ export function getLiveRegulatoryNews(): RegNews[] {
 }
 
 // ─────────────────────────────────────────
-// STATUTORY DEADLINES (Dynamic)
+// STATUTORY DEADLINES & NOTICES
 // ─────────────────────────────────────────
+
+export async function getClientGovtNotices(): Promise<any[]> {
+  try {
+    const { data: { user } } = await supabase.auth.getUser();
+    if (!user) return [];
+
+    const { data, error } = await supabase
+      .from('client_govt_notices')
+      .select('*, companies(name)')
+      .eq('ca_user_id', user.id)
+      .order('due_date', { ascending: true });
+
+    if (error || !data) return [];
+    
+    return data.map((n: any) => {
+      const now = new Date();
+      const dueDate = new Date(n.due_date);
+      const diffMs = dueDate.getTime() - now.getTime();
+      const daysRemaining = Math.ceil(diffMs / (1000 * 60 * 60 * 24));
+      
+      return {
+        id: n.id,
+        company: n.companies?.name || 'Unknown Company',
+        company_id: n.company_id.substring(0, 8),
+        task: `${n.notice_type} - ${n.notice_number}`,
+        authority: n.department,
+        filing_type: 'Notice Response',
+        dueDate: dueDate.toLocaleDateString('en-IN', { day: '2-digit', month: 'short', year: 'numeric' }),
+        days_remaining: daysRemaining,
+        penalty: 'Notice Assessment',
+        dependency: n.status === 'detected' ? 'Pending AI Analysis' : n.status,
+        urgency: daysRemaining <= 3 ? 'critical' : daysRemaining <= 7 ? 'high' : daysRemaining <= 15 ? 'medium' : 'low',
+        status: daysRemaining < 0 ? 'overdue' : 'pending',
+      };
+    });
+  } catch (err) {
+    console.error("Failed to fetch notices", err);
+    return [];
+  }
+}
+
+export async function getCADependencies(): Promise<any[]> {
+  try {
+    const { data: { user } } = await supabase.auth.getUser();
+    if (!user) return [];
+
+    const { data, error } = await supabase
+      .from('ca_dependencies')
+      .select('*, companies(name)')
+      .eq('ca_user_id', user.id)
+      .order('due_date', { ascending: true });
+
+    if (error || !data) return [];
+    
+    return data.map((d: any) => {
+      const now = new Date();
+      const dueDate = new Date(d.due_date);
+      const diffMs = dueDate.getTime() - now.getTime();
+      const daysRemaining = Math.ceil(diffMs / (1000 * 60 * 60 * 24));
+
+      return {
+        id: d.id,
+        company: d.companies?.name || 'Unknown Company',
+        company_id: d.company_id,
+        document: d.document_name,
+        type: 'Required Document',
+        dueDate: dueDate.toLocaleDateString('en-IN', { day: '2-digit', month: 'short', year: 'numeric' }),
+        days_remaining: daysRemaining,
+        status: d.status, // 'pending', 'uploaded', 'verified'
+        urgency: d.urgency, // 'critical', 'high', 'medium', 'low'
+      };
+    });
+  } catch (err) {
+    console.error("Failed to fetch dependencies", err);
+    return [];
+  }
+}
+
+export async function getCommunicationLogs(): Promise<any[]> {
+  try {
+    const { data: { user } } = await supabase.auth.getUser();
+    if (!user) return [];
+
+    const { data, error } = await supabase
+      .from('communication_logs')
+      .select('*, companies(name)')
+      .eq('ca_user_id', user.id)
+      .order('created_at', { ascending: false });
+
+    if (error || !data) return [];
+    
+    return data.map((log: any) => ({
+      id: log.id,
+      type: log.type === 'whatsapp' ? 'message' : log.type === 'email' ? 'email' : 'system',
+      direction: log.direction === 'inbound' ? 'incoming' : log.direction === 'outbound' ? 'outgoing' : 'system',
+      company_id: log.company_id,
+      company_name: log.companies?.name || 'Unknown Company',
+      subject: log.subject || 'Compliance Notification',
+      content: log.content,
+      sender: log.direction === 'inbound' ? log.companies?.name : 'Sannidh AI',
+      recipient: log.recipient || (log.direction === 'outbound' ? log.companies?.name : 'CA (You)'),
+      status: log.status === 'pending' ? 'unread' : 'read',
+      priority: 'medium', // Default mapped
+      category: 'general', // Default mapped
+      timestamp: log.created_at,
+      ai_summary: log.ai_agent_id ? `Auto-generated by Agent ${log.ai_agent_id}` : undefined,
+    }));
+  } catch (err) {
+    console.error("Failed to fetch logs", err);
+    return [];
+  }
+}
+
+export async function getUnbilledTasks(): Promise<any[]> {
+  try {
+    const { data: { user } } = await supabase.auth.getUser();
+    if (!user) return [];
+
+    const { data, error } = await supabase
+      .from('ca_task_history')
+      .select('*, companies(name)')
+      .eq('ca_user_id', user.id)
+      .eq('is_billed', false)
+      .order('completed_at', { ascending: false });
+
+    if (error || !data) return [];
+    
+    return data.map((t: any) => ({
+      id: t.id,
+      client: t.companies?.name || 'Unknown Client',
+      task_name: t.task_name,
+      date_completed: new Date(t.completed_at).toLocaleDateString('en-IN', { day: '2-digit', month: 'short', year: 'numeric' }),
+      suggested_fee: parseFloat(t.suggested_fee),
+    }));
+  } catch (err) {
+    console.error("Failed to fetch unbilled tasks", err);
+    return [];
+  }
+}
+
+export async function getBillingStats(): Promise<any> {
+  try {
+    const { data: { user } } = await supabase.auth.getUser();
+    if (!user) return null;
+
+    const { data: invoices, error } = await supabase
+      .from('ca_firm_invoices')
+      .select('*')
+      .eq('firm_id', user.id);
+
+    if (error || !invoices) return null;
+    
+    let accounts_receivable = 0;
+    let overdue_invoices = 0;
+    let collected_this_month = 0;
+    
+    const now = new Date();
+    
+    for (const inv of invoices) {
+      if (inv.payment_status === 'unpaid' || inv.payment_status === 'overdue' || inv.payment_status === 'draft') {
+        accounts_receivable += parseFloat(inv.total_amount || 0);
+        if (inv.due_date && new Date(inv.due_date) < now) {
+          overdue_invoices += 1;
+        }
+      } else if (inv.payment_status === 'paid' && inv.payment_received_date) {
+        const paidDate = new Date(inv.payment_received_date);
+        if (paidDate.getMonth() === now.getMonth() && paidDate.getFullYear() === now.getFullYear()) {
+          collected_this_month += parseFloat(inv.total_amount);
+        }
+      }
+    }
+
+    return {
+      accounts_receivable,
+      overdue_invoices,
+      collected_this_month,
+      collected_change_pct: 0, // Requires historical comparison, defaulting to 0
+    };
+  } catch (err) {
+    console.error("Failed to fetch billing stats", err);
+    return null;
+  }
+}
 
 export interface StatutoryDeadline {
   id: string;

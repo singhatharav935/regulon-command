@@ -36,13 +36,11 @@ import {
 const CA_API = (import.meta.env.VITE_CA_API_BASE_URL as string);
 
 interface TaskFilingManagementProps {
-  isRealDashboard?: boolean;
   apiEndpoint?: string;
   governmentIntegration?: boolean;
 }
 
 const TaskFilingManagement = ({ 
-  isRealDashboard = false, 
   apiEndpoint = `${CA_API}/api/v1/ca/filings/dashboard`, 
   governmentIntegration = false 
 }: TaskFilingManagementProps) => {
@@ -55,12 +53,10 @@ const TaskFilingManagement = ({
   const [sortBy, setSortBy] = useState("dueDate");
 
   useEffect(() => {
-    if (isRealDashboard) {
-      loadRealTaskData();
-      const interval = setInterval(loadRealTaskData, 60000);
-      return () => clearInterval(interval);
-    }
-  }, [isRealDashboard]);
+    loadRealTaskData();
+    const interval = setInterval(loadRealTaskData, 60000);
+    return () => clearInterval(interval);
+  }, [loadRealTaskData]);
 
   // Filter and sort logic
   useEffect(() => {
@@ -102,51 +98,45 @@ const TaskFilingManagement = ({
   }, [tasks, filterAuthority, filterUrgency, searchQuery, sortBy]);
 
   const loadRealTaskData = useCallback(async () => {
-    if (!isRealDashboard) return;
     setIsLoading(true);
     try {
 
 
-      const { loadCAClients, getStatutoryDeadlines } = await import('@/services/ca-supabase-service');
-      const [clients, deadlines] = await Promise.all([loadCAClients(), Promise.resolve(getStatutoryDeadlines())]);
+      const { loadCAClients, getStatutoryDeadlines, getClientGovtNotices } = await import('@/services/ca-supabase-service');
+      const [clients, deadlines, notices] = await Promise.all([
+        loadCAClients(), 
+        Promise.resolve(getStatutoryDeadlines()),
+        getClientGovtNotices()
+      ]);
 
-      if (clients.length === 0) {
+      if (clients.length === 0 && notices.length === 0) {
         setTasks([]);
         setIsLoading(false);
         return;
       }
 
-      const TASK_TEMPLATES = [
-        { task: 'GSTR-3B Filing & ITC Reconciliation', authority: 'GST', filing_type: 'GSTR-3B', penalty: '₹10,000 + Interest', dependency: 'Awaiting Data' },
-        { task: 'GSTR-1 Outward Supply Return', authority: 'GST', filing_type: 'GSTR-1', penalty: '₹10,000 per return', dependency: 'Complete' },
-        { task: 'TDS Return (Form 24Q/26Q)', authority: 'Income Tax', filing_type: 'Form 26Q', penalty: '₹200/day default', dependency: 'Complete' },
-        { task: 'Income Tax Return Preparation', authority: 'Income Tax', filing_type: 'ITR-6', penalty: '₹5,000 under Sec 234F', dependency: 'Awaiting Data' },
-        { task: 'MCA Annual Return (MGT-7 + AOC-4)', authority: 'MCA', filing_type: 'MGT-7', penalty: '₹100/day delay', dependency: 'Pending Verification' },
-      ];
-
-      const now = new Date();
-      const generatedTasks = clients.flatMap((client, ci) =>
-        TASK_TEMPLATES.slice(0, 3).map((tmpl, ti) => {
-          const deadline = deadlines[ti % deadlines.length];
-          const daysRemaining = deadline ? deadline.daysRemaining : 12 - ti * 3;
+      // Generate standard statutory filings mapped to clients
+      const standardTasks = clients.flatMap((client) =>
+        deadlines.slice(0, 2).map((deadline, ti) => {
           return {
-            id: `${client.id}-task-${ti}`,
+            id: `${client.id}-std-${ti}`,
             company: client.name,
             company_id: client.id.substring(0, 8),
-            task: tmpl.task,
-            authority: tmpl.authority,
-            filing_type: tmpl.filing_type,
-            dueDate: deadline?.deadline || new Date(now.getFullYear(), now.getMonth() + 1, 20).toLocaleDateString('en-IN'),
-            days_remaining: daysRemaining,
-            penalty: tmpl.penalty,
-            dependency: client.health >= 80 ? 'Complete' : tmpl.dependency,
-            urgency: daysRemaining <= 3 ? 'critical' : daysRemaining <= 7 ? 'high' : daysRemaining <= 15 ? 'medium' : 'low',
-            status: daysRemaining < 0 ? 'overdue' : 'pending',
+            task: deadline.title,
+            authority: deadline.regulator,
+            filing_type: deadline.type,
+            dueDate: deadline.deadline,
+            days_remaining: deadline.daysRemaining,
+            penalty: 'Standard Penalty',
+            dependency: client.health >= 80 ? 'Complete' : 'Pending Verification',
+            urgency: deadline.daysRemaining <= 3 ? 'critical' : deadline.daysRemaining <= 7 ? 'high' : deadline.daysRemaining <= 15 ? 'medium' : 'low',
+            status: deadline.daysRemaining < 0 ? 'overdue' : 'pending',
           };
         })
       );
 
-      setTasks(generatedTasks);
+      // Combine live government notices from DB with standard deadlines
+      setTasks([...notices, ...standardTasks]);
     } catch {
       setTasks([]);
     } finally {
@@ -191,49 +181,37 @@ const TaskFilingManagement = ({
         <div className="flex items-center justify-between mb-2">
           <div className="flex items-center gap-3">
             <h2 className="text-xl font-semibold text-foreground">Task & Filing Management</h2>
-            {isRealDashboard && (
-              <>
-                <CASectionAgentBadge agentId="D2_REFINER" />
-                <Badge className="bg-green-500/10 text-green-400 border-green-500/30">
-                  Advanced Live System
-                </Badge>
-              </>
-            )}
+            <CASectionAgentBadge agentId="D2_REFINER" />
+            <Badge className="bg-green-500/10 text-green-400 border-green-500/30">
+              Advanced Live System
+            </Badge>
           </div>
           <div className="flex items-center gap-3">
-            {isRealDashboard && (
-              <>
-                <div className="flex items-center gap-2 text-xs">
-                  <div className="w-2 h-2 bg-green-500 rounded-full animate-pulse" />
-                  <span className="text-green-400">Live Sync</span>
-                  {governmentIntegration && (
-                    <Badge variant="outline" className="text-xs border-green-500/30 text-green-400">Gov API Active</Badge>
-                  )}
-                </div>
-                <Button 
-                  size="sm" 
-                  variant="outline" 
-                  onClick={loadRealTaskData}
-                  disabled={isLoading}
-                  className="h-7"
-                >
-                  <RefreshCw className={`w-3 h-3 mr-1 ${isLoading ? 'animate-spin' : ''}`} />
-                  Refresh
-                </Button>
-              </>
-            )}
+            <div className="flex items-center gap-2 text-xs">
+              <div className="w-2 h-2 bg-green-500 rounded-full animate-pulse" />
+              <span className="text-green-400">Live Sync</span>
+              {governmentIntegration && (
+                <Badge variant="outline" className="text-xs border-green-500/30 text-green-400">Gov API Active</Badge>
+              )}
+            </div>
+            <Button 
+              size="sm" 
+              variant="outline" 
+              onClick={loadRealTaskData}
+              disabled={isLoading}
+              className="h-7"
+            >
+              <RefreshCw className={`w-3 h-3 mr-1 ${isLoading ? 'animate-spin' : ''}`} />
+              Refresh
+            </Button>
           </div>
         </div>
         <p className="text-sm text-muted-foreground mb-4">
-          {isRealDashboard 
-            ? "AI-powered auto-detection: When you add a company in Client Portfolio, our AI agent automatically identifies all compliance obligations, deadlines, and filing requirements from government portals in real-time. Tasks are auto-synced with live government data."
-            : "The following compliance obligations require your filing, verification, or approval."
-          }
+          AI-powered auto-detection: When you add a company in Client Portfolio, our AI agent automatically identifies all compliance obligations, deadlines, and filing requirements from government portals in real-time. Tasks are auto-synced with live government data.
         </p>
 
         {/* Advanced Filters - Horizontal Layout in Single Row */}
-        {(isRealDashboard || tasks.length > 0) && (
-          <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-3 mb-6">
+        <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-3 mb-6">
             {/* Search */}
             <div className="flex items-center gap-2 min-w-0">
               <Search className="w-4 h-4 text-muted-foreground flex-shrink-0" />
@@ -289,10 +267,9 @@ const TaskFilingManagement = ({
               </SelectContent>
             </Select>
           </div>
-        )}
 
         {/* Stats Summary - Horizontal Grid Layout */}
-        {isRealDashboard && filteredTasks.length > 0 && (
+        {filteredTasks.length > 0 && (
           <div className="grid grid-cols-2 md:grid-cols-4 lg:grid-cols-7 gap-3 mb-6">
             {/* Total Tasks */}
             <div className="p-3 rounded-lg bg-card border border-border/30">
@@ -412,12 +389,10 @@ const TaskFilingManagement = ({
                   <div className="flex flex-col items-center justify-center py-8">
                     <FileText className="w-12 h-12 text-muted-foreground/30 mb-3" />
                     <p className="text-sm font-medium text-foreground">
-                      {isRealDashboard ? "No tasks yet" : "No compliance obligations"}
+                      No tasks yet
                     </p>
                     <p className="text-xs text-muted-foreground mt-1">
-                      {isRealDashboard 
-                        ? "Tasks will appear automatically when you add companies to your Client Portfolio." 
-                        : "All current compliance obligations will appear here."}
+                      Tasks will appear automatically when you add companies to your Client Portfolio.
                     </p>
                   </div>
                 </TableCell>
@@ -477,11 +452,9 @@ const TaskFilingManagement = ({
                         <Badge variant="outline" className="text-[10px] px-1.5 py-0.5 bg-blue-500/10 border-blue-500/30 text-blue-400">
                           📋 {task.filing_type}
                         </Badge>
-                        {isRealDashboard && (
-                          <span className="text-[9px] text-muted-foreground">
-                            Auto-detected by AI
-                          </span>
-                        )}
+                        <span className="text-[9px] text-muted-foreground">
+                          Auto-detected by AI
+                        </span>
                       </div>
                     )}
                   </div>

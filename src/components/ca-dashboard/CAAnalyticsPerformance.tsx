@@ -91,45 +91,7 @@ interface CAAnalyticsProps {
 }
 
 
-// Demo data for CA Demo Dashboard
-const DEMO_ANALYTICS: CAAnalytics = {
-  tasks_completed: 42,
-  tasks_pending: 15,
-  tasks_delayed: 8,
-  tasks_on_time_percentage: 84,
-  avg_closure_time_days: 3.2,
-
-  total_clients: 12,
-  active_clients: 10,
-  new_clients_this_month: 2,
-  client_retention_rate: 95,
-
-  avg_compliance_score: 87,
-  score_improvement: 12,
-  risk_reduction_percentage: 18,
-  critical_alerts_resolved: 24,
-
-  total_earnings: 480000,
-  this_month_earnings: 95000,
-  pending_invoices: 35000,
-  avg_billing_per_client: 40000,
-
-  efficiency_score: 92,
-  client_satisfaction_rating: 4.8,
-  response_time_hours: 4.5,
-  queries_resolved: 156,
-
-  ai_insights: [
-    'Task completion rate improved 15% vs last month',
-    'Client ABC Corp shows declining compliance - attention needed',
-    'Revenue growth trend: 23% YoY',
-  ],
-  ai_recommendations: [
-    'Schedule proactive review for 3 clients approaching due dates',
-    'Consider hiring support for GST filing peak season',
-  ],
-  performance_trend: 'improving',
-};
+// Live analytics generated from PostgreSQL
 
 // Helper functions
 const formatCurrency = (amount: number) => {
@@ -227,12 +189,8 @@ export default function CAAnalyticsPerformance({
 
   // Load initial data
   useEffect(() => {
-    if (isRealDashboard) {
-      fetchAnalytics();
-    } else {
-      setAnalytics(DEMO_ANALYTICS);
-    }
-  }, [isRealDashboard, fetchAnalytics]);
+    fetchAnalytics();
+  }, [fetchAnalytics]);
 
 
   // Build performance chart data

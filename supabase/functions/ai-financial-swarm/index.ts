@@ -176,33 +176,49 @@ serve(async (req) => {
       
       // Attempt to pull bank data autonomously via API
       if (setuClientId && setuClientSecret) {
-        try {
-          console.log("[AI SWARM] Autonomously fetching bank data from Account Aggregator API...");
-          // This is the real structure for hitting a banking API like Setu
-          const bankApiRes = await fetch(`https://sandbox.setu.co/api/v2/account-aggregator/fi/data/${company_id}`, {
-            method: 'GET',
-            headers: {
-              'x-client-id': setuClientId,
-              'x-client-secret': setuClientSecret,
-              'Content-Type': 'application/json'
+        let retries = 3;
+        let success = false;
+        
+        while (retries > 0 && !success) {
+          try {
+            console.log(`[AI SWARM] Autonomously fetching bank data from Account Aggregator API... (Attempts left: ${retries})`);
+            const bankApiRes = await fetch(`https://sandbox.setu.co/api/v2/account-aggregator/fi/data/${company_id}`, {
+              method: 'GET',
+              headers: {
+                'x-client-id': setuClientId,
+                'x-client-secret': setuClientSecret,
+                'Content-Type': 'application/json'
+              }
+            });
+            
+            if (bankApiRes.ok) {
+              const fiData = await bankApiRes.json();
+              rawTransactions = fiData.transactions.map((t: any) => ({
+                date: t.transactionTimestamp.split('T')[0],
+                desc: t.narration,
+                debit: t.type === 'DEBIT' ? parseFloat(t.amount) : 0,
+                credit: t.type === 'CREDIT' ? parseFloat(t.amount) : 0
+              }));
+              await supabase.from('ai_swarm_jobs').update({ current_step: `Successfully pulled ${rawTransactions.length} transactions autonomously.` }).eq('id', job.id);
+              success = true;
+            } else if (bankApiRes.status === 429 || bankApiRes.status >= 500) {
+               console.warn(`[AI SWARM] Account Aggregator API Rate Limited/Server Error (${bankApiRes.status}). Retrying...`);
+               retries--;
+               await new Promise(res => setTimeout(res, Math.pow(2, 4 - retries) * 1000)); // Exponential backoff: 2s, 4s, 8s
+            } else {
+               console.error("[AI SWARM] Account Aggregator API Client Error:", await bankApiRes.text());
+               break; // Don't retry 400/401/403 errors
             }
-          });
-          
-          if (bankApiRes.ok) {
-            const fiData = await bankApiRes.json();
-            // Transform banking API JSON into our internal transaction format
-            rawTransactions = fiData.transactions.map((t: any) => ({
-              date: t.transactionTimestamp.split('T')[0],
-              desc: t.narration,
-              debit: t.type === 'DEBIT' ? parseFloat(t.amount) : 0,
-              credit: t.type === 'CREDIT' ? parseFloat(t.amount) : 0
-            }));
-            await supabase.from('ai_swarm_jobs').update({ current_step: `Successfully pulled ${rawTransactions.length} transactions autonomously.` }).eq('id', job.id);
-          } else {
-             console.error("[AI SWARM] Account Aggregator API Error:", await bankApiRes.text());
+          } catch (apiErr) {
+            console.error("[AI SWARM] Network failure fetching bank data:", apiErr);
+            retries--;
+            await new Promise(res => setTimeout(res, Math.pow(2, 4 - retries) * 1000));
           }
-        } catch (apiErr) {
-          console.error("[AI SWARM] Failed to autonomously fetch bank data:", apiErr);
+        }
+        
+        if (!success) {
+          await supabase.from('ai_swarm_jobs').update({ status: 'failed', current_step: 'Account Aggregator API unreachable after 3 retries.' }).eq('id', job.id);
+          throw new Error("Account Aggregator API unreachable after 3 retries. Please check SANNIDH status page or try again later.");
         }
       } else {
         // FALLBACK: If Account Aggregator APIs are not configured in Supabase, check if we have transactions in the DB already (from a previous sync or test).
@@ -235,7 +251,9 @@ serve(async (req) => {
           // We send a batch of descriptions to the LLM
           const descriptionsList = rawTransactions.map((t, i) => `[ID:${i}] ${t.desc} | Credit: ${t.credit} | Debit: ${t.debit}`).join('\n');
           
-          const prompt = `You are an expert AI Auditor for Indian CA firms. Categorize the following bank transactions into EXACTLY one of these statutory categories: "revenue", "salary", "rent", "gst_payment", "tds_payment", "utilities", "capex", "uncategorized". Return ONLY a valid JSON object where the keys are the IDs and the values are the exact category string.\n\nTransactions:\n${descriptionsList}`;
+          const prompt = `You are an expert AI Auditor for Indian CA firms. Categorize the following bank transactions into EXACTLY one of these statutory categories: "revenue", "salary", "rent", "gst_payment", "tds_payment", "utilities", "capex", "uncategorized", or "needs_review". 
+          CRITICAL INSTRUCTION: Return a JSON object where keys are the IDs and values are objects containing "category" (string) and "confidence" (number between 0 and 1). If your confidence is below 0.85, you MUST force the category to "needs_review" to ensure human CA oversight. Avoid hallucinations.
+          Transactions:\n${descriptionsList}`;
           
           const llmRes = await fetch("https://api.openai.com/v1/chat/completions", {
             method: "POST",
@@ -254,7 +272,7 @@ serve(async (req) => {
           if (llmRes.ok) {
             const llmData = await llmRes.json();
             categorizedMap = JSON.parse(llmData.choices[0].message.content);
-            console.log("[AI SWARM] Successfully categorized via OpenAI.");
+            console.log("[AI SWARM] Successfully categorized via OpenAI with confidence scoring.");
           } else {
             console.error("[AI SWARM] OpenAI API Error:", await llmRes.text());
           }
@@ -270,10 +288,17 @@ serve(async (req) => {
       let expenses = 0;
 
       const newTransactions = rawTransactions.map((t, i) => {
-        let cat = categorizedMap[`[ID:${i}]`] || categorizedMap[`${i}`] || 'uncategorized';
+        let llmResult = categorizedMap[`[ID:${i}]`] || categorizedMap[`${i}`];
+        let cat = 'uncategorized';
         
-        // Fallback logic if LLM failed
-        if (cat === 'uncategorized') {
+        if (llmResult && typeof llmResult === 'object' && llmResult.category) {
+          cat = llmResult.category;
+        } else if (typeof llmResult === 'string') {
+          cat = llmResult; // Fallback if LLM ignores JSON object request
+        }
+        
+        // Fallback logic if LLM failed or explicitly marked needs_review
+        if (cat === 'uncategorized' || cat === 'needs_review') {
           const lowerDesc = t.desc.toLowerCase();
           if (lowerDesc.includes('salary') || lowerDesc.includes('payroll')) cat = 'salary';
           else if (lowerDesc.includes('rent')) cat = 'rent';
@@ -446,42 +471,42 @@ serve(async (req) => {
 
       const modulesToRun = [
         // GST
-        { id: 'gstr1', label: 'GSTR-1 Generator', calc: outwardInvoicesCount > 0 ? { outward_liability: outwardTax, invoices_count: outwardInvoicesCount } : { status: 'Pending Accounting Sync' } },
-        { id: 'gstr2b', label: 'GSTR-2B Reconciliation', calc: verifiedItc > 0 ? { itc_matching: 100, mismatch_count: 0 } : { status: 'Pending Accounting Sync' } },
-        { id: 'gstr3b', label: 'GSTR-3B Net Tax', calc: { outward: outwardTax, itc: itcAvailable, net_payable: netGstPayable, rule_86b: netGstPayable > 500000 } },
+        { id: 'gstr1', label: 'GSTR-1 Generator', status: outwardInvoicesCount > 0 ? 'completed' : 'action_required', calc: outwardInvoicesCount > 0 ? { outward_liability: outwardTax, invoices_count: outwardInvoicesCount } : { missing_inputs: ['outward_invoices_count', 'sales_register'] } },
+        { id: 'gstr2b', label: 'GSTR-2B Reconciliation', status: verifiedItc > 0 ? 'completed' : 'action_required', calc: verifiedItc > 0 ? { itc_matching: 100, mismatch_count: 0 } : { missing_inputs: ['verified_itc_gstr2b'] } },
+        { id: 'gstr3b', label: 'GSTR-3B Net Tax', status: 'completed', calc: { outward: outwardTax, itc: itcAvailable, net_payable: netGstPayable, rule_86b: netGstPayable > 500000 } },
         
         // Income Tax
-        { id: 'itr', label: 'ITR-3 Generator', calc: { taxable_income: taxableIncome, tax_at_slab: incomeTax, cess: incomeTax * 0.04, total_liability: totalTaxWithCess, payable: finalTaxPayable } },
-        { id: 'advance-tax-radar', label: 'Advance Tax Radar', calc: advanceTaxInstallments },
-        { id: 'regime-optimizer', label: 'Tax Regime Optimizer', calc: { status: 'Pending Detailed Inputs' } },
-        { id: 'capital-gains', label: 'Capital Gains', calc: { status: 'Pending Demat/Property Sync' } },
-        { id: 'deferred-tax', label: 'Deferred Tax & Dep.', calc: grossBlock > 0 ? { deferred_tax_asset: grossBlock * 0.1, it_depreciation: accumDep } : { status: 'Pending Fixed Asset Register' } },
+        { id: 'itr', label: 'ITR-3 Generator', status: 'completed', calc: { taxable_income: taxableIncome, tax_at_slab: incomeTax, cess: incomeTax * 0.04, total_liability: totalTaxWithCess, payable: finalTaxPayable } },
+        { id: 'advance-tax-radar', label: 'Advance Tax Radar', status: 'completed', calc: advanceTaxInstallments },
+        { id: 'regime-optimizer', label: 'Tax Regime Optimizer', status: 'action_required', calc: { missing_inputs: ['detailed_80c_breakup', 'hra_rent_receipts'] } },
+        { id: 'capital-gains', label: 'Capital Gains', status: 'action_required', calc: { missing_inputs: ['demat_statement', 'property_sale_deeds'] } },
+        { id: 'deferred-tax', label: 'Deferred Tax & Dep.', status: grossBlock > 0 ? 'completed' : 'action_required', calc: grossBlock > 0 ? { deferred_tax_asset: grossBlock * 0.1, it_depreciation: accumDep } : { missing_inputs: ['gross_block_value', 'accumulated_depreciation_schedule'] } },
 
         // Payroll & TDS
-        { id: 'epf-esi', label: 'EPF & ESI Tracker', calc: { epf: epfContribution, esi: esiContribution, total: epfContribution + esiContribution } },
-        { id: 'salary-tds', label: 'Salary TDS (24Q)', calc: totalEmp > 0 ? { total_tds: salaryPayouts * 0.1, pan_verified: panEmp === totalEmp } : { status: 'Pending Payroll Register' } },
-        { id: 'gratuity', label: 'Gratuity Valuer', calc: gratuityProv > 0 ? { liability_provision: gratuityProv, as15_compliant: true } : { status: 'Pending Actuarial Report' } },
+        { id: 'epf-esi', label: 'EPF & ESI Tracker', status: 'completed', calc: { epf: epfContribution, esi: esiContribution, total: epfContribution + esiContribution } },
+        { id: 'salary-tds', label: 'Salary TDS (24Q)', status: totalEmp > 0 ? 'completed' : 'action_required', calc: totalEmp > 0 ? { total_tds: salaryPayouts * 0.1, pan_verified: panEmp === totalEmp } : { missing_inputs: ['total_employees_count', 'pan_verified_employees'] } },
+        { id: 'gratuity', label: 'Gratuity Valuer', status: gratuityProv > 0 ? 'completed' : 'action_required', calc: gratuityProv > 0 ? { liability_provision: gratuityProv, as15_compliant: true } : { missing_inputs: ['actuarial_valuation_report'] } },
 
         // Financials & Audit
-        { id: 'financials', label: 'Financial Statements', calc: { revenue, expenses, net_profit: netProfitBeforeTax, assets: bsData.assets, liabilities: bsData.liabilities_equity } },
-        { id: 'debtors-aging', label: 'Debtors Aging', calc: totalReceivables > 0 ? { total_receivables: totalReceivables, over_90_days: receivablesOver90 } : { status: 'Pending Invoicing Sync' } },
-        { id: 'audit-file', label: 'Audit File Generator', calc: { status: 'Pending Vouching' } },
-        { id: 'bank-reconciliation', label: 'Bank Recon Automator', calc: { status: tallyStatus === 'Connected' ? 'Complete' : 'Pending Tally Sync' } },
+        { id: 'financials', label: 'Financial Statements', status: 'completed', calc: { revenue, expenses, net_profit: netProfitBeforeTax, assets: bsData.assets, liabilities: bsData.liabilities_equity } },
+        { id: 'debtors-aging', label: 'Debtors Aging', status: totalReceivables > 0 ? 'completed' : 'action_required', calc: totalReceivables > 0 ? { total_receivables: totalReceivables, over_90_days: receivablesOver90 } : { missing_inputs: ['total_receivables_ledger', 'receivables_over_90_days'] } },
+        { id: 'audit-file', label: 'Audit File Generator', status: 'action_required', calc: { missing_inputs: ['vouching_sample_size', 'management_representation_letter'] } },
+        { id: 'bank-reconciliation', label: 'Bank Recon Automator', status: tallyStatus === 'Connected' ? 'completed' : 'action_required', calc: tallyStatus === 'Connected' ? { reconciled: true } : { missing_inputs: ['tally_api_key'] } },
 
         // MCA & Secretarial
-        { id: 'mca-20b', label: 'MCA Form 20B', calc: { status: 'Pending MCA API' } },
-        { id: 'board-meetings', label: 'Board Meetings', calc: boardMeetings > 0 ? { meetings_held: boardMeetings, quorum_verified: true } : { status: 'Pending Minutes Upload' } },
-        { id: 'board-resolutions', label: 'Board Resolutions', calc: resolutions > 0 ? { resolutions_count: resolutions, digitally_signed: true } : { status: 'Pending Document Parse' } },
-        { id: 'agm-minutes', label: 'AGM Minutes', calc: agmDate ? { agm_date: agmDate, minutes_finalized: true } : { status: 'Pending Document Parse' } },
-        { id: 'din-tan-renewal', label: 'DIN & TAN Renewal', calc: { status: 'Pending Portal Sync' } },
+        { id: 'mca-20b', label: 'MCA Form 20B', status: 'action_required', calc: { missing_inputs: ['mca_v3_credentials'] } },
+        { id: 'board-meetings', label: 'Board Meetings', status: boardMeetings > 0 ? 'completed' : 'action_required', calc: boardMeetings > 0 ? { meetings_held: boardMeetings, quorum_verified: true } : { missing_inputs: ['board_meetings_held', 'minutes_pdf_upload'] } },
+        { id: 'board-resolutions', label: 'Board Resolutions', status: resolutions > 0 ? 'completed' : 'action_required', calc: resolutions > 0 ? { resolutions_count: resolutions, digitally_signed: true } : { missing_inputs: ['resolutions_passed_count'] } },
+        { id: 'agm-minutes', label: 'AGM Minutes', status: agmDate ? 'completed' : 'action_required', calc: agmDate ? { agm_date: agmDate, minutes_finalized: true } : { missing_inputs: ['agm_date'] } },
+        { id: 'din-tan-renewal', label: 'DIN & TAN Renewal', status: 'action_required', calc: { missing_inputs: ['director_din_list'] } },
         
         // Legal & Others
-        { id: 'fema-sebi', label: 'FEMA & SEBI', calc: fcgprStatus !== 'pending' ? { fcgpr_status: fcgprStatus, compliance_score: 100 } : { status: 'Pending RBI Portal Sync' } },
-        { id: 'import-export', label: 'Import Export', calc: iecVerified ? { iec_verified: true, dgft_sync: true } : { status: 'Pending DGFT Sync' } },
-        { id: 'professional-cqc', label: 'Professional CQC', calc: { status: 'Pending Audit' } },
-        { id: 'invoice-parser', label: 'Invoice Parser', calc: { status: 'Pending File Uploads' } },
-        { id: 'notice-tracker', label: 'Notice Tracker', calc: { status: 'Active via SANNIDH' } },
-        { id: 'accounting-sync', label: 'Accounting Sync', calc: { status: tallyStatus } },
+        { id: 'fema-sebi', label: 'FEMA & SEBI', status: fcgprStatus !== 'pending' ? 'completed' : 'action_required', calc: fcgprStatus !== 'pending' ? { fcgpr_status: fcgprStatus, compliance_score: 100 } : { missing_inputs: ['rbi_fcgpr_status'] } },
+        { id: 'import-export', label: 'Import Export', status: iecVerified ? 'completed' : 'action_required', calc: iecVerified ? { iec_verified: true, dgft_sync: true } : { missing_inputs: ['dgft_iec_certificate'] } },
+        { id: 'professional-cqc', label: 'Professional CQC', status: 'action_required', calc: { missing_inputs: ['peer_review_certificate'] } },
+        { id: 'invoice-parser', label: 'Invoice Parser', status: 'action_required', calc: { missing_inputs: ['expense_invoices_zip'] } },
+        { id: 'notice-tracker', label: 'Notice Tracker', status: 'completed', calc: { status: 'Active via SANNIDH' } },
+        { id: 'accounting-sync', label: 'Accounting Sync', status: tallyStatus === 'Connected' ? 'completed' : 'action_required', calc: { tally_status: tallyStatus, missing_inputs: tallyStatus === 'Connected' ? [] : ['tally_api_key'] } },
       ];
 
       for (const mod of modulesToRun) {
@@ -490,7 +515,7 @@ serve(async (req) => {
           module_id: mod.id,
           module_label: mod.label,
           calculation_data: mod.calc,
-          status: 'completed'
+          status: mod.status
         }, { onConflict: 'company_id,financial_year,module_id' });
       }
 
