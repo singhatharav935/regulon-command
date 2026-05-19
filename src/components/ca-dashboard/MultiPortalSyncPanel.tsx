@@ -123,16 +123,26 @@ export default function MultiPortalSyncPanel() {
 
   const fetchReconciliation = async () => {
     try {
-      const { loadCAClients } = await import('@/services/ca-supabase-service');
-      const clients = await loadCAClients();
-      const mismatches = clients.filter(c => c.health < 80).map(c => ({
-        client: c.name,
-        type: 'GSTR-2B vs Books',
-        portal: `₹${Math.round(Math.abs(c.health - 80) * 1200).toLocaleString()}`,
-        books: `₹${Math.round(Math.abs(c.health - 75) * 1500).toLocaleString()}`,
-        diff: `₹${Math.round(Math.abs(c.health - 80) * 300).toLocaleString()} var`,
-        status: c.risk === 'High' ? 'critical' : 'warning',
-        desc: `ITC mismatch in GSTR-2B vs purchase ledger for ${new Date().toLocaleString('default', { month: 'long' })} ${new Date().getFullYear()}`,
+      const { supabase } = await import('@/lib/supabase');
+      const { data, error } = await supabase
+        .from('client_module_calculations')
+        .select('company_id, module_label, calculation_data, status, ca_clients(company_name)')
+        .eq('status', 'action_required')
+        .not('calculation_data->missing_inputs', 'is', null);
+
+      if (error || !data) {
+        setReconciliationItems([]);
+        return;
+      }
+
+      const mismatches = data.map(row => ({
+        client: row.ca_clients?.company_name || 'Unknown Client',
+        type: row.module_label,
+        portal: 'Pending Data',
+        books: 'Pending Data',
+        diff: 'Action Required',
+        status: 'warning',
+        desc: `Missing inputs: ${(row.calculation_data.missing_inputs || []).join(', ')}`,
       }));
       setReconciliationItems(mismatches);
     } catch { setReconciliationItems([]); }
@@ -158,21 +168,34 @@ export default function MultiPortalSyncPanel() {
   const handleMasterSync = async () => {
     if (isSyncing) return;
     setIsSyncing(true); setSyncProgress(0);
-    toast.info('Initiating secure AES-256 multi-portal sync...');
-    // Simulate sync progress — real portal sync requires backend with credentials
-    let p = 0;
-    const timer = setInterval(() => {
-      p += Math.floor(Math.random() * 18) + 7;
-      if (p >= 100) {
-        clearInterval(timer);
-        setIsSyncing(false); setSyncProgress(100);
-        setLastSync(new Date().toISOString());
-        toast.success('Multi-portal sync complete. Dashboard updated.');
-        fetchDashboardData();
-      } else {
-        setSyncProgress(p);
+    toast.info('Initiating secure multi-portal sync...');
+    
+    try {
+      const { loadCAClients, triggerSync } = await import('@/services/ca-supabase-service');
+      const clients = await loadCAClients();
+      
+      if (clients.length === 0) {
+        toast.error("No clients to sync");
+        setIsSyncing(false);
+        return;
       }
-    }, 400);
+
+      let completed = 0;
+      for (const client of clients) {
+        await triggerSync(client.id);
+        completed++;
+        setSyncProgress(Math.floor((completed / clients.length) * 100));
+      }
+      
+      setIsSyncing(false); 
+      setSyncProgress(100);
+      setLastSync(new Date().toISOString());
+      toast.success('Multi-portal sync dispatched to Edge Function.');
+      fetchDashboardData();
+    } catch (e) {
+      toast.error('Sync failed');
+      setIsSyncing(false);
+    }
   };
 
   const getPortalConnected = (portalId: string) =>

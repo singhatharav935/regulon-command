@@ -210,10 +210,22 @@ async function handleTrigger(req: Request): Promise<Response> {
   else return json(400, { error: "job_id or company_id required" });
 
   const { data: jobs } = await jobQuery;
-  const job = Array.isArray(jobs) ? jobs[0] : jobs;
+  let job = Array.isArray(jobs) ? jobs[0] : jobs;
+  
+  if (!job && company_id) {
+    // Create a new job if one doesn't exist
+    const { data: newJob, error } = await db.from("regulatory_sync_jobs").insert({
+      company_id,
+      ca_user_id: user.id,
+      status: "pending",
+    }).select().single();
+    if (error) return json(500, { error: "Failed to create sync job: " + error.message });
+    job = newJob;
+  }
+
   if (!job) return json(404, { error: "Sync job not found" });
   if (job.ca_user_id !== user.id) return json(403, { error: "Forbidden" });
-  if (job.status === "running") return json(200, { message: "Already running", job_id: job.id });
+  if (job.status === "running") return json(200, { success: true, message: "Already running", job_id: job.id });
 
   await db.from("regulatory_sync_jobs").update({ status: "running", started_at: new Date().toISOString() }).eq("id", job.id);
   await db.from("companies").update({ sync_status: "syncing" }).eq("id", job.company_id);
@@ -223,6 +235,25 @@ async function handleTrigger(req: Request): Promise<Response> {
   return json(200, { success: true, job_id: job.id, message: "Real GSP Sync started" });
 }
 
+async function handleStatus(req: Request): Promise<Response> {
+  const user = await getAuthUser(req);
+  const url = new URL(req.url);
+  const company_id = url.searchParams.get("company_id");
+  if (!company_id) return json(400, { error: "company_id required" });
+
+  const db = getServiceClient();
+  const { data: job } = await db.from("regulatory_sync_jobs")
+    .select("*")
+    .eq("company_id", company_id)
+    .eq("ca_user_id", user.id)
+    .order("created_at", { ascending: false })
+    .limit(1)
+    .single();
+
+  if (!job) return json(404, { error: "No sync job found" });
+  return json(200, { success: true, ...job });
+}
+
 serve(async (req) => {
   if (req.method === "OPTIONS") return new Response("ok", { headers: cors });
   const url = new URL(req.url);
@@ -230,7 +261,8 @@ serve(async (req) => {
 
   try {
     if (action === "trigger" && req.method === "POST") return await handleTrigger(req);
-    return json(404, { error: "Unknown action. Use: trigger" });
+    if (action === "status" && req.method === "GET") return await handleStatus(req);
+    return json(404, { error: "Unknown action. Use: trigger, status" });
   } catch (err: unknown) {
     const msg = err instanceof Error ? err.message : "Internal error";
     if (msg === "Unauthorized") return json(401, { error: "Unauthorized" });

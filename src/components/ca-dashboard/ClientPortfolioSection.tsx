@@ -39,12 +39,10 @@ const CONSENT_STATUS_CONFIG = {
 };
 
 interface ClientPortfolioSectionProps {
-  isRealDashboard?: boolean;
   governmentApiEnabled?: boolean;
 }
 
 const ClientPortfolioSection = ({
-  isRealDashboard = false,
   governmentApiEnabled = false,
 }: ClientPortfolioSectionProps) => {
   const [clients, setClients] = useState<CAClient[]>([]);
@@ -169,14 +167,25 @@ const ClientPortfolioSection = ({
     const result = await triggerSync(clientId);
     if (result.success) {
       toast.success(`Syncing ${clientName}`, {
-        description: '⚡ Fetching compliance data from GST Portal & MCA. Dashboard will update in ~30 seconds.',
+        description: '⚡ Fetching compliance data from GST Portal & MCA...',
       });
-      // Mark as synced after 35s (enough time for the edge function to complete)
-      setTimeout(() => {
-        setSyncingIds(prev => { const s = new Set(prev); s.delete(clientId); return s; });
-        setSyncedIds(prev => new Set(prev).add(clientId));
-        fetchData(); // Refresh client list with new health score
-      }, 35000);
+
+      // Real DB Polling (Every 3 seconds)
+      const pollId = setInterval(async () => {
+        const { getSyncStatus } = await import('@/services/ca-supabase-service');
+        const status = await getSyncStatus(clientId);
+        if (status && (status.status === 'completed' || status.status === 'failed')) {
+          clearInterval(pollId);
+          setSyncingIds(prev => { const s = new Set(prev); s.delete(clientId); return s; });
+          if (status.status === 'completed') {
+            setSyncedIds(prev => new Set(prev).add(clientId));
+            toast.success(`Sync Complete for ${clientName}`);
+            fetchData(); // Refresh with new real health score
+          } else {
+            toast.error(`Sync Failed for ${clientName}`, { description: status.error_message || 'Government API error' });
+          }
+        }
+      }, 3000);
     } else {
       setSyncingIds(prev => { const s = new Set(prev); s.delete(clientId); return s; });
       toast.error('Sync failed', { description: result.error || 'No pending sync job found for this client.' });
@@ -200,17 +209,18 @@ const ClientPortfolioSection = ({
       toast.success(`AI Swarm started for ${clientName}`, {
         description: `Processing FY ${fy}: bank categorization → books → 26 modules → data room`,
       });
-      // Poll progress every 3s
+      
+      // Real DB Polling
       const pollId = setInterval(async () => {
         const status = await getSwarmStatus(clientId);
         if (status) {
           setSwarmProgress(prev => ({ ...prev, [clientId]: { progress: status.progress, step: status.current_step || '' } }));
-          if (status.status === 'completed' || status.status === 'failed') {
+          if (status.status === 'completed' || status.status === 'failed' || status.status === 'pending_ca_review') {
             clearInterval(pollId);
             setSwarmingIds(prev => { const s = new Set(prev); s.delete(clientId); return s; });
-            if (status.status === 'completed') {
+            if (status.status === 'completed' || status.status === 'pending_ca_review') {
               setSwarmDoneIds(prev => new Set(prev).add(clientId));
-              toast.success(`AI Swarm complete for ${clientName}`, { description: 'Data Room is ready!' });
+              toast.success(`AI Swarm processed for ${clientName}`, { description: status.current_step });
             } else {
               toast.error(`Swarm failed for ${clientName}`, { description: status.error_message || 'Unknown error' });
             }
@@ -236,13 +246,11 @@ const ClientPortfolioSection = ({
         <div>
           <div className="flex items-center gap-3 mb-2">
             <h2 className="text-xl font-semibold text-foreground">Client Portfolio</h2>
-            {isRealDashboard && (
-              <div className="flex items-center gap-2 text-xs">
-                <div className="w-2 h-2 bg-green-500 rounded-full animate-pulse" />
-                <span className="text-green-400">Real Data</span>
-                {governmentApiEnabled && <Badge variant="outline" className="text-xs">Gov API Active</Badge>}
-              </div>
-            )}
+            <div className="flex items-center gap-2 text-xs">
+              <div className="w-2 h-2 bg-green-500 rounded-full animate-pulse" />
+              <span className="text-green-400">Live Database Sync Active</span>
+              {governmentApiEnabled && <Badge variant="outline" className="text-xs">Gov API Active</Badge>}
+            </div>
             {pendingCount > 0 && (
               <Badge className="bg-amber-500/20 text-amber-400 border-amber-500/30 border text-xs">
                 {pendingCount} Pending Consent{pendingCount > 1 ? 's' : ''}
@@ -250,9 +258,7 @@ const ClientPortfolioSection = ({
             )}
           </div>
           <p className="text-sm text-muted-foreground mt-1 max-w-2xl">
-            {isRealDashboard
-              ? "Live client portfolio with consent-based onboarding. Email & WhatsApp notifications sent automatically."
-              : "Clients under your professional responsibility. Unresolved items affect compliance standing."}
+            Live client portfolio with consent-based onboarding. Email & WhatsApp notifications sent automatically.
           </p>
         </div>
         <div className="flex gap-2 flex-shrink-0 ml-4">

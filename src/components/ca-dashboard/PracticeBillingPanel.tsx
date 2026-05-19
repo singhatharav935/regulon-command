@@ -56,46 +56,25 @@ export default function PracticeBillingPanel() {
   const fetchBillingData = async () => {
     setLoading(true);
     try {
-      // Load real clients from Supabase to generate billing entries
-      const { loadCAClients } = await import('@/services/ca-supabase-service');
-      const clients = await loadCAClients();
+      const { getUnbilledTasks, getBillingStats } = await import('@/services/ca-supabase-service');
+      const [tasks, dbStats] = await Promise.all([
+        getUnbilledTasks(),
+        getBillingStats()
+      ]);
 
-      if (clients.length === 0) {
+      if (tasks.length === 0 && !dbStats) {
         setUnbilledTasks([]);
         setStats(null);
         setLoading(false);
         return;
       }
 
-      // Generate unbilled tasks from real clients
-      const tasks: UnbilledTask[] = clients.flatMap((client, i) => {
-        const fees = [8500, 12000, 6500, 9500, 15000];
-        const taskNames = [
-          'GSTR-3B Filing & Reconciliation',
-          'Income Tax Return Preparation',
-          'MCA Annual Compliance (AOC-4 + MGT-7)',
-          'TDS Return Filing (Q4 FY25-26)',
-          'GST Show Cause Reply Drafting'
-        ];
-        const today = new Date();
-        const completedDate = new Date(today);
-        completedDate.setDate(today.getDate() - (i + 1) * 3);
-        return [{
-          id: `${client.id}-task-${i}`,
-          client: client.name,
-          task_name: taskNames[i % taskNames.length],
-          date_completed: completedDate.toLocaleDateString('en-IN', { day: '2-digit', month: 'short', year: 'numeric' }),
-          suggested_fee: fees[i % fees.length],
-        }];
-      });
-
-      const totalFees = tasks.reduce((sum, t) => sum + t.suggested_fee, 0);
       setUnbilledTasks(tasks);
-      setStats({
-        accounts_receivable: Math.floor(totalFees * 0.6),
-        overdue_invoices: Math.max(1, Math.floor(clients.length * 0.3)),
-        collected_this_month: Math.floor(totalFees * 1.4),
-        collected_change_pct: 18,
+      setStats(dbStats || {
+        accounts_receivable: 0,
+        overdue_invoices: 0,
+        collected_this_month: 0,
+        collected_change_pct: 0,
       });
     } catch {
       setUnbilledTasks([]);

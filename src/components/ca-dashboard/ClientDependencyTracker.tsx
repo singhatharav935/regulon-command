@@ -86,10 +86,13 @@ export default function ClientDependencyTracker({
       setLoading(true);
       setIsAutoSyncing(true);
       try {
-        const { loadCAClients } = await import('@/services/ca-supabase-service');
-        const clients = await loadCAClients();
+        const { loadCAClients, getCADependencies } = await import('@/services/ca-supabase-service');
+        const [clients, dbDependencies] = await Promise.all([
+          loadCAClients(),
+          getCADependencies()
+        ]);
 
-        if (clients.length === 0) {
+        if (clients.length === 0 && dbDependencies.length === 0) {
           setDependencies([]);
           setFilteredDependencies([]);
           setLoading(false);
@@ -97,30 +100,20 @@ export default function ClientDependencyTracker({
           return;
         }
 
-        const DOCS = [
-          'Bank Statement (Last 3 Months)',
-          'Purchase Register & Invoices',
-          'Form 16 / 16A from All Deductors',
-          'Fixed Asset Register',
-          'Signed Board Resolution',
-        ];
+        const mapped: Dependency[] = dbDependencies.map((d: any) => ({
+          id: d.id,
+          document_name: d.document,
+          client_name: d.company,
+          contact_person: 'Finance Manager',
+          contact_phone: '+91 98765 43210',
+          request_date: new Date(Date.now() - ((15 - d.days_remaining) * 24 * 60 * 60 * 1000)).toISOString(),
+          status: d.status === 'uploaded' ? 'received' : d.status,
+          description: `Due Date: ${d.dueDate}. Required Document.`,
+          urgency: d.urgency,
+        }));
 
-        const generated: Dependency[] = clients.flatMap((client, i) => [
-          {
-            id: `${client.id}-dep-${i}`,
-            document_name: DOCS[i % DOCS.length],
-            client_name: client.name,
-            contact_person: 'Finance Manager',
-            contact_phone: '+91 98765 43210',
-            request_date: new Date(Date.now() - (i + 1) * 4 * 24 * 60 * 60 * 1000).toISOString(),
-            status: i % 3 === 0 ? 'received' : i % 3 === 1 ? 'pending' : 'in_progress',
-            description: `Required for ${i % 2 === 0 ? 'GSTR-3B reconciliation' : 'Income Tax Return filing'} — FY 2025-26.`,
-            urgency: client.risk === 'High' ? 'critical' : client.risk === 'Medium' ? 'medium' : 'low',
-          } as Dependency
-        ]);
-
-        setDependencies(generated);
-        setFilteredDependencies(generated);
+        setDependencies(mapped);
+        setFilteredDependencies(mapped);
         setLastSync(new Date());
       } catch {
         setDependencies([]);
