@@ -14,7 +14,7 @@ export default function AccountingSoftwareSync() {
           <h2 className="text-2xl font-bold flex items-center gap-2 text-foreground">
             <Database className="w-6 h-6 text-zinc-500" />
             Accounting Software Integrations
-            <CASectionAgentBadge agentId="F3_FINANCE" />
+            <CASectionAgentBadge agentId="D2_REFINER" />
           </h2>
           <p className="text-sm text-muted-foreground mt-1">
             Connect external ledgers (Tally, QuickBooks, Zoho) to pull general ledgers and sales registers automatically.
