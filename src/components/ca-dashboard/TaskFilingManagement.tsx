@@ -52,6 +52,51 @@ const TaskFilingManagement = ({
   const [searchQuery, setSearchQuery] = useState("");
   const [sortBy, setSortBy] = useState("dueDate");
 
+  const loadRealTaskData = useCallback(async () => {
+    setIsLoading(true);
+    try {
+      const { loadCAClients, getStatutoryDeadlines, getClientGovtNotices } = await import('@/services/ca-supabase-service');
+      const [clients, deadlines, notices] = await Promise.all([
+        loadCAClients(), 
+        Promise.resolve(getStatutoryDeadlines()),
+        getClientGovtNotices()
+      ]);
+
+      if (clients.length === 0 && notices.length === 0) {
+        setTasks([]);
+        setIsLoading(false);
+        return;
+      }
+
+      // Generate standard statutory filings mapped to clients
+      const standardTasks = clients.flatMap((client) =>
+        deadlines.slice(0, 2).map((deadline, ti) => {
+          return {
+            id: `${client.id}-std-${ti}`,
+            company: client.name,
+            company_id: client.id.substring(0, 8),
+            task: deadline.title,
+            authority: deadline.regulator,
+            filing_type: deadline.type,
+            dueDate: deadline.deadline,
+            days_remaining: deadline.daysRemaining,
+            penalty: 'Standard Penalty',
+            dependency: client.health >= 80 ? 'Complete' : 'Pending Verification',
+            urgency: deadline.daysRemaining <= 3 ? 'critical' : deadline.daysRemaining <= 7 ? 'high' : deadline.daysRemaining <= 15 ? 'medium' : 'low',
+            status: deadline.daysRemaining < 0 ? 'overdue' : 'pending',
+          };
+        })
+      );
+
+      // Combine live government notices from DB with standard deadlines
+      setTasks([...notices, ...standardTasks]);
+    } catch {
+      setTasks([]);
+    } finally {
+      setIsLoading(false);
+    }
+  }, []);
+
   useEffect(() => {
     loadRealTaskData();
     const interval = setInterval(loadRealTaskData, 60000);
@@ -96,53 +141,6 @@ const TaskFilingManagement = ({
     
     setFilteredTasks(filtered);
   }, [tasks, filterAuthority, filterUrgency, searchQuery, sortBy]);
-
-  const loadRealTaskData = useCallback(async () => {
-    setIsLoading(true);
-    try {
-
-
-      const { loadCAClients, getStatutoryDeadlines, getClientGovtNotices } = await import('@/services/ca-supabase-service');
-      const [clients, deadlines, notices] = await Promise.all([
-        loadCAClients(), 
-        Promise.resolve(getStatutoryDeadlines()),
-        getClientGovtNotices()
-      ]);
-
-      if (clients.length === 0 && notices.length === 0) {
-        setTasks([]);
-        setIsLoading(false);
-        return;
-      }
-
-      // Generate standard statutory filings mapped to clients
-      const standardTasks = clients.flatMap((client) =>
-        deadlines.slice(0, 2).map((deadline, ti) => {
-          return {
-            id: `${client.id}-std-${ti}`,
-            company: client.name,
-            company_id: client.id.substring(0, 8),
-            task: deadline.title,
-            authority: deadline.regulator,
-            filing_type: deadline.type,
-            dueDate: deadline.deadline,
-            days_remaining: deadline.daysRemaining,
-            penalty: 'Standard Penalty',
-            dependency: client.health >= 80 ? 'Complete' : 'Pending Verification',
-            urgency: deadline.daysRemaining <= 3 ? 'critical' : deadline.daysRemaining <= 7 ? 'high' : deadline.daysRemaining <= 15 ? 'medium' : 'low',
-            status: deadline.daysRemaining < 0 ? 'overdue' : 'pending',
-          };
-        })
-      );
-
-      // Combine live government notices from DB with standard deadlines
-      setTasks([...notices, ...standardTasks]);
-    } catch {
-      setTasks([]);
-    } finally {
-      setIsLoading(false);
-    }
-  }, [isRealDashboard]);
 
   // Action Handlers
   const handleSendReminder = async (task: any) => {
