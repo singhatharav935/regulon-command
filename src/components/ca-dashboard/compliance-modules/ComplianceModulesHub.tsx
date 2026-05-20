@@ -61,7 +61,7 @@ interface Module {
   bgColor: string;
   badge?: string;
   isNew?: boolean;
-  component: React.ComponentType<{ clientId?: string }>;
+  component: React.ComponentType<{ clientId?: string; isDemo?: boolean }>;
 }
 
 const MODULES: Module[] = [
