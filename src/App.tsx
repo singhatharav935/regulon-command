@@ -59,6 +59,8 @@ const AdvancedPlatformPage = lazy(() => import("./pages/AdvancedPlatformPage"));
 const AdvancedSolutionsPage = lazy(() => import("./pages/AdvancedSolutionsPage"));
 const AdvancedSecurityPage = lazy(() => import("./pages/AdvancedSecurityPage"));
 const AdvancedCustomersPage = lazy(() => import("./pages/AdvancedCustomersPage"));
+const SovereignInfrastructurePage = lazy(() => import("./pages/SovereignInfrastructurePage"));
+const AgenticExecutionModelPage = lazy(() => import("./pages/AgenticExecutionModelPage"));
 
 const ProfileSettings = lazy(() => import("./pages/ProfileSettings"));
 const ConsentApprovalPage = lazy(() => import("./pages/ConsentApprovalPage")); // Public — CA client consent
@@ -89,8 +91,8 @@ const App = () => (
             <Route path="/" element={<Index />} />
             <Route path="/platform" element={<AdvancedPlatformPage />} />
             <Route path="/platform/how-it-works" element={<AdvancedPlatformPage />} />
-            <Route path="/platform/infrastructure" element={<AdvancedPlatformPage />} />
-            <Route path="/platform/ai-human-review" element={<AdvancedPlatformPage />} />
+            <Route path="/platform/infrastructure" element={<SovereignInfrastructurePage />} />
+            <Route path="/platform/ai-human-review" element={<AgenticExecutionModelPage />} />
             <Route path="/platform/regulators" element={<AdvancedPlatformPage />} />
             <Route path="/platform/ai-assistant" element={<AdvancedPlatformPage />} />
             <Route path="/platform/audit" element={<AdvancedPlatformPage />} />
