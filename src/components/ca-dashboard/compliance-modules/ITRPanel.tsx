@@ -1,5 +1,6 @@
-import { useState } from 'react';
+import { useState, useEffect } from 'react';
 import { motion } from 'framer-motion';
+import { supabase } from '@/integrations/supabase/client';
 import { FileText, Download, RefreshCw, AlertTriangle, CheckCircle, Zap, Calculator, TrendingUp } from 'lucide-react';
 import { jsPDF } from 'jspdf';
 import { Button } from '@/components/ui/button';
@@ -26,17 +27,17 @@ export default function ITRPanel({ clientId, isDemo }: { clientId?: string; isDe
 
   const fetchSwarmData = async () => {
     try {
-      const { data, error } = await supabase
-        .from('client_module_calculations')
+      const { data, error } = await (supabase
+        .from('client_module_calculations' as any)
         .select('*')
-        .eq('company_id', clientId)
+        .eq('company_id', clientId as string)
         .eq('module_id', 'itr')
         .order('created_at', { ascending: false })
         .limit(1)
-        .maybeSingle();
+        .maybeSingle() as any);
 
-      if (data && data.calculation_data) {
-        const calc = data.calculation_data as any;
+      if (data && (data as any).calculation_data) {
+        const calc = (data as any).calculation_data as any;
         setItrType('itr3');
         setResult({
           summary: `AI Swarm Assessment for Assessment Year 2025-26.`,
