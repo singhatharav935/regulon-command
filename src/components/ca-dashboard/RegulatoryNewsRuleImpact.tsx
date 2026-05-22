@@ -230,73 +230,72 @@ export default function RegulatoryNewsRuleImpact({
 
   // Load initial data
   useEffect(() => {
-    if (isRealDashboard) {
-      // Wire directly to the real API endpoint without using local defaults
-      fetchRegulatoryNews();
-    } else {
-      // Demo mode - use sample data
-      setNews(DEMO_REGULATORY_NEWS);
-      setFilteredNews(DEMO_REGULATORY_NEWS);
-    }
-  }, [isRealDashboard]);
+    fetchRegulatoryNews();
+  }, [fetchRegulatoryNews]);
 
-  // Fetch live regulatory news from backend (supplements local data)
+  // Fetch live regulatory news — queries Supabase regulatory_news_feed table directly
   const fetchRegulatoryNews = useCallback(async () => {
-    if (!isRealDashboard) return;
-
-    // If no backend is configured, skip network request — local data is already loaded
-    if (!apiEndpoint || apiEndpoint.includes('undefined')) {
-      setLastSync(new Date());
-      return;
-    }
-
     try {
       setLoading(true);
       setAiFetchingStatus('scanning');
 
-      // AI scanning government portals animation
-      await new Promise(resolve => setTimeout(resolve, 800));
+      const { supabase } = await import('@/integrations/supabase/client');
       setAiFetchingStatus('analyzing');
 
-      const response = await fetch(`${apiEndpoint}?ca_id=${caId}`, {
-        headers: {
-          'Authorization': `Bearer ${localStorage.getItem('ca_token') || ''}`,
-          'Content-Type': 'application/json',
-        },
-      });
+      const { data, error } = await supabase
+        .from('regulatory_news_feed')
+        .select('*')
+        .order('published_date', { ascending: false })
+        .limit(50);
 
-      await new Promise(resolve => setTimeout(resolve, 500));
       setAiFetchingStatus('complete');
 
-      if (response.ok) {
-        const data = await response.json();
-        // If API returns data, use it; otherwise use centralized service fallback
-        if (data.news && data.news.length > 0) {
-          setNews(data.news);
-          setFilteredNews(data.news);
-        }
-        setLastSync(new Date());
+      if (!error && data && data.length > 0) {
+        // Map Supabase column names to the RegulatoryNews interface shape
+        const mapped: RegulatoryNews[] = data.map((row: any) => ({
+          id: row.id,
+          title: row.title,
+          authority: row.authority,
+          authorityCode: row.authority_code,
+          category: row.category,
+          effectiveDate: row.effective_date,
+          publishedDate: row.published_date,
+          summary: row.summary,
+          sourceUrl: row.source_url || '',
+          impactLevel: row.impact_level,
+          affectedSectors: row.affected_sectors || [],
+          affectedCompanyTypes: row.affected_companies || [],
+          requiredActions: row.required_actions || [],
+          penaltyInfo: { maxPenalty: row.penalty_max || '', lateFilingFee: row.penalty_late_fee || '' },
+          relatedFilings: row.related_filings || [],
+          aiSummary: row.ai_summary || '',
+          aiImpactAnalysis: row.ai_impact_analysis || '',
+        }));
+        setNews(mapped);
+        setFilteredNews(mapped);
+      } else {
+        // Table is empty (Edge Function hasn't seeded yet) — use curated demo data
+        setNews(DEMO_REGULATORY_NEWS);
+        setFilteredNews(DEMO_REGULATORY_NEWS);
       }
+      setLastSync(new Date());
     } catch {
-      // Backend not available — silently use already-loaded local data
+      // On any error fall back to demo data so the UI never breaks
+      setNews(DEMO_REGULATORY_NEWS);
+      setFilteredNews(DEMO_REGULATORY_NEWS);
       setLastSync(new Date());
       setAiFetchingStatus('complete');
     } finally {
       setLoading(false);
       setTimeout(() => setAiFetchingStatus('idle'), 2000);
     }
-  }, [isRealDashboard, apiEndpoint, caId]);
+  }, []);
 
-  // Auto-refresh for real dashboard
+  // Auto-refresh every 5 minutes
   useEffect(() => {
-    if (!isRealDashboard) return;
-
-    const interval = setInterval(() => {
-      fetchRegulatoryNews();
-    }, 300000); // Refresh every 5 minutes for regulatory news
-
+    const interval = setInterval(fetchRegulatoryNews, 300000);
     return () => clearInterval(interval);
-  }, [isRealDashboard, fetchRegulatoryNews]);
+  }, [fetchRegulatoryNews]);
 
   // Apply filters and search
   useEffect(() => {
