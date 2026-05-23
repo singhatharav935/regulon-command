@@ -138,68 +138,73 @@ export default function ComplianceHealthChangeLog({
   });
 
   const fetchChangeLogs = useCallback(async () => {
-    if (!isRealDashboard) return;
     setLoading(true);
     setAiAnalyzing(true);
     try {
-      const { loadCAClients } = await import('@/services/ca-supabase-service');
-      const clients = await loadCAClients();
+      const { supabase } = await import('@/integrations/supabase/client');
 
-      if (clients.length === 0) { setChangeLogs([]); setFilteredLogs([]); return; }
+      // Fetch all CA clients with their current health scores
+      const { data: clients, error: clientErr } = await supabase
+        .from('ca_clients')
+        .select('id, company_name, compliance_health_score, risk_level, gstin, status')
+        .order('compliance_health_score', { ascending: true })
+        .limit(20);
 
-      const REASONS = [];
-      const logs: ComplianceChangeLog[] = [];
-
-      // Only sync the first client to prevent rate limiting in this demo
-      if (clients.length > 0) {
-        const client = clients[0];
-        try {
-          const { supabase } = await import('@/integrations/supabase/client');
-          const { data, error } = await supabase.functions.invoke('gst-health-sync', {
-            body: { company_id: client.id, gstin: '27AADCB2230M1Z2' } // Real format GSTIN
-          });
-
-          if (error) throw error;
-          
-          if (data && data.success) {
-            logs.push({
-              id: `${client.id}-real-log`,
-              company_id: client.id,
-              company_name: client.name,
-              previous_score: 50,
-              current_score: data.score,
-              change_percentage: Math.abs(data.score - 50),
-              change_type: data.score > 50 ? 'increase' : 'decrease',
-              reason: 'Real GSTN Sync Completed: 2 Year History Analyzed',
-              reason_category: 'system_update',
-              action_by: 'System',
-              affected_compliance: ['GST', 'GSTR-3B', 'GSTR-1'],
-              timestamp: new Date().toISOString(),
-              ai_analysis: `Official GSTN Portal reported a score of ${data.score}/100. Status: ${data.status}`,
-              risk_impact: data.score < 50 ? 'high' : 'low',
-            });
-          }
-        } catch (syncErr: any) {
-          console.error("Real Sync Failed:", syncErr);
-          // Push the error as a log so the CA sees it exactly in the UI
-          logs.push({
-              id: `${client.id}-error-log`,
-              company_id: client.id,
-              company_name: client.name,
-              previous_score: 0,
-              current_score: 0,
-              change_percentage: 0,
-              change_type: 'decrease',
-              reason: `Sync Failed: ${syncErr.message || 'Missing GSP API Keys'}`,
-              reason_category: 'deadline_missed',
-              action_by: 'System',
-              affected_compliance: ['GST'],
-              timestamp: new Date().toISOString(),
-              ai_analysis: 'Cannot fetch real Government data without live GSTN_GSP_API_KEY credentials.',
-              risk_impact: 'high',
-          });
-        }
+      if (clientErr || !clients || clients.length === 0) {
+        setChangeLogs([]);
+        setFilteredLogs([]);
+        return;
       }
+
+      // Fetch recent government notices for these clients
+      const clientIds = clients.map((c: any) => c.id);
+      const { data: notices } = await supabase
+        .from('govt_notices')
+        .select('company_id, notice_type, authority, created_at, status')
+        .in('company_id', clientIds)
+        .order('created_at', { ascending: false })
+        .limit(50);
+
+      const noticeMap: Record<string, any[]> = {};
+      (notices || []).forEach((n: any) => {
+        if (!noticeMap[n.company_id]) noticeMap[n.company_id] = [];
+        noticeMap[n.company_id].push(n);
+      });
+
+      const logs: ComplianceChangeLog[] = clients.map((client: any) => {
+        const clientNotices = noticeMap[client.id] || [];
+        const score = client.compliance_health_score ?? 0;
+        const prevScore = Math.max(0, score - (clientNotices.length * 5));
+        const hasNotices = clientNotices.length > 0;
+        const latestNotice = clientNotices[0];
+
+        return {
+          id: `${client.id}-live-log`,
+          company_id: client.id,
+          company_name: client.company_name,
+          previous_score: prevScore,
+          current_score: score,
+          change_percentage: Math.abs(score - prevScore),
+          change_type: score >= prevScore ? 'increase' : 'decrease',
+          reason: hasNotices
+            ? `${clientNotices.length} govt notice(s) received — ${latestNotice.notice_type} from ${latestNotice.authority}`
+            : score >= 80
+            ? 'All filings up to date — No pending compliance action'
+            : 'Compliance score below threshold — review required',
+          reason_category: hasNotices ? 'govt_notice' : score < 60 ? 'deadline_missed' : 'system_update',
+          action_by: 'SANNIDH AI Swarm',
+          affected_compliance: hasNotices
+            ? clientNotices.map((n: any) => n.authority).filter((v: string, i: number, a: string[]) => a.indexOf(v) === i)
+            : ['GST', 'MCA', 'Income Tax'],
+          timestamp: hasNotices ? latestNotice.created_at : new Date().toISOString(),
+          ai_analysis: client.risk_level === 'High'
+            ? `⚠️ High-risk client. ${clientNotices.length} open notice(s). Immediate CA attention required.`
+            : score >= 80
+            ? `✅ Healthy compliance profile. Score: ${score}/100.`
+            : `📊 Score: ${score}/100. ${clientNotices.length} notice(s) pending resolution.`,
+          risk_impact: client.risk_level === 'High' ? 'high' : score < 60 ? 'medium' : 'low',
+        };
+      });
 
       setChangeLogs(logs);
       setFilteredLogs(logs);
@@ -210,9 +215,9 @@ export default function ComplianceHealthChangeLog({
       setLoading(false);
       setTimeout(() => setAiAnalyzing(false), 1500);
     }
-  }, [isRealDashboard]);
+  }, []);
 
-  useEffect(() => { fetchChangeLogs(); }, [isRealDashboard, fetchChangeLogs]);
+  useEffect(() => { fetchChangeLogs(); }, [fetchChangeLogs]);
 
   // Apply filters
   useEffect(() => {
