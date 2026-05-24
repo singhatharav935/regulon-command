@@ -61,6 +61,8 @@ const AdvancedSecurityPage = lazy(() => import("./pages/AdvancedSecurityPage"));
 const AdvancedCustomersPage = lazy(() => import("./pages/AdvancedCustomersPage"));
 const SovereignInfrastructurePage = lazy(() => import("./pages/SovereignInfrastructurePage"));
 const AgenticExecutionModelPage = lazy(() => import("./pages/AgenticExecutionModelPage"));
+const ComplianceCommandCenterPage = lazy(() => import("./pages/ComplianceCommandCenterPage"));
+const Nexus9DraftingEnginePage = lazy(() => import("./pages/Nexus9DraftingEnginePage"));
 
 const ProfileSettings = lazy(() => import("./pages/ProfileSettings"));
 const ConsentApprovalPage = lazy(() => import("./pages/ConsentApprovalPage")); // Public — CA client consent
@@ -89,12 +91,14 @@ const App = () => (
             <Suspense fallback={<RouteFallback />}>
               <Routes>
             <Route path="/" element={<Index />} />
-            <Route path="/platform" element={<AdvancedPlatformPage />} />
+            <Route path="/platform" element={<ComplianceCommandCenterPage />} />
+            <Route path="/platform/compliance-command-center" element={<ComplianceCommandCenterPage />} />
             <Route path="/platform/how-it-works" element={<AdvancedPlatformPage />} />
             <Route path="/platform/infrastructure" element={<SovereignInfrastructurePage />} />
             <Route path="/platform/ai-human-review" element={<AgenticExecutionModelPage />} />
+            <Route path="/platform/nexus-9-drafting" element={<Nexus9DraftingEnginePage />} />
+            <Route path="/platform/ai-assistant" element={<Nexus9DraftingEnginePage />} />
             <Route path="/platform/regulators" element={<AdvancedPlatformPage />} />
-            <Route path="/platform/ai-assistant" element={<AdvancedPlatformPage />} />
             <Route path="/platform/audit" element={<AdvancedPlatformPage />} />
             <Route path="/solutions" element={<AdvancedSolutionsPage />} />
             <Route path="/solutions/roc" element={<AdvancedSolutionsPage />} />
