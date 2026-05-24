@@ -92,7 +92,7 @@ export default function RegimeOptimizerPanel({ clientId, isDemo }: { clientId?: 
         const rows = [
           ['Total Income (Excl. Exemp)', (result?.old_regime?.taxable_income || 0).toLocaleString(), (result?.new_regime?.taxable_income || 0).toLocaleString()],
           ['Standard Deduction', '50,000', '75,000'],
-          ['Chapter VI-A Deductions', (result?.deductions?.total_80c_80d || 0).toLocaleString(), '0'],
+          ['Chapter VI-A Deductions', (result?.old_regime?.total_deductions || 0).toLocaleString(), '0'],
           ['NET TAXABLE INCOME', (result?.old_regime?.taxable_income || 0).toLocaleString(), (result?.new_regime?.taxable_income || 0).toLocaleString()],
           ['TAX LIABILITY (INC. CESS)', (result?.old_regime?.tax_liability || 0).toLocaleString(), (result?.new_regime?.tax_liability || 0).toLocaleString()]
         ];
