@@ -23,8 +23,8 @@ const Footer = () => {
             <ul className="space-y-3">
               <li><Link to="/platform/infrastructure" className="text-sm text-muted-foreground hover:text-foreground transition-colors">Sovereign Infrastructure Overview</Link></li>
               <li><Link to="/platform/ai-human-review" className="text-sm text-muted-foreground hover:text-foreground transition-colors">Agentic Execution Model</Link></li>
-              <li><Link to="/platform" className="text-sm text-muted-foreground hover:text-foreground transition-colors">Compliance Command Center</Link></li>
-              <li><Link to="/platform/ai-assistant" className="text-sm text-muted-foreground hover:text-foreground transition-colors">Nexus-9 Drafting Engine</Link></li>
+              <li><Link to="/platform/compliance-command-center" className="text-sm text-muted-foreground hover:text-foreground transition-colors">Compliance Command Center</Link></li>
+              <li><Link to="/platform/nexus-9-drafting" className="text-sm text-muted-foreground hover:text-foreground transition-colors">Nexus-9 Drafting Engine</Link></li>
               <li><Link to="/platform/audit" className="text-sm text-muted-foreground hover:text-foreground transition-colors">Audit & Traceability Vault</Link></li>
             </ul>
           </div>

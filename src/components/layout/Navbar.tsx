@@ -28,8 +28,8 @@ type NavDropdownItem = {
 const platformLinks = [
   { title: "Sovereign Infrastructure Overview", detail: "How SANNIDH Secures National Data.", href: "/platform/infrastructure", icon: Landmark },
   { title: "Agentic Execution Model", detail: "Understanding AI + Human Review Workflows.", href: "/platform/ai-human-review", icon: Users },
-  { title: "Compliance Command Center", detail: "Unified Dashboard for Multiple Taxpayer Entities.", href: "/platform", icon: Building2 },
-  { title: "Nexus-9™ Drafting Engine", detail: "Autonomous Legal & Regulatory Document Generation.", href: "/platform/ai-assistant", icon: Cpu },
+  { title: "Compliance Command Center", detail: "Unified Dashboard for Multiple Taxpayer Entities.", href: "/platform/compliance-command-center", icon: Building2 },
+  { title: "Nexus-9™ Drafting Engine", detail: "Autonomous Legal & Regulatory Document Generation.", href: "/platform/nexus-9-drafting", icon: Cpu },
   { title: "Audit & Traceability Vault", detail: "100% Immutable Logs for Every Regulatory Action.", href: "/platform/audit", icon: Lock },
   { title: "Sentinel™ Live Monitoring", detail: "24/7 Portal Scanning & Risk Alert System.", href: "/platform/regulators", icon: Shield },
 ] satisfies NavDropdownItem[];
