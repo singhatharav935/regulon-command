@@ -106,7 +106,7 @@ export const PasswordStrengthMeter: React.FC<PasswordStrengthMeterProps> = ({
 };
 
 interface SecurePasswordInputProps extends React.InputHTMLAttributes<HTMLInputElement> {
-  label: string;
+  label?: string;
   showStrengthMeter?: boolean;
   value: string;
   onValueChange: (value: string) => void;
@@ -124,9 +124,11 @@ export const SecurePasswordInput: React.FC<SecurePasswordInputProps> = ({
 
   return (
     <div className="space-y-2">
-      <label className="block text-sm font-medium text-gray-200">
-        {label}
-      </label>
+      {label && (
+        <label className="block text-sm font-medium text-gray-200">
+          {label}
+        </label>
+      )}
       
       <div className="relative">
         <input
