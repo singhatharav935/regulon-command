@@ -77,6 +77,10 @@ const ProfileSettings = () => {
         setLocalIcai(meta.icai_membership_number);
         setIcaiNumber(meta.icai_membership_number);
       }
+      // avatar_url from user_metadata (quick sync)
+      if (!avatarUrl && meta.avatar_url) {
+        setAvatarUrl(meta.avatar_url);
+      }
       setDbLoaded(true);
     }
 
@@ -86,6 +90,31 @@ const ProfileSettings = () => {
       setLocalName(fallbackName);
     }
   }, [user, dbLoaded]);
+
+  // ── Fetch avatar from Supabase profiles table for cross-device sync ──
+  useEffect(() => {
+    if (!user?.id) return;
+    // Only fetch if we don't have a remote avatar URL already
+    const isRemote = avatarUrl?.startsWith("http://") || avatarUrl?.startsWith("https://");
+    if (isRemote) return;
+
+    const fetchAvatar = async () => {
+      try {
+        const { data } = await supabase
+          .from("profiles")
+          .select("avatar_url")
+          .eq("user_id", user.id)
+          .maybeSingle();
+
+        if (data?.avatar_url) {
+          setAvatarUrl(data.avatar_url);
+        }
+      } catch {
+        // Silently ignore — avatar will show fallback initials
+      }
+    };
+    fetchAvatar();
+  }, [user?.id]);
 
   const userEmail = user?.email || "user@sannidh.in";
   const initials = (localName || userEmail)
@@ -108,23 +137,61 @@ const ProfileSettings = () => {
       return;
     }
 
+    if (!user?.id) {
+      toast.error("You must be logged in to upload a profile picture.");
+      return;
+    }
+
     setUploading(true);
     try {
-      // Convert to base64 and store in localStorage for offline-first behavior
-      const reader = new FileReader();
-      reader.onloadend = () => {
-        const base64 = reader.result as string;
-        setAvatarUrl(base64);
-        toast.success("Profile picture updated!");
+      // Generate a unique file path for this user
+      const fileExt = file.name.split(".").pop() || "jpg";
+      const filePath = `${user.id}/avatar.${fileExt}`;
+
+      // Upload to Supabase Storage (upsert to overwrite previous avatar)
+      const { error: uploadError } = await supabase.storage
+        .from("avatars")
+        .upload(filePath, file, { upsert: true, contentType: file.type });
+
+      if (uploadError) {
+        console.error("Avatar upload error:", uploadError);
+        toast.error("Failed to upload profile picture. Please try again.");
         setUploading(false);
-      };
-      reader.onerror = () => {
-        toast.error("Failed to read image file.");
-        setUploading(false);
-      };
-      reader.readAsDataURL(file);
-    } catch {
+        return;
+      }
+
+      // Get the public URL
+      const { data: urlData } = supabase.storage
+        .from("avatars")
+        .getPublicUrl(filePath);
+
+      const publicUrl = `${urlData.publicUrl}?t=${Date.now()}`; // cache-bust
+
+      // Save URL to the profiles table
+      const { error: dbError } = await supabase
+        .from("profiles")
+        .upsert(
+          { user_id: user.id, avatar_url: publicUrl, updated_at: new Date().toISOString() },
+          { onConflict: "user_id" }
+        );
+
+      if (dbError) {
+        console.error("Profile DB update error:", dbError);
+        // Non-fatal: the storage upload succeeded, URL is still usable
+      }
+
+      // Also persist to user_metadata for quick access
+      await supabase.auth.updateUser({
+        data: { avatar_url: publicUrl },
+      });
+
+      // Update local state
+      setAvatarUrl(publicUrl);
+      toast.success("Profile picture updated!");
+    } catch (err) {
+      console.error("Avatar upload failed:", err);
       toast.error("Failed to upload profile picture.");
+    } finally {
       setUploading(false);
     }
 
