@@ -24,6 +24,9 @@ import ComplianceModulesHub from "@/components/ca-dashboard/compliance-modules/C
 import ApprovalWorkflowHub from "@/components/ca-dashboard/ApprovalWorkflowHub";
 import ClientPortfolioSection from "@/components/ca-dashboard/ClientPortfolioSection";
 import ClientFinancialVault from "@/components/ca-dashboard/ClientFinancialVault";
+import MultiEntityConsolidatedReporting from "@/components/ca-dashboard/MultiEntityConsolidatedReporting";
+import EFilingIntegration from "@/components/ca-dashboard/EFilingIntegration";
+import PaymentTaxLiability from "@/components/ca-dashboard/PaymentTaxLiability";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
@@ -74,6 +77,9 @@ import {
   Upload,
   Send,
   Volume2,
+  Network,
+  FileCheck2,
+  IndianRupee,
 } from "lucide-react";
 import { toast } from "sonner";
 import useCAMetrics from "@/hooks/useCAMetrics";
@@ -1642,16 +1648,40 @@ const ExternalCADashboardReal = () => {
             <Tabs value={activeZone} onValueChange={(val: any) => setActiveZone(val)} className="w-full">
               <div className="flex items-center justify-between mb-8 overflow-x-auto pb-2 scrollbar-none">
                  <TabsList className="h-14 bg-card/40 border border-border/50 p-1 flex-shrink-0">
-                    <TabsTrigger value="command" className="px-6 py-2.5 rounded-lg data-[state=active]:bg-cyan-500/20 data-[state=active]:text-cyan-400 font-medium">Overview</TabsTrigger>
-                    <TabsTrigger value="clients" className="px-6 py-2.5 rounded-lg data-[state=active]:bg-indigo-500/20 data-[state=active]:text-indigo-400 font-medium">Client Vault</TabsTrigger>
-                    <TabsTrigger value="operations" className="px-6 py-2.5 rounded-lg data-[state=active]:bg-emerald-500/20 data-[state=active]:text-emerald-400 font-medium">Firm Operations</TabsTrigger>
-                    <TabsTrigger value="ai-swarm" className="px-6 py-2.5 rounded-lg data-[state=active]:bg-purple-500/20 data-[state=active]:text-purple-400 font-medium">Regulatory News & Calendar</TabsTrigger>
-                    <TabsTrigger value="calculations" className="px-6 py-2.5 rounded-lg data-[state=active]:bg-rose-500/20 data-[state=active]:text-rose-400 font-medium">Calculators & Forms</TabsTrigger>
+                    <TabsTrigger value="command" className="px-4 py-2.5 rounded-lg data-[state=active]:bg-cyan-500/20 data-[state=active]:text-cyan-400 font-medium text-xs">Overview</TabsTrigger>
+                    <TabsTrigger value="multi-entity" className="px-4 py-2.5 rounded-lg data-[state=active]:bg-cyan-500/20 data-[state=active]:text-cyan-400 font-medium text-xs flex items-center gap-1">
+                      <Network className="w-3.5 h-3.5" />Multi-Entity
+                    </TabsTrigger>
+                    <TabsTrigger value="e-filing" className="px-4 py-2.5 rounded-lg data-[state=active]:bg-blue-500/20 data-[state=active]:text-blue-400 font-medium text-xs flex items-center gap-1">
+                      <FileCheck2 className="w-3.5 h-3.5" />E-Filing
+                    </TabsTrigger>
+                    <TabsTrigger value="payment" className="px-4 py-2.5 rounded-lg data-[state=active]:bg-green-500/20 data-[state=active]:text-green-400 font-medium text-xs flex items-center gap-1">
+                      <IndianRupee className="w-3.5 h-3.5" />Payments
+                    </TabsTrigger>
+                    <TabsTrigger value="clients" className="px-4 py-2.5 rounded-lg data-[state=active]:bg-indigo-500/20 data-[state=active]:text-indigo-400 font-medium text-xs">Client Vault</TabsTrigger>
+                    <TabsTrigger value="operations" className="px-4 py-2.5 rounded-lg data-[state=active]:bg-emerald-500/20 data-[state=active]:text-emerald-400 font-medium text-xs">Firm Operations</TabsTrigger>
+                    <TabsTrigger value="ai-swarm" className="px-4 py-2.5 rounded-lg data-[state=active]:bg-purple-500/20 data-[state=active]:text-purple-400 font-medium text-xs">Regulatory News</TabsTrigger>
+                    <TabsTrigger value="calculations" className="px-4 py-2.5 rounded-lg data-[state=active]:bg-rose-500/20 data-[state=active]:text-rose-400 font-medium text-xs">Calculators</TabsTrigger>
                  </TabsList>
                  <Button onClick={() => setIsDrawerOpen(true)} className="ml-4 flex-shrink-0 bg-gradient-to-r from-purple-600 to-cyan-600 hover:from-purple-500 hover:to-cyan-500 text-white border-0 shadow-[0_0_20px_rgba(139,92,246,0.3)]">
                     <Cpu className="w-4 h-4 mr-2" /> Open Engine
                  </Button>
               </div>
+              {/* ZONE 0: MULTI-ENTITY & CONSOLIDATED REPORTING */}
+              <TabsContent value="multi-entity" className="m-0 focus-visible:outline-none focus-visible:ring-0">
+                <MultiEntityConsolidatedReporting />
+              </TabsContent>
+
+              {/* ZONE 0B: E-FILING INTEGRATION */}
+              <TabsContent value="e-filing" className="m-0 focus-visible:outline-none focus-visible:ring-0">
+                <EFilingIntegration />
+              </TabsContent>
+
+              {/* ZONE 0C: PAYMENT & TAX-LIABILITY AUTOMATION */}
+              <TabsContent value="payment" className="m-0 focus-visible:outline-none focus-visible:ring-0">
+                <PaymentTaxLiability />
+              </TabsContent>
+
               {/* ZONE 1: COMMAND CENTER (OVERVIEW) */}
               <TabsContent value="command" className="m-0 focus-visible:outline-none focus-visible:ring-0 space-y-8">
                 <CAActionInbox />
