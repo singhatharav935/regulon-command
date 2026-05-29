@@ -30,7 +30,16 @@ import PaymentTaxLiability from "@/components/ca-dashboard/PaymentTaxLiability";
 import EnterpriseApiWebhooks from "@/components/ca-dashboard/EnterpriseApiWebhooks";
 import ErpIntegrationHub from "@/components/ca-dashboard/ErpIntegrationHub";
 import DocumentOcrHub from "@/components/ca-dashboard/DocumentOcrHub";
+import TeamRbacHub from "@/components/ca-dashboard/TeamRbacHub";
+import NotificationAlertHub from "@/components/ca-dashboard/NotificationAlertHub";
+import AuditTrailHub from "@/components/ca-dashboard/AuditTrailHub";
+import LocalizationHub from "@/components/ca-dashboard/LocalizationHub";
+import OfflinePwaHub from "@/components/ca-dashboard/OfflinePwaHub";
+import { isOnline } from "@/services/offline-sync-service";
+import { useLanguage, LANGUAGE_LABELS } from "@/contexts/LanguageContext";
+import { Globe2, Wifi, WifiOff } from "lucide-react";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
+import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
@@ -86,6 +95,7 @@ import {
   Code2,
   Database,
   FileSearch,
+  BellRing,
 } from "lucide-react";
 import { toast } from "sonner";
 import useCAMetrics from "@/hooks/useCAMetrics";
@@ -1350,8 +1360,28 @@ const LiveAIDraftingEngine = () => {
   );
 };
 
+type CADashboardZone = 
+  | "command" | "multi-entity" | "e-filing" | "payment" | "clients" | "operations" 
+  | "ai-swarm" | "calculations" | "enterprise-api" | "erp-integration" | "doc-ocr" 
+  | "team-rbac" | "notifications" | "branding" | "audit-trail" | "language-hub" | "offline-hub";
+
 const ExternalCADashboardReal = () => {
   const navigate = useNavigate();
+  const { t, language, isRtlLayout, setLanguagePreference } = useLanguage();
+  const [dashboardOnline, setDashboardOnline] = useState(isOnline());
+
+  useEffect(() => {
+    const handleConn = () => setDashboardOnline(isOnline());
+    window.addEventListener('ca:connectivity-change', handleConn);
+    window.addEventListener('online', handleConn);
+    window.addEventListener('offline', handleConn);
+    return () => {
+      window.removeEventListener('ca:connectivity-change', handleConn);
+      window.removeEventListener('online', handleConn);
+      window.removeEventListener('offline', handleConn);
+    };
+  }, []);
+
   const { metrics, loading, refetch } = useCAMetrics();
   const { caId, caFirmId } = useCAIdentity?.() || { caId: 'ca-001', caFirmId: 'firm-001' };
   const [activeZone, setActiveZone] = useState<CADashboardZone>("command");
@@ -1644,9 +1674,51 @@ const ExternalCADashboardReal = () => {
     <div className="min-h-screen bg-background">
       <Navbar />
       
-      
       <main className="pt-24 pb-16">
         <div className="container mx-auto px-4 max-w-7xl">
+          {/* Global Multi-Language Switcher (Gap 13) */}
+          <div className="flex flex-col md:flex-row justify-between items-start md:items-center mb-6 gap-4 p-4 rounded-xl bg-card/20 border border-border/40 backdrop-blur-sm">
+            <div>
+              <h2 className="text-xl font-black text-transparent bg-clip-text bg-gradient-to-r from-cyan-400 via-indigo-400 to-purple-500 tracking-tight">
+                {t('headings.dashboardTitle')}
+              </h2>
+              <p className="text-[11px] text-muted-foreground/80 mt-0.5">
+                {t('headings.dashboardSubtitle')}
+              </p>
+            </div>
+            <div className="flex items-center gap-3">
+              {/* Connection Status Badge (Gap 15) */}
+              <Badge variant="outline" className={`text-[10px] px-2.5 py-1 flex items-center gap-1.5 ${
+                dashboardOnline 
+                  ? 'bg-emerald-500/10 text-emerald-400 border-emerald-500/30' 
+                  : 'bg-amber-500/10 text-amber-400 border-amber-500/30 animate-pulse'
+              }`}>
+                {dashboardOnline ? <Wifi className="w-3.5 h-3.5 text-emerald-400" /> : <WifiOff className="w-3.5 h-3.5 text-amber-400" />}
+                <span>{dashboardOnline ? 'ONLINE' : 'OFFLINE MODE'}</span>
+              </Badge>
+
+              <Badge variant="outline" className="bg-indigo-500/10 text-indigo-400 border-indigo-500/30 text-[10px] px-2.5 py-1 flex items-center gap-1.5">
+                <Globe2 className="w-3.5 h-3.5" /> Language: <strong className="text-white">{LANGUAGE_LABELS[language].label.split(' ')[0]}</strong>
+              </Badge>
+              <Select
+                value={language}
+                onValueChange={(val: any) => setLanguagePreference(val, isRtlLayout)}
+              >
+                <SelectTrigger className="w-40 bg-background/50 border-border/40 text-xs h-9">
+                  <SelectValue placeholder="Select Language" />
+                </SelectTrigger>
+                <SelectContent className="bg-card border-border/40 text-xs">
+                  <SelectItem value="en">English (EN)</SelectItem>
+                  <SelectItem value="hi">हिन्दी (Hindi)</SelectItem>
+                  <SelectItem value="mr">मराठी (Marathi)</SelectItem>
+                  <SelectItem value="ta">தமிழ் (Tamil)</SelectItem>
+                  <SelectItem value="te">తెలుగు (Telugu)</SelectItem>
+                  <SelectItem value="bn">বাংলা (Bengali)</SelectItem>
+                </SelectContent>
+              </Select>
+            </div>
+          </div>
+
           {/* CA Command Center Header */}
           <CACommandCenterHeader />
           {/* Main Dashboard Layout with Horizontal Tabs */}
@@ -1677,6 +1749,21 @@ const ExternalCADashboardReal = () => {
                     <TabsTrigger value="doc-ocr" className="px-4 py-2.5 rounded-lg data-[state=active]:bg-violet-500/20 data-[state=active]:text-violet-400 font-medium text-xs flex items-center gap-1">
                       <FileSearch className="w-3.5 h-3.5" />Docs & OCR
                     </TabsTrigger>
+                    <TabsTrigger value="team-rbac" className="px-4 py-2.5 rounded-lg data-[state=active]:bg-rose-500/20 data-[state=active]:text-rose-400 font-medium text-xs flex items-center gap-1">
+                       <Shield className="w-3.5 h-3.5" />Team & RBAC
+                     </TabsTrigger>
+                     <TabsTrigger value="notifications" className="px-4 py-2.5 rounded-lg data-[state=active]:bg-orange-500/20 data-[state=active]:text-orange-400 font-medium text-xs flex items-center gap-1">
+                       <BellRing className="w-3.5 h-3.5" />Notifications
+                     </TabsTrigger>
+                     <TabsTrigger value="audit-trail" className="px-4 py-2.5 rounded-lg data-[state=active]:bg-indigo-500/20 data-[state=active]:text-indigo-400 font-medium text-xs flex items-center gap-1">
+                       <Shield className="w-3.5 h-3.5" />{t('nav.auditTrail')}
+                     </TabsTrigger>
+                     <TabsTrigger value="language-hub" className="px-4 py-2.5 rounded-lg data-[state=active]:bg-teal-500/20 data-[state=active]:text-teal-400 font-medium text-xs flex items-center gap-1">
+                       <Globe2 className="w-3.5 h-3.5" />{t('nav.languageHub')}
+                     </TabsTrigger>
+                     <TabsTrigger value="offline-hub" className="px-4 py-2.5 rounded-lg data-[state=active]:bg-emerald-500/20 data-[state=active]:text-emerald-400 font-medium text-xs flex items-center gap-1">
+                       <Wifi className="w-3.5 h-3.5" />Offline & PWA
+                     </TabsTrigger>
                  </TabsList>
                  <Button onClick={() => setIsDrawerOpen(true)} className="ml-4 flex-shrink-0 bg-gradient-to-r from-purple-600 to-cyan-600 hover:from-purple-500 hover:to-cyan-500 text-white border-0 shadow-[0_0_20px_rgba(139,92,246,0.3)]">
                     <Cpu className="w-4 h-4 mr-2" /> Open Engine
@@ -1858,6 +1945,31 @@ const ExternalCADashboardReal = () => {
               {/* ZONE 8: DOCUMENT MANAGEMENT & OCR */}
               <TabsContent value="doc-ocr" className="m-0 focus-visible:outline-none focus-visible:ring-0 space-y-8">
                 <DocumentOcrHub />
+              </TabsContent>
+
+              {/* ZONE 9: RBAC & TEAM MANAGEMENT */}
+              <TabsContent value="team-rbac" className="m-0 focus-visible:outline-none focus-visible:ring-0 space-y-8">
+                <TeamRbacHub />
+              </TabsContent>
+
+              {/* ZONE 10: NOTIFICATION & ALERT ENGINE */}
+              <TabsContent value="notifications" className="m-0 focus-visible:outline-none focus-visible:ring-0 space-y-8">
+                <NotificationAlertHub />
+              </TabsContent>
+
+              {/* ZONE 12: AUDIT TRAIL & COMPLIANCE REPORTING */}
+              <TabsContent value="audit-trail" className="m-0 focus-visible:outline-none focus-visible:ring-0 space-y-8">
+                <AuditTrailHub />
+              </TabsContent>
+
+              {/* ZONE 13: MULTI-LANGUAGE & REGIONAL LOCALIZATION */}
+              <TabsContent value="language-hub" className="m-0 focus-visible:outline-none focus-visible:ring-0 space-y-8">
+                <LocalizationHub />
+              </TabsContent>
+
+              {/* ZONE 15: OFFLINE MODE & PROGRESSIVE WEB APP (PWA) */}
+              <TabsContent value="offline-hub" className="m-0 focus-visible:outline-none focus-visible:ring-0 space-y-8">
+                <OfflinePwaHub />
               </TabsContent>
             </Tabs>
           </div>

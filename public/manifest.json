@@ -1,0 +1,28 @@
+{
+  "short_name": "Regulon",
+  "name": "Regulon CA Practice Management Command Console",
+  "icons": [
+    {
+      "src": "/favicon.ico",
+      "sizes": "64x64 32x32 24x24 16x16",
+      "type": "image/x-icon"
+    },
+    {
+      "src": "/placeholder.svg",
+      "type": "image/svg+xml",
+      "sizes": "192x192 512x512",
+      "purpose": "any maskable"
+    }
+  ],
+  "start_url": "/real-external-ca-dashboard",
+  "background_color": "#070b13",
+  "theme_color": "#6366f1",
+  "display": "standalone",
+  "orientation": "portrait-primary",
+  "categories": [
+    "productivity",
+    "finance",
+    "business"
+  ],
+  "description": "Progressive Web App for CA practice management with offline support, notice parsing, and automated compliance auditing."
+}
