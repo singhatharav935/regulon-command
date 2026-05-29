@@ -145,20 +145,22 @@ const SannidhAIAgent = () => {
           
           toast.success("🎤 Sannidh activated!");
           
-          // Send wake-word event to backend
-          fetch("/api/ca/voice/wake-word", {
-            method: "POST",
-            headers: {
-              "Content-Type": "application/json",
-              "Authorization": `Bearer ${localStorage.getItem("token") || "ca-token-123"}`,
-            },
-            body: JSON.stringify({
-              event: "wake_word_detected",
-              timestamp: new Date().toISOString(),
-              ca_id: (await supabase.auth.getUser()).data.user?.id || '',
-              responded_with_tts: true,
-            }),
-          }).catch(() => { /* Wake-word logging skipped — backend unavailable */ });
+          // Send wake-word event to backend (resolve auth asynchronously)
+          supabase.auth.getUser().then(({ data }) => {
+            fetch("/api/ca/voice/wake-word", {
+              method: "POST",
+              headers: {
+                "Content-Type": "application/json",
+                "Authorization": `Bearer ${localStorage.getItem("token") || "ca-token-123"}`,
+              },
+              body: JSON.stringify({
+                event: "wake_word_detected",
+                timestamp: new Date().toISOString(),
+                ca_id: data.user?.id || '',
+                responded_with_tts: true,
+              }),
+            }).catch(() => { /* Wake-word logging skipped — backend unavailable */ });
+          }).catch(() => { /* Auth lookup failed — skip wake-word logging */ });
 
           // Extract command after "Hey Sannidh"
           const commandText = lowerTranscript
