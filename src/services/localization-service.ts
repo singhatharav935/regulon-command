@@ -4,6 +4,7 @@
  */
 import { supabase } from '@/integrations/supabase/client';
 import { isValidUUID } from '@/lib/uuid-guard';
+import { handleServiceError } from '@/lib/safe-query';
 
 export type IssuingAuthority =
   | 'GSTIN' | 'Income Tax' | 'MCA' | 'DGFT' | 'EPFO' | 'ESIC' | 'SEBI' | 'RBI' | 'Customs';
@@ -82,7 +83,7 @@ export async function saveLanguagePreference(
     .select()
     .single();
 
-  if (error) throw new Error(error.message);
+  if (error) return handleServiceError(error, []);
   return data;
 }
 
@@ -96,7 +97,7 @@ export async function fetchBilingualNotices(caUserId: string): Promise<Bilingual
     .eq('ca_user_id', caUserId)
     .order('created_at', { ascending: false });
 
-  if (error) throw new Error(error.message);
+  if (error) return handleServiceError(error, []);
   return data ?? [];
 }
 
@@ -107,7 +108,7 @@ export async function createBilingualNotice(notice: Omit<BilingualNotice, 'id' |
     .select()
     .single();
 
-  if (error) throw new Error(error.message);
+  if (error) return handleServiceError(error, []);
   return data;
 }
 
@@ -119,7 +120,7 @@ export async function updateBilingualNotice(id: string, updates: Partial<Bilingu
     .select()
     .single();
 
-  if (error) throw new Error(error.message);
+  if (error) return handleServiceError(error, []);
   return data;
 }
 
@@ -129,7 +130,7 @@ export async function deleteBilingualNotice(id: string): Promise<void> {
     .delete()
     .eq('id', id);
 
-  if (error) throw new Error(error.message);
+  if (error) return handleServiceError(error, []);
 }
 
 // ─── OCR Translator & Extraction Engine (Notice Simulator) ───────────────────

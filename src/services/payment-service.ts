@@ -5,6 +5,7 @@
  */
 import { supabase } from '@/integrations/supabase/client';
 import { isValidUUID } from '@/lib/uuid-guard';
+import { handleServiceError } from '@/lib/safe-query';
 
 // ─── Types ────────────────────────────────────────────────────────────────────
 
@@ -161,7 +162,7 @@ export async function fetchLiabilities(
   if (filters?.taxType) q = q.eq('tax_type', filters.taxType);
 
   const { data, error } = await q.order('due_date', { ascending: true });
-  if (error) throw new Error(error.message);
+  if (error) return handleServiceError(error, []);
 
   return (data ?? []).map((row: any) => ({
     ...row,
@@ -179,7 +180,7 @@ export async function fetchUpcomingPayments(caUserId: string): Promise<TaxLiabil
     .select('*')
     .eq('ca_user_id', caUserId);
 
-  if (error) throw new Error(error.message);
+  if (error) return handleServiceError(error, []);
   return data ?? [];
 }
 
@@ -196,7 +197,7 @@ export async function createLiability(
     .select()
     .single();
 
-  if (error) throw new Error(error.message);
+  if (error) return handleServiceError(error, []);
   return data;
 }
 
@@ -232,7 +233,7 @@ export async function updateLiability(
     .select()
     .single();
 
-  if (error) throw new Error(error.message);
+  if (error) return handleServiceError(error, []);
   return data;
 }
 
@@ -241,7 +242,7 @@ export async function deleteLiability(id: string): Promise<void> {
     .from('tax_liability_heads')
     .delete()
     .eq('id', id);
-  if (error) throw new Error(error.message);
+  if (error) return handleServiceError(error, []);
 }
 
 /**
@@ -343,7 +344,7 @@ export async function fetchPaymentTransactions(
   if (filters?.entityId) q = q.eq('entity_id', filters.entityId);
 
   const { data, error } = await q.order('created_at', { ascending: false });
-  if (error) throw new Error(error.message);
+  if (error) return handleServiceError(error, []);
   return data ?? [];
 }
 
@@ -375,7 +376,7 @@ export async function initiateRazorpayPayment(
     .select()
     .single();
 
-  if (txnErr) throw new Error(txnErr.message);
+  if (txnErr) return handleServiceError(txnErr, []);
 
   try {
     const { data, error } = await supabase.functions.invoke('create-razorpay-order', {
@@ -422,7 +423,7 @@ export async function confirmPayment(
     .select()
     .single();
 
-  if (error) throw new Error(error.message);
+  if (error) return handleServiceError(error, []);
   return data;
 }
 
@@ -464,7 +465,7 @@ export async function recordManualPayment(
     .select()
     .single();
 
-  if (error) throw new Error(error.message);
+  if (error) return handleServiceError(error, []);
 
   // Also update challan on liability head
   if (details.bsr_code) {
@@ -516,7 +517,7 @@ export async function fetchReminders(caUserId: string): Promise<PaymentReminder[
     .eq('ca_user_id', caUserId)
     .order('reminder_date', { ascending: true });
 
-  if (error) throw new Error(error.message);
+  if (error) return handleServiceError(error, []);
   return data ?? [];
 }
 
@@ -543,7 +544,7 @@ export async function createReminder(
     .select()
     .single();
 
-  if (error) throw new Error(error.message);
+  if (error) return handleServiceError(error, []);
   return data;
 }
 
@@ -552,7 +553,7 @@ export async function deleteReminder(id: string): Promise<void> {
     .from('payment_reminders')
     .delete()
     .eq('id', id);
-  if (error) throw new Error(error.message);
+  if (error) return handleServiceError(error, []);
 }
 
 // ─── Reconciliation ───────────────────────────────────────────────────────────
@@ -567,7 +568,7 @@ export async function fetchReconciliationEntries(
     .eq('ca_user_id', caUserId)
     .order('bank_txn_date', { ascending: false });
 
-  if (error) throw new Error(error.message);
+  if (error) return handleServiceError(error, []);
   return data ?? [];
 }
 
@@ -581,7 +582,7 @@ export async function addBankTransaction(
     .select()
     .single();
 
-  if (error) throw new Error(error.message);
+  if (error) return handleServiceError(error, []);
   return data;
 }
 
@@ -606,5 +607,5 @@ export async function matchReconciliationEntry(
     })
     .eq('id', entryId);
 
-  if (error) throw new Error(error.message);
+  if (error) return handleServiceError(error, []);
 }

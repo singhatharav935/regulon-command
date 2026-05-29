@@ -5,6 +5,7 @@
  */
 import { supabase } from '@/integrations/supabase/client';
 import { isValidUUID } from '@/lib/uuid-guard';
+import { handleServiceError } from '@/lib/safe-query';
 
 // ─── Types ───────────────────────────────────────────────────────────────────
 
@@ -201,7 +202,7 @@ export async function fetchChannels(caUserId: string): Promise<NotificationChann
     .select('*')
     .eq('ca_user_id', caUserId)
     .order('channel_type', { ascending: true });
-  if (error) throw new Error(error.message);
+  if (error) return handleServiceError(error, []);
   return data ?? [];
 }
 
@@ -211,7 +212,7 @@ export async function createChannel(channel: Partial<NotificationChannel>): Prom
     .insert([channel])
     .select()
     .single();
-  if (error) throw new Error(error.message);
+  if (error) return handleServiceError(error, []);
   return data;
 }
 
@@ -222,7 +223,7 @@ export async function updateChannel(id: string, updates: Partial<NotificationCha
     .eq('id', id)
     .select()
     .single();
-  if (error) throw new Error(error.message);
+  if (error) return handleServiceError(error, []);
   return data;
 }
 
@@ -231,7 +232,7 @@ export async function deleteChannel(id: string): Promise<void> {
     .from('notification_channels')
     .delete()
     .eq('id', id);
-  if (error) throw new Error(error.message);
+  if (error) return handleServiceError(error, []);
 }
 
 /**
@@ -264,7 +265,7 @@ export async function fetchTemplates(caUserId: string): Promise<NotificationTemp
     .select('*')
     .eq('ca_user_id', caUserId)
     .order('template_name', { ascending: true });
-  if (error) throw new Error(error.message);
+  if (error) return handleServiceError(error, []);
   return data ?? [];
 }
 
@@ -274,7 +275,7 @@ export async function createTemplate(template: Partial<NotificationTemplate>): P
     .insert([template])
     .select()
     .single();
-  if (error) throw new Error(error.message);
+  if (error) return handleServiceError(error, []);
   return data;
 }
 
@@ -285,7 +286,7 @@ export async function updateTemplate(id: string, updates: Partial<NotificationTe
     .eq('id', id)
     .select()
     .single();
-  if (error) throw new Error(error.message);
+  if (error) return handleServiceError(error, []);
   return data;
 }
 
@@ -294,7 +295,7 @@ export async function deleteTemplate(id: string): Promise<void> {
     .from('notification_templates')
     .delete()
     .eq('id', id);
-  if (error) throw new Error(error.message);
+  if (error) return handleServiceError(error, []);
 }
 
 // ─── Alert Rules ─────────────────────────────────────────────────────────────
@@ -306,7 +307,7 @@ export async function fetchAlertRules(caUserId: string): Promise<NotificationAle
     .select('*, template:notification_templates(*)')
     .eq('ca_user_id', caUserId)
     .order('rule_name', { ascending: true });
-  if (error) throw new Error(error.message);
+  if (error) return handleServiceError(error, []);
   return data ?? [];
 }
 
@@ -316,7 +317,7 @@ export async function createAlertRule(rule: Partial<NotificationAlertRule>): Pro
     .insert([rule])
     .select()
     .single();
-  if (error) throw new Error(error.message);
+  if (error) return handleServiceError(error, []);
   return data;
 }
 
@@ -327,7 +328,7 @@ export async function updateAlertRule(id: string, updates: Partial<NotificationA
     .eq('id', id)
     .select()
     .single();
-  if (error) throw new Error(error.message);
+  if (error) return handleServiceError(error, []);
   return data;
 }
 
@@ -336,7 +337,7 @@ export async function deleteAlertRule(id: string): Promise<void> {
     .from('notification_alert_rules')
     .delete()
     .eq('id', id);
-  if (error) throw new Error(error.message);
+  if (error) return handleServiceError(error, []);
 }
 
 // ─── Recipients ──────────────────────────────────────────────────────────────
@@ -348,7 +349,7 @@ export async function fetchRecipients(caUserId: string): Promise<NotificationRec
     .select('*')
     .eq('ca_user_id', caUserId)
     .order('full_name', { ascending: true });
-  if (error) throw new Error(error.message);
+  if (error) return handleServiceError(error, []);
   return data ?? [];
 }
 
@@ -358,7 +359,7 @@ export async function createRecipient(recipient: Partial<NotificationRecipient>)
     .insert([recipient])
     .select()
     .single();
-  if (error) throw new Error(error.message);
+  if (error) return handleServiceError(error, []);
   return data;
 }
 
@@ -369,7 +370,7 @@ export async function updateRecipient(id: string, updates: Partial<NotificationR
     .eq('id', id)
     .select()
     .single();
-  if (error) throw new Error(error.message);
+  if (error) return handleServiceError(error, []);
   return data;
 }
 
@@ -378,7 +379,7 @@ export async function deleteRecipient(id: string): Promise<void> {
     .from('notification_recipients')
     .delete()
     .eq('id', id);
-  if (error) throw new Error(error.message);
+  if (error) return handleServiceError(error, []);
 }
 
 // ─── Dispatch (Send Notification) ────────────────────────────────────────────
@@ -419,7 +420,7 @@ export async function dispatchNotification(payload: {
     .select()
     .single();
 
-  if (insertError) throw new Error(insertError.message);
+  if (insertError) return handleServiceError(insertError, []);
 
   // Attempt to call Edge Function for actual dispatch
   try {
@@ -459,7 +460,7 @@ export async function fetchDispatches(caUserId: string, limit = 100): Promise<No
     .eq('ca_user_id', caUserId)
     .order('created_at', { ascending: false })
     .limit(limit);
-  if (error) throw new Error(error.message);
+  if (error) return handleServiceError(error, []);
   return data ?? [];
 }
 
@@ -476,7 +477,7 @@ export async function fetchDeliveryStats(caUserId: string, days = 30): Promise<N
     .eq('ca_user_id', caUserId)
     .gte('stat_date', since.toISOString().split('T')[0])
     .order('stat_date', { ascending: false });
-  if (error) throw new Error(error.message);
+  if (error) return handleServiceError(error, []);
   return data ?? [];
 }
 

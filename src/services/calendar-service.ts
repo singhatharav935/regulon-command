@@ -4,6 +4,7 @@
  */
 import { supabase } from '@/integrations/supabase/client';
 import { isValidUUID } from '@/lib/uuid-guard';
+import { handleServiceError } from '@/lib/safe-query';
 
 // ─── Types ───────────────────────────────────────────────────────────────
 
@@ -226,7 +227,7 @@ export async function fetchCalendarEvents(
   if (filters?.entityId) query = query.eq('entity_id', filters.entityId);
 
   const { data, error } = await query;
-  if (error) throw new Error(error.message);
+  if (error) return handleServiceError(error, []);
   return (data || []) as CalendarEvent[];
 }
 
@@ -238,7 +239,7 @@ export async function fetchUpcomingDeadlines(caUserId: string): Promise<Calendar
     .eq('ca_user_id', caUserId)
     .order('due_date', { ascending: true });
 
-  if (error) throw new Error(error.message);
+  if (error) return handleServiceError(error, []);
   return (data || []) as CalendarEvent[];
 }
 
@@ -251,7 +252,7 @@ export async function createCalendarEvent(
     .select()
     .single();
 
-  if (error) throw new Error(error.message);
+  if (error) return handleServiceError(error, []);
   return data as CalendarEvent;
 }
 
@@ -266,7 +267,7 @@ export async function updateCalendarEvent(
     .select()
     .single();
 
-  if (error) throw new Error(error.message);
+  if (error) return handleServiceError(error, []);
   return data as CalendarEvent;
 }
 
@@ -276,7 +277,7 @@ export async function deleteCalendarEvent(id: string): Promise<void> {
     .delete()
     .eq('id', id);
 
-  if (error) throw new Error(error.message);
+  if (error) return handleServiceError(error, []);
 }
 
 export async function completeCalendarEvent(
@@ -316,7 +317,7 @@ export async function fetchCalendarDashboard(
     .eq('ca_user_id', caUserId)
     .maybeSingle();
 
-  if (error) throw new Error(error.message);
+  if (error) return handleServiceError(error, []);
   return data as CalendarDashboardSummary | null;
 }
 
@@ -337,7 +338,7 @@ export async function fetchReminders(
   if (filters?.sent !== undefined) query = query.eq('is_sent', filters.sent);
 
   const { data, error } = await query;
-  if (error) throw new Error(error.message);
+  if (error) return handleServiceError(error, []);
   return (data || []) as DeadlineReminder[];
 }
 
@@ -350,7 +351,7 @@ export async function createReminder(
     .select()
     .single();
 
-  if (error) throw new Error(error.message);
+  if (error) return handleServiceError(error, []);
   return data as DeadlineReminder;
 }
 
@@ -365,7 +366,7 @@ export async function updateReminder(
     .select()
     .single();
 
-  if (error) throw new Error(error.message);
+  if (error) return handleServiceError(error, []);
   return data as DeadlineReminder;
 }
 
@@ -393,7 +394,7 @@ export async function deleteReminder(id: string): Promise<void> {
     .from('deadline_reminders')
     .delete()
     .eq('id', id);
-  if (error) throw new Error(error.message);
+  if (error) return handleServiceError(error, []);
 }
 
 // ─── Escalation Rules CRUD ──────────────────────────────────────────────
@@ -408,7 +409,7 @@ export async function fetchEscalationRules(
     .eq('ca_user_id', caUserId)
     .order('created_at', { ascending: false });
 
-  if (error) throw new Error(error.message);
+  if (error) return handleServiceError(error, []);
   return (data || []) as EscalationRule[];
 }
 
@@ -421,7 +422,7 @@ export async function createEscalationRule(
     .select()
     .single();
 
-  if (error) throw new Error(error.message);
+  if (error) return handleServiceError(error, []);
   return data as EscalationRule;
 }
 
@@ -436,7 +437,7 @@ export async function updateEscalationRule(
     .select()
     .single();
 
-  if (error) throw new Error(error.message);
+  if (error) return handleServiceError(error, []);
   return data as EscalationRule;
 }
 
@@ -445,7 +446,7 @@ export async function deleteEscalationRule(id: string): Promise<void> {
     .from('escalation_rules')
     .delete()
     .eq('id', id);
-  if (error) throw new Error(error.message);
+  if (error) return handleServiceError(error, []);
 }
 
 export async function toggleEscalationRule(
@@ -473,7 +474,7 @@ export async function fetchEscalationLogs(
   if (filters?.limit) query = query.limit(filters.limit);
 
   const { data, error } = await query;
-  if (error) throw new Error(error.message);
+  if (error) return handleServiceError(error, []);
   return (data || []) as EscalationLog[];
 }
 
@@ -486,7 +487,7 @@ export async function createEscalationLog(
     .select()
     .single();
 
-  if (error) throw new Error(error.message);
+  if (error) return handleServiceError(error, []);
   return data as EscalationLog;
 }
 
@@ -556,7 +557,7 @@ export async function fetchRecurringTemplates(
     .eq('ca_user_id', caUserId)
     .order('template_name', { ascending: true });
 
-  if (error) throw new Error(error.message);
+  if (error) return handleServiceError(error, []);
   return (data || []) as RecurringTemplate[];
 }
 
@@ -569,7 +570,7 @@ export async function createRecurringTemplate(
     .select()
     .single();
 
-  if (error) throw new Error(error.message);
+  if (error) return handleServiceError(error, []);
   return data as RecurringTemplate;
 }
 
@@ -584,7 +585,7 @@ export async function updateRecurringTemplate(
     .select()
     .single();
 
-  if (error) throw new Error(error.message);
+  if (error) return handleServiceError(error, []);
   return data as RecurringTemplate;
 }
 
@@ -593,7 +594,7 @@ export async function deleteRecurringTemplate(id: string): Promise<void> {
     .from('recurring_deadline_templates')
     .delete()
     .eq('id', id);
-  if (error) throw new Error(error.message);
+  if (error) return handleServiceError(error, []);
 }
 
 // ─── Generate Events from Template ──────────────────────────────────────
@@ -677,7 +678,7 @@ export async function fetchSLATimers(
   if (filters?.running !== undefined) query = query.eq('is_running', filters.running);
 
   const { data, error } = await query;
-  if (error) throw new Error(error.message);
+  if (error) return handleServiceError(error, []);
   return (data || []) as SLATimer[];
 }
 
@@ -690,7 +691,7 @@ export async function createSLATimer(
     .select()
     .single();
 
-  if (error) throw new Error(error.message);
+  if (error) return handleServiceError(error, []);
   return data as SLATimer;
 }
 
@@ -705,7 +706,7 @@ export async function updateSLATimer(
     .select()
     .single();
 
-  if (error) throw new Error(error.message);
+  if (error) return handleServiceError(error, []);
   return data as SLATimer;
 }
 
@@ -756,7 +757,7 @@ export async function bulkUpdateStatus(
     .update(updates)
     .in('id', ids);
 
-  if (error) throw new Error(error.message);
+  if (error) return handleServiceError(error, []);
 }
 
 // ─── Indian Statutory Deadline Presets ───────────────────────────────────

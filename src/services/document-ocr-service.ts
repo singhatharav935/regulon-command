@@ -7,6 +7,7 @@
  */
 import { supabase } from '@/integrations/supabase/client';
 import { isValidUUID } from '@/lib/uuid-guard';
+import { handleServiceError } from '@/lib/safe-query';
 
 // ─── Types ────────────────────────────────────────────────────────────────────
 
@@ -206,7 +207,7 @@ export async function fetchDocuments(
   else q = q.limit(100);
 
   const { data, error } = await q;
-  if (error) throw new Error(error.message);
+  if (error) return handleServiceError(error, []);
   return data ?? [];
 }
 
@@ -341,7 +342,7 @@ export async function updateDocument(
     .select()
     .single();
 
-  if (error) throw new Error(error.message);
+  if (error) return handleServiceError(error, []);
   return data;
 }
 
@@ -364,7 +365,7 @@ export async function deleteDocument(id: string): Promise<void> {
     .delete()
     .eq('id', id);
 
-  if (error) throw new Error(error.message);
+  if (error) return handleServiceError(error, []);
 }
 
 export async function archiveDocument(id: string): Promise<void> {
@@ -373,7 +374,7 @@ export async function archiveDocument(id: string): Promise<void> {
     .update({ status: 'archived', updated_at: new Date().toISOString() })
     .eq('id', id);
 
-  if (error) throw new Error(error.message);
+  if (error) return handleServiceError(error, []);
 }
 
 export async function verifyDocument(id: string, userId: string): Promise<void> {
@@ -387,7 +388,7 @@ export async function verifyDocument(id: string, userId: string): Promise<void> 
     })
     .eq('id', id);
 
-  if (error) throw new Error(error.message);
+  if (error) return handleServiceError(error, []);
 }
 
 /**
@@ -398,7 +399,7 @@ export async function getDocumentUrl(storagePath: string, bucket = 'documents'):
     .from(bucket)
     .createSignedUrl(storagePath, 3600); // 1 hour expiry
 
-  if (error) throw new Error(error.message);
+  if (error) return handleServiceError(error, []);
   return data.signedUrl;
 }
 
@@ -411,7 +412,7 @@ export async function fetchDocumentVersions(documentId: string): Promise<Documen
     .eq('document_id', documentId)
     .order('version_number', { ascending: false });
 
-  if (error) throw new Error(error.message);
+  if (error) return handleServiceError(error, []);
   return data ?? [];
 }
 
@@ -434,7 +435,7 @@ export async function fetchOcrJobs(
   else q = q.limit(50);
 
   const { data, error } = await q;
-  if (error) throw new Error(error.message);
+  if (error) return handleServiceError(error, []);
   return data ?? [];
 }
 
@@ -515,7 +516,7 @@ export async function cancelOcrJob(jobId: string): Promise<void> {
     })
     .eq('id', jobId);
 
-  if (error) throw new Error(error.message);
+  if (error) return handleServiceError(error, []);
 }
 
 // ─── OCR Results ──────────────────────────────────────────────────────────────
@@ -527,7 +528,7 @@ export async function fetchOcrResults(ocrJobId: string): Promise<OcrResult[]> {
     .eq('ocr_job_id', ocrJobId)
     .order('page_number', { ascending: true });
 
-  if (error) throw new Error(error.message);
+  if (error) return handleServiceError(error, []);
   return data ?? [];
 }
 
@@ -538,7 +539,7 @@ export async function fetchDocumentOcrResults(documentId: string): Promise<OcrRe
     .eq('document_id', documentId)
     .order('page_number', { ascending: true });
 
-  if (error) throw new Error(error.message);
+  if (error) return handleServiceError(error, []);
   return data ?? [];
 }
 
@@ -568,7 +569,7 @@ export async function fetchDocumentAccessLogs(documentId: string): Promise<Docum
     .order('created_at', { ascending: false })
     .limit(100);
 
-  if (error) throw new Error(error.message);
+  if (error) return handleServiceError(error, []);
   return data ?? [];
 }
 

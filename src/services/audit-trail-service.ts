@@ -5,6 +5,7 @@
  */
 import { supabase } from '@/integrations/supabase/client';
 import { isValidUUID } from '@/lib/uuid-guard';
+import { handleServiceError } from '@/lib/safe-query';
 
 // ─── Types ───────────────────────────────────────────────────────────────────
 
@@ -214,7 +215,7 @@ export async function fetchAuditEvents(
   if (opts.offset) query = query.range(opts.offset, (opts.offset + (opts.limit ?? 100)) - 1);
 
   const { data, error, count } = await query;
-  if (error) throw new Error(error.message);
+  if (error) return handleServiceError(error, []);
   return { events: data ?? [], total: count ?? 0 };
 }
 
@@ -227,7 +228,7 @@ export async function logAuditEvent(event: Omit<AuditTrailEvent, 'id' | 'event_i
     .insert([event])
     .select()
     .single();
-  if (error) throw new Error(error.message);
+  if (error) return handleServiceError(error, []);
   return data;
 }
 
@@ -240,7 +241,7 @@ export async function fetchComplianceScores(caUserId: string): Promise<Complianc
     .select('*')
     .eq('ca_user_id', caUserId)
     .order('score_date', { ascending: false });
-  if (error) throw new Error(error.message);
+  if (error) return handleServiceError(error, []);
   return data ?? [];
 }
 
@@ -252,7 +253,7 @@ export async function upsertComplianceScore(
     .upsert([score], { onConflict: 'ca_user_id,entity_id,score_date' })
     .select()
     .single();
-  if (error) throw new Error(error.message);
+  if (error) return handleServiceError(error, []);
   return data;
 }
 
@@ -261,7 +262,7 @@ export async function deleteComplianceScore(id: string): Promise<void> {
     .from('compliance_scores')
     .delete()
     .eq('id', id);
-  if (error) throw new Error(error.message);
+  if (error) return handleServiceError(error, []);
 }
 
 // ─── Compliance Reports ───────────────────────────────────────────────────────
@@ -273,7 +274,7 @@ export async function fetchComplianceReports(caUserId: string): Promise<Complian
     .select('*')
     .eq('ca_user_id', caUserId)
     .order('created_at', { ascending: false });
-  if (error) throw new Error(error.message);
+  if (error) return handleServiceError(error, []);
   return data ?? [];
 }
 
@@ -383,7 +384,7 @@ export async function generateComplianceReport(
     .select()
     .single();
 
-  if (error) throw new Error(error.message);
+  if (error) return handleServiceError(error, []);
 
   // 5. Log the report generation in audit trail
   await logAuditEvent({
@@ -410,7 +411,7 @@ export async function updateReportStatus(id: string, status: ReportStatus, updat
     .from('compliance_reports')
     .update({ status, ...updates })
     .eq('id', id);
-  if (error) throw new Error(error.message);
+  if (error) return handleServiceError(error, []);
 }
 
 export async function deleteReport(id: string): Promise<void> {
@@ -418,7 +419,7 @@ export async function deleteReport(id: string): Promise<void> {
     .from('compliance_reports')
     .delete()
     .eq('id', id);
-  if (error) throw new Error(error.message);
+  if (error) return handleServiceError(error, []);
 }
 
 // ─── Data Retention ───────────────────────────────────────────────────────────
@@ -435,7 +436,7 @@ export async function fetchRetentionPolicies(caUserId: string): Promise<DataRete
     .select('*')
     .eq('ca_user_id', caUserId)
     .order('module', { ascending: true });
-  if (error) throw new Error(error.message);
+  if (error) return handleServiceError(error, []);
   return data ?? [];
 }
 
@@ -449,7 +450,7 @@ export async function updateRetentionPolicy(
     .eq('id', id)
     .select()
     .single();
-  if (error) throw new Error(error.message);
+  if (error) return handleServiceError(error, []);
   return data;
 }
 
@@ -462,7 +463,7 @@ export async function fetchAuditAlerts(caUserId: string): Promise<AuditAlertSubs
     .select('*')
     .eq('ca_user_id', caUserId)
     .order('alert_name', { ascending: true });
-  if (error) throw new Error(error.message);
+  if (error) return handleServiceError(error, []);
   return data ?? [];
 }
 
@@ -472,7 +473,7 @@ export async function createAuditAlert(alert: Partial<AuditAlertSubscription>): 
     .insert([alert])
     .select()
     .single();
-  if (error) throw new Error(error.message);
+  if (error) return handleServiceError(error, []);
   return data;
 }
 
@@ -481,7 +482,7 @@ export async function toggleAuditAlert(id: string, isActive: boolean): Promise<v
     .from('audit_alert_subscriptions')
     .update({ is_active: isActive })
     .eq('id', id);
-  if (error) throw new Error(error.message);
+  if (error) return handleServiceError(error, []);
 }
 
 export async function deleteAuditAlert(id: string): Promise<void> {
@@ -489,7 +490,7 @@ export async function deleteAuditAlert(id: string): Promise<void> {
     .from('audit_alert_subscriptions')
     .delete()
     .eq('id', id);
-  if (error) throw new Error(error.message);
+  if (error) return handleServiceError(error, []);
 }
 
 // ─── Dashboard Aggregation ────────────────────────────────────────────────────

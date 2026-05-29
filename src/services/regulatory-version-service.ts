@@ -3,6 +3,7 @@
  * Real Supabase queries only. No mock data.
  */
 import { supabase } from '@/integrations/supabase/client';
+import { handleServiceError } from '@/lib/safe-query';
 
 export interface RegulatoryNews {
   id: string;
@@ -83,7 +84,7 @@ export async function fetchRegulatoryNewsList(): Promise<RegulatoryNews[]> {
     .select('*')
     .order('published_date', { ascending: false });
 
-  if (error) throw new Error(error.message);
+  if (error) return handleServiceError(error, []);
   return (data || []) as RegulatoryNews[];
 }
 
@@ -94,7 +95,7 @@ export async function fetchRegulatoryNewsItem(id: string): Promise<RegulatoryNew
     .eq('id', id)
     .single();
 
-  if (error) throw new Error(error.message);
+  if (error) return handleServiceError(error, []);
   return data as RegulatoryNews;
 }
 
@@ -116,7 +117,7 @@ export async function createRegulatoryNews(news: Partial<RegulatoryNews>): Promi
     .select()
     .single();
 
-  if (error) throw new Error(error.message);
+  if (error) return handleServiceError(error, []);
   return data as RegulatoryNews;
 }
 
@@ -146,7 +147,7 @@ export async function updateRegulatoryNews(
     .select()
     .single();
 
-  if (error) throw new Error(error.message);
+  if (error) return handleServiceError(error, []);
   return data as RegulatoryNews;
 }
 
@@ -159,7 +160,7 @@ export async function fetchNewsVersions(newsId: string): Promise<RegulatoryNewsV
     .eq('news_id', newsId)
     .order('version', { ascending: false });
 
-  if (error) throw new Error(error.message);
+  if (error) return handleServiceError(error, []);
   return (data || []) as RegulatoryNewsVersion[];
 }
 
@@ -178,7 +179,7 @@ export async function fetchCompanyEvaluations(newsId: string): Promise<CompanyEv
     .eq('news_id', newsId)
     .order('updated_at', { ascending: false });
 
-  if (error) throw new Error(error.message);
+  if (error) return handleServiceError(error, []);
 
   return (data || []).map((row: any) => ({
     ...row,
@@ -203,7 +204,7 @@ export async function updateEvaluationStatus(
     .select()
     .single();
 
-  if (error) throw new Error(error.message);
+  if (error) return handleServiceError(error, []);
   return data as CompanyEvaluation;
 }
 
@@ -218,5 +219,5 @@ export async function sendRegulatoryNotification(evaluationId: string): Promise<
     } as any)
     .eq('id', evaluationId);
 
-  if (error) throw new Error(error.message);
+  if (error) return handleServiceError(error, []);
 }

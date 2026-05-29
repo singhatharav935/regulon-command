@@ -10,6 +10,7 @@
  */
 import { supabase } from '@/integrations/supabase/client';
 import { isValidUUID } from '@/lib/uuid-guard';
+import { handleServiceError } from '@/lib/safe-query';
 
 // ─── Types ────────────────────────────────────────────────────────────────────
 
@@ -254,7 +255,7 @@ export async function fetchErpConnections(caUserId: string): Promise<ErpConnecti
     .eq('ca_user_id', caUserId)
     .order('created_at', { ascending: false });
 
-  if (error) throw new Error(error.message);
+  if (error) return handleServiceError(error, []);
   return data ?? [];
 }
 
@@ -353,7 +354,7 @@ export async function testErpConnection(connectionId: string): Promise<{
     .eq('id', connectionId)
     .single();
 
-  if (fetchErr) throw new Error(fetchErr.message);
+  if (fetchErr) return handleServiceError(fetchErr, []);
 
   const startTime = performance.now();
 
@@ -462,7 +463,7 @@ export async function fetchFieldMappings(connectionId: string): Promise<ErpField
     .eq('connection_id', connectionId)
     .order('sort_order', { ascending: true });
 
-  if (error) throw new Error(error.message);
+  if (error) return handleServiceError(error, []);
   return data ?? [];
 }
 
@@ -500,7 +501,7 @@ export async function createFieldMapping(
     .select()
     .single();
 
-  if (error) throw new Error(error.message);
+  if (error) return handleServiceError(error, []);
   return data;
 }
 
@@ -579,7 +580,7 @@ export async function fetchSyncJobs(
   else q = q.limit(50);
 
   const { data, error } = await q;
-  if (error) throw new Error(error.message);
+  if (error) return handleServiceError(error, []);
   return data ?? [];
 }
 
@@ -598,7 +599,7 @@ export async function fetchAllSyncJobs(
   else q = q.limit(50);
 
   const { data, error } = await q;
-  if (error) throw new Error(error.message);
+  if (error) return handleServiceError(error, []);
   return data ?? [];
 }
 
@@ -695,7 +696,7 @@ export async function cancelSyncJob(jobId: string): Promise<void> {
     })
     .eq('id', jobId);
 
-  if (error) throw new Error(error.message);
+  if (error) return handleServiceError(error, []);
 }
 
 // ─── Sync Logs ────────────────────────────────────────────────────────────────
@@ -716,7 +717,7 @@ export async function fetchSyncLogs(
   else q = q.limit(200);
 
   const { data, error } = await q;
-  if (error) throw new Error(error.message);
+  if (error) return handleServiceError(error, []);
   return data ?? [];
 }
 
@@ -738,7 +739,7 @@ export async function fetchCachedData(
   else q = q.limit(100);
 
   const { data, error } = await q;
-  if (error) throw new Error(error.message);
+  if (error) return handleServiceError(error, []);
   return data ?? [];
 }
 
@@ -751,5 +752,5 @@ export async function clearCache(connectionId: string, erpEntity?: string): Prom
   if (erpEntity) q = q.eq('erp_entity', erpEntity);
 
   const { error } = await q;
-  if (error) throw new Error(error.message);
+  if (error) return handleServiceError(error, []);
 }

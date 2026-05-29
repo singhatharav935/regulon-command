@@ -5,6 +5,7 @@
  */
 import { supabase } from '@/integrations/supabase/client';
 import { isValidUUID } from '@/lib/uuid-guard';
+import { handleServiceError } from '@/lib/safe-query';
 
 // ─── Types ────────────────────────────────────────────────────────────────────
 
@@ -168,7 +169,7 @@ export async function fetchApiKeys(caUserId: string): Promise<EnterpriseApiKey[]
     .eq('ca_user_id', caUserId)
     .order('created_at', { ascending: false });
 
-  if (error) throw new Error(error.message);
+  if (error) return handleServiceError(error, []);
   return data ?? [];
 }
 
@@ -268,7 +269,7 @@ export async function fetchApiKeyUsageSummary(
     .eq('ca_user_id', caUserId)
     .order('created_at', { ascending: false });
 
-  if (keysErr) throw new Error(keysErr.message);
+  if (keysErr) return handleServiceError(keysErr, []);
   if (!keys || keys.length === 0) return [];
 
   const keyIds = keys.map((k: any) => k.id);
@@ -279,7 +280,7 @@ export async function fetchApiKeyUsageSummary(
     .in('api_key_id', keyIds)
     .eq('is_active', true);
 
-  if (wcErr) throw new Error(wcErr.message);
+  if (wcErr) return handleServiceError(wcErr, []);
 
   // Count webhooks per key
   const countMap: Record<string, number> = {};
@@ -308,7 +309,7 @@ export async function fetchWebhooks(caUserId: string): Promise<WebhookEndpoint[]
     .eq('ca_user_id', caUserId)
     .order('created_at', { ascending: false });
 
-  if (error) throw new Error(error.message);
+  if (error) return handleServiceError(error, []);
   return data ?? [];
 }
 
@@ -491,7 +492,7 @@ export async function fetchWebhookHealthSummary(
     .select('id, url, is_active')
     .eq('ca_user_id', caUserId);
 
-  if (whErr) throw new Error(whErr.message);
+  if (whErr) return handleServiceError(whErr, []);
   if (!webhooks || webhooks.length === 0) return [];
 
   const webhookIds = webhooks.map((w: any) => w.id);
@@ -501,7 +502,7 @@ export async function fetchWebhookHealthSummary(
     .select('webhook_id, status, response_time_ms')
     .in('webhook_id', webhookIds);
 
-  if (delErr) throw new Error(delErr.message);
+  if (delErr) return handleServiceError(delErr, []);
 
   // Aggregate per webhook
   const statsMap: Record<string, { total: number; success: number; failure: number; totalTime: number; timeCount: number }> = {};
@@ -554,7 +555,7 @@ export async function fetchDeliveries(
   else q = q.limit(100);
 
   const { data, error } = await q;
-  if (error) throw new Error(error.message);
+  if (error) return handleServiceError(error, []);
   return data ?? [];
 }
 
@@ -566,7 +567,7 @@ export async function retryDelivery(deliveryId: string): Promise<WebhookDelivery
     .eq('id', deliveryId)
     .single();
 
-  if (fetchErr) throw new Error(fetchErr.message);
+  if (fetchErr) return handleServiceError(fetchErr, []);
 
   const nextAttempt = (existing.attempt_number ?? 1) + 1;
 
@@ -641,7 +642,7 @@ export async function fetchAccessLogs(
   if (opts?.offset) q = q.range(opts.offset, opts.offset + (opts.limit ?? 100) - 1);
 
   const { data, error } = await q;
-  if (error) throw new Error(error.message);
+  if (error) return handleServiceError(error, []);
   return data ?? [];
 }
 
@@ -656,7 +657,7 @@ export async function fetchRecentActivity(
     .select('id')
     .eq('ca_user_id', caUserId);
 
-  if (keysErr) throw new Error(keysErr.message);
+  if (keysErr) return handleServiceError(keysErr, []);
   if (!keys || keys.length === 0) return [];
 
   const keyIds = keys.map((k: any) => k.id);
@@ -668,6 +669,6 @@ export async function fetchRecentActivity(
     .order('created_at', { ascending: false })
     .limit(limit);
 
-  if (error) throw new Error(error.message);
+  if (error) return handleServiceError(error, []);
   return data ?? [];
 }
