@@ -3,6 +3,7 @@
  * All functions query Supabase directly. No mock data.
  */
 import { supabase } from '@/integrations/supabase/client';
+import { isValidUUID } from '@/lib/uuid-guard';
 
 // ─── Types ───────────────────────────────────────────────────────────────────
 
@@ -123,6 +124,7 @@ export interface GroupComplianceSummary {
 // ─── Entity CRUD ─────────────────────────────────────────────────────────────
 
 export async function fetchEntities(caUserId: string): Promise<Entity[]> {
+  if (!isValidUUID(caUserId)) return [];
   const { data, error } = await (supabase as any)
     .from('entities')
     .select('*')
@@ -168,6 +170,7 @@ export async function deleteEntity(id: string): Promise<void> {
 // ─── Entity Groups ────────────────────────────────────────────────────────────
 
 export async function fetchEntityGroups(caUserId: string): Promise<EntityGroup[]> {
+  if (!isValidUUID(caUserId)) return [];
   const { data: groups, error } = await (supabase as any)
     .from('entity_groups')
     .select('*')
@@ -340,6 +343,7 @@ export async function getGroupComplianceSummary(
 export async function fetchConsolidatedReports(
   caUserId: string
 ): Promise<ConsolidatedReport[]> {
+  if (!isValidUUID(caUserId)) return [];
   const { data, error } = await (supabase as any)
     .from('consolidated_reports')
     .select('*')

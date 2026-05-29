@@ -532,7 +532,7 @@ interface RegulatoryNewsRuleImpactProps {
 export default function RegulatoryNewsRuleImpact({
   isRealDashboard = false,
   aiEnabled = true,
-  caId = 'ca-001'
+  caId = ''
 }: RegulatoryNewsRuleImpactProps) {
   
   const { news, loading, refetch, addNews } = useRegulatoryNewsList();

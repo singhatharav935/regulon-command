@@ -43,7 +43,7 @@ const CA_API = (import.meta.env.VITE_CA_API_BASE_URL as string);
 
 export default function UnifiedReconciliationView({
   isRealDashboard = false,
-  caId = 'ca-001'
+  caId = ''
 }: UnifiedReconciliationProps) {
   const [data, setData] = useState<any[]>([]);
   const [loading, setLoading] = useState(false);

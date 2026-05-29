@@ -1310,7 +1310,7 @@ Generated: ${new Date().toLocaleString()}
 const InhouseCADashboardReal = () => {
   const navigate = useNavigate();
   const { metrics, loading, refetch } = useCAMetrics();
-  const { caId, caFirmId } = useCAIdentity?.() || { caId: 'inhouse-ca-001', caFirmId: 'firm-001' };
+  const { caId, caFirmId } = useCAIdentity();
 
   // Role-based access control
   useEffect(() => {

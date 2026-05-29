@@ -120,7 +120,7 @@ const getAuthorityIcon = (type: string) => {
 
 export default function AuditInspectionSupport({
   isRealDashboard = false,
-  caId = 'ca-001',
+  caId = '',
 }: AuditSupportProps) {
   const [audits, setAudits] = useState<AuditRecord[]>([]);
   const [filteredAudits, setFilteredAudits] = useState<AuditRecord[]>([]);

@@ -4,6 +4,7 @@
  * Supports SMS (Twilio / MSG91 / Kaleyra), Email (SMTP), WhatsApp (Meta / WATI / Twilio)
  */
 import { supabase } from '@/integrations/supabase/client';
+import { isValidUUID } from '@/lib/uuid-guard';
 
 // ─── Types ───────────────────────────────────────────────────────────────────
 
@@ -194,6 +195,7 @@ export function renderTemplate(body: string, variables: Record<string, string>):
 // ─── Channels ────────────────────────────────────────────────────────────────
 
 export async function fetchChannels(caUserId: string): Promise<NotificationChannel[]> {
+  if (!isValidUUID(caUserId)) return [];
   const { data, error } = await (supabase as any)
     .from('notification_channels')
     .select('*')
@@ -256,6 +258,7 @@ export async function testChannel(channelId: string): Promise<{ success: boolean
 // ─── Templates ───────────────────────────────────────────────────────────────
 
 export async function fetchTemplates(caUserId: string): Promise<NotificationTemplate[]> {
+  if (!isValidUUID(caUserId)) return [];
   const { data, error } = await (supabase as any)
     .from('notification_templates')
     .select('*')
@@ -297,6 +300,7 @@ export async function deleteTemplate(id: string): Promise<void> {
 // ─── Alert Rules ─────────────────────────────────────────────────────────────
 
 export async function fetchAlertRules(caUserId: string): Promise<NotificationAlertRule[]> {
+  if (!isValidUUID(caUserId)) return [];
   const { data, error } = await (supabase as any)
     .from('notification_alert_rules')
     .select('*, template:notification_templates(*)')
@@ -338,6 +342,7 @@ export async function deleteAlertRule(id: string): Promise<void> {
 // ─── Recipients ──────────────────────────────────────────────────────────────
 
 export async function fetchRecipients(caUserId: string): Promise<NotificationRecipient[]> {
+  if (!isValidUUID(caUserId)) return [];
   const { data, error } = await (supabase as any)
     .from('notification_recipients')
     .select('*')
@@ -447,6 +452,7 @@ export async function dispatchNotification(payload: {
 // ─── Dispatch Log ────────────────────────────────────────────────────────────
 
 export async function fetchDispatches(caUserId: string, limit = 100): Promise<NotificationDispatch[]> {
+  if (!isValidUUID(caUserId)) return [];
   const { data, error } = await (supabase as any)
     .from('notification_dispatches')
     .select('*, template:notification_templates(template_name, category), recipient:notification_recipients(full_name, email)')
@@ -460,6 +466,7 @@ export async function fetchDispatches(caUserId: string, limit = 100): Promise<No
 // ─── Delivery Stats ───────────────────────────────────────────────────────────
 
 export async function fetchDeliveryStats(caUserId: string, days = 30): Promise<NotificationDeliveryStats[]> {
+  if (!isValidUUID(caUserId)) return [];
   const since = new Date();
   since.setDate(since.getDate() - days);
 
@@ -476,6 +483,11 @@ export async function fetchDeliveryStats(caUserId: string, days = 30): Promise<N
 // ─── Dashboard Aggregation ────────────────────────────────────────────────────
 
 export async function fetchNotificationDashboard(caUserId: string): Promise<NotificationDashboard> {
+  if (!isValidUUID(caUserId)) return {
+    totalChannels: 0, enabledChannels: 0, totalTemplates: 0,
+    activeRules: 0, totalRecipients: 0, dispatchesLast7Days: 0,
+    deliveryRate: 0, channelBreakdown: [],
+  };
   const [channels, templates, rules, recipients, dispatches] = await Promise.all([
     fetchChannels(caUserId),
     fetchTemplates(caUserId),

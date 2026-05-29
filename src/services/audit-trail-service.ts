@@ -4,6 +4,7 @@
  * Immutable audit logs, compliance scores, SOC/board reports, data retention policies.
  */
 import { supabase } from '@/integrations/supabase/client';
+import { isValidUUID } from '@/lib/uuid-guard';
 
 // ─── Types ───────────────────────────────────────────────────────────────────
 
@@ -193,6 +194,7 @@ export async function fetchAuditEvents(
     toDate?: string;
   } = {}
 ): Promise<{ events: AuditTrailEvent[]; total: number }> {
+  if (!isValidUUID(caUserId)) return { events: [], total: 0 };
   let query = (supabase as any)
     .from('audit_trail_events')
     .select('*', { count: 'exact' })
@@ -232,6 +234,7 @@ export async function logAuditEvent(event: Omit<AuditTrailEvent, 'id' | 'event_i
 // ─── Compliance Scores ────────────────────────────────────────────────────────
 
 export async function fetchComplianceScores(caUserId: string): Promise<ComplianceScore[]> {
+  if (!isValidUUID(caUserId)) return [];
   const { data, error } = await (supabase as any)
     .from('compliance_scores')
     .select('*')
@@ -264,6 +267,7 @@ export async function deleteComplianceScore(id: string): Promise<void> {
 // ─── Compliance Reports ───────────────────────────────────────────────────────
 
 export async function fetchComplianceReports(caUserId: string): Promise<ComplianceReport[]> {
+  if (!isValidUUID(caUserId)) return [];
   const { data, error } = await (supabase as any)
     .from('compliance_reports')
     .select('*')
@@ -289,6 +293,7 @@ export async function generateComplianceReport(
     isConfidential?: boolean;
   }
 ): Promise<ComplianceReport> {
+  if (!isValidUUID(caUserId)) throw new Error('Not authenticated');
   // 1. Fetch recent audit events for the period
   const { events } = await fetchAuditEvents(caUserId, {
     fromDate: opts.periodStart,
@@ -420,6 +425,7 @@ export async function deleteReport(id: string): Promise<void> {
 
 export async function fetchRetentionPolicies(caUserId: string): Promise<DataRetentionPolicy[]> {
   // Bootstrap default policies if none exist
+  if (!isValidUUID(caUserId)) return [];
   try {
     await supabase.rpc('bootstrap_retention_policies', { ca_id: caUserId });
   } catch { /* graceful — proceed even if RPC not deployed */ }
@@ -450,6 +456,7 @@ export async function updateRetentionPolicy(
 // ─── Audit Alert Subscriptions ────────────────────────────────────────────────
 
 export async function fetchAuditAlerts(caUserId: string): Promise<AuditAlertSubscription[]> {
+  if (!isValidUUID(caUserId)) return [];
   const { data, error } = await (supabase as any)
     .from('audit_alert_subscriptions')
     .select('*')
@@ -488,6 +495,11 @@ export async function deleteAuditAlert(id: string): Promise<void> {
 // ─── Dashboard Aggregation ────────────────────────────────────────────────────
 
 export async function fetchAuditDashboard(caUserId: string): Promise<AuditDashboard> {
+  if (!isValidUUID(caUserId)) return {
+    totalEvents: 0, criticalEvents: 0, warningEvents: 0,
+    eventsLast24h: 0, eventsLast7d: 0, topModules: [],
+    topActors: [], avgComplianceScore: 0, entitiesBelow70: 0,
+  };
   const now = new Date();
   const yesterday = new Date(now.getTime() - 24 * 60 * 60 * 1000).toISOString();
   const sevenDaysAgo = new Date(now.getTime() - 7 * 24 * 60 * 60 * 1000).toISOString();

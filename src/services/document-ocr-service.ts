@@ -6,6 +6,7 @@
  * No mock data.
  */
 import { supabase } from '@/integrations/supabase/client';
+import { isValidUUID } from '@/lib/uuid-guard';
 
 // ─── Types ────────────────────────────────────────────────────────────────────
 
@@ -189,6 +190,7 @@ export async function fetchDocuments(
   caUserId: string,
   opts?: { category?: DocumentCategory; status?: DocumentStatus; domain?: ComplianceDomain; fy?: string; search?: string; limit?: number }
 ): Promise<DocumentVault[]> {
+  if (!isValidUUID(caUserId)) return [];
   let q = (supabase as any)
     .from('document_vault')
     .select('*')
@@ -209,6 +211,7 @@ export async function fetchDocuments(
 }
 
 export async function fetchDocumentDashboard(caUserId: string): Promise<DocumentDashboard[]> {
+  if (!isValidUUID(caUserId)) return [];
   const { data, error } = await (supabase as any)
     .from('document_vault_dashboard')
     .select('*')
@@ -266,6 +269,7 @@ export async function uploadDocument(
     company_id?: string;
   }
 ): Promise<DocumentVault> {
+  if (!isValidUUID(caUserId)) throw new Error('Not authenticated');
   const fileExt = file.name.split('.').pop()?.toLowerCase() ?? 'bin';
   const storagePath = `${caUserId}/${Date.now()}_${file.name}`;
 
@@ -417,6 +421,7 @@ export async function fetchOcrJobs(
   caUserId: string,
   opts?: { documentId?: string; status?: OcrJobStatus; limit?: number }
 ): Promise<OcrJob[]> {
+  if (!isValidUUID(caUserId)) return [];
   let q = (supabase as any)
     .from('ocr_jobs')
     .select('*')
@@ -445,6 +450,7 @@ export async function triggerOcrJob(
     language_hints?: string[];
   }
 ): Promise<OcrJob> {
+  if (!isValidUUID(caUserId)) throw new Error('Not authenticated');
   const engine = params?.ocr_engine ?? 'google_vision';
   const langs = params?.language_hints ?? ['eng', 'hin'];
 

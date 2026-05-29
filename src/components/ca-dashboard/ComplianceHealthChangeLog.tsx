@@ -124,7 +124,7 @@ const getRiskImpactBadge = (risk: string | undefined) => {
 
 export default function ComplianceHealthChangeLog({
   isRealDashboard = false,
-  caId = 'ca-001',
+  caId = '',
 }: ComplianceHealthChangeLogProps) {
   const [changeLogs, setChangeLogs] = useState<ComplianceChangeLog[]>([]);
   const [filteredLogs, setFilteredLogs] = useState<ComplianceChangeLog[]>([]);

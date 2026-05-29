@@ -3,6 +3,7 @@
  * Real Supabase queries only. No mock data.
  */
 import { supabase } from '@/integrations/supabase/client';
+import { isValidUUID } from '@/lib/uuid-guard';
 
 // ─── Types ───────────────────────────────────────────────────────────────
 
@@ -209,6 +210,7 @@ export async function fetchCalendarEvents(
     entityId?: string;
   }
 ): Promise<CalendarEvent[]> {
+  if (!isValidUUID(caUserId)) return [];
   let query = supabase
     .from('compliance_calendar_events')
     .select('*')
@@ -229,6 +231,7 @@ export async function fetchCalendarEvents(
 }
 
 export async function fetchUpcomingDeadlines(caUserId: string): Promise<CalendarEvent[]> {
+  if (!isValidUUID(caUserId)) return [];
   const { data, error } = await supabase
     .from('upcoming_deadlines_detailed')
     .select('*')
@@ -306,6 +309,7 @@ export async function extendDeadline(
 export async function fetchCalendarDashboard(
   caUserId: string
 ): Promise<CalendarDashboardSummary | null> {
+  if (!isValidUUID(caUserId)) return null;
   const { data, error } = await supabase
     .from('calendar_dashboard_summary')
     .select('*')
@@ -322,6 +326,7 @@ export async function fetchReminders(
   caUserId: string,
   filters?: { eventId?: string; sent?: boolean }
 ): Promise<DeadlineReminder[]> {
+  if (!isValidUUID(caUserId)) return [];
   let query = supabase
     .from('deadline_reminders')
     .select('*')
@@ -396,6 +401,7 @@ export async function deleteReminder(id: string): Promise<void> {
 export async function fetchEscalationRules(
   caUserId: string
 ): Promise<EscalationRule[]> {
+  if (!isValidUUID(caUserId)) return [];
   const { data, error } = await supabase
     .from('escalation_rules')
     .select('*')
@@ -455,6 +461,7 @@ export async function fetchEscalationLogs(
   caUserId: string,
   filters?: { eventId?: string; ruleId?: string; limit?: number }
 ): Promise<EscalationLog[]> {
+  if (!isValidUUID(caUserId)) return [];
   let query = supabase
     .from('escalation_logs')
     .select('*')
@@ -542,6 +549,7 @@ export async function fireEscalation(
 export async function fetchRecurringTemplates(
   caUserId: string
 ): Promise<RecurringTemplate[]> {
+  if (!isValidUUID(caUserId)) return [];
   const { data, error } = await supabase
     .from('recurring_deadline_templates')
     .select('*')
@@ -658,6 +666,7 @@ export async function fetchSLATimers(
   caUserId: string,
   filters?: { eventId?: string; running?: boolean }
 ): Promise<SLATimer[]> {
+  if (!isValidUUID(caUserId)) return [];
   let query = supabase
     .from('deadline_sla_timers')
     .select('*')

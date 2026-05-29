@@ -9,6 +9,7 @@
  * Supabase Edge Functions (when deployed) — the DB layer is fully functional.
  */
 import { supabase } from '@/integrations/supabase/client';
+import { isValidUUID } from '@/lib/uuid-guard';
 
 // ─── Types ────────────────────────────────────────────────────────────────────
 
@@ -246,6 +247,7 @@ export const DEFAULT_FIELD_MAPPINGS: Record<string, { erp_entity: string; erp_fi
 // ─── Connections ──────────────────────────────────────────────────────────────
 
 export async function fetchErpConnections(caUserId: string): Promise<ErpConnection[]> {
+  if (!isValidUUID(caUserId)) return [];
   const { data, error } = await (supabase as any)
     .from('erp_connections')
     .select('*')
@@ -276,6 +278,7 @@ export async function createErpConnection(
     entity_id?: string;
   }
 ): Promise<ErpConnection> {
+  if (!isValidUUID(caUserId)) throw new Error('Not authenticated');
   const { data, error } = await (supabase as any)
     .from('erp_connections')
     .insert([
@@ -415,6 +418,7 @@ export async function testErpConnection(connectionId: string): Promise<{
 export async function fetchConnectionDashboard(
   caUserId: string
 ): Promise<ErpConnectionDashboard[]> {
+  if (!isValidUUID(caUserId)) return [];
   // Try the view first
   const { data: viewData, error: viewErr } = await (supabase as any)
     .from('erp_connection_dashboard')
@@ -583,6 +587,7 @@ export async function fetchAllSyncJobs(
   caUserId: string,
   opts?: { limit?: number }
 ): Promise<ErpSyncJob[]> {
+  if (!isValidUUID(caUserId)) return [];
   let q = (supabase as any)
     .from('erp_sync_jobs')
     .select('*')
@@ -609,6 +614,7 @@ export async function triggerSyncJob(
     entities?: string[];
   }
 ): Promise<ErpSyncJob> {
+  if (!isValidUUID(caUserId)) throw new Error('Not authenticated');
   const syncType = params?.sync_type ?? 'incremental';
   const direction = params?.direction ?? 'pull';
   const entities = params?.entities ?? [];

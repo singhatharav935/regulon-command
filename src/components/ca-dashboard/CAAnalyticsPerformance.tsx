@@ -109,7 +109,7 @@ const getPerformanceColor = (score: number, threshold: { good: number; medium: n
 
 export default function CAAnalyticsPerformance({
   isRealDashboard = false,
-  caId = 'ca-001',
+  caId = '',
 }: CAAnalyticsProps) {
   const [analytics, setAnalytics] = useState<CAAnalytics | null>(null);
   const [loading, setLoading] = useState(false);

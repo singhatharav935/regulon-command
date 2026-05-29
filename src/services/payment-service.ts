@@ -4,6 +4,7 @@
  * No mock data.
  */
 import { supabase } from '@/integrations/supabase/client';
+import { isValidUUID } from '@/lib/uuid-guard';
 
 // ─── Types ────────────────────────────────────────────────────────────────────
 
@@ -149,6 +150,7 @@ export async function fetchLiabilities(
   caUserId: string,
   filters?: { isPaid?: boolean; entityId?: string; taxType?: TaxType }
 ): Promise<TaxLiability[]> {
+  if (!isValidUUID(caUserId)) return [];
   let q = (supabase as any)
     .from('tax_liability_heads')
     .select('*, entities(entity_name, entity_type, gstin, pan)')
@@ -171,6 +173,7 @@ export async function fetchLiabilities(
 }
 
 export async function fetchUpcomingPayments(caUserId: string): Promise<TaxLiability[]> {
+  if (!isValidUUID(caUserId)) return [];
   const { data, error } = await (supabase as any)
     .from('upcoming_payments')
     .select('*')
@@ -329,6 +332,7 @@ export async function fetchPaymentTransactions(
   caUserId: string,
   filters?: { liabilityId?: string; status?: PaymentStatus; entityId?: string }
 ): Promise<PaymentTransaction[]> {
+  if (!isValidUUID(caUserId)) return [];
   let q = (supabase as any)
     .from('payment_transactions')
     .select('*')
@@ -483,6 +487,11 @@ export async function recordManualPayment(
 export async function fetchPaymentDashboardSummary(
   caUserId: string
 ): Promise<PaymentDashboardSummary> {
+  if (!isValidUUID(caUserId)) return {
+    total_liabilities: 0, paid_count: 0, unpaid_count: 0,
+    overdue_count: 0, due_this_week: 0,
+    total_due_paise: 0, total_paid_paise: 0, total_balance_paise: 0,
+  };
   const { data, error } = await (supabase as any)
     .from('payment_dashboard_summary')
     .select('*')
@@ -500,6 +509,7 @@ export async function fetchPaymentDashboardSummary(
 // ─── Reminders ────────────────────────────────────────────────────────────────
 
 export async function fetchReminders(caUserId: string): Promise<PaymentReminder[]> {
+  if (!isValidUUID(caUserId)) return [];
   const { data, error } = await (supabase as any)
     .from('payment_reminders')
     .select('*')
@@ -550,6 +560,7 @@ export async function deleteReminder(id: string): Promise<void> {
 export async function fetchReconciliationEntries(
   caUserId: string
 ): Promise<ReconciliationEntry[]> {
+  if (!isValidUUID(caUserId)) return [];
   const { data, error } = await (supabase as any)
     .from('payment_reconciliation')
     .select('*')
