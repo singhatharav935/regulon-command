@@ -4,6 +4,7 @@
  */
 import { supabase } from '@/integrations/supabase/client';
 import { isValidUUID } from '@/lib/uuid-guard';
+import { handleServiceError } from '@/lib/safe-query';
 
 // ─── Types ────────────────────────────────────────────────────────────────────
 
@@ -134,7 +135,7 @@ export async function fetchCredentials(caUserId: string): Promise<EfilingCredent
     .eq('ca_user_id', caUserId)
     .order('portal', { ascending: true });
 
-  if (error) throw new Error(error.message);
+  if (error) return handleServiceError(error, []);
   return data ?? [];
 }
 
@@ -147,7 +148,7 @@ export async function createCredential(
     .select()
     .single();
 
-  if (error) throw new Error(error.message);
+  if (error) return handleServiceError(error, []);
   return data;
 }
 
@@ -162,7 +163,7 @@ export async function updateCredential(
     .select()
     .single();
 
-  if (error) throw new Error(error.message);
+  if (error) return handleServiceError(error, []);
   return data;
 }
 
@@ -172,7 +173,7 @@ export async function deleteCredential(id: string): Promise<void> {
     .delete()
     .eq('id', id);
 
-  if (error) throw new Error(error.message);
+  if (error) return handleServiceError(error, []);
 }
 
 /**
@@ -224,7 +225,7 @@ export async function fetchFilingJobs(
   if (filters?.entityId) query = query.eq('entity_id', filters.entityId);
 
   const { data, error } = await query.order('created_at', { ascending: false });
-  if (error) throw new Error(error.message);
+  if (error) return handleServiceError(error, []);
   return data ?? [];
 }
 
@@ -235,7 +236,7 @@ export async function fetchFilingJobById(id: string): Promise<EfilingJob> {
     .eq('id', id)
     .single();
 
-  if (error) throw new Error(error.message);
+  if (error) return handleServiceError(error, []);
   return data;
 }
 
@@ -248,7 +249,7 @@ export async function createFilingJob(
     .select()
     .single();
 
-  if (error) throw new Error(error.message);
+  if (error) return handleServiceError(error, []);
   return data;
 }
 
@@ -263,7 +264,7 @@ export async function updateFilingJob(
     .select()
     .single();
 
-  if (error) throw new Error(error.message);
+  if (error) return handleServiceError(error, []);
   return data;
 }
 
@@ -273,7 +274,7 @@ export async function deleteFilingJob(id: string): Promise<void> {
     .delete()
     .eq('id', id);
 
-  if (error) throw new Error(error.message);
+  if (error) return handleServiceError(error, []);
 }
 
 export async function approveFilingJob(
@@ -363,7 +364,7 @@ export async function fetchStatusLogs(jobId: string): Promise<EfilingStatusLog[]
     .eq('job_id', jobId)
     .order('created_at', { ascending: false });
 
-  if (error) throw new Error(error.message);
+  if (error) return handleServiceError(error, []);
   return data ?? [];
 }
 
@@ -376,7 +377,7 @@ export async function fetchJobDocuments(jobId: string): Promise<EfilingDocument[
     .eq('job_id', jobId)
     .order('created_at', { ascending: false });
 
-  if (error) throw new Error(error.message);
+  if (error) return handleServiceError(error, []);
   return data ?? [];
 }
 
@@ -409,7 +410,7 @@ export async function uploadJobDocument(
     .select()
     .single();
 
-  if (error) throw new Error(error.message);
+  if (error) return handleServiceError(error, []);
   return data;
 }
 
@@ -422,7 +423,7 @@ export async function deleteJobDocument(docId: string, filePath?: string): Promi
     .delete()
     .eq('id', docId);
 
-  if (error) throw new Error(error.message);
+  if (error) return handleServiceError(error, []);
 }
 
 // ─── Templates ────────────────────────────────────────────────────────────────
@@ -436,7 +437,7 @@ export async function fetchTemplates(caUserId: string): Promise<EfilingTemplate[
     .eq('is_active', true)
     .order('template_name', { ascending: true });
 
-  if (error) throw new Error(error.message);
+  if (error) return handleServiceError(error, []);
   return data ?? [];
 }
 
@@ -449,7 +450,7 @@ export async function createTemplate(
     .select()
     .single();
 
-  if (error) throw new Error(error.message);
+  if (error) return handleServiceError(error, []);
   return data;
 }
 

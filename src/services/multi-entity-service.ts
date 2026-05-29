@@ -4,6 +4,7 @@
  */
 import { supabase } from '@/integrations/supabase/client';
 import { isValidUUID } from '@/lib/uuid-guard';
+import { handleServiceError } from '@/lib/safe-query';
 
 // ─── Types ───────────────────────────────────────────────────────────────────
 
@@ -131,7 +132,7 @@ export async function fetchEntities(caUserId: string): Promise<Entity[]> {
     .eq('ca_user_id', caUserId)
     .order('entity_name', { ascending: true });
 
-  if (error) throw new Error(error.message);
+  if (error) return handleServiceError(error, []);
   return data ?? [];
 }
 
@@ -142,7 +143,7 @@ export async function createEntity(entity: Partial<Entity>): Promise<Entity> {
     .select()
     .single();
 
-  if (error) throw new Error(error.message);
+  if (error) return handleServiceError(error, []);
   return data;
 }
 
@@ -154,7 +155,7 @@ export async function updateEntity(id: string, updates: Partial<Entity>): Promis
     .select()
     .single();
 
-  if (error) throw new Error(error.message);
+  if (error) return handleServiceError(error, []);
   return data;
 }
 
@@ -164,7 +165,7 @@ export async function deleteEntity(id: string): Promise<void> {
     .delete()
     .eq('id', id);
 
-  if (error) throw new Error(error.message);
+  if (error) return handleServiceError(error, []);
 }
 
 // ─── Entity Groups ────────────────────────────────────────────────────────────
@@ -177,7 +178,7 @@ export async function fetchEntityGroups(caUserId: string): Promise<EntityGroup[]
     .eq('ca_user_id', caUserId)
     .order('group_name', { ascending: true });
 
-  if (error) throw new Error(error.message);
+  if (error) return handleServiceError(error, []);
   if (!groups) return [];
 
   // Enrich with member counts
@@ -204,7 +205,7 @@ export async function createEntityGroup(
     .select()
     .single();
 
-  if (error) throw new Error(error.message);
+  if (error) return handleServiceError(error, []);
   return data;
 }
 
@@ -214,7 +215,7 @@ export async function deleteEntityGroup(id: string): Promise<void> {
     .delete()
     .eq('id', id);
 
-  if (error) throw new Error(error.message);
+  if (error) return handleServiceError(error, []);
 }
 
 // ─── Group Members ────────────────────────────────────────────────────────────
@@ -228,7 +229,7 @@ export async function fetchGroupMembers(
     .eq('group_id', groupId)
     .order('created_at', { ascending: true });
 
-  if (error) throw new Error(error.message);
+  if (error) return handleServiceError(error, []);
   return data ?? [];
 }
 
@@ -249,7 +250,7 @@ export async function addEntityToGroup(
     .select()
     .single();
 
-  if (error) throw new Error(error.message);
+  if (error) return handleServiceError(error, []);
   return data;
 }
 
@@ -263,7 +264,7 @@ export async function removeEntityFromGroup(
     .eq('group_id', groupId)
     .eq('entity_id', entityId);
 
-  if (error) throw new Error(error.message);
+  if (error) return handleServiceError(error, []);
 }
 
 // ─── Compliance Snapshots ─────────────────────────────────────────────────────
@@ -302,7 +303,7 @@ export async function upsertComplianceSnapshot(
     .select()
     .single();
 
-  if (error) throw new Error(error.message);
+  if (error) return handleServiceError(error, []);
   return data;
 }
 
@@ -350,7 +351,7 @@ export async function fetchConsolidatedReports(
     .eq('ca_user_id', caUserId)
     .order('created_at', { ascending: false });
 
-  if (error) throw new Error(error.message);
+  if (error) return handleServiceError(error, []);
   return data ?? [];
 }
 
@@ -469,7 +470,7 @@ export async function generateConsolidatedReport(
     .select()
     .single();
 
-  if (error) throw new Error(error.message);
+  if (error) return handleServiceError(error, []);
   return data;
 }
 
@@ -482,5 +483,5 @@ export async function updateReportStatus(
     .update({ status })
     .eq('id', reportId);
 
-  if (error) throw new Error(error.message);
+  if (error) return handleServiceError(error, []);
 }

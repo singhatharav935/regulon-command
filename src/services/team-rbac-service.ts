@@ -4,6 +4,7 @@
  */
 import { supabase } from '@/integrations/supabase/client';
 import { isValidUUID } from '@/lib/uuid-guard';
+import { handleServiceError, isNonCriticalError } from '@/lib/safe-query';
 
 // ─── Types ───────────────────────────────────────────────────────────────────
 
@@ -94,13 +95,13 @@ export async function bootstrapRbac(caUserId: string): Promise<void> {
   try {
     const { error } = await supabase.rpc('bootstrap_ca_rbac_system', { ca_id: caUserId });
     if (error) {
-      console.warn('RPC bootstrap fallback triggered:', error.message);
-      // Fallback: Check if roles exist, if not, create them via client inserts
+      if (isNonCriticalError(error)) return; // RLS recursion or missing table — skip silently
+      // Non-critical RPC errors — try fallback
       await fallbackBootstrap(caUserId);
     }
   } catch (err: any) {
-    console.error('Failed to bootstrap RBAC:', err);
-    await fallbackBootstrap(caUserId);
+    // Fallback also gracefully — don't propagate
+    try { await fallbackBootstrap(caUserId); } catch { /* skip */ }
   }
 }
 
@@ -180,7 +181,7 @@ export async function fetchTeams(caUserId: string): Promise<RbacTeam[]> {
     .eq('ca_user_id', caUserId)
     .order('team_name', { ascending: true });
 
-  if (error) throw new Error(error.message);
+  if (error) return handleServiceError(error, []);
   if (!teams) return [];
 
   // Enrich with member counts
@@ -390,7 +391,7 @@ export async function fetchRoles(caUserId: string): Promise<RbacRole[]> {
     .eq('ca_user_id', caUserId)
     .order('role_name', { ascending: true });
 
-  if (error) throw new Error(error.message);
+  if (error) return handleServiceError(error, []);
   return data ?? [];
 }
 
