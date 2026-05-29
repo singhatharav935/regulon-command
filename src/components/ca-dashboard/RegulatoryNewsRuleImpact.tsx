@@ -1,198 +1,42 @@
-import React, { useState, useEffect, useCallback } from 'react';
+/**
+ * RegulatoryNewsRuleImpact — Version-Control & Change-Log of Regulatory Text (Gap 5)
+ * Full Supabase database integration. No mock data.
+ */
+import React, { useState, useEffect, useCallback, useMemo } from 'react';
 import { CASectionAgentBadge } from '../agents/CASectionAgentBadge';
 import { motion, AnimatePresence } from 'framer-motion';
 import {
-  Scale,
-  Calendar,
-  AlertTriangle,
-  FileText,
-  Bell,
-  RefreshCw,
-  ExternalLink,
-  Filter,
-  Search,
-  Bot,
-  Zap,
-  Activity,
-  Shield,
-  Building2,
-  Clock,
-  ChevronDown,
-  ChevronUp,
-  Bookmark,
-  Share2,
-  Download,
-  TrendingUp,
-  Globe,
-  Gavel,
-  AlertCircle,
-  CheckCircle,
-  Info,
+  Scale, Calendar, AlertTriangle, FileText, Bell, RefreshCw, ExternalLink,
+  Filter, Search, Bot, Zap, Activity, Shield, Building2, Clock, ChevronDown,
+  ChevronUp, Bookmark, Share2, Download, TrendingUp, Globe, Gavel, AlertCircle,
+  CheckCircle, Info, History, ArrowRight, Save, Plus, ArrowLeftRight, Check, Send
 } from 'lucide-react';
 import { Badge } from '@/components/ui/badge';
 import { Button } from '@/components/ui/button';
-import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
+import { Card, CardContent, CardHeader, CardTitle, CardDescription } from '@/components/ui/card';
 import { Input } from '@/components/ui/input';
+import { Textarea } from '@/components/ui/textarea';
+import { Label } from '@/components/ui/label';
 import {
-  Select,
-  SelectContent,
-  SelectItem,
-  SelectTrigger,
-  SelectValue,
+  Select, SelectContent, SelectItem, SelectTrigger, SelectValue
 } from '@/components/ui/select';
+import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogTrigger, DialogFooter } from '@/components/ui/dialog';
+import { toast } from 'sonner';
 
-// Types
-interface RegulatoryNews {
-  id: string;
-  title: string;
-  authority: string;
-  authorityCode: string;
-  category: 'law_amendment' | 'new_regulation' | 'circular' | 'notification' | 'guideline' | 'penalty_update';
-  effectiveDate: string;
-  publishedDate: string;
-  summary: string;
-  fullText?: string;
-  sourceUrl: string;
-  impactLevel: 'critical' | 'high' | 'medium' | 'low';
-  affectedSectors: string[];
-  affectedCompanyTypes: string[];
-  requiredActions: string[];
-  penaltyInfo?: {
-    maxPenalty: string;
-    lateFilingFee?: string;
-  };
-  relatedFilings?: string[];
-  isBookmarked?: boolean;
-  aiSummary?: string;
-  aiImpactAnalysis?: string;
-}
+import { useCAIdentity } from '@/hooks/useCAIdentity';
+import {
+  useRegulatoryNewsList,
+  useRegulatoryNewsVersions,
+  useCompanyEvaluations
+} from '@/hooks/useRegulatoryVersion';
 
-interface RegulatoryNewsRuleImpactProps {
-  isRealDashboard?: boolean;
-  apiEndpoint?: string;
-  aiEnabled?: boolean;
-  caId?: string;
-}
+// ─── Constants & Metadata ───────────────────────────────────────────────────
 
-
-// Demo data for CA Demo Dashboard
-const DEMO_REGULATORY_NEWS: RegulatoryNews[] = [
-  {
-    id: 'reg-001',
-    title: '📜 DPDP Act 2023 - Data Principal Rights Implementation',
-    authority: 'Ministry of Electronics & IT',
-    authorityCode: 'MEITY',
-    category: 'new_regulation',
-    effectiveDate: '2026-04-01',
-    publishedDate: '2026-03-15',
-    summary: 'New data protection regulations requiring explicit consent mechanisms, data portability rights, and right to erasure for all data principals.',
-    sourceUrl: 'https://www.meity.gov.in/data-protection-framework',
-    impactLevel: 'critical',
-    affectedSectors: ['IT Services', 'E-commerce', 'Healthcare', 'BFSI'],
-    affectedCompanyTypes: ['Private Limited', 'LLP', 'Public Limited'],
-    requiredActions: [
-      'Update privacy policies',
-      'Implement consent management systems',
-      'Establish data grievance mechanisms',
-      'Conduct data mapping exercises',
-    ],
-    penaltyInfo: {
-      maxPenalty: '₹250 Crore',
-      lateFilingFee: '₹200 per day',
-    },
-    relatedFilings: ['DPO Registration', 'Annual Data Audit Report'],
-    aiSummary: 'Critical compliance update requiring immediate action for all data-handling entities.',
-    aiImpactAnalysis: 'High impact on IT and e-commerce sectors. Estimated 60% of your clients need to update systems.',
-  },
-  {
-    id: 'reg-002',
-    title: '🏛️ MCA Amendment - ESG Disclosure Requirements for Listed Companies',
-    authority: 'Ministry of Corporate Affairs',
-    authorityCode: 'MCA',
-    category: 'law_amendment',
-    effectiveDate: '2026-07-01',
-    publishedDate: '2026-03-10',
-    summary: 'Mandatory ESG (Environmental, Social, Governance) reporting for all listed companies and large unlisted companies with turnover exceeding ₹500 Cr.',
-    sourceUrl: 'https://www.mca.gov.in',
-    impactLevel: 'high',
-    affectedSectors: ['Manufacturing', 'Energy', 'Mining', 'All Listed'],
-    affectedCompanyTypes: ['Public Listed', 'Large Private'],
-    requiredActions: [
-      'Prepare BRSR (Business Responsibility & Sustainability Report)',
-      'Board attestation on ESG compliance',
-      'Third-party ESG audit',
-      'Carbon footprint assessment',
-    ],
-    penaltyInfo: {
-      maxPenalty: '₹25 Lakh + Directors liability',
-    },
-    relatedFilings: ['BRSR Report', 'ESG Audit Certificate'],
-    aiSummary: 'ESG disclosure now mandatory for large companies. Plan sustainability reporting early.',
-    aiImpactAnalysis: 'Affects 35% of your listed company clients. Recommend starting ESG audit process immediately.',
-  },
-  {
-    id: 'reg-003',
-    title: '💰 GST Council - New Rate Structure for IT Services',
-    authority: 'GST Council / CBIC',
-    authorityCode: 'GST',
-    category: 'circular',
-    effectiveDate: '2026-03-01',
-    publishedDate: '2026-02-20',
-    summary: 'Revised GST rates for IT services: SaaS products now at 12% (down from 18%), while consulting services remain at 18%. New compliance requirements for e-invoicing.',
-    sourceUrl: 'https://cbic-gst.gov.in',
-    impactLevel: 'medium',
-    affectedSectors: ['IT Services', 'Software Development', 'Consulting'],
-    affectedCompanyTypes: ['All'],
-    requiredActions: [
-      'Update invoicing systems with new rates',
-      'Revise client contracts',
-      'File transitional returns',
-      'Update accounting software',
-    ],
-    penaltyInfo: {
-      maxPenalty: '₹10,000 or tax amount (whichever higher)',
-      lateFilingFee: '₹50 per day (max ₹10,000)',
-    },
-    relatedFilings: ['GSTR-1', 'GSTR-3B', 'ITC-04'],
-    aiSummary: 'Beneficial rate reduction for SaaS. Update systems before effective date.',
-    aiImpactAnalysis: '45% of IT clients benefit from rate reduction. Action needed on invoicing systems.',
-  },
-  {
-    id: 'reg-004',
-    title: '🏦 RBI Guidelines - Digital Lending Framework Update',
-    authority: 'Reserve Bank of India',
-    authorityCode: 'RBI',
-    category: 'guideline',
-    effectiveDate: '2026-05-15',
-    publishedDate: '2026-03-01',
-    summary: 'Enhanced KYC requirements for digital lending platforms. All NBFC-connected apps must implement Video KYC and real-time consent tracking.',
-    sourceUrl: 'https://www.rbi.org.in/Scripts/BS_ViewMasterDirections.aspx',
-    impactLevel: 'high',
-    affectedSectors: ['FinTech', 'NBFC', 'Digital Lending'],
-    affectedCompanyTypes: ['NBFC', 'FinTech Companies'],
-    requiredActions: [
-      'Implement Video KYC systems',
-      'Establish real-time consent tracking',
-      'Update loan documentation',
-      'Submit compliance report to RBI',
-    ],
-    penaltyInfo: {
-      maxPenalty: 'License cancellation + ₹2 Crore',
-    },
-    relatedFilings: ['RBI Compliance Report', 'KYC Audit Certificate'],
-    aiSummary: 'Strict new guidelines for digital lenders. Non-compliance risks license.',
-    aiImpactAnalysis: '12% of fintech clients need immediate action. High risk of license issues.',
-  },
-];
-
-// LIVE Regulatory News is now fetched entirely from the Supabase Edge Function (regulatory-news)
-
-// Government portal sources
 const GOVERNMENT_PORTALS = [
   { code: 'MCA', name: 'Ministry of Corporate Affairs', url: 'https://www.mca.gov.in', icon: '🏛️' },
   { code: 'GST', name: 'GST Council / CBIC', url: 'https://cbic-gst.gov.in', icon: '💰' },
   { code: 'RBI', name: 'Reserve Bank of India', url: 'https://www.rbi.org.in', icon: '🏦' },
-  { code: 'SEBI', name: 'Securities & Exchange Board', url: 'https://www.sebi.gov.in/sebiweb/home/HomeAction.do?doListing=yes&sid=1&ssid=7&smid=0', icon: '📈' },
+  { code: 'SEBI', name: 'Securities & Exchange Board', url: 'https://www.sebi.gov.in', icon: '📈' },
   { code: 'MEITY', name: 'Ministry of Electronics & IT', url: 'https://www.meity.gov.in', icon: '💻' },
   { code: 'MoF', name: 'Ministry of Finance', url: 'https://finmin.nic.in', icon: '💵' },
   { code: 'EPFO', name: 'Employees PF Organization', url: 'https://www.epfindia.gov.in', icon: '👥' },
@@ -202,749 +46,983 @@ const GOVERNMENT_PORTALS = [
   { code: 'ROC', name: 'Registrar of Companies', url: 'https://www.mca.gov.in', icon: '📋' },
   { code: 'LOCAL', name: 'State Commercial Tax Depts', url: 'https://www.gst.gov.in', icon: '🏙️' },
   { code: 'MSME', name: 'Ministry of MSME', url: 'https://msme.gov.in', icon: '🏭' },
-  { code: 'GST Council', name: 'GST Council', url: 'https://gstcouncil.gov.in', icon: '💰' },
 ];
 
-import { getLiveRegulatoryNews } from '@/services/ca-supabase-service';
+const CATEGORY_META: Record<string, { icon: React.ReactNode; label: string; color: string }> = {
+  law_amendment:  { icon: <Gavel className="w-3.5 h-3.5" />, label: 'Law Amendment',  color: 'bg-purple-500/20 text-purple-400' },
+  new_regulation: { icon: <Scale className="w-3.5 h-3.5" />, label: 'New Regulation', color: 'bg-blue-500/20 text-blue-400' },
+  circular:       { icon: <FileText className="w-3.5 h-3.5" />, label: 'Circular',       color: 'bg-cyan-500/20 text-cyan-400' },
+  notification:   { icon: <Bell className="w-3.5 h-3.5" />, label: 'Notification',   color: 'bg-indigo-500/20 text-indigo-400' },
+  guideline:      { icon: <Info className="w-3.5 h-3.5" />, label: 'Guideline',      color: 'bg-teal-500/20 text-teal-400' },
+  penalty_update: { icon: <AlertCircle className="w-3.5 h-3.5" />, label: 'Penalty Update', color: 'bg-red-500/20 text-red-400' },
+};
+
+const IMPACT_META: Record<string, { emoji: string; label: string; color: string; border: string }> = {
+  critical: { emoji: '🚨', label: 'CRITICAL', color: 'bg-red-500/20 text-red-400', border: 'border-red-500/30' },
+  high:     { emoji: '⚠️', label: 'HIGH',     color: 'bg-orange-500/20 text-orange-400', border: 'border-orange-500/30' },
+  medium:   { emoji: '🟡', label: 'MEDIUM',   color: 'bg-yellow-500/20 text-yellow-400', border: 'border-yellow-500/30' },
+  low:      { emoji: '🟢', label: 'LOW',      color: 'bg-green-500/20 text-green-400', border: 'border-green-500/30' },
+};
+
+// ─── Details Tab Component ───────────────────────────────────────────────────
+
+const DetailsTab = ({ item, isRealDashboard }: { item: any; isRealDashboard: boolean }) => {
+  const portal = GOVERNMENT_PORTALS.find(p => p.code === item.authorityCode);
+  return (
+    <div className="space-y-4 pt-3 text-sm">
+      <p className="text-muted-foreground leading-relaxed">{item.summary}</p>
+      
+      {item.full_text && (
+        <div className="mt-3 p-3 bg-card/25 border border-border/20 rounded-lg max-h-[160px] overflow-y-auto font-mono text-xs whitespace-pre-wrap text-muted-foreground">
+          {item.full_text}
+        </div>
+      )}
+
+      {isRealDashboard && item.aiImpactAnalysis && (
+        <div className="p-3 rounded-lg bg-purple-500/10 border border-purple-500/20">
+          <div className="flex items-center gap-2 mb-1.5">
+            <Bot className="w-4 h-4 text-purple-400 animate-pulse" />
+            <span className="text-xs font-bold text-purple-400 uppercase tracking-wider">AI Impact Analysis</span>
+          </div>
+          <p className="text-xs leading-relaxed text-purple-200">{item.aiImpactAnalysis}</p>
+        </div>
+      )}
+
+      <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+        <div className="space-y-2">
+          <h5 className="text-xs text-muted-foreground font-semibold uppercase tracking-wider">Affected Sectors</h5>
+          <div className="flex flex-wrap gap-1.5">
+            {item.affectedSectors?.map((s: string) => (
+              <Badge key={s} variant="outline" className="text-xs py-0.5">{s}</Badge>
+            )) || <span className="text-xs text-muted-foreground">All Sectors</span>}
+          </div>
+        </div>
+
+        <div className="space-y-2">
+          <h5 className="text-xs text-muted-foreground font-semibold uppercase tracking-wider">Company Scope</h5>
+          <div className="flex flex-wrap gap-1.5">
+            {item.affectedCompanyTypes?.map((c: string) => (
+              <Badge key={c} variant="outline" className="text-xs py-0.5">{c}</Badge>
+            )) || <span className="text-xs text-muted-foreground">All Company Types</span>}
+          </div>
+        </div>
+      </div>
+
+      <div className="space-y-2">
+        <h5 className="text-xs text-muted-foreground font-semibold uppercase tracking-wider">Required CA Action Checklists</h5>
+        <div className="space-y-1">
+          {item.requiredActions?.map((act: string, idx: number) => (
+            <div key={idx} className="flex items-start gap-2 text-xs">
+              <span className="text-green-400 font-bold">✓</span>
+              <span>{act}</span>
+            </div>
+          )) || <span className="text-xs text-muted-foreground">No specific actions required.</span>}
+        </div>
+      </div>
+
+      {item.penaltyInfo?.maxPenalty && (
+        <div className="p-3 rounded-lg bg-red-500/10 border border-red-500/20 text-xs">
+          <div className="flex items-center gap-2 text-red-400 font-semibold mb-1">
+            <AlertTriangle className="w-4 h-4" /> Penalty Information
+          </div>
+          <p><strong>Max Fine:</strong> {item.penaltyInfo.maxPenalty}</p>
+          {item.penaltyInfo.lateFilingFee && <p className="mt-1"><strong>Late Filing Fee:</strong> {item.penaltyInfo.lateFilingFee}</p>}
+        </div>
+      )}
+    </div>
+  );
+};
+
+// ─── Version History & Diffs Tab ─────────────────────────────────────────────
+
+const HistoryTab = ({ newsId, currentItem }: { newsId: string; currentItem: any }) => {
+  const { versions, loading } = useRegulatoryNewsVersions(newsId);
+  const [selectedPrevVersion, setSelectedPrevVersion] = useState<number | null>(null);
+
+  const prevItem = useMemo(() => {
+    if (!selectedPrevVersion || !versions.length) return null;
+    return versions.find(v => v.version === selectedPrevVersion);
+  }, [selectedPrevVersion, versions]);
+
+  if (loading) {
+    return <div className="flex justify-center py-8"><RefreshCw className="w-6 h-6 animate-spin text-cyan-400" /></div>;
+  }
+
+  return (
+    <div className="space-y-5 pt-3">
+      <div className="grid grid-cols-1 md:grid-cols-3 gap-5">
+        
+        {/* Version list timeline */}
+        <div className="md:col-span-1 border-r border-border/30 pr-4 space-y-3">
+          <h5 className="text-xs text-muted-foreground font-semibold uppercase tracking-wider mb-3">Version History Log</h5>
+          <div className="space-y-2 max-h-[300px] overflow-y-auto">
+            
+            {/* Active Version */}
+            <div
+              onClick={() => setSelectedPrevVersion(null)}
+              className={`p-3 rounded-lg border cursor-pointer transition-all ${
+                selectedPrevVersion === null 
+                  ? 'border-cyan-500 bg-cyan-500/5' 
+                  : 'border-border/30 bg-card/20 hover:bg-card/40'
+              }`}
+            >
+              <div className="flex justify-between items-center mb-1">
+                <span className="text-xs font-bold text-cyan-400">Version {currentItem.version} (Active)</span>
+                <Badge className="bg-green-500/20 text-green-400 text-[9px]">Active</Badge>
+              </div>
+              <p className="text-[11px] text-muted-foreground truncate">{currentItem.change_summary || 'Current active rule'}</p>
+            </div>
+
+            {/* Historical versions */}
+            {versions.map(v => (
+              <div
+                key={v.id}
+                onClick={() => setSelectedPrevVersion(v.version)}
+                className={`p-3 rounded-lg border cursor-pointer transition-all ${
+                  selectedPrevVersion === v.version 
+                    ? 'border-cyan-500 bg-cyan-500/5' 
+                    : 'border-border/30 bg-card/20 hover:bg-card/40'
+                }`}
+              >
+                <div className="flex justify-between items-center mb-1">
+                  <span className="text-xs font-bold">Version {v.version}</span>
+                  <span className="text-[10px] text-muted-foreground">{new Date(v.created_at).toLocaleDateString('en-IN')}</span>
+                </div>
+                <p className="text-[11px] text-muted-foreground line-clamp-1">{v.change_summary}</p>
+              </div>
+            ))}
+          </div>
+        </div>
+
+        {/* Change diff panel */}
+        <div className="md:col-span-2 space-y-4">
+          {selectedPrevVersion === null ? (
+            <div className="p-8 text-center border border-dashed border-border/20 rounded-xl text-muted-foreground">
+              <History className="w-8 h-8 mx-auto mb-2 opacity-35 text-cyan-400" />
+              <p className="text-xs font-semibold">Select a previous version on the left to compare change logs and text diffs.</p>
+            </div>
+          ) : prevItem ? (
+            <div className="space-y-4">
+              <div className="p-3 bg-purple-500/5 border border-purple-500/20 rounded-lg flex items-center justify-between text-xs">
+                <div className="flex items-center gap-2">
+                  <ArrowLeftRight className="w-4 h-4 text-purple-400" />
+                  <span className="font-semibold">Comparing Version {prevItem.version}</span>
+                  <ArrowRight className="w-3.5 h-3.5 text-muted-foreground" />
+                  <span className="font-semibold text-cyan-400">Version {currentItem.version} (Active)</span>
+                </div>
+              </div>
+
+              {/* Compare attributes */}
+              <div className="space-y-3 max-h-[350px] overflow-y-auto pr-2">
+                {[
+                  { field: 'Title', prev: prevItem.title, curr: currentItem.title },
+                  { field: 'Effective Date', prev: prevItem.effective_date, curr: currentItem.effective_date },
+                  { field: 'Summary', prev: prevItem.summary, curr: currentItem.summary },
+                  { field: 'Penalty Max', prev: prevItem.penalty_max || 'None', curr: currentItem.penaltyInfo?.maxPenalty || 'None' },
+                  { field: 'Required Actions', prev: prevItem.required_actions?.join(', '), curr: currentItem.requiredActions?.join(', ') }
+                ].map(diff => {
+                  const hasChanged = diff.prev !== diff.curr;
+                  return (
+                    <div key={diff.field} className="border border-border/20 rounded-lg overflow-hidden text-xs">
+                      <div className={`p-2 font-semibold flex justify-between ${hasChanged ? 'bg-amber-500/10 text-amber-400' : 'bg-card/40 text-muted-foreground'}`}>
+                        <span>{diff.field}</span>
+                        {hasChanged && <Badge className="bg-amber-500/20 text-amber-400 text-[9px]">Modified</Badge>}
+                      </div>
+                      
+                      <div className="grid grid-cols-2 divide-x divide-border/20 bg-card/10">
+                        <div className="p-3 text-red-400 bg-red-950/10 space-y-1">
+                          <p className="text-[9px] text-muted-foreground uppercase font-bold">Before</p>
+                          <p className="leading-relaxed">{diff.prev}</p>
+                        </div>
+                        <div className="p-3 text-green-400 bg-green-950/10 space-y-1">
+                          <p className="text-[9px] text-muted-foreground uppercase font-bold">After</p>
+                          <p className="leading-relaxed">{diff.curr}</p>
+                        </div>
+                      </div>
+                    </div>
+                  );
+                })}
+              </div>
+            </div>
+          ) : null}
+        </div>
+      </div>
+    </div>
+  );
+};
+
+// ─── Matched Clients Tab Component ───────────────────────────────────────────
+
+const ClientsTab = ({ newsId }: { newsId: string }) => {
+  const { evaluations, loading, changeStatus, notifyClient } = useCompanyEvaluations(newsId);
+  const [selectedEval, setSelectedEval] = useState<any | null>(null);
+  const [evalStatus, setEvalStatus] = useState<'compliant' | 'action_required' | 'non_compliant'>('compliant');
+  const [evalNotes, setEvalNotes] = useState('');
+
+  if (loading) {
+    return <div className="flex justify-center py-8"><RefreshCw className="w-6 h-6 animate-spin text-indigo-400" /></div>;
+  }
+
+  const getStatusBadge = (status: string) => {
+    switch (status) {
+      case 'compliant': return <Badge className="bg-green-500/20 text-green-400">Compliant</Badge>;
+      case 'action_required': return <Badge className="bg-orange-500/20 text-orange-400">Action Required</Badge>;
+      case 'non_compliant': return <Badge className="bg-red-500/20 text-red-400">Non-Compliant</Badge>;
+      default: return <Badge className="bg-gray-500/20 text-gray-400">Pending Review</Badge>;
+    }
+  };
+
+  const handleUpdateStatus = async () => {
+    if (!selectedEval) return;
+    try {
+      await changeStatus(selectedEval.id, evalStatus, evalNotes);
+      setSelectedEval(null);
+      setEvalNotes('');
+    } catch {}
+  };
+
+  return (
+    <div className="space-y-4 pt-3">
+      <div className="flex justify-between items-center mb-1">
+        <h5 className="text-xs text-muted-foreground font-semibold uppercase tracking-wider">Re-evaluated Client Impacts</h5>
+        <Badge variant="outline" className="text-[10px]">{evaluations.length} Matched Clients</Badge>
+      </div>
+
+      {evaluations.length === 0 ? (
+        <div className="text-center py-12 border border-dashed border-border/20 rounded-xl text-muted-foreground bg-card/10">
+          <Building2 className="w-8 h-8 mx-auto mb-2 opacity-25" />
+          No client companies matched the industry or company type filters of this rule yet.
+        </div>
+      ) : (
+        <div className="rounded-xl border border-border/30 overflow-hidden bg-card/10">
+          <Table>
+            <TableHeader>
+              <TableRow className="bg-card/50 border-border/40 text-xs">
+                <TableHead className="text-muted-foreground">Client Name</TableHead>
+                <TableHead className="text-muted-foreground">Sector / Industry</TableHead>
+                <TableHead className="text-muted-foreground">Re-evaluation Trigger</TableHead>
+                <TableHead className="text-muted-foreground text-center">Compliance Status</TableHead>
+                <TableHead className="text-muted-foreground text-center">Notification Status</TableHead>
+                <TableHead className="text-muted-foreground text-right">Actions</TableHead>
+              </TableRow>
+            </TableHeader>
+            <TableBody className="text-xs">
+              {evaluations.map(ev => (
+                <TableRow key={ev.id} className="border-border/20 hover:bg-card/20">
+                  <TableCell className="font-semibold py-2.5">{ev.company_name}</TableCell>
+                  <TableCell className="py-2.5">{ev.company_industry}</TableCell>
+                  <TableCell className="py-2.5 text-muted-foreground max-w-[200px] truncate" title={ev.matched_reason}>
+                    {ev.matched_reason}
+                  </TableCell>
+                  <TableCell className="py-2.5 text-center">{getStatusBadge(ev.evaluation_status)}</TableCell>
+                  <TableCell className="py-2.5 text-center">
+                    {ev.notification_sent ? (
+                      <Badge className="bg-green-500/10 text-green-400 border border-green-500/20 gap-1">
+                        <Check className="w-3 h-3" /> Alert Sent
+                      </Badge>
+                    ) : (
+                      <Badge variant="outline" className="text-muted-foreground">Unnotified</Badge>
+                    )}
+                  </TableCell>
+                  <TableCell className="py-2.5 text-right">
+                    <div className="flex justify-end gap-1.5">
+                      <Button
+                        size="sm"
+                        className="h-6 text-[10px] bg-indigo-600 hover:bg-indigo-700 text-white"
+                        onClick={() => {
+                          setSelectedEval(ev);
+                          setEvalStatus(ev.evaluation_status === 'pending_review' ? 'compliant' : ev.evaluation_status as any);
+                          setEvalNotes(ev.notes || '');
+                        }}
+                      >
+                        Evaluate
+                      </Button>
+                      
+                      {!ev.notification_sent && (
+                        <Button
+                          size="icon"
+                          variant="ghost"
+                          className="h-6 w-6 text-cyan-400 hover:bg-cyan-500/10"
+                          onClick={() => notifyClient(ev.id)}
+                        >
+                          <Send className="w-3.5 h-3.5" />
+                        </Button>
+                      )}
+                    </div>
+                  </TableCell>
+                </TableRow>
+              ))}
+            </TableBody>
+          </Table>
+        </div>
+      )}
+
+      {/* Evaluate Status Dialog */}
+      <Dialog open={!!selectedEval} onOpenChange={o => !o && setSelectedEval(null)}>
+        <DialogContent className="bg-background border-border/50 max-w-sm">
+          <DialogHeader>
+            <DialogTitle className="text-indigo-400 flex items-center gap-2 text-sm font-bold">
+              <Building2 className="w-4 h-4" /> Evaluate Client Compliance
+            </DialogTitle>
+          </DialogHeader>
+          {selectedEval && (
+            <div className="space-y-4 pt-2 text-xs">
+              <div className="p-3 rounded-lg bg-card/30 border border-border/30 text-xs">
+                <p className="font-semibold text-foreground">{selectedEval.company_name}</p>
+                <p className="text-muted-foreground mt-0.5">Matched reason: {selectedEval.matched_reason}</p>
+              </div>
+
+              <div className="space-y-1">
+                <Label className="text-[10px] text-muted-foreground uppercase font-bold">Compliance Status *</Label>
+                <Select value={evalStatus} onValueChange={v => setEvalStatus(v as any)}>
+                  <SelectTrigger className="bg-card/50 border-border/50">
+                    <SelectValue />
+                  </SelectTrigger>
+                  <SelectContent className="text-xs">
+                    <SelectItem value="compliant">Compliant</SelectItem>
+                    <SelectItem value="action_required">Action Required</SelectItem>
+                    <SelectItem value="non_compliant">Non-Compliant</SelectItem>
+                  </SelectContent>
+                </Select>
+              </div>
+
+              <div className="space-y-1">
+                <Label className="text-[10px] text-muted-foreground uppercase font-bold">Audit Evaluation Notes</Label>
+                <Textarea
+                  value={evalNotes}
+                  onChange={e => setEvalNotes(e.target.value)}
+                  placeholder="Record specific audit notes or checklist compliance steps..."
+                  className="bg-card/50 border-border/50 h-20 text-xs"
+                />
+              </div>
+
+              <div className="flex gap-2">
+                <Button className="flex-1 bg-indigo-600 hover:bg-indigo-700 text-white" onClick={handleUpdateStatus}>
+                  Save Audit Status
+                </Button>
+                <Button variant="outline" onClick={() => setSelectedEval(null)}>Cancel</Button>
+              </div>
+            </div>
+          )}
+        </DialogContent>
+      </Dialog>
+    </div>
+  );
+};
+
+// ─── Amend Circular Tab Component ────────────────────────────────────────────
+
+const AmendTab = ({ item, onUpdateSuccess }: { item: any; onUpdateSuccess: () => void }) => {
+  const [form, setForm] = useState({
+    title: item.title,
+    summary: item.summary,
+    full_text: item.full_text || '',
+    effective_date: item.effectiveDate,
+    published_date: item.publishedDate,
+    impact_level: item.impactLevel,
+    penalty_max: item.penaltyInfo?.maxPenalty || '',
+    penalty_late_fee: item.penaltyInfo?.lateFilingFee || '',
+    change_summary: ''
+  });
+  const [saving, setSaving] = useState(false);
+  const { editNews } = useRegulatoryNewsList();
+
+  const handleAmend = async (e: React.FormEvent) => {
+    e.preventDefault();
+    if (!form.change_summary) {
+      toast.error('Change summary log is required for version control audits');
+      return;
+    }
+
+    setSaving(true);
+    try {
+      await editNews(item.id, {
+        title: form.title,
+        summary: form.summary,
+        full_text: form.full_text,
+        effective_date: form.effective_date,
+        published_date: form.published_date,
+        impact_level: form.impact_level,
+        penalty_max: form.penalty_max,
+        penalty_late_fee: form.penalty_late_fee
+      } as any, form.change_summary);
+      
+      onUpdateSuccess();
+    } catch {}
+    setSaving(false);
+  };
+
+  return (
+    <form onSubmit={handleAmend} className="space-y-4 pt-3 text-xs max-h-[400px] overflow-y-auto pr-1">
+      <div className="grid grid-cols-2 gap-3">
+        <div className="col-span-2">
+          <Label className="text-[10px] text-muted-foreground uppercase font-bold">Circular Title *</Label>
+          <Input required value={form.title} onChange={e => setForm(f => ({ ...f, title: e.target.value }))} className="mt-1 bg-card/50 border-border/50" />
+        </div>
+
+        <div>
+          <Label className="text-[10px] text-muted-foreground uppercase font-bold">Effective Date *</Label>
+          <Input required type="date" value={form.effective_date} onChange={e => setForm(f => ({ ...f, effective_date: e.target.value }))} className="mt-1 bg-card/50 border-border/50" />
+        </div>
+
+        <div>
+          <Label className="text-[10px] text-muted-foreground uppercase font-bold">Published Date *</Label>
+          <Input required type="date" value={form.published_date} onChange={e => setForm(f => ({ ...f, published_date: e.target.value }))} className="mt-1 bg-card/50 border-border/50" />
+        </div>
+
+        <div>
+          <Label className="text-[10px] text-muted-foreground uppercase font-bold">Impact Level *</Label>
+          <Select value={form.impact_level} onValueChange={v => setForm(f => ({ ...f, impact_level: v }))}>
+            <SelectTrigger className="mt-1 bg-card/50 border-border/50">
+              <SelectValue />
+            </SelectTrigger>
+            <SelectContent className="text-xs">
+              <SelectItem value="critical">Critical</SelectItem>
+              <SelectItem value="high">High</SelectItem>
+              <SelectItem value="medium">Medium</SelectItem>
+              <SelectItem value="low">Low</SelectItem>
+            </SelectContent>
+          </Select>
+        </div>
+
+        <div>
+          <Label className="text-[10px] text-muted-foreground uppercase font-bold">Max Penalty Fine</Label>
+          <Input value={form.penalty_max} onChange={e => setForm(f => ({ ...f, penalty_max: e.target.value }))} placeholder="₹250 Crore" className="mt-1 bg-card/50 border-border/50" />
+        </div>
+
+        <div className="col-span-2">
+          <Label className="text-[10px] text-muted-foreground uppercase font-bold">Change Summary Audit log *</Label>
+          <Input
+            required
+            placeholder="Describe what changed in this version (e.g. rate reduced from 18% to 12% by Council Notification...)"
+            value={form.change_summary}
+            onChange={e => setForm(f => ({ ...f, change_summary: e.target.value }))}
+            className="mt-1 bg-card/50 border-border/50 border-cyan-500/30"
+          />
+        </div>
+
+        <div className="col-span-2">
+          <Label className="text-[10px] text-muted-foreground uppercase font-bold">Circular Summary *</Label>
+          <Textarea required value={form.summary} onChange={e => setForm(f => ({ ...f, summary: e.target.value }))} className="mt-1 bg-card/50 border-border/50 h-16" />
+        </div>
+
+        <div className="col-span-2">
+          <Label className="text-[10px] text-muted-foreground uppercase font-bold">Full Act / Circular Text</Label>
+          <Textarea value={form.full_text} onChange={e => setForm(f => ({ ...f, full_text: e.target.value }))} className="mt-1 bg-card/50 border-border/50 h-24 font-mono" />
+        </div>
+      </div>
+
+      <Button type="submit" disabled={saving} className="bg-cyan-600 hover:bg-cyan-700 text-white w-full">
+        {saving ? <RefreshCw className="w-4 h-4 mr-2 animate-spin" /> : <Save className="w-4 h-4 mr-2" />}
+        Amend Circular (Increments Version & Re-evaluates Clients)
+      </Button>
+    </form>
+  );
+};
+
+// ─── MAIN COMPONENT ─────────────────────────────────────────────────────────
+
+interface RegulatoryNewsRuleImpactProps {
+  isRealDashboard?: boolean;
+  apiEndpoint?: string;
+  aiEnabled?: boolean;
+  caId?: string;
+}
 
 export default function RegulatoryNewsRuleImpact({
   isRealDashboard = false,
-  apiEndpoint = `${(import.meta.env.VITE_CA_API_BASE_URL as string)}/api/v1/ca/regulatory-news`,
   aiEnabled = true,
-  caId = 'ca-001',
+  caId = 'ca-001'
 }: RegulatoryNewsRuleImpactProps) {
-  const [news, setNews] = useState<RegulatoryNews[]>([]);
-  const [filteredNews, setFilteredNews] = useState<RegulatoryNews[]>([]);
-  const [loading, setLoading] = useState(false);
+  
+  const { news, loading, refetch, addNews } = useRegulatoryNewsList();
+  
+  // States
   const [searchQuery, setSearchQuery] = useState('');
   const [expandedId, setExpandedId] = useState<string | null>(null);
-  const [lastSync, setLastSync] = useState<Date | null>(null);
-  const [isAutoSyncing, setIsAutoSyncing] = useState(false);
-  const [aiFetchingStatus, setAiFetchingStatus] = useState<'idle' | 'scanning' | 'analyzing' | 'complete'>('idle');
-  const [showAllNews, setShowAllNews] = useState(false); // Dropdown state for news list
+  const [showAllNews, setShowAllNews] = useState(false);
+  const [activeSubTab, setActiveSubTab] = useState<Record<string, 'details' | 'history' | 'clients' | 'amend'>>({});
+  const [showAddNews, setShowAddNews] = useState(false);
+
   const [filters, setFilters] = useState({
     authority: 'all',
     impactLevel: 'all',
     category: 'all',
   });
 
-  // Load initial data
-  useEffect(() => {
-    fetchRegulatoryNews();
-  }, [fetchRegulatoryNews]);
+  // Add custom news form state
+  const [addForm, setAddForm] = useState({
+    title: '', summary: '', full_text: '', authority: 'GST Council / CBIC', authority_code: 'GST',
+    category: 'circular', effective_date: '', published_date: '', impact_level: 'medium',
+    penalty_max: '', penalty_late_fee: '', change_summary: 'Initial release',
+    affected_sectors: 'IT Services, E-commerce', affected_companies: 'Private Limited, LLP'
+  });
 
-  // Fetch live regulatory news — queries Supabase regulatory_news_feed table directly
-  const fetchRegulatoryNews = useCallback(async () => {
+  const handleCreateNews = async (e: React.FormEvent) => {
+    e.preventDefault();
+    if (!addForm.title || !addForm.summary || !addForm.effective_date) {
+      toast.error('Title, Summary, and Effective date are required');
+      return;
+    }
+
     try {
-      setLoading(true);
-      setAiFetchingStatus('scanning');
-
-      const { supabase } = await import('@/integrations/supabase/client');
-      setAiFetchingStatus('analyzing');
-
-      const { data, error } = await supabase
-        .from('regulatory_news_feed')
-        .select('*')
-        .order('published_date', { ascending: false })
-        .limit(50);
-
-      setAiFetchingStatus('complete');
-
-      if (!error && data && data.length > 0) {
-        // Map Supabase column names to the RegulatoryNews interface shape
-        const mapped: RegulatoryNews[] = data.map((row: any) => ({
-          id: row.id,
-          title: row.title,
-          authority: row.authority,
-          authorityCode: row.authority_code,
-          category: row.category,
-          effectiveDate: row.effective_date,
-          publishedDate: row.published_date,
-          summary: row.summary,
-          sourceUrl: row.source_url || '',
-          impactLevel: row.impact_level,
-          affectedSectors: row.affected_sectors || [],
-          affectedCompanyTypes: row.affected_companies || [],
-          requiredActions: row.required_actions || [],
-          penaltyInfo: { maxPenalty: row.penalty_max || '', lateFilingFee: row.penalty_late_fee || '' },
-          relatedFilings: row.related_filings || [],
-          aiSummary: row.ai_summary || '',
-          aiImpactAnalysis: row.ai_impact_analysis || '',
-        }));
-        setNews(mapped);
-        setFilteredNews(mapped);
-      } else {
-        // Table is empty (Edge Function hasn't seeded yet) — use curated demo data
-        setNews(DEMO_REGULATORY_NEWS);
-        setFilteredNews(DEMO_REGULATORY_NEWS);
-      }
-      setLastSync(new Date());
-    } catch {
-      // On any error fall back to demo data so the UI never breaks
-      setNews(DEMO_REGULATORY_NEWS);
-      setFilteredNews(DEMO_REGULATORY_NEWS);
-      setLastSync(new Date());
-      setAiFetchingStatus('complete');
-    } finally {
-      setLoading(false);
-      setTimeout(() => setAiFetchingStatus('idle'), 2000);
-    }
-  }, []);
-
-  // Auto-refresh every 5 minutes
-  useEffect(() => {
-    const interval = setInterval(fetchRegulatoryNews, 300000);
-    return () => clearInterval(interval);
-  }, [fetchRegulatoryNews]);
-
-  // Apply filters and search
-  useEffect(() => {
-    let filtered = news;
-
-    if (searchQuery) {
-      const query = searchQuery.toLowerCase();
-      filtered = filtered.filter(
-        (item) =>
-          item.title.toLowerCase().includes(query) ||
-          item.authority.toLowerCase().includes(query) ||
-          item.summary.toLowerCase().includes(query)
-      );
-    }
-
-    if (filters.authority !== 'all') {
-      filtered = filtered.filter((item) => item.authorityCode === filters.authority);
-    }
-
-    if (filters.impactLevel !== 'all') {
-      filtered = filtered.filter((item) => item.impactLevel === filters.impactLevel);
-    }
-
-    if (filters.category !== 'all') {
-      filtered = filtered.filter((item) => item.category === filters.category);
-    }
-
-    setFilteredNews(filtered);
-  }, [news, searchQuery, filters]);
-
-  const getImpactBadge = (level: string) => {
-    const config = {
-      critical: { emoji: '🚨', label: 'CRITICAL', color: 'bg-red-500/20 text-red-400 border-red-500/30' },
-      high: { emoji: '⚠️', label: 'HIGH', color: 'bg-orange-500/20 text-orange-400 border-orange-500/30' },
-      medium: { emoji: '🟡', label: 'MEDIUM', color: 'bg-yellow-500/20 text-yellow-400 border-yellow-500/30' },
-      low: { emoji: '🟢', label: 'LOW', color: 'bg-green-500/20 text-green-400 border-green-500/30' },
-    };
-    const { emoji, label, color } = config[level as keyof typeof config] || config.low;
-    return (
-      <span className={`px-2 py-1 rounded-full text-xs font-bold border ${color}`}>
-        {emoji} {label}
-      </span>
-    );
-  };
-
-  const getCategoryBadge = (category: string) => {
-    const config = {
-      law_amendment: { icon: <Gavel className="w-3 h-3" />, label: 'Law Amendment', color: 'bg-purple-500/20 text-purple-400' },
-      new_regulation: { icon: <Scale className="w-3 h-3" />, label: 'New Regulation', color: 'bg-blue-500/20 text-blue-400' },
-      circular: { icon: <FileText className="w-3 h-3" />, label: 'Circular', color: 'bg-cyan-500/20 text-cyan-400' },
-      notification: { icon: <Bell className="w-3 h-3" />, label: 'Notification', color: 'bg-indigo-500/20 text-indigo-400' },
-      guideline: { icon: <Info className="w-3 h-3" />, label: 'Guideline', color: 'bg-teal-500/20 text-teal-400' },
-      penalty_update: { icon: <AlertCircle className="w-3 h-3" />, label: 'Penalty Update', color: 'bg-red-500/20 text-red-400' },
-    };
-    const { icon, label, color } = config[category as keyof typeof config] || config.notification;
-    return (
-      <span className={`px-2 py-1 rounded-full text-xs font-semibold flex items-center gap-1 ${color}`}>
-        {icon} {label}
-      </span>
-    );
+      await addNews({
+        title: addForm.title,
+        summary: addForm.summary,
+        full_text: addForm.full_text || null,
+        authority: addForm.authority,
+        authority_code: addForm.authority_code,
+        category: addForm.category,
+        effective_date: addForm.effective_date,
+        published_date: addForm.published_date || addForm.effective_date,
+        impact_level: addForm.impact_level as any,
+        penalty_max: addForm.penalty_max || null,
+        penalty_late_fee: addForm.penalty_late_fee || null,
+        change_summary: addForm.change_summary,
+        affected_sectors: addForm.affected_sectors.split(',').map(s => s.trim()),
+        affected_companies: addForm.affected_companies.split(',').map(c => c.trim()),
+        required_actions: ['Update invoicing systems', 'Transitional return check']
+      });
+      setShowAddNews(false);
+      refetch();
+    } catch {}
   };
 
   const getDaysUntilEffective = (effectiveDate: string) => {
     const days = Math.ceil(
       (new Date(effectiveDate).getTime() - Date.now()) / (1000 * 60 * 60 * 24)
     );
-    return days;
+    return isNaN(days) ? 0 : days;
   };
 
-  const stats = [
-    {
-      label: 'Critical Updates',
-      count: filteredNews.filter((n) => n.impactLevel === 'critical').length,
-      icon: <AlertTriangle className="w-4 h-4" />,
-      color: 'text-red-500',
-      bgColor: 'bg-red-500/10',
-    },
-    {
-      label: 'High Priority',
-      count: filteredNews.filter((n) => n.impactLevel === 'high').length,
-      icon: <AlertCircle className="w-4 h-4" />,
-      color: 'text-orange-500',
-      bgColor: 'bg-orange-500/10',
-    },
-    {
-      label: 'Coming This Month',
-      count: filteredNews.filter((n) => getDaysUntilEffective(n.effectiveDate) <= 30).length,
-      icon: <Calendar className="w-4 h-4" />,
-      color: 'text-blue-500',
-      bgColor: 'bg-blue-500/10',
-    },
-    {
-      label: 'Total Updates',
-      count: filteredNews.length,
-      icon: <TrendingUp className="w-4 h-4" />,
-      color: 'text-green-500',
-      bgColor: 'bg-green-500/10',
-    },
-  ];
+  const filteredNewsList = useMemo(() => {
+    return news.filter(item => {
+      const matchSearch = searchQuery === '' || 
+        item.title.toLowerCase().includes(searchQuery.toLowerCase()) || 
+        item.authority.toLowerCase().includes(searchQuery.toLowerCase()) ||
+        item.summary.toLowerCase().includes(searchQuery.toLowerCase());
+      
+      const matchAuth = filters.authority === 'all' || item.authority_code === filters.authority;
+      const matchImpact = filters.impactLevel === 'all' || item.impact_level === filters.impactLevel;
+      const matchCategory = filters.category === 'all' || item.category === filters.category;
+
+      return matchSearch && matchAuth && matchImpact && matchCategory;
+    });
+  }, [news, searchQuery, filters]);
+
+  const stats = useMemo(() => {
+    return [
+      {
+        label: 'Critical Updates',
+        count: filteredNewsList.filter((n) => n.impact_level === 'critical').length,
+        icon: <AlertTriangle className="w-4 h-4" />,
+        color: 'text-red-500',
+        bgColor: 'bg-red-500/10',
+      },
+      {
+        label: 'High Priority',
+        count: filteredNewsList.filter((n) => n.impact_level === 'high').length,
+        icon: <AlertCircle className="w-4 h-4" />,
+        color: 'text-orange-500',
+        bgColor: 'bg-orange-500/10',
+      },
+      {
+        label: 'Coming This Month',
+        count: filteredNewsList.filter((n) => getDaysUntilEffective(n.effective_date) <= 30 && getDaysUntilEffective(n.effective_date) > 0).length,
+        icon: <Calendar className="w-4 h-4" />,
+        color: 'text-blue-500',
+        bgColor: 'bg-blue-500/10',
+      },
+      {
+        label: 'Total Active Rules',
+        count: filteredNewsList.length,
+        icon: <TrendingUp className="w-4 h-4" />,
+        color: 'text-green-500',
+        bgColor: 'bg-green-500/10',
+      },
+    ];
+  }, [filteredNewsList]);
 
   return (
     <div className="space-y-6">
-      {/* Header Section */}
-      <div className="space-y-4">
-        <div className="flex items-center justify-between flex-wrap gap-4">
-          <div className="flex items-center gap-3 flex-wrap">
-            <h2 className="text-2xl font-bold text-foreground flex items-center gap-2">
-              <Scale className="w-6 h-6 text-cyan-400" />
-              📜 Regulatory News & Rule Impact
-            </h2>
-            {isRealDashboard && (
-              <>
-                <CASectionAgentBadge agentId="A1_PRIME" />
-                <div className="flex items-center gap-1 px-2 py-1 rounded-full bg-green-500/10 text-green-500 text-xs font-semibold">
-                  <Zap className="w-3 h-3" />
-                  Live System
-                </div>
-                <div className="flex items-center gap-1 px-2 py-1 rounded-full bg-blue-500/10 text-blue-500 text-xs font-semibold border border-blue-500/30">
-                  <Shield className="w-3 h-3" />
-                  Active Scanners: 48 (Including 22 Local Edge-Cases)
-                </div>
-                {aiEnabled && (
-                  <div className="flex items-center gap-1 px-2 py-1 rounded-full bg-purple-500/10 text-purple-500 text-xs font-semibold">
-                    <Bot className="w-3 h-3" />
-                    AI Agent Active
-                  </div>
-                )}
-                {aiFetchingStatus !== 'idle' && (
-                  <motion.div
-                    initial={{ opacity: 0, scale: 0.8 }}
-                    animate={{ opacity: 1, scale: 1 }}
-                    className="flex items-center gap-1 px-2 py-1 rounded-full bg-blue-500/10 text-blue-500 text-xs font-semibold"
-                  >
-                    <Activity className="w-3 h-3 animate-pulse" />
-                    {aiFetchingStatus === 'scanning' && '🔍 Scanning Gov Portals...'}
-                    {aiFetchingStatus === 'analyzing' && '🤖 AI Analyzing...'}
-                    {aiFetchingStatus === 'complete' && '✅ Sync Complete'}
-                  </motion.div>
-                )}
-              </>
-            )}
-          </div>
-          <Button
-            variant="outline"
-            size="sm"
-            onClick={fetchRegulatoryNews}
-            disabled={loading}
-          >
-            <RefreshCw className={`w-4 h-4 mr-1 ${loading ? 'animate-spin' : ''}`} />
-            Refresh
-          </Button>
+      {/* Header Banner */}
+      <div className="flex flex-col md:flex-row md:items-center justify-between gap-4">
+        <div>
+          <h2 className="text-2xl font-bold text-foreground flex items-center gap-2">
+            <Scale className="w-6 h-6 text-cyan-400" />
+            📜 Regulatory News & Rule Impact
+          </h2>
+          <p className="text-sm text-muted-foreground mt-1">
+            Auditable change log and version-control systems tracking CBIC, CBDT, RBI, and MCA regulatory amendments.
+          </p>
         </div>
 
-        <p className="text-sm text-muted-foreground">
-          {isRealDashboard
-            ? 'Live updates from government portals including MCA, GST, RBI, SEBI, and more. AI-powered analysis for your clients.'
-            : 'New or upcoming regulations affecting your assigned clients. Demo data shown.'}
-        </p>
+        <div className="flex items-center gap-3 flex-wrap">
+          <Button variant="outline" size="sm" onClick={refetch} className="border-border/50">
+            <RefreshCw className="w-4 h-4 mr-2" /> Refresh
+          </Button>
 
-        {/* Last Sync Info */}
-        {isRealDashboard && lastSync && (
-          <div className="text-xs text-muted-foreground flex items-center gap-2">
-            <motion.div
-              animate={{ scale: isAutoSyncing ? [1, 1.2, 1] : 1 }}
-              transition={{ duration: 1.5, repeat: isAutoSyncing ? Infinity : 0 }}
-            >
-              <div className="w-2 h-2 rounded-full bg-green-500" />
-            </motion.div>
-            Last synced: {lastSync.toLocaleTimeString()} • Auto-refreshes every 5 minutes
-          </div>
-        )}
+          <Dialog open={showAddNews} onOpenChange={setShowAddNews}>
+            <DialogTrigger asChild>
+              <Button size="sm" className="bg-cyan-600 hover:bg-cyan-700 text-white">
+                <Plus className="w-4 h-4 mr-2" /> Add Circular
+              </Button>
+            </DialogTrigger>
+            <DialogContent className="bg-background border-border/50 max-w-lg max-h-[85vh] overflow-y-auto pr-1">
+              <DialogHeader>
+                <DialogTitle className="text-cyan-400 flex items-center gap-2">
+                  <Plus className="w-5 h-5" /> Publish New Circular
+                </DialogTitle>
+                <CardDescription>Creates a new regulatory text update and maps it to client scopes.</CardDescription>
+              </DialogHeader>
+              <form onSubmit={handleCreateNews} className="space-y-4 pt-2 text-xs">
+                <div>
+                  <Label className="text-[10px] text-muted-foreground uppercase font-bold">Circular Title *</Label>
+                  <Input required value={addForm.title} onChange={e => setAddForm(f => ({ ...f, title: e.target.value }))} placeholder="e.g. GST Council Rate Cut SaaS Products" className="mt-1 bg-card/50 border-border/50" />
+                </div>
+
+                <div className="grid grid-cols-2 gap-3">
+                  <div>
+                    <Label className="text-[10px] text-muted-foreground uppercase font-bold">Authority *</Label>
+                    <Input required value={addForm.authority} onChange={e => setAddForm(f => ({ ...f, authority: e.target.value }))} className="mt-1 bg-card/50 border-border/50" />
+                  </div>
+                  <div>
+                    <Label className="text-[10px] text-muted-foreground uppercase font-bold">Authority Code *</Label>
+                    <Select value={addForm.authority_code} onValueChange={v => setAddForm(f => ({ ...f, authority_code: v }))}>
+                      <SelectTrigger className="mt-1 bg-card/50 border-border/50">
+                        <SelectValue />
+                      </SelectTrigger>
+                      <SelectContent className="text-xs">
+                        {GOVERNMENT_PORTALS.map(p => <SelectItem key={p.code} value={p.code}>{p.icon} {p.code}</SelectItem>)}
+                      </SelectContent>
+                    </Select>
+                  </div>
+                </div>
+
+                <div className="grid grid-cols-2 gap-3">
+                  <div>
+                    <Label className="text-[10px] text-muted-foreground uppercase font-bold">Category *</Label>
+                    <Select value={addForm.category} onValueChange={v => setAddForm(f => ({ ...f, category: v }))}>
+                      <SelectTrigger className="mt-1 bg-card/50 border-border/50">
+                        <SelectValue />
+                      </SelectTrigger>
+                      <SelectContent className="text-xs">
+                        <SelectItem value="law_amendment">⚖️ Law Amendment</SelectItem>
+                        <SelectItem value="new_regulation">📜 New Regulation</SelectItem>
+                        <SelectItem value="circular">📄 Circular</SelectItem>
+                        <SelectItem value="notification">🔔 Notification</SelectItem>
+                      </SelectContent>
+                    </Select>
+                  </div>
+                  <div>
+                    <Label className="text-[10px] text-muted-foreground uppercase font-bold">Impact Level *</Label>
+                    <Select value={addForm.impact_level} onValueChange={v => setAddForm(f => ({ ...f, impact_level: v }))}>
+                      <SelectTrigger className="mt-1 bg-card/50 border-border/50">
+                        <SelectValue />
+                      </SelectTrigger>
+                      <SelectContent className="text-xs">
+                        <SelectItem value="critical">Critical</SelectItem>
+                        <SelectItem value="high">High</SelectItem>
+                        <SelectItem value="medium">Medium</SelectItem>
+                        <SelectItem value="low">Low</SelectItem>
+                      </SelectContent>
+                    </Select>
+                  </div>
+                </div>
+
+                <div className="grid grid-cols-2 gap-3">
+                  <div>
+                    <Label className="text-[10px] text-muted-foreground uppercase font-bold">Effective Date *</Label>
+                    <Input required type="date" value={addForm.effective_date} onChange={e => setAddForm(f => ({ ...f, effective_date: e.target.value }))} className="mt-1 bg-card/50 border-border/50" />
+                  </div>
+                  <div>
+                    <Label className="text-[10px] text-muted-foreground uppercase font-bold">Published Date</Label>
+                    <Input type="date" value={addForm.published_date} onChange={e => setAddForm(f => ({ ...f, published_date: e.target.value }))} className="mt-1 bg-card/50 border-border/50" />
+                  </div>
+                </div>
+
+                <div className="grid grid-cols-2 gap-3 border-t border-border/20 pt-3">
+                  <div>
+                    <Label className="text-[10px] text-muted-foreground uppercase font-bold">Affected Sectors (Comma sep) *</Label>
+                    <Input required value={addForm.affected_sectors} onChange={e => setAddForm(f => ({ ...f, affected_sectors: e.target.value }))} className="mt-1 bg-card/50 border-border/50" />
+                  </div>
+                  <div>
+                    <Label className="text-[10px] text-muted-foreground uppercase font-bold">Company Scope (Comma sep)</Label>
+                    <Input value={addForm.affected_companies} onChange={e => setAddForm(f => ({ ...f, affected_companies: e.target.value }))} className="mt-1 bg-card/50 border-border/50" />
+                  </div>
+                </div>
+
+                <div>
+                  <Label className="text-[10px] text-muted-foreground uppercase font-bold">Summary Brief *</Label>
+                  <Textarea required value={addForm.summary} onChange={e => setAddForm(f => ({ ...f, summary: e.target.value }))} className="mt-1 bg-card/50 border-border/50 h-16" />
+                </div>
+
+                <div>
+                  <Label className="text-[10px] text-muted-foreground uppercase font-bold">Full Text Content</Label>
+                  <Textarea value={addForm.full_text} onChange={e => setAddForm(f => ({ ...f, full_text: e.target.value }))} className="mt-1 bg-card/50 border-border/50 h-20" />
+                </div>
+
+                <DialogFooter className="pt-2">
+                  <Button type="submit" className="bg-cyan-600 hover:bg-cyan-700 text-white w-full">
+                    Publish Circular
+                  </Button>
+                </DialogFooter>
+              </form>
+            </DialogContent>
+          </Dialog>
+        </div>
       </div>
 
-      {/* Government Portals Status (Real Dashboard Only) */}
-      {isRealDashboard && (
-        <Card className="bg-card/30 border-border/50">
-          <CardContent className="p-4">
-            <div className="flex items-center gap-2 mb-3">
-              <Globe className="w-4 h-4 text-cyan-400" />
-              <span className="text-sm font-semibold text-foreground">Connected Government Portals</span>
-            </div>
-            <div className="flex flex-wrap gap-2">
-              {GOVERNMENT_PORTALS.map((portal) => (
-                <Badge
-                  key={portal.code}
-                  variant="outline"
-                  className="text-xs flex items-center gap-1 hover:bg-primary/10 cursor-pointer"
-                >
-                  <span>{portal.icon}</span>
-                  <span>{portal.code}</span>
-                  <CheckCircle className="w-3 h-3 text-green-500" />
-                </Badge>
-              ))}
-            </div>
-          </CardContent>
-        </Card>
-      )}
-
-      {/* Stats Grid */}
-      <div className="grid grid-cols-2 md:grid-cols-4 gap-3">
-        {stats.map((stat, index) => (
-          <motion.div
-            key={index}
-            initial={{ opacity: 0, y: 10 }}
-            animate={{ opacity: 1, y: 0 }}
-            transition={{ delay: index * 0.1 }}
-            className={`border rounded-lg p-3 text-center ${stat.bgColor} border-border/50`}
-          >
-            <div className={`flex items-center justify-center gap-2 mb-2 ${stat.color}`}>
-              {stat.icon}
-              <span className="text-xs font-semibold">{stat.label}</span>
-            </div>
-            <div className="text-2xl font-bold text-foreground">{stat.count}</div>
-          </motion.div>
-        ))}
-      </div>
-
-      {/* Search and Filters */}
+      {/* Connection Portals Banner */}
       <Card className="bg-card/30 border-border/50">
-        <CardContent className="p-4">
-          <div className="flex items-center gap-2 mb-3">
-            <Filter className="w-4 h-4 text-muted-foreground" />
-            <span className="text-sm font-semibold text-foreground">Filter & Search</span>
-          </div>
-
-          <div className="grid grid-cols-1 md:grid-cols-5 gap-3">
-            <div className="md:col-span-2 relative">
-              <Search className="w-4 h-4 absolute left-3 top-1/2 transform -translate-y-1/2 text-muted-foreground" />
-              <Input
-                placeholder="Search regulations, authorities..."
-                value={searchQuery}
-                onChange={(e) => setSearchQuery(e.target.value)}
-                className="pl-10"
-              />
+        <CardContent className="p-4 flex flex-col md:flex-row items-start md:items-center justify-between gap-4">
+          <div className="flex items-center gap-2">
+            <Globe className="w-5 h-5 text-cyan-400" />
+            <div>
+              <span className="text-sm font-semibold text-foreground">Scraper Sync Engine</span>
+              <p className="text-[11px] text-muted-foreground">Scraping RBI Master Directions, CBIC Circulars, and MCA21 Notifications</p>
             </div>
-
-            <Select
-              value={filters.authority}
-              onValueChange={(value) => setFilters({ ...filters, authority: value })}
-            >
-              <SelectTrigger>
-                <SelectValue placeholder="All Authorities" />
-              </SelectTrigger>
-              <SelectContent>
-                <SelectItem value="all">🏛️ All Authorities</SelectItem>
-                {GOVERNMENT_PORTALS.map((portal) => (
-                  <SelectItem key={portal.code} value={portal.code}>
-                    {portal.icon} {portal.name}
-                  </SelectItem>
-                ))}
-              </SelectContent>
-            </Select>
-
-            <Select
-              value={filters.impactLevel}
-              onValueChange={(value) => setFilters({ ...filters, impactLevel: value })}
-            >
-              <SelectTrigger>
-                <SelectValue placeholder="All Impact Levels" />
-              </SelectTrigger>
-              <SelectContent>
-                <SelectItem value="all">📊 All Impact Levels</SelectItem>
-                <SelectItem value="critical">🚨 Critical</SelectItem>
-                <SelectItem value="high">⚠️ High</SelectItem>
-                <SelectItem value="medium">🟡 Medium</SelectItem>
-                <SelectItem value="low">🟢 Low</SelectItem>
-              </SelectContent>
-            </Select>
-
-            <Select
-              value={filters.category}
-              onValueChange={(value) => setFilters({ ...filters, category: value })}
-            >
-              <SelectTrigger>
-                <SelectValue placeholder="All Categories" />
-              </SelectTrigger>
-              <SelectContent>
-                <SelectItem value="all">📋 All Categories</SelectItem>
-                <SelectItem value="law_amendment">⚖️ Law Amendment</SelectItem>
-                <SelectItem value="new_regulation">📜 New Regulation</SelectItem>
-                <SelectItem value="circular">📄 Circular</SelectItem>
-                <SelectItem value="notification">🔔 Notification</SelectItem>
-                <SelectItem value="guideline">📖 Guideline</SelectItem>
-                <SelectItem value="penalty_update">⚠️ Penalty Update</SelectItem>
-              </SelectContent>
-            </Select>
+          </div>
+          <div className="flex flex-wrap gap-1.5 justify-end">
+            {GOVERNMENT_PORTALS.slice(0, 6).map(p => (
+              <Badge key={p.code} variant="outline" className="text-[10px] py-0.5 bg-card/50">
+                {p.icon} {p.code} <CheckCircle className="w-2.5 h-2.5 ml-1 text-green-400" />
+              </Badge>
+            ))}
           </div>
         </CardContent>
       </Card>
 
-      {/* News Cards - Collapsible Dropdown Section */}
-      <Card className="bg-card/50 border-border/50">
-        <CardHeader className="pb-2">
-          <div 
-            className="flex items-center justify-between cursor-pointer"
-            onClick={() => setShowAllNews(!showAllNews)}
-          >
-            <div className="flex items-center gap-3">
-              <div className="p-2 rounded-lg bg-blue-500/20">
-                <FileText className="w-5 h-5 text-blue-400" />
+      {/* KPI Stats Grid */}
+      <div className="grid grid-cols-2 md:grid-cols-4 gap-4">
+        {stats.map((stat, i) => {
+          const Icon = stat.icon;
+          return (
+            <motion.div
+              key={stat.label}
+              initial={{ opacity: 0, y: 10 }}
+              animate={{ opacity: 1, y: 0 }}
+              transition={{ delay: i * 0.05 }}
+              className={`p-4 rounded-xl border border-border/40 ${stat.bgColor}`}
+            >
+              <div className="flex justify-between items-center mb-1.5">
+                <span className="text-[10px] text-muted-foreground uppercase font-bold tracking-wider">{stat.label}</span>
+                <span className={stat.color}>{Icon}</span>
               </div>
-              <div>
-                <CardTitle className="text-lg flex items-center gap-2">
-                  📋 Regulatory Updates List
-                  <Badge variant="outline" className="text-xs">
-                    {filteredNews.length} {filteredNews.length === 1 ? 'Update' : 'Updates'}
-                  </Badge>
-                  {filteredNews.filter(n => getDaysUntilEffective(n.effectiveDate) <= 30).length > 0 && (
-                    <Badge className="bg-red-500/20 text-red-400 text-xs">
-                      🚨 {filteredNews.filter(n => getDaysUntilEffective(n.effectiveDate) <= 30).length} Urgent
-                    </Badge>
-                  )}
-                </CardTitle>
-                <p className="text-xs text-muted-foreground mt-1">
-                  {showAllNews ? 'Click to collapse' : 'Click to expand and view all regulatory updates'}
-                </p>
-              </div>
-            </div>
-            <Button variant="ghost" size="sm" className="h-8 w-8 p-0">
-              {showAllNews ? (
-                <ChevronUp className="w-5 h-5" />
-              ) : (
-                <ChevronDown className="w-5 h-5" />
-              )}
-            </Button>
+              <p className="text-2xl font-bold text-foreground font-mono">{stat.count}</p>
+            </motion.div>
+          );
+        })}
+      </div>
+
+      {/* Filter and Search controls */}
+      <Card className="bg-card/30 border-border/50">
+        <CardContent className="p-4 grid grid-cols-1 md:grid-cols-4 gap-3">
+          <div className="relative">
+            <Search className="w-4 h-4 absolute left-3 top-1/2 -translate-y-1/2 text-muted-foreground" />
+            <Input
+              placeholder="Search circular title / text..."
+              value={searchQuery}
+              onChange={e => setSearchQuery(e.target.value)}
+              className="pl-9 bg-card/40 border-border/50 text-xs"
+            />
           </div>
+
+          <Select value={filters.authority} onValueChange={v => setFilters(f => ({ ...f, authority: v }))}>
+            <SelectTrigger className="bg-card/40 border-border/50 text-xs">
+              <SelectValue placeholder="Portal Source" />
+            </SelectTrigger>
+            <SelectContent className="text-xs">
+              <SelectItem value="all">🏛️ All Portals</SelectItem>
+              {GOVERNMENT_PORTALS.map(p => <SelectItem key={p.code} value={p.code}>{p.icon} {p.name}</SelectItem>)}
+            </SelectContent>
+          </Select>
+
+          <Select value={filters.impactLevel} onValueChange={v => setFilters(f => ({ ...f, impactLevel: v }))}>
+            <SelectTrigger className="bg-card/40 border-border/50 text-xs">
+              <SelectValue placeholder="Impact Level" />
+            </SelectTrigger>
+            <SelectContent className="text-xs">
+              <SelectItem value="all">📊 All Impacts</SelectItem>
+              {Object.entries(IMPACT_META).map(([v, m]) => <SelectItem key={v} value={v}>{m.emoji} {m.label}</SelectItem>)}
+            </SelectContent>
+          </Select>
+
+          <Select value={filters.category} onValueChange={v => setFilters(f => ({ ...f, category: v }))}>
+            <SelectTrigger className="bg-card/40 border-border/50 text-xs">
+              <SelectValue placeholder="Category" />
+            </SelectTrigger>
+            <SelectContent className="text-xs">
+              <SelectItem value="all">📋 All Categories</SelectItem>
+              {Object.entries(CATEGORY_META).map(([v, m]) => <SelectItem key={v} value={v}>{m.label}</SelectItem>)}
+            </SelectContent>
+          </Select>
+        </CardContent>
+      </Card>
+
+      {/* Main rule matching feed */}
+      <Card className="bg-card/40 border-border/50">
+        <CardHeader className="pb-3 flex flex-row justify-between items-center border-b border-border/30">
+          <div>
+            <CardTitle className="text-md flex items-center gap-2">
+              <FileText className="w-5 h-5 text-cyan-400" />
+              <span>Filing Rules & Regulatory Change-Log</span>
+            </CardTitle>
+            <p className="text-xs text-muted-foreground mt-0.5">Click any regulatory update card to inspect details, version snapshots, change diffs, and affected clients.</p>
+          </div>
+          <Button variant="outline" size="sm" onClick={() => setShowAllNews(!showAllNews)} className="h-8 border-border/50 bg-card/20">
+            {showAllNews ? 'Collapse All' : 'Expand All'}
+          </Button>
         </CardHeader>
         
-        <AnimatePresence>
-          {showAllNews && (
-            <motion.div
-              initial={{ opacity: 0, height: 0 }}
-              animate={{ opacity: 1, height: 'auto' }}
-              exit={{ opacity: 0, height: 0 }}
-              transition={{ duration: 0.3 }}
-            >
-              <CardContent className="pt-2">
-                <div className="space-y-3 max-h-[600px] overflow-y-auto pr-2">
-                  {filteredNews.length > 0 ? (
-                    filteredNews.map((item, index) => {
-                      const daysUntil = getDaysUntilEffective(item.effectiveDate);
-                      const isExpanded = expandedId === item.id;
-                      const isUrgent = daysUntil <= 30;
+        <CardContent className="p-6 space-y-4">
+          {loading ? (
+            <div className="flex justify-center py-12"><RefreshCw className="w-8 h-8 animate-spin text-cyan-400" /></div>
+          ) : filteredNewsList.length === 0 ? (
+            <div className="text-center py-16 border border-dashed border-border/30 rounded-xl text-muted-foreground">
+              <Gavel className="w-12 h-12 mx-auto mb-3 opacity-25" />
+              <p className="font-semibold">No matching regulatory rules found</p>
+              <p className="text-xs">Adjust search filters or publish a new circular above.</p>
+            </div>
+          ) : (
+            <div className="space-y-3">
+              {filteredNewsList.map((item) => {
+                const daysUntil = getDaysUntilEffective(item.effective_date);
+                const isExpanded = expandedId === item.id || showAllNews;
+                const imp = IMPACT_META[item.impact_level] || IMPACT_META.low;
+                const cat = CATEGORY_META[item.category] || CATEGORY_META.notification;
+                const port = GOVERNMENT_PORTALS.find(p => p.code === item.authority_code);
+                
+                // Active sub tab inside card
+                const activeTab = activeSubTab[item.id] || 'details';
+                const setActiveTab = (tab: 'details' | 'history' | 'clients' | 'amend') => {
+                  setActiveSubTab(prev => ({ ...prev, [item.id]: tab }));
+                };
 
-                      return (
-                        <motion.div
-                          key={item.id}
-                          layout
-                          initial={{ opacity: 0, y: 10 }}
-                          animate={{ opacity: 1, y: 0 }}
-                          exit={{ opacity: 0, y: -10 }}
-                          transition={{ delay: index * 0.03 }}
-                >
-                  <Card
-                    className={`bg-card/50 border transition-all ${
-                      item.impactLevel === 'critical'
-                        ? 'border-red-500/30 hover:border-red-500/50'
-                        : item.impactLevel === 'high'
-                        ? 'border-orange-500/30 hover:border-orange-500/50'
-                        : 'border-border/50 hover:border-border'
+                return (
+                  <motion.div
+                    key={item.id}
+                    layout
+                    className={`rounded-xl border transition-all ${
+                      isExpanded 
+                        ? 'border-cyan-500 bg-card/40' 
+                        : 'border-border/30 bg-card/25 hover:border-border/60'
                     }`}
                   >
-                    <CardContent className="p-3">
-                      {/* Compact Header Row - Always Visible */}
-                      <div
-                        className="flex items-center justify-between gap-3 cursor-pointer"
-                        onClick={() => setExpandedId(isExpanded ? null : item.id)}
-                      >
-                        <div className="flex items-center gap-3 flex-1 min-w-0">
-                          {/* Impact Indicator */}
-                          <div className={`w-2 h-10 rounded-full flex-shrink-0 ${
-                            item.impactLevel === 'critical' ? 'bg-red-500' :
-                            item.impactLevel === 'high' ? 'bg-orange-500' :
-                            item.impactLevel === 'medium' ? 'bg-yellow-500' : 'bg-green-500'
-                          }`} />
-                          
-                          {/* Title & Badges */}
-                          <div className="flex-1 min-w-0">
-                            <div className="flex items-center gap-2 flex-wrap">
-                              <h3 className="font-semibold text-foreground text-sm truncate">{item.title}</h3>
-                            </div>
-                            <div className="flex items-center gap-2 mt-1 flex-wrap">
-                              {getImpactBadge(item.impactLevel)}
-                              <Badge variant="outline" className="text-xs">
-                                {GOVERNMENT_PORTALS.find((p) => p.code === item.authorityCode)?.icon} {item.authorityCode}
-                              </Badge>
-                              <span className={`text-xs ${daysUntil <= 7 ? 'text-red-400 font-bold' : daysUntil <= 30 ? 'text-orange-400' : 'text-muted-foreground'}`}>
-                                📅 {daysUntil > 0 ? `${daysUntil}d left` : 'In effect'}
-                              </span>
-                            </div>
+                    {/* Header Row - Always visible */}
+                    <div
+                      className="p-4 flex items-center justify-between gap-4 cursor-pointer"
+                      onClick={() => setExpandedId(expandedId === item.id ? null : item.id)}
+                    >
+                      <div className="flex items-center gap-3 flex-1 min-w-0">
+                        {/* Side bar color code */}
+                        <div className={`w-1.5 h-10 rounded-full shrink-0 ${
+                          item.impact_level === 'critical' ? 'bg-red-500' :
+                          item.impact_level === 'high' ? 'bg-orange-500' :
+                          item.impact_level === 'medium' ? 'bg-yellow-500' : 'bg-green-500'
+                        }`} />
+                        
+                        <div>
+                          <div className="flex items-center gap-2 flex-wrap">
+                            <h4 className="font-semibold text-sm leading-tight text-foreground">{item.title}</h4>
+                            <Badge variant="outline" className="text-[10px] font-mono py-0 text-cyan-400 border-cyan-500/20">v{item.version}</Badge>
+                          </div>
+                          <div className="flex items-center gap-2 mt-1 flex-wrap text-xs text-muted-foreground">
+                            <Badge variant="outline" className={`text-[10px] ${imp.color} ${imp.border}`}>{imp.emoji} {imp.label}</Badge>
+                            <span className="flex items-center gap-1">
+                              <span>{port?.icon}</span>
+                              <span className="font-semibold text-foreground">{item.authority_code}</span>
+                            </span>
+                            <span>•</span>
+                            <span className={daysUntil <= 30 && daysUntil > 0 ? 'text-red-400 font-bold' : ''}>
+                              📅 {daysUntil <= 0 ? 'Effective Now' : `Effective in ${daysUntil} days`}
+                            </span>
                           </div>
                         </div>
-
-                        {/* Quick Actions */}
-                        <div className="flex items-center gap-2 flex-shrink-0">
-                          {/* External Verification Button */}
-                          <Button
-                            size="sm"
-                            variant="outline"
-                            className="text-xs h-8 px-2 bg-green-500/10 border-green-500/30 text-green-400 hover:bg-green-500/20"
-                            onClick={(e) => {
-                              e.stopPropagation();
-                              // Use sourceUrl if available, otherwise fall back to the authority's main portal
-                              const url = item.sourceUrl
-                                || GOVERNMENT_PORTALS.find(p => p.code === item.authorityCode)?.url
-                                || (item as any).source && GOVERNMENT_PORTALS.find(p => p.code === (item as any).source || p.name.includes((item as any).source))?.url
-                                || '#';
-                              if (url && url !== '#') {
-                                window.open(url, '_blank', 'noopener,noreferrer');
-                              }
-                            }}
-                          >
-                            <ExternalLink className="w-3 h-3 mr-1" />
-                            Verify Source
-                          </Button>
-                          
-                          {/* Expand/Collapse */}
-                          <Button variant="ghost" size="sm" className="h-8 w-8 p-0">
-                            {isExpanded ? (
-                              <ChevronUp className="w-4 h-4" />
-                            ) : (
-                              <ChevronDown className="w-4 h-4" />
-                            )}
-                          </Button>
-                        </div>
                       </div>
 
-                      {/* Expanded Details - Dropdown */}
-                      <AnimatePresence>
-                        {isExpanded && (
-                          <motion.div
-                            initial={{ opacity: 0, height: 0 }}
-                            animate={{ opacity: 1, height: 'auto' }}
-                            exit={{ opacity: 0, height: 0 }}
-                            className="mt-3 pt-3 border-t border-border/30 space-y-3"
-                          >
-                            {/* Summary */}
-                            <p className="text-sm text-muted-foreground">{item.summary}</p>
-
-                            {/* Category & Dates */}
-                            <div className="flex items-center gap-3 flex-wrap text-xs">
-                              {getCategoryBadge(item.category)}
-                              <span className="text-muted-foreground">
-                                <Calendar className="w-3 h-3 inline mr-1" />
-                                Effective: {new Date(item.effectiveDate).toLocaleDateString('en-IN', { day: 'numeric', month: 'short', year: 'numeric' })}
-                              </span>
-                              <span className="text-muted-foreground">
-                                Published: {new Date(item.publishedDate).toLocaleDateString('en-IN', { day: 'numeric', month: 'short', year: 'numeric' })}
-                              </span>
-                            </div>
-
-                            {/* AI Analysis (Real Dashboard Only) */}
-                            {isRealDashboard && item.aiImpactAnalysis && (
-                              <div className="p-2 rounded-lg bg-purple-500/10 border border-purple-500/30">
-                                <div className="flex items-center gap-2 mb-1">
-                                  <Bot className="w-3 h-3 text-purple-400" />
-                                  <span className="text-xs font-semibold text-purple-400">AI Impact Analysis</span>
-                                </div>
-                                <p className="text-xs text-foreground">{item.aiImpactAnalysis}</p>
-                              </div>
-                            )}
-
-                            {/* Affected Sectors & Company Types */}
-                            <div className="grid grid-cols-1 md:grid-cols-2 gap-3">
-                              <div>
-                                <p className="text-xs text-muted-foreground mb-1">
-                                  <Building2 className="w-3 h-3 inline mr-1" />
-                                  Affected Sectors:
-                                </p>
-                                <div className="flex flex-wrap gap-1">
-                                  {item.affectedSectors.map((sector) => (
-                                    <Badge key={sector} variant="outline" className="text-xs py-0">
-                                      {sector}
-                                    </Badge>
-                                  ))}
-                                </div>
-                              </div>
-                              <div>
-                                <p className="text-xs text-muted-foreground mb-1">
-                                  <Shield className="w-3 h-3 inline mr-1" />
-                                  Company Types:
-                                </p>
-                                <div className="flex flex-wrap gap-1">
-                                  {item.affectedCompanyTypes.map((type) => (
-                                    <Badge key={type} variant="outline" className="text-xs py-0">
-                                      {type}
-                                    </Badge>
-                                  ))}
-                                </div>
-                              </div>
-                            </div>
-
-                            {/* Required Actions */}
-                            <div>
-                              <p className="text-xs text-muted-foreground mb-1">
-                                <CheckCircle className="w-3 h-3 inline mr-1" />
-                                Required CA Actions:
-                              </p>
-                              <ul className="space-y-0.5">
-                                {item.requiredActions.map((action, idx) => (
-                                  <li key={idx} className="text-xs text-foreground flex items-start gap-1">
-                                    <span className="text-green-400">✓</span>
-                                    {action}
-                                  </li>
-                                ))}
-                              </ul>
-                            </div>
-
-                            {/* Penalty Info */}
-                            {item.penaltyInfo && (
-                              <div className="p-2 rounded-lg bg-red-500/10 border border-red-500/30">
-                                <p className="text-xs text-muted-foreground mb-1">
-                                  <AlertTriangle className="w-3 h-3 inline mr-1" />
-                                  Penalty Information:
-                                </p>
-                                <div className="text-xs text-foreground">
-                                  <span><strong>Max:</strong> {item.penaltyInfo.maxPenalty}</span>
-                                  {item.penaltyInfo.lateFilingFee && (
-                                    <span className="ml-3"><strong>Late Fee:</strong> {item.penaltyInfo.lateFilingFee}</span>
-                                  )}
-                                </div>
-                              </div>
-                            )}
-
-                            {/* Related Filings */}
-                            {item.relatedFilings && item.relatedFilings.length > 0 && (
-                              <div>
-                                <p className="text-xs text-muted-foreground mb-1">
-                                  <FileText className="w-3 h-3 inline mr-1" />
-                                  Related Filings:
-                                </p>
-                                <div className="flex flex-wrap gap-1">
-                                  {item.relatedFilings.map((filing) => (
-                                    <Badge key={filing} className="text-xs py-0 bg-cyan-500/20 text-cyan-400">
-                                      📄 {filing}
-                                    </Badge>
-                                  ))}
-                                </div>
-                              </div>
-                            )}
-
-                            {/* Action Buttons */}
-                            <div className="flex flex-wrap gap-2 pt-2 border-t border-border/30">
-                              <Button size="sm" variant="outline" className="h-7 text-xs">
-                                <Bell className="w-3 h-3 mr-1" />
-                                Notify Clients
-                              </Button>
-                              <Button size="sm" variant="outline" className="h-7 text-xs">
-                                <FileText className="w-3 h-3 mr-1" />
-                                Prepare Filing
-                              </Button>
-                              <Button size="sm" variant="outline" className="h-7 text-xs">
-                                <Bookmark className="w-3 h-3 mr-1" />
-                                Bookmark
-                              </Button>
-                              <Button 
-                                size="sm" 
-                                className="h-7 text-xs bg-green-600 hover:bg-green-700 text-white"
-                                onClick={(e) => {
-                                  e.stopPropagation();
-                                  window.open(item.sourceUrl, '_blank', 'noopener,noreferrer');
-                                }}
-                              >
-                                <ExternalLink className="w-3 h-3 mr-1" />
-                                🔗 External Verification (Read Full Article)
-                              </Button>
-                              <Button size="sm" variant="outline" className="h-7 text-xs">
-                                <Download className="w-3 h-3 mr-1" />
-                                Export
-                              </Button>
-                              <Button size="sm" variant="outline" className="h-7 text-xs">
-                                <Share2 className="w-3 h-3 mr-1" />
-                                Share
-                              </Button>
-                            </div>
-                          </motion.div>
-                        )}
-                      </AnimatePresence>
-                    </CardContent>
-                  </Card>
-                </motion.div>
-                      );
-                    })
-                  ) : (
-                    <div className="p-8 text-center">
-                      <Scale className="w-12 h-12 mx-auto text-muted-foreground/30 mb-3" />
-                      <p className="text-sm font-medium text-muted-foreground">
-                        {isRealDashboard
-                          ? 'No regulatory updates yet'
-                          : 'No regulations matching your criteria'}
-                      </p>
-                      <p className="text-xs text-muted-foreground mt-1">
-                        {isRealDashboard
-                          ? 'AI agents are scanning government portals.'
-                          : 'Try adjusting your filters.'}
-                      </p>
-                      {isRealDashboard && (
-                        <Button variant="outline" size="sm" className="mt-3" onClick={fetchRegulatoryNews}>
-                          <RefreshCw className="w-3 h-3 mr-1" />
-                          Scan Now
+                      <div className="flex items-center gap-2 shrink-0" onClick={e => e.stopPropagation()}>
+                        <Button
+                          size="sm"
+                          variant="outline"
+                          onClick={() => window.open(item.source_url || port?.url, '_blank')}
+                          className="h-8 text-xs border-border/50 bg-card/30 hover:bg-card/50"
+                        >
+                          <ExternalLink className="w-3.5 h-3.5 mr-1" /> Verify Source
                         </Button>
+                        <Button
+                          size="icon"
+                          variant="ghost"
+                          onClick={() => setExpandedId(expandedId === item.id ? null : item.id)}
+                          className="h-8 w-8 text-muted-foreground hover:text-foreground"
+                        >
+                          {isExpanded ? <ChevronUp className="w-4.5 h-4.5" /> : <ChevronDown className="w-4.5 h-4.5" />}
+                        </Button>
+                      </div>
+                    </div>
+
+                    {/* Collapsible content */}
+                    <AnimatePresence>
+                      {isExpanded && (
+                        <motion.div
+                          initial={{ opacity: 0, height: 0 }}
+                          animate={{ opacity: 1, height: 'auto' }}
+                          exit={{ opacity: 0, height: 0 }}
+                          className="border-t border-border/20 px-6 pb-6 pt-4 space-y-4"
+                        >
+                          {/* Inner Tabs buttons */}
+                          <div className="flex border-b border-border/20 gap-1 pb-1">
+                            {[
+                              { id: 'details', label: 'Summary & Actions', icon: FileText },
+                              { id: 'history', label: `Change Log (v${item.version})`, icon: History },
+                              { id: 'clients', label: 'Affected Client Matches', icon: Building2 },
+                              { id: 'amend', label: 'Amend Circular Rule', icon: Scale }
+                            ].map(tab => {
+                              const Icon = tab.icon;
+                              const isActive = activeTab === tab.id;
+                              return (
+                                <button
+                                  key={tab.id}
+                                  onClick={() => setActiveTab(tab.id as any)}
+                                  className={`px-3 py-1.5 rounded-t-lg text-xs font-semibold flex items-center gap-1.5 transition-all ${
+                                    isActive 
+                                      ? 'bg-cyan-500/10 text-cyan-400 border-t border-x border-cyan-500/30' 
+                                      : 'text-muted-foreground hover:text-foreground hover:bg-card/20'
+                                  }`}
+                                >
+                                  <Icon className="w-3.5 h-3.5" /> {tab.label}
+                                </button>
+                              );
+                            })}
+                          </div>
+
+                          {/* Inner Tabs Contents */}
+                          <div className="pt-2">
+                            {activeTab === 'details' && (
+                              <DetailsTab item={item} isRealDashboard={isRealDashboard} />
+                            )}
+                            {activeTab === 'history' && (
+                              <HistoryTab newsId={item.id} currentItem={item} />
+                            )}
+                            {activeTab === 'clients' && (
+                              <ClientsTab newsId={item.id} />
+                            )}
+                            {activeTab === 'amend' && (
+                              <AmendTab item={item} onUpdateSuccess={() => {
+                                setExpandedId(null);
+                                refetch();
+                              }} />
+                            )}
+                          </div>
+                        </motion.div>
                       )}
-                    </div>
-                  )}
-                </div>
-              </CardContent>
-            </motion.div>
-          )}
-        </AnimatePresence>
-        
-        {/* Preview when collapsed - show first 2 critical/high items */}
-        {!showAllNews && filteredNews.length > 0 && (
-          <CardContent className="pt-0 pb-3">
-            <div className="space-y-2">
-              {filteredNews
-                .filter(n => n.impactLevel === 'critical' || n.impactLevel === 'high')
-                .slice(0, 2)
-                .map((item) => {
-                  const daysUntil = getDaysUntilEffective(item.effectiveDate);
-                  return (
-                    <div 
-                      key={item.id}
-                      className="flex items-center justify-between p-2 rounded-lg bg-card/30 border border-border/30"
-                    >
-                      <div className="flex items-center gap-2 flex-1 min-w-0">
-                        <div className={`w-1.5 h-6 rounded-full flex-shrink-0 ${
-                          item.impactLevel === 'critical' ? 'bg-red-500' : 'bg-orange-500'
-                        }`} />
-                        <span className="text-xs font-medium truncate">{item.title}</span>
-                      </div>
-                      <div className="flex items-center gap-2 flex-shrink-0">
-                        <Badge variant="outline" className="text-xs py-0">
-                          {item.authorityCode}
-                        </Badge>
-                        <span className={`text-xs ${daysUntil <= 7 ? 'text-red-400' : 'text-orange-400'}`}>
-                          {daysUntil}d
-                        </span>
-                      </div>
-                    </div>
-                  );
-                })}
-              {filteredNews.filter(n => n.impactLevel === 'critical' || n.impactLevel === 'high').length > 2 && (
-                <p className="text-xs text-center text-muted-foreground">
-                  +{filteredNews.filter(n => n.impactLevel === 'critical' || n.impactLevel === 'high').length - 2} more urgent updates...
-                </p>
-              )}
+                    </AnimatePresence>
+                  </motion.div>
+                );
+              })}
             </div>
-          </CardContent>
-        )}
+          )}
+        </CardContent>
       </Card>
     </div>
   );
