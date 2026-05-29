@@ -3,6 +3,7 @@
  * Real Supabase direct CRUD operations.
  */
 import { supabase } from '@/integrations/supabase/client';
+import { isValidUUID } from '@/lib/uuid-guard';
 
 export type IssuingAuthority =
   | 'GSTIN' | 'Income Tax' | 'MCA' | 'DGFT' | 'EPFO' | 'ESIC' | 'SEBI' | 'RBI' | 'Customs';
@@ -88,6 +89,7 @@ export async function saveLanguagePreference(
 // ─── Bilingual Notices CRUD ──────────────────────────────────────────────────
 
 export async function fetchBilingualNotices(caUserId: string): Promise<BilingualNotice[]> {
+  if (!isValidUUID(caUserId)) return [];
   const { data, error } = await (supabase as any)
     .from('bilingual_notices')
     .select('*')

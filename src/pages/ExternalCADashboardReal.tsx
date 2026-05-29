@@ -1383,7 +1383,7 @@ const ExternalCADashboardReal = () => {
   }, []);
 
   const { metrics, loading, refetch } = useCAMetrics();
-  const { caId, caFirmId } = useCAIdentity?.() || { caId: 'ca-001', caFirmId: 'firm-001' };
+  const { caId, caFirmId } = useCAIdentity();
   const [activeZone, setActiveZone] = useState<CADashboardZone>("command");
   const CA_API = (import.meta.env.VITE_CA_API_BASE_URL as string);
   // Role-based access control
@@ -1433,7 +1433,8 @@ const ExternalCADashboardReal = () => {
   const fetchClients = async () => {
     if (!isCABackendConfigured()) return;
     try {
-      const response = await fetch(`${COMPLIANCE_API}/ca/ca-001/clients`);
+      if (!caId) return;
+      const response = await fetch(`${COMPLIANCE_API}/ca/${caId}/clients`);
       const data = await response.json();
       if (data.success && data.clients) {
         setCompanies(data.clients.map((c: any) => ({
@@ -1481,7 +1482,7 @@ const ExternalCADashboardReal = () => {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({
-          ca_id: 'ca-001',
+          ca_id: caId || '',
           ca_name: 'Rajesh Kumar, CA',
           ca_email: 'ca@sannidh.ai',
           ...onboardForm

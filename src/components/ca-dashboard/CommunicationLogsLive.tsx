@@ -110,7 +110,7 @@ const getPriorityIndicator = (priority: string) => {
 
 export default function CommunicationLogs({
   isRealDashboard = false,
-  caId = 'ca-001',
+  caId = '',
 }: CommunicationLogsProps) {
   const [logs, setLogs] = useState<CommunicationLog[]>([]);
   const [filteredLogs, setFilteredLogs] = useState<CommunicationLog[]>([]);

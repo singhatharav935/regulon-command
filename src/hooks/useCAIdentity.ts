@@ -1,23 +1,27 @@
 /**
- * useCAIdentity — JWT-based CA Identity Resolution Hook
+ * useCAIdentity — Supabase Auth-Based CA Identity Resolution Hook
  * 
- * Reads the JWT from localStorage (Supabase session), decodes the sub claim,
- * and provides the real caId and caFirmId for use across all dashboard components.
- * Falls back to 'ca-001' when no authenticated session exists (local dev).
+ * Reads the authenticated user from Supabase auth session and provides
+ * the real caId (user UUID) and caFirmId for use across all dashboard components.
+ * 
+ * When no authenticated session exists, caId is null — downstream hooks and
+ * services MUST guard against null/invalid UUIDs before querying Supabase.
+ * 
+ * IMPORTANT: This hook NEVER returns a hardcoded fallback like 'ca-001'.
+ * Non-UUID strings cause PostgreSQL errors on UUID columns.
  */
 
 import { useState, useEffect } from 'react';
+import { supabase } from '@/integrations/supabase/client';
 
 export interface CAIdentity {
-  caId: string;
-  caFirmId: string;
+  caId: string | null;
+  caFirmId: string | null;
   email: string;
   role: string;
   isLoading: boolean;
+  isAuthenticated: boolean;
 }
-
-const FALLBACK_CA_ID = 'ca-001';
-const FALLBACK_FIRM_ID = 'firm-001';
 
 /**
  * Decode a JWT token without external dependencies
@@ -36,76 +40,102 @@ function decodeJWT(token: string): Record<string, unknown> | null {
   }
 }
 
-/**
- * Get the access token from Supabase session in localStorage
- */
-function getSupabaseToken(): string | null {
-  try {
-    // Supabase stores session under this key pattern
-    const keys = Object.keys(localStorage).filter(k => k.includes('supabase') && k.includes('auth-token'));
-    for (const key of keys) {
-      const raw = localStorage.getItem(key);
-      if (!raw) continue;
-      const parsed = JSON.parse(raw);
-      return parsed?.access_token || parsed?.currentSession?.access_token || null;
-    }
-  } catch {
-    return null;
-  }
-  return null;
-}
-
 export function useCAIdentity(): CAIdentity {
   const [identity, setIdentity] = useState<CAIdentity>({
-    caId: FALLBACK_CA_ID,
-    caFirmId: FALLBACK_FIRM_ID,
+    caId: null,
+    caFirmId: null,
     email: '',
     role: 'default',
     isLoading: true,
+    isAuthenticated: false,
   });
 
   useEffect(() => {
-    const resolve = () => {
-      const token = getSupabaseToken();
+    let mounted = true;
 
-      if (!token) {
-        setIdentity({
-          caId: FALLBACK_CA_ID,
-          caFirmId: FALLBACK_FIRM_ID,
-          email: 'dev@sannidh.ai',
-          role: 'admin',
-          isLoading: false,
-        });
-        return;
+    const resolve = async () => {
+      try {
+        // Use the Supabase auth API to get the current session — this returns a real UUID
+        const { data: { session } } = await supabase.auth.getSession();
+
+        if (!session?.user) {
+          if (mounted) {
+            setIdentity({
+              caId: null,
+              caFirmId: null,
+              email: '',
+              role: 'default',
+              isLoading: false,
+              isAuthenticated: false,
+            });
+          }
+          return;
+        }
+
+        const user = session.user;
+        const userId = user.id; // Always a valid UUID from Supabase
+
+        // Extract metadata from JWT claims for firm/role info
+        const accessToken = session.access_token;
+        const claims = accessToken ? decodeJWT(accessToken) : null;
+        const metadata = (claims?.user_metadata as Record<string, string>) || user.user_metadata || {};
+        const appMeta = (claims?.app_metadata as Record<string, string>) || user.app_metadata || {};
+
+        if (mounted) {
+          setIdentity({
+            caId: userId,
+            caFirmId: metadata.ca_firm_id || appMeta.ca_firm_id || `firm_${userId.slice(0, 8)}`,
+            email: user.email || '',
+            role: metadata.role || appMeta.role || 'senior_ca',
+            isLoading: false,
+            isAuthenticated: true,
+          });
+        }
+      } catch (err) {
+        console.warn('[useCAIdentity] Failed to resolve identity:', err);
+        if (mounted) {
+          setIdentity(prev => ({ ...prev, isLoading: false }));
+        }
       }
-
-      const claims = decodeJWT(token);
-      if (!claims) {
-        setIdentity(prev => ({ ...prev, isLoading: false }));
-        return;
-      }
-
-      // Supabase JWT claims:
-      // sub = user UUID, email = email, user_metadata for custom fields
-      const sub = (claims.sub as string) || FALLBACK_CA_ID;
-      const metadata = (claims.user_metadata as Record<string, string>) || {};
-      const appMeta = (claims.app_metadata as Record<string, string>) || {};
-
-      setIdentity({
-        caId: sub,
-        caFirmId: metadata.ca_firm_id || appMeta.ca_firm_id || `firm_${sub.slice(0, 8)}`,
-        email: (claims.email as string) || '',
-        role: metadata.role || appMeta.role || 'senior_ca',
-        isLoading: false,
-      });
     };
 
     resolve();
 
-    // Re-resolve if storage changes (login/logout events)
-    const handleStorage = () => resolve();
-    window.addEventListener('storage', handleStorage);
-    return () => window.removeEventListener('storage', handleStorage);
+    // Listen for auth state changes (login/logout/token refresh)
+    const { data: { subscription } } = supabase.auth.onAuthStateChange((_event, session) => {
+      if (!mounted) return;
+
+      if (!session?.user) {
+        setIdentity({
+          caId: null,
+          caFirmId: null,
+          email: '',
+          role: 'default',
+          isLoading: false,
+          isAuthenticated: false,
+        });
+        return;
+      }
+
+      const user = session.user;
+      const userId = user.id;
+      const metadata = user.user_metadata || {};
+      const appMeta = user.app_metadata || {};
+
+      setIdentity({
+        caId: userId,
+        caFirmId: metadata.ca_firm_id || appMeta.ca_firm_id || `firm_${userId.slice(0, 8)}`,
+        email: user.email || '',
+        role: metadata.role || appMeta.role || 'senior_ca',
+        isLoading: false,
+        isAuthenticated: true,
+      });
+    });
+
+    return () => {
+      mounted = false;
+      subscription.unsubscribe();
+    };
   }, []);
 
   return identity;

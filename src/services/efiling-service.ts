@@ -3,6 +3,7 @@
  * Real Supabase queries. No mock data.
  */
 import { supabase } from '@/integrations/supabase/client';
+import { isValidUUID } from '@/lib/uuid-guard';
 
 // ─── Types ────────────────────────────────────────────────────────────────────
 
@@ -126,6 +127,7 @@ export interface EfilingDashboardSummary {
 // ─── Portal Credentials ───────────────────────────────────────────────────────
 
 export async function fetchCredentials(caUserId: string): Promise<EfilingCredential[]> {
+  if (!isValidUUID(caUserId)) return [];
   const { data, error } = await (supabase as any)
     .from('efiling_portal_credentials')
     .select('*')
@@ -211,6 +213,7 @@ export async function fetchFilingJobs(
   caUserId: string,
   filters?: { status?: EfilingStatus; portal?: EfilingPortal; entityId?: string }
 ): Promise<EfilingJob[]> {
+  if (!isValidUUID(caUserId)) return [];
   let query = (supabase as any)
     .from('efiling_jobs')
     .select('*')
@@ -425,6 +428,7 @@ export async function deleteJobDocument(docId: string, filePath?: string): Promi
 // ─── Templates ────────────────────────────────────────────────────────────────
 
 export async function fetchTemplates(caUserId: string): Promise<EfilingTemplate[]> {
+  if (!isValidUUID(caUserId)) return [];
   const { data, error } = await (supabase as any)
     .from('efiling_templates')
     .select('*')
@@ -454,6 +458,11 @@ export async function createTemplate(
 export async function fetchDashboardSummary(
   caUserId: string
 ): Promise<EfilingDashboardSummary> {
+  if (!isValidUUID(caUserId)) return {
+    total_filings: 0, draft_count: 0, ready_count: 0, submitted_count: 0,
+    acknowledged_count: 0, approved_count: 0, rejected_count: 0,
+    overdue_count: 0, due_this_week: 0,
+  };
   const { data, error } = await (supabase as any)
     .from('efiling_dashboard_summary')
     .select('*')

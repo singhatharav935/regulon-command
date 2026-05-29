@@ -4,6 +4,7 @@
  * No mock data.
  */
 import { supabase } from '@/integrations/supabase/client';
+import { isValidUUID } from '@/lib/uuid-guard';
 
 // ─── Types ────────────────────────────────────────────────────────────────────
 
@@ -160,6 +161,7 @@ export async function generateWebhookSecret(): Promise<{
 // ─── API Keys ─────────────────────────────────────────────────────────────────
 
 export async function fetchApiKeys(caUserId: string): Promise<EnterpriseApiKey[]> {
+  if (!isValidUUID(caUserId)) return [];
   const { data, error } = await (supabase as any)
     .from('enterprise_api_keys')
     .select('*')
@@ -183,6 +185,7 @@ export async function createApiKey(
     expires_at?: string;
   }
 ): Promise<{ apiKey: EnterpriseApiKey; plainTextKey: string }> {
+  if (!isValidUUID(caUserId)) throw new Error('Not authenticated');
   const { plainText, hash, prefix } = await generateApiKey();
 
   const { data, error } = await (supabase as any)
@@ -298,6 +301,7 @@ export async function fetchApiKeyUsageSummary(
 // ─── Webhooks ─────────────────────────────────────────────────────────────────
 
 export async function fetchWebhooks(caUserId: string): Promise<WebhookEndpoint[]> {
+  if (!isValidUUID(caUserId)) return [];
   const { data, error } = await (supabase as any)
     .from('webhook_endpoints')
     .select('*')
@@ -318,6 +322,7 @@ export async function createWebhook(
     max_failures_before_disable?: number;
   }
 ): Promise<{ webhook: WebhookEndpoint; signingSecret: string }> {
+  if (!isValidUUID(caUserId)) throw new Error('Not authenticated');
   const { plainText, hash, prefix } = await generateWebhookSecret();
 
   const { data, error } = await (supabase as any)
@@ -644,6 +649,7 @@ export async function fetchRecentActivity(
   caUserId: string,
   limit: number = 50
 ): Promise<ApiAccessLog[]> {
+  if (!isValidUUID(caUserId)) return [];
   // Fetch all key IDs for this CA user first
   const { data: keys, error: keysErr } = await (supabase as any)
     .from('enterprise_api_keys')

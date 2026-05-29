@@ -211,7 +211,7 @@ const TeamRbacHub: React.FC = () => {
       return;
     }
     try {
-      await inviteMember(inviteEmail.trim(), inviteRole, caId || 'ca-001');
+      await inviteMember(inviteEmail.trim(), inviteRole, caId || '');
       setShowInviteMember(false);
       setInviteEmail('');
       setInviteRole('Viewer');

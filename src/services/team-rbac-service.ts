@@ -3,6 +3,7 @@
  * All functions query Supabase directly. No mock data.
  */
 import { supabase } from '@/integrations/supabase/client';
+import { isValidUUID } from '@/lib/uuid-guard';
 
 // ─── Types ───────────────────────────────────────────────────────────────────
 
@@ -89,6 +90,7 @@ export interface RbacActivityLog {
  * Invokes the bootstrap_ca_rbac_system stored procedure to seed system roles & default permissions
  */
 export async function bootstrapRbac(caUserId: string): Promise<void> {
+  if (!isValidUUID(caUserId)) return;
   try {
     const { error } = await supabase.rpc('bootstrap_ca_rbac_system', { ca_id: caUserId });
     if (error) {
@@ -106,6 +108,7 @@ export async function bootstrapRbac(caUserId: string): Promise<void> {
  * Fallback JS-based seeding in case RPC execution is restricted
  */
 async function fallbackBootstrap(caUserId: string): Promise<void> {
+  if (!isValidUUID(caUserId)) return;
   const { data: existingRoles } = await (supabase as any)
     .from('rbac_roles')
     .select('id')
@@ -167,6 +170,7 @@ async function fallbackBootstrap(caUserId: string): Promise<void> {
 // ─── Teams CRUD ──────────────────────────────────────────────────────────────
 
 export async function fetchTeams(caUserId: string): Promise<RbacTeam[]> {
+  if (!isValidUUID(caUserId)) return [];
   // First, guarantee that system roles exist for this CA
   await bootstrapRbac(caUserId);
 
@@ -379,6 +383,7 @@ export async function removeTeamMember(id: string): Promise<void> {
 // ─── Roles & Permissions ─────────────────────────────────────────────────────
 
 export async function fetchRoles(caUserId: string): Promise<RbacRole[]> {
+  if (!isValidUUID(caUserId)) return [];
   const { data, error } = await (supabase as any)
     .from('rbac_roles')
     .select('*')

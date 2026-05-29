@@ -6,6 +6,7 @@
 
 import { useState, useEffect, useRef, useCallback } from "react";
 import { isCABackendConfigured } from "@/lib/ca-backend-guard";
+import { supabase } from "@/integrations/supabase/client";
 import { motion, AnimatePresence } from "framer-motion";
 import {
   Card,
@@ -154,7 +155,7 @@ const SannidhAIAgent = () => {
             body: JSON.stringify({
               event: "wake_word_detected",
               timestamp: new Date().toISOString(),
-              ca_id: "ca-001",
+              ca_id: (await supabase.auth.getUser()).data.user?.id || '',
               responded_with_tts: true,
             }),
           }).catch(() => { /* Wake-word logging skipped — backend unavailable */ });
@@ -379,7 +380,7 @@ const SannidhAIAgent = () => {
             },
             body: JSON.stringify({
               command: query,
-              ca_id: "ca-001",
+              ca_id: (await supabase.auth.getUser()).data.user?.id || '',
               timestamp: new Date().toISOString(),
             }),
           });
