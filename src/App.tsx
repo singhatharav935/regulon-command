@@ -22,6 +22,7 @@ import AboutPage from "./pages/AboutPage";
 import { AuthProvider } from "./hooks/use-auth";
 import { EnhancedAuthProvider } from "./lib/enhanced-auth-context";
 import ProtectedRoute from "./components/auth/ProtectedRoute";
+import { LanguageProvider } from "./contexts/LanguageContext";
 import RoleLandingRoute from "./components/auth/RoleLandingRoute";
 import { PersonaAuthProvider } from "./lib/persona-auth-context";
 import { PersonaRoute } from "./components/auth/PersonaRoute";
@@ -81,8 +82,9 @@ const RouteFallback = () => (
 const App = () => (
   <QueryClientProvider client={queryClient}>
     <AuthProvider>
-      <EnhancedAuthProvider>
-        <PersonaAuthProvider>
+      <LanguageProvider>
+        <EnhancedAuthProvider>
+          <PersonaAuthProvider>
           <CAAgentProvider>
           <TooltipProvider>
           <Toaster />
@@ -228,6 +230,7 @@ const App = () => (
       </CAAgentProvider>
       </PersonaAuthProvider>
       </EnhancedAuthProvider>
+      </LanguageProvider>
     </AuthProvider>
   </QueryClientProvider>
 );
