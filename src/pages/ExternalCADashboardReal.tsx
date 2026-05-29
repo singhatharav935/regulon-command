@@ -27,6 +27,9 @@ import ClientFinancialVault from "@/components/ca-dashboard/ClientFinancialVault
 import MultiEntityConsolidatedReporting from "@/components/ca-dashboard/MultiEntityConsolidatedReporting";
 import EFilingIntegration from "@/components/ca-dashboard/EFilingIntegration";
 import PaymentTaxLiability from "@/components/ca-dashboard/PaymentTaxLiability";
+import EnterpriseApiWebhooks from "@/components/ca-dashboard/EnterpriseApiWebhooks";
+import ErpIntegrationHub from "@/components/ca-dashboard/ErpIntegrationHub";
+import DocumentOcrHub from "@/components/ca-dashboard/DocumentOcrHub";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
@@ -80,6 +83,9 @@ import {
   Network,
   FileCheck2,
   IndianRupee,
+  Code2,
+  Database,
+  FileSearch,
 } from "lucide-react";
 import { toast } from "sonner";
 import useCAMetrics from "@/hooks/useCAMetrics";
@@ -1662,6 +1668,15 @@ const ExternalCADashboardReal = () => {
                     <TabsTrigger value="operations" className="px-4 py-2.5 rounded-lg data-[state=active]:bg-emerald-500/20 data-[state=active]:text-emerald-400 font-medium text-xs">Firm Operations</TabsTrigger>
                     <TabsTrigger value="ai-swarm" className="px-4 py-2.5 rounded-lg data-[state=active]:bg-purple-500/20 data-[state=active]:text-purple-400 font-medium text-xs">Regulatory News</TabsTrigger>
                     <TabsTrigger value="calculations" className="px-4 py-2.5 rounded-lg data-[state=active]:bg-rose-500/20 data-[state=active]:text-rose-400 font-medium text-xs">Calculators</TabsTrigger>
+                    <TabsTrigger value="enterprise-api" className="px-4 py-2.5 rounded-lg data-[state=active]:bg-amber-500/20 data-[state=active]:text-amber-400 font-medium text-xs flex items-center gap-1">
+                      <Code2 className="w-3.5 h-3.5" />API & Webhooks
+                    </TabsTrigger>
+                    <TabsTrigger value="erp-integration" className="px-4 py-2.5 rounded-lg data-[state=active]:bg-teal-500/20 data-[state=active]:text-teal-400 font-medium text-xs flex items-center gap-1">
+                      <Database className="w-3.5 h-3.5" />ERP Integration
+                    </TabsTrigger>
+                    <TabsTrigger value="doc-ocr" className="px-4 py-2.5 rounded-lg data-[state=active]:bg-violet-500/20 data-[state=active]:text-violet-400 font-medium text-xs flex items-center gap-1">
+                      <FileSearch className="w-3.5 h-3.5" />Docs & OCR
+                    </TabsTrigger>
                  </TabsList>
                  <Button onClick={() => setIsDrawerOpen(true)} className="ml-4 flex-shrink-0 bg-gradient-to-r from-purple-600 to-cyan-600 hover:from-purple-500 hover:to-cyan-500 text-white border-0 shadow-[0_0_20px_rgba(139,92,246,0.3)]">
                     <Cpu className="w-4 h-4 mr-2" /> Open Engine
@@ -1828,6 +1843,21 @@ const ExternalCADashboardReal = () => {
                 <div className="flex flex-col space-y-8">
                   <ComplianceModulesHub />
                 </div>
+              </TabsContent>
+
+              {/* ZONE 6: ENTERPRISE API & WEBHOOKS */}
+              <TabsContent value="enterprise-api" className="m-0 focus-visible:outline-none focus-visible:ring-0 space-y-8">
+                <EnterpriseApiWebhooks />
+              </TabsContent>
+
+              {/* ZONE 7: ERP / ACCOUNTING INTEGRATION */}
+              <TabsContent value="erp-integration" className="m-0 focus-visible:outline-none focus-visible:ring-0 space-y-8">
+                <ErpIntegrationHub />
+              </TabsContent>
+
+              {/* ZONE 8: DOCUMENT MANAGEMENT & OCR */}
+              <TabsContent value="doc-ocr" className="m-0 focus-visible:outline-none focus-visible:ring-0 space-y-8">
+                <DocumentOcrHub />
               </TabsContent>
             </Tabs>
           </div>
