@@ -5,37 +5,39 @@ import { QueryClient, QueryClientProvider } from "@tanstack/react-query";
 import { BrowserRouter, Routes, Route, Navigate } from "react-router-dom";
 import { Suspense, lazy } from "react";
 import { CAAgentProvider } from "./components/agents/CAAgentOrchestrator";
-import Index from "./pages/Index";
-import AuthReal from "./pages/Auth-Real-Enhanced";
-import AccountSettingsPage from "./pages/AccountSettings";
-import { UserOnboardingFlow } from "./components/auth/UserOnboardingFlow";
-import ForgotPassword from "./pages/ForgotPassword";
-import ResetPassword from "./pages/ResetPassword";
-import TermsOfService from "./pages/TermsOfService";
-import PrivacyPolicy from "./pages/PrivacyPolicy";
-import Disclaimers from "./pages/Disclaimers";
-import RefundPolicy from "./pages/RefundPolicy";
-import ComplianceCenterStandalone from "./pages/ComplianceCenterStandalone";
-import NotFound from "./pages/NotFound";
-import MarketingOptionPage from "./pages/MarketingOptionPage";
-import AboutPage from "./pages/AboutPage";
+const Index = lazy(() => import("./pages/Index"));
+const AuthReal = lazy(() => import("./pages/Auth-Real-Enhanced"));
+const AccountSettingsPage = lazy(() => import("./pages/AccountSettings"));
+const UserOnboardingFlow = lazy(() => import("./components/auth/UserOnboardingFlow").then(module => ({ default: module.UserOnboardingFlow })));
+const ForgotPassword = lazy(() => import("./pages/ForgotPassword"));
+const ResetPassword = lazy(() => import("./pages/ResetPassword"));
+const TermsOfService = lazy(() => import("./pages/TermsOfService"));
+const PrivacyPolicy = lazy(() => import("./pages/PrivacyPolicy"));
+const Disclaimers = lazy(() => import("./pages/Disclaimers"));
+const RefundPolicy = lazy(() => import("./pages/RefundPolicy"));
+const ComplianceCenterStandalone = lazy(() => import("./pages/ComplianceCenterStandalone"));
+const NotFound = lazy(() => import("./pages/NotFound"));
+const MarketingOptionPage = lazy(() => import("./pages/MarketingOptionPage"));
+const AboutPage = lazy(() => import("./pages/AboutPage"));
+
+// Dashboards & Personas
+const RoleLandingRoute = lazy(() => import("./components/auth/RoleLandingRoute"));
+const PersonaSelector = lazy(() => import("./components/auth/PersonaSelector").then(module => ({ default: module.PersonaSelector })));
+const ExternalCADashboardFull = lazy(() => import("./pages/dashboards/phases/ExternalCADashboardFull").then(module => ({ default: module.ExternalCADashboardFull })));
+const InhouseCADashboard = lazy(() => import("./pages/dashboards/InhouseCADashboard").then(module => ({ default: module.InhouseCADashboard })));
+const CAFirmDashboardReal = lazy(() => import("./pages/dashboards/CAFirmDashboardReal").then(module => ({ default: module.CAFirmDashboardReal })));
+const LawyerDashboard = lazy(() => import("./pages/dashboards/LawyerDashboard").then(module => ({ default: module.LawyerDashboard })));
+const InhouseLawyerDashboardReal = lazy(() => import("./pages/dashboards/InhouseLawyerDashboardReal").then(module => ({ default: module.InhouseLawyerDashboardReal })));
+const OwnerDashboard = lazy(() => import("./pages/dashboards/OwnerDashboard").then(module => ({ default: module.OwnerDashboard })));
+const PersonaAdminDashboard = lazy(() => import("./pages/dashboards/AdminDashboard").then(module => ({ default: module.AdminDashboard })));
+
+// Contexts & Route Utilities (Eagerly loaded)
 import { AuthProvider } from "./hooks/use-auth";
 import { EnhancedAuthProvider } from "./lib/enhanced-auth-context";
 import ProtectedRoute from "./components/auth/ProtectedRoute";
 import { LanguageProvider } from "./contexts/LanguageContext";
-import RoleLandingRoute from "./components/auth/RoleLandingRoute";
 import { PersonaAuthProvider } from "./lib/persona-auth-context";
 import { PersonaRoute } from "./components/auth/PersonaRoute";
-import { PersonaSelector } from "./components/auth/PersonaSelector";
-// import { ExternalCADashboard } from "./pages/dashboards/ExternalCADashboard"; // Removed - using RealCADashboard
-import { ExternalCADashboardFull } from "./pages/dashboards/phases/ExternalCADashboardFull";
-// import { CAFirmDashboardFull } from "./pages/dashboards/phases/CAFirmDashboardFull";
-import { InhouseCADashboard } from "./pages/dashboards/InhouseCADashboard";
-import { CAFirmDashboardReal } from "./pages/dashboards/CAFirmDashboardReal";
-import { LawyerDashboard } from "./pages/dashboards/LawyerDashboard";
-import InhouseLawyerDashboardReal from "./pages/dashboards/InhouseLawyerDashboardReal";
-import { OwnerDashboard } from "./pages/dashboards/OwnerDashboard";
-import { AdminDashboard as PersonaAdminDashboard } from "./pages/dashboards/AdminDashboard";
 
 const Dashboard = lazy(() => import("./pages/Dashboard"));
 const CADashboard = lazy(() => import("./pages/CADashboard"));
