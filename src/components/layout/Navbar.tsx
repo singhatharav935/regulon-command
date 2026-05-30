@@ -126,7 +126,7 @@ const Navbar = () => {
         <div className="flex items-center justify-between h-16">
           {/* Logo */}
           <Link to="/" className="flex items-center gap-2.5">
-            <img src="/favicon.ico" alt="Sannidh" className="w-8 h-8 rounded-lg" />
+            <img src="/favicon.ico" alt="Sannidh" className="w-8 h-8 rounded-lg object-cover" />
             <span className="text-xl font-bold text-gradient-primary">SANNIDH</span>
           </Link>
 
@@ -231,7 +231,7 @@ const Navbar = () => {
               /* ── Avatar Dropdown (on dashboard pages) ── */
               <DropdownMenu>
                 <DropdownMenuTrigger asChild>
-                  <button className="relative flex items-center gap-2.5 rounded-full border border-border/50 bg-card/50 hover:bg-card/80 pl-3 pr-1.5 py-1 transition-all cursor-pointer outline-none focus:ring-2 focus:ring-cyan-500/30">
+                  <button aria-label="User Menu" className="relative flex items-center gap-2.5 rounded-full border border-border/50 bg-card/50 hover:bg-card/80 pl-3 pr-1.5 py-1 transition-all cursor-pointer outline-none focus:ring-2 focus:ring-cyan-500/30">
                     <span className="text-sm font-medium text-foreground/80 hidden xl:block max-w-[120px] truncate">
                       {userName}
                     </span>
@@ -279,7 +279,7 @@ const Navbar = () => {
                 {/* Small avatar for non-dashboard pages */}
                 <DropdownMenu>
                   <DropdownMenuTrigger asChild>
-                    <button className="rounded-full outline-none focus:ring-2 focus:ring-cyan-500/30 cursor-pointer">
+                    <button aria-label="User Menu" className="rounded-full outline-none focus:ring-2 focus:ring-cyan-500/30 cursor-pointer">
                       <Avatar className="w-8 h-8 border border-border/50 hover:border-cyan-500/50 transition-colors">
                         <AvatarImage src={avatarUrl || undefined} alt={userName} />
                         <AvatarFallback className="text-xs font-bold bg-gradient-to-br from-cyan-500/30 to-blue-600/30 text-cyan-300">
@@ -331,6 +331,7 @@ const Navbar = () => {
 
           {/* Mobile Menu Button */}
           <button
+            aria-label="Toggle Mobile Menu"
             className="lg:hidden p-2 text-muted-foreground hover:text-foreground"
             onClick={() => setMobileOpen(!mobileOpen)}
           >
