@@ -743,7 +743,36 @@ const LiveAIDraftingEngine = () => {
       addAgentLog(`📝 Reading real text from uploaded document...`);
       
       let extractedText = "";
-      if (uploadedFile.type === 'application/pdf' || uploadedFile.name.toLowerCase().endsWith('.pdf')) {
+
+      if (uploadedFile.type.startsWith('image/')) {
+        // --- PHASE 3: ADVANCED VISION OCR FOR SCANNED NOTICES ---
+        addAgentLog(`👁️ Initializing SANNIDH Vision OCR Engine for scanned document...`);
+        
+        // Convert image to base64
+        const base64 = await new Promise<string>((resolve, reject) => {
+          const reader = new FileReader();
+          reader.readAsDataURL(uploadedFile);
+          reader.onload = () => resolve((reader.result as string).split(',')[1]);
+          reader.onerror = error => reject(error);
+        });
+
+        const { supabase } = await import('@/integrations/supabase/client');
+        const { data: ocrRes, error: ocrErr } = await supabase.functions.invoke('document-vision-ocr', {
+          body: {
+            base64Image: base64,
+            mimeType: uploadedFile.type
+          }
+        });
+
+        if (ocrErr || !ocrRes?.success) {
+          throw new Error("Vision OCR failed to read the document.");
+        }
+        
+        extractedText = ocrRes.text;
+        addAgentLog(`✅ Vision OCR successfully read ${extractedText.length} characters from scan.`);
+        
+      } else if (uploadedFile.type === 'application/pdf' || uploadedFile.name.toLowerCase().endsWith('.pdf')) {
+        // --- DIGITAL PDF EXTRACTION ---
         try {
           const pdfjsLib = await import('pdfjs-dist');
           pdfjsLib.GlobalWorkerOptions.workerSrc = `//cdnjs.cloudflare.com/ajax/libs/pdf.js/${pdfjsLib.version}/pdf.worker.min.mjs`;
@@ -756,7 +785,12 @@ const LiveAIDraftingEngine = () => {
             const textContent = await page.getTextContent();
             extractedText += textContent.items.map((item: any) => item.str).join(' ') + "\n";
           }
-          addAgentLog(`✅ Successfully extracted ${extractedText.length} characters from PDF.`);
+          addAgentLog(`✅ Successfully extracted ${extractedText.length} characters from digital PDF.`);
+          
+          // Fallback if PDF was just a scanned image wrapper
+          if (extractedText.trim().length < 50) {
+            addAgentLog(`⚠️ PDF appears to be a scanned image. Please upload as JPEG/PNG for Vision OCR.`);
+          }
         } catch (pdfErr) {
           console.error("PDF parsing error", pdfErr);
           extractedText = "Error extracting text. Proceeding with filename analysis: " + uploadedFile.name;
@@ -767,7 +801,7 @@ const LiveAIDraftingEngine = () => {
       }
 
       if (!extractedText || extractedText.trim() === "") {
-        throw new Error("Could not extract any readable text from the document.");
+        throw new Error("Could not extract any readable text from the document. If it is a scanned PDF, please screenshot it and upload as an image for Vision OCR.");
       }
 
       // 2. Create the Notice record in the database

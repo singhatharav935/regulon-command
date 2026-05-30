@@ -261,7 +261,40 @@ async function saveToSupabase(
       .from("regulatory_news_feed")
       .upsert(row, { onConflict: "title,authority_code", ignoreDuplicates: true });
 
-    if (!error) saved++;
+    if (!error) {
+      saved++;
+      
+      // Autonomous Legal Brain Update: Seed into Vector DB
+      try {
+        const embedRes = await fetch("https://api.openai.com/v1/embeddings", {
+          method: "POST",
+          headers: {
+            "Content-Type": "application/json",
+            "Authorization": `Bearer ${Deno.env.get("OPENAI_API_KEY")}`
+          },
+          body: JSON.stringify({
+            model: "text-embedding-3-small",
+            input: `${authorityCode} ${item.category}: ${item.title} - ${item.summary}`
+          })
+        });
+
+        if (embedRes.ok) {
+          const embedData = await embedRes.json();
+          const vector = embedData.data[0].embedding;
+          
+          await db.from('legal_corpus_vectors').insert({
+            act_name: `Recent ${authorityCode} ${item.category}`,
+            section_reference: item.title.substring(0, 50),
+            category: authorityCode,
+            content: `Official update from ${authorityName} on ${item.published_date || today}: ${item.title}. Summary: ${item.summary}. Required actions: ${item.required_actions?.join(", ")}`,
+            embedding: vector
+          });
+          console.log(`[Vector DB] Autonomously learned: ${item.title}`);
+        }
+      } catch (embedErr) {
+        console.error(`[Vector DB] Failed to learn ${item.title}:`, embedErr);
+      }
+    }
   }
 
   return saved;
