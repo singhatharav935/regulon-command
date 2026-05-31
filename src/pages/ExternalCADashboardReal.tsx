@@ -100,6 +100,7 @@ import {
 import { toast } from "sonner";
 import useCAMetrics from "@/hooks/useCAMetrics";
 import { useCAIdentity } from "@/hooks/useCAIdentity";
+import { useRealtimeSync } from "@/hooks/useRealtimeSync";
 import { addCompany as addCompanyAPI } from "@/services/api";
 // CAAgentProvider is now global — provided at App.tsx level
 import { CACommandCenterHeader } from "@/components/agents/CACommandCenterHeader";
@@ -1431,6 +1432,9 @@ const ExternalCADashboardReal = () => {
 
   const { metrics, loading, refetch } = useCAMetrics();
   const { caId, caFirmId } = useCAIdentity();
+
+  // Realtime sync: re-fetch when ANY device changes data in Supabase
+  useRealtimeSync(refetch);
   const [activeZone, setActiveZone] = useState<CADashboardZone>("command");
   const CA_API = (import.meta.env.VITE_CA_API_BASE_URL as string);
   // Role-based access control
