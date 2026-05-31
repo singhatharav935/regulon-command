@@ -156,6 +156,15 @@ const DailyGovernanceBrief = () => {
 
   useEffect(() => {
     fetchDailyBrief();
+    const interval = setInterval(fetchDailyBrief, 60000);
+    const onVisible = () => { if (document.visibilityState === 'visible') fetchDailyBrief(); };
+    document.addEventListener('visibilitychange', onVisible);
+    window.addEventListener('focus', fetchDailyBrief);
+    return () => {
+      clearInterval(interval);
+      document.removeEventListener('visibilitychange', onVisible);
+      window.removeEventListener('focus', fetchDailyBrief);
+    };
   }, []);
 
   const handleRefresh = () => {

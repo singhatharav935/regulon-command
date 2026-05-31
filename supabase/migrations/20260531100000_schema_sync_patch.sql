@@ -288,7 +288,48 @@ DECLARE
     'ALTER TABLE public.user_verifications ADD COLUMN IF NOT EXISTS document_path TEXT',
     'ALTER TABLE public.user_verifications ADD COLUMN IF NOT EXISTS verification_data JSONB DEFAULT ''{}''',
     'ALTER TABLE public.user_verifications ADD COLUMN IF NOT EXISTS reviewed_by UUID',
-    'ALTER TABLE public.user_verifications ADD COLUMN IF NOT EXISTS reviewed_at TIMESTAMPTZ'
+    'ALTER TABLE public.user_verifications ADD COLUMN IF NOT EXISTS reviewed_at TIMESTAMPTZ',
+
+    -- companies — LocalizationHub queries company_name, gst_number, pan_number
+    'ALTER TABLE public.companies ADD COLUMN IF NOT EXISTS company_name TEXT',
+    'ALTER TABLE public.companies ADD COLUMN IF NOT EXISTS gst_number TEXT',
+    'ALTER TABLE public.companies ADD COLUMN IF NOT EXISTS pan_number TEXT',
+    'ALTER TABLE public.companies ADD COLUMN IF NOT EXISTS risk TEXT DEFAULT ''Medium''',
+
+    -- compliance_tasks — OfflinePwaHub queries client_name, task_title
+    'ALTER TABLE public.compliance_tasks ADD COLUMN IF NOT EXISTS client_name TEXT',
+    'ALTER TABLE public.compliance_tasks ADD COLUMN IF NOT EXISTS task_title TEXT',
+
+    -- ca_clients — extra columns queried by dashboard
+    'ALTER TABLE public.ca_clients ADD COLUMN IF NOT EXISTS company_name TEXT DEFAULT ''''',
+    'ALTER TABLE public.ca_clients ADD COLUMN IF NOT EXISTS gstin TEXT',
+    'ALTER TABLE public.ca_clients ADD COLUMN IF NOT EXISTS risk_level TEXT DEFAULT ''Medium''',
+    'ALTER TABLE public.ca_clients ADD COLUMN IF NOT EXISTS compliance_health_score INTEGER DEFAULT 75',
+
+    -- draft_runs — used by CA firms view
+    'ALTER TABLE public.draft_runs ADD COLUMN IF NOT EXISTS user_id UUID',
+
+    -- ca_firm_invoices — extra columns
+    'ALTER TABLE public.ca_firm_invoices ADD COLUMN IF NOT EXISTS firm_id UUID',
+    'ALTER TABLE public.ca_firm_invoices ADD COLUMN IF NOT EXISTS payment_status TEXT DEFAULT ''draft''',
+    'ALTER TABLE public.ca_firm_invoices ADD COLUMN IF NOT EXISTS total_amount NUMERIC(14,2) DEFAULT 0',
+    'ALTER TABLE public.ca_firm_invoices ADD COLUMN IF NOT EXISTS payment_received_date DATE',
+
+    -- client_module_calculations — MultiPortalSyncPanel FK
+    'ALTER TABLE public.client_module_calculations ADD COLUMN IF NOT EXISTS module_label TEXT DEFAULT ''''',
+    'ALTER TABLE public.client_module_calculations ADD COLUMN IF NOT EXISTS module_id TEXT DEFAULT ''''',
+
+    -- ca_task_history — ordering by completed_at
+    'ALTER TABLE public.ca_task_history ADD COLUMN IF NOT EXISTS completed_at TIMESTAMPTZ DEFAULT now()',
+
+    -- communication_logs — various columns
+    'ALTER TABLE public.communication_logs ADD COLUMN IF NOT EXISTS direction TEXT DEFAULT ''outbound''',
+    'ALTER TABLE public.communication_logs ADD COLUMN IF NOT EXISTS ai_agent_id TEXT',
+
+    -- deadlines — used by StatutoryDeadlineCalendar
+    'ALTER TABLE public.deadlines ADD COLUMN IF NOT EXISTS type TEXT',
+    'ALTER TABLE public.deadlines ADD COLUMN IF NOT EXISTS deadline DATE',
+    'ALTER TABLE public.deadlines ADD COLUMN IF NOT EXISTS authority TEXT'
   ];
 BEGIN
   FOREACH _sql IN ARRAY _statements LOOP
