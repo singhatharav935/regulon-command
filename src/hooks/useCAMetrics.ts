@@ -48,7 +48,19 @@ export const useCAMetrics = (): UseCAMetricsReturn => {
   useEffect(() => {
     fetchMetrics();
     const interval = setInterval(fetchMetrics, 60000); // Refresh every minute
-    return () => clearInterval(interval);
+
+    // Refetch when tab becomes visible (catches changes from other sessions)
+    const handleVisibility = () => {
+      if (document.visibilityState === 'visible') fetchMetrics();
+    };
+    document.addEventListener('visibilitychange', handleVisibility);
+    window.addEventListener('focus', fetchMetrics);
+
+    return () => {
+      clearInterval(interval);
+      document.removeEventListener('visibilitychange', handleVisibility);
+      window.removeEventListener('focus', fetchMetrics);
+    };
   }, [fetchMetrics]);
 
   return { metrics, loading, error, refetch: fetchMetrics };
