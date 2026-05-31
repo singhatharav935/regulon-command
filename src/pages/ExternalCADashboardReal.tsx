@@ -809,9 +809,13 @@ const LiveAIDraftingEngine = () => {
       const { supabase } = await import('@/integrations/supabase/client');
       const { data: caUser } = await supabase.auth.getUser();
       
-      // We'll just attach it to the first active company for the CA for demo purposes
-      const { data: companies } = await supabase.from('companies').select('id').eq('ca_user_id', caUser?.user?.id).limit(1);
-      const companyId = companies?.[0]?.id;
+      // Find the first company this CA manages via company_members (companies has no ca_user_id column)
+      const { data: memberships } = await supabase
+        .from('company_members')
+        .select('company_id')
+        .eq('user_id', caUser?.user?.id)
+        .limit(1);
+      const companyId = memberships?.[0]?.company_id;
 
       if (!companyId) throw new Error("No active clients found to map this notice to.");
 
