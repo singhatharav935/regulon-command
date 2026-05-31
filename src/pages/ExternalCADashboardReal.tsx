@@ -1,40 +1,40 @@
-import { useState, useEffect, useRef, useCallback } from "react";
+import { useState, useEffect, useRef, useCallback, Suspense, lazy } from "react";
 import { isCABackendConfigured } from "@/lib/ca-backend-guard";
 import { getLiveRegulatoryNews, getStatutoryDeadlines } from "@/services/ca-supabase-service";
-import MultiClientMasterHub from "@/components/ca-dashboard/MultiClientMasterHub";
-import PracticeBillingPanel from "@/components/ca-dashboard/PracticeBillingPanel";
-import SecureFileSharingPanel from "@/components/ca-dashboard/SecureFileSharingPanel";
-import StatutoryDeadlineCalendar from "@/components/ca-dashboard/StatutoryDeadlineCalendar";
+const MultiClientMasterHub = lazy(() => import("@/components/ca-dashboard/MultiClientMasterHub"));
+const PracticeBillingPanel = lazy(() => import("@/components/ca-dashboard/PracticeBillingPanel"));
+const SecureFileSharingPanel = lazy(() => import("@/components/ca-dashboard/SecureFileSharingPanel"));
+const StatutoryDeadlineCalendar = lazy(() => import("@/components/ca-dashboard/StatutoryDeadlineCalendar"));
 import { useNavigate } from "react-router-dom";
 import { motion, AnimatePresence } from "framer-motion";
 import Navbar from "@/components/layout/Navbar";
 import Footer from "@/components/layout/Footer";
-import SannidhAIAgent from "@/components/ai-agent/SannidhAIAgent";
-import AIDraftingEngine from "@/components/ca-dashboard/AIDraftingEngine";
-import TaskFilingManagement from "@/components/ca-dashboard/TaskFilingManagement";
-import ClientDependencyTracker from "@/components/ca-dashboard/ClientDependencyTracker";
-import RegulatoryNewsRuleImpact from "@/components/ca-dashboard/RegulatoryNewsRuleImpact";
-import ComplianceHealthChangeLog from "@/components/ca-dashboard/ComplianceHealthChangeLog";
-import AuditInspectionSupport from "@/components/ca-dashboard/AuditInspectionSupport";
-import CommunicationLogsLive from "@/components/ca-dashboard/CommunicationLogsLive";
-import CAAnalyticsPerformance from "@/components/ca-dashboard/CAAnalyticsPerformance";
-import FirmBrandingSettings from "@/components/ca-dashboard/FirmBrandingSettings";
+const SannidhAIAgent = lazy(() => import("@/components/ai-agent/SannidhAIAgent"));
+const AIDraftingEngine = lazy(() => import("@/components/ca-dashboard/AIDraftingEngine"));
+const TaskFilingManagement = lazy(() => import("@/components/ca-dashboard/TaskFilingManagement"));
+const ClientDependencyTracker = lazy(() => import("@/components/ca-dashboard/ClientDependencyTracker"));
+const RegulatoryNewsRuleImpact = lazy(() => import("@/components/ca-dashboard/RegulatoryNewsRuleImpact"));
+const ComplianceHealthChangeLog = lazy(() => import("@/components/ca-dashboard/ComplianceHealthChangeLog"));
+const AuditInspectionSupport = lazy(() => import("@/components/ca-dashboard/AuditInspectionSupport"));
+const CommunicationLogsLive = lazy(() => import("@/components/ca-dashboard/CommunicationLogsLive"));
+const CAAnalyticsPerformance = lazy(() => import("@/components/ca-dashboard/CAAnalyticsPerformance"));
+const FirmBrandingSettings = lazy(() => import("@/components/ca-dashboard/FirmBrandingSettings"));
 
-import ComplianceModulesHub from "@/components/ca-dashboard/compliance-modules/ComplianceModulesHub";
-import ApprovalWorkflowHub from "@/components/ca-dashboard/ApprovalWorkflowHub";
-import ClientPortfolioSection from "@/components/ca-dashboard/ClientPortfolioSection";
-import ClientFinancialVault from "@/components/ca-dashboard/ClientFinancialVault";
-import MultiEntityConsolidatedReporting from "@/components/ca-dashboard/MultiEntityConsolidatedReporting";
-import EFilingIntegration from "@/components/ca-dashboard/EFilingIntegration";
-import PaymentTaxLiability from "@/components/ca-dashboard/PaymentTaxLiability";
-import EnterpriseApiWebhooks from "@/components/ca-dashboard/EnterpriseApiWebhooks";
-import ErpIntegrationHub from "@/components/ca-dashboard/ErpIntegrationHub";
-import DocumentOcrHub from "@/components/ca-dashboard/DocumentOcrHub";
-import TeamRbacHub from "@/components/ca-dashboard/TeamRbacHub";
-import NotificationAlertHub from "@/components/ca-dashboard/NotificationAlertHub";
-import AuditTrailHub from "@/components/ca-dashboard/AuditTrailHub";
-import LocalizationHub from "@/components/ca-dashboard/LocalizationHub";
-import OfflinePwaHub from "@/components/ca-dashboard/OfflinePwaHub";
+const ComplianceModulesHub = lazy(() => import("@/components/ca-dashboard/compliance-modules/ComplianceModulesHub"));
+const ApprovalWorkflowHub = lazy(() => import("@/components/ca-dashboard/ApprovalWorkflowHub"));
+const ClientPortfolioSection = lazy(() => import("@/components/ca-dashboard/ClientPortfolioSection"));
+const ClientFinancialVault = lazy(() => import("@/components/ca-dashboard/ClientFinancialVault"));
+const MultiEntityConsolidatedReporting = lazy(() => import("@/components/ca-dashboard/MultiEntityConsolidatedReporting"));
+const EFilingIntegration = lazy(() => import("@/components/ca-dashboard/EFilingIntegration"));
+const PaymentTaxLiability = lazy(() => import("@/components/ca-dashboard/PaymentTaxLiability"));
+const EnterpriseApiWebhooks = lazy(() => import("@/components/ca-dashboard/EnterpriseApiWebhooks"));
+const ErpIntegrationHub = lazy(() => import("@/components/ca-dashboard/ErpIntegrationHub"));
+const DocumentOcrHub = lazy(() => import("@/components/ca-dashboard/DocumentOcrHub"));
+const TeamRbacHub = lazy(() => import("@/components/ca-dashboard/TeamRbacHub"));
+const NotificationAlertHub = lazy(() => import("@/components/ca-dashboard/NotificationAlertHub"));
+const AuditTrailHub = lazy(() => import("@/components/ca-dashboard/AuditTrailHub"));
+const LocalizationHub = lazy(() => import("@/components/ca-dashboard/LocalizationHub"));
+const OfflinePwaHub = lazy(() => import("@/components/ca-dashboard/OfflinePwaHub"));
 import { isOnline } from "@/services/offline-sync-service";
 import { useLanguage, LANGUAGE_LABELS } from "@/contexts/LanguageContext";
 import { Globe2, Wifi, WifiOff } from "lucide-react";
@@ -1821,6 +1821,8 @@ const ExternalCADashboardReal = () => {
                     <Cpu className="w-4 h-4 mr-2" /> Open Engine
                  </Button>
               </div>
+              {/* ALL LAZY LOADED ZONES START HERE */}
+              <Suspense fallback={<div className="p-12 flex justify-center items-center"><Loader className="w-8 h-8 animate-spin text-cyan-500" /></div>}>
               {/* ZONE 0: MULTI-ENTITY & CONSOLIDATED REPORTING */}
               <TabsContent value="multi-entity" className="m-0 focus-visible:outline-none focus-visible:ring-0">
                 <MultiEntityConsolidatedReporting />
@@ -2023,6 +2025,7 @@ const ExternalCADashboardReal = () => {
               <TabsContent value="offline-hub" className="m-0 focus-visible:outline-none focus-visible:ring-0 space-y-8">
                 <OfflinePwaHub />
               </TabsContent>
+              </Suspense>
             </Tabs>
           </div>
 
