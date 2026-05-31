@@ -358,10 +358,1126 @@ export type Database = {
         }
         Relationships: []
       }
+      consent_requests: {
+        Row: {
+          id: string
+          company_id: string | null
+          ca_user_id: string
+          client_name: string
+          client_email: string | null
+          client_phone: string | null
+          gstin: string | null
+          pan: string | null
+          cin: string | null
+          ca_name: string | null
+          consent_status: "pending" | "approved" | "rejected"
+          consent_token: string
+          email_sent: boolean
+          whatsapp_sent: boolean
+          responded_at: string | null
+          created_at: string
+          updated_at: string
+        }
+        Insert: {
+          id?: string
+          company_id?: string | null
+          ca_user_id: string
+          client_name: string
+          client_email?: string | null
+          client_phone?: string | null
+          gstin?: string | null
+          pan?: string | null
+          cin?: string | null
+          ca_name?: string | null
+          consent_status?: "pending" | "approved" | "rejected"
+          consent_token?: string
+          email_sent?: boolean
+          whatsapp_sent?: boolean
+          responded_at?: string | null
+          created_at?: string
+          updated_at?: string
+        }
+        Update: {
+          id?: string
+          company_id?: string | null
+          ca_user_id?: string
+          client_name?: string
+          client_email?: string | null
+          client_phone?: string | null
+          gstin?: string | null
+          pan?: string | null
+          cin?: string | null
+          ca_name?: string | null
+          consent_status?: "pending" | "approved" | "rejected"
+          consent_token?: string
+          email_sent?: boolean
+          whatsapp_sent?: boolean
+          responded_at?: string | null
+          created_at?: string
+          updated_at?: string
+        }
+        Relationships: []
+      }
+      client_govt_notices: {
+        Row: {
+          id: string
+          company_id: string
+          ca_user_id: string
+          department: string
+          notice_type: string
+          notice_number: string | null
+          issue_date: string | null
+          due_date: string | null
+          financial_year: string | null
+          raw_text_content: string | null
+          ai_draft_response: string | null
+          status: "detected" | "in_progress" | "replied" | "closed"
+          created_at: string
+          updated_at: string
+        }
+        Insert: {
+          id?: string
+          company_id: string
+          ca_user_id: string
+          department: string
+          notice_type: string
+          notice_number?: string | null
+          issue_date?: string | null
+          due_date?: string | null
+          financial_year?: string | null
+          raw_text_content?: string | null
+          ai_draft_response?: string | null
+          status?: "detected" | "in_progress" | "replied" | "closed"
+          created_at?: string
+          updated_at?: string
+        }
+        Update: {
+          id?: string
+          company_id?: string
+          ca_user_id?: string
+          department?: string
+          notice_type?: string
+          notice_number?: string | null
+          issue_date?: string | null
+          due_date?: string | null
+          financial_year?: string | null
+          raw_text_content?: string | null
+          ai_draft_response?: string | null
+          status?: "detected" | "in_progress" | "replied" | "closed"
+          created_at?: string
+          updated_at?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "client_govt_notices_company_id_fkey"
+            columns: ["company_id"]
+            isOneToOne: false
+            referencedRelation: "companies"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+      ca_dependencies: {
+        Row: {
+          id: string
+          company_id: string
+          ca_user_id: string
+          document_name: string
+          description: string | null
+          due_date: string | null
+          status: "pending" | "uploaded" | "verified"
+          urgency: "critical" | "high" | "medium" | "low"
+          created_at: string
+          updated_at: string
+        }
+        Insert: {
+          id?: string
+          company_id: string
+          ca_user_id: string
+          document_name: string
+          description?: string | null
+          due_date?: string | null
+          status?: "pending" | "uploaded" | "verified"
+          urgency?: "critical" | "high" | "medium" | "low"
+          created_at?: string
+          updated_at?: string
+        }
+        Update: {
+          id?: string
+          company_id?: string
+          ca_user_id?: string
+          document_name?: string
+          description?: string | null
+          due_date?: string | null
+          status?: "pending" | "uploaded" | "verified"
+          urgency?: "critical" | "high" | "medium" | "low"
+          created_at?: string
+          updated_at?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "ca_dependencies_company_id_fkey"
+            columns: ["company_id"]
+            isOneToOne: false
+            referencedRelation: "companies"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+      communication_logs: {
+        Row: {
+          id: string
+          company_id: string | null
+          ca_user_id: string
+          type: "email" | "whatsapp" | "system" | "sms"
+          direction: "inbound" | "outbound" | "system"
+          subject: string | null
+          content: string
+          recipient: string | null
+          status: "sent" | "delivered" | "pending" | "failed" | "read"
+          ai_agent_id: string | null
+          created_at: string
+        }
+        Insert: {
+          id?: string
+          company_id?: string | null
+          ca_user_id: string
+          type?: "email" | "whatsapp" | "system" | "sms"
+          direction?: "inbound" | "outbound" | "system"
+          subject?: string | null
+          content: string
+          recipient?: string | null
+          status?: "sent" | "delivered" | "pending" | "failed" | "read"
+          ai_agent_id?: string | null
+          created_at?: string
+        }
+        Update: {
+          id?: string
+          company_id?: string | null
+          ca_user_id?: string
+          type?: "email" | "whatsapp" | "system" | "sms"
+          direction?: "inbound" | "outbound" | "system"
+          subject?: string | null
+          content?: string
+          recipient?: string | null
+          status?: "sent" | "delivered" | "pending" | "failed" | "read"
+          ai_agent_id?: string | null
+          created_at?: string
+        }
+        Relationships: []
+      }
+      ca_task_history: {
+        Row: {
+          id: string
+          company_id: string | null
+          ca_user_id: string
+          task_name: string
+          task_type: string | null
+          description: string | null
+          suggested_fee: number
+          is_billed: boolean
+          invoice_id: string | null
+          completed_at: string
+          created_at: string
+        }
+        Insert: {
+          id?: string
+          company_id?: string | null
+          ca_user_id: string
+          task_name: string
+          task_type?: string | null
+          description?: string | null
+          suggested_fee?: number
+          is_billed?: boolean
+          invoice_id?: string | null
+          completed_at?: string
+          created_at?: string
+        }
+        Update: {
+          id?: string
+          company_id?: string | null
+          ca_user_id?: string
+          task_name?: string
+          task_type?: string | null
+          description?: string | null
+          suggested_fee?: number
+          is_billed?: boolean
+          invoice_id?: string | null
+          completed_at?: string
+          created_at?: string
+        }
+        Relationships: []
+      }
+      ca_firm_invoices: {
+        Row: {
+          id: string
+          firm_id: string
+          company_id: string | null
+          invoice_number: string | null
+          invoice_date: string
+          due_date: string | null
+          total_amount: number
+          tax_amount: number | null
+          discount_amount: number | null
+          payment_status: "draft" | "unpaid" | "paid" | "overdue" | "cancelled"
+          payment_received_date: string | null
+          line_items: Json
+          notes: string | null
+          created_at: string
+          updated_at: string
+        }
+        Insert: {
+          id?: string
+          firm_id: string
+          company_id?: string | null
+          invoice_number?: string | null
+          invoice_date?: string
+          due_date?: string | null
+          total_amount?: number
+          tax_amount?: number | null
+          discount_amount?: number | null
+          payment_status?: "draft" | "unpaid" | "paid" | "overdue" | "cancelled"
+          payment_received_date?: string | null
+          line_items?: Json
+          notes?: string | null
+          created_at?: string
+          updated_at?: string
+        }
+        Update: {
+          id?: string
+          firm_id?: string
+          company_id?: string | null
+          invoice_number?: string | null
+          invoice_date?: string
+          due_date?: string | null
+          total_amount?: number
+          tax_amount?: number | null
+          discount_amount?: number | null
+          payment_status?: "draft" | "unpaid" | "paid" | "overdue" | "cancelled"
+          payment_received_date?: string | null
+          line_items?: Json
+          notes?: string | null
+          created_at?: string
+          updated_at?: string
+        }
+        Relationships: []
+      }
+      client_financial_books: {
+        Row: {
+          id: string
+          company_id: string
+          ca_user_id: string
+          financial_year: string
+          book_type: string
+          book_data: Json
+          summary_metrics: Json
+          created_at: string
+          updated_at: string
+        }
+        Insert: {
+          id?: string
+          company_id: string
+          ca_user_id: string
+          financial_year: string
+          book_type: string
+          book_data?: Json
+          summary_metrics?: Json
+          created_at?: string
+          updated_at?: string
+        }
+        Update: {
+          id?: string
+          company_id?: string
+          ca_user_id?: string
+          financial_year?: string
+          book_type?: string
+          book_data?: Json
+          summary_metrics?: Json
+          created_at?: string
+          updated_at?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "client_financial_books_company_id_fkey"
+            columns: ["company_id"]
+            isOneToOne: false
+            referencedRelation: "companies"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+      client_module_calculations: {
+        Row: {
+          id: string
+          company_id: string
+          ca_user_id: string
+          financial_year: string
+          module_id: string
+          module_label: string
+          calculation_data: Json
+          summary: string | null
+          status: "pending" | "in_progress" | "completed" | "filed"
+          created_at: string
+          updated_at: string
+        }
+        Insert: {
+          id?: string
+          company_id: string
+          ca_user_id: string
+          financial_year: string
+          module_id: string
+          module_label: string
+          calculation_data?: Json
+          summary?: string | null
+          status?: "pending" | "in_progress" | "completed" | "filed"
+          created_at?: string
+          updated_at?: string
+        }
+        Update: {
+          id?: string
+          company_id?: string
+          ca_user_id?: string
+          financial_year?: string
+          module_id?: string
+          module_label?: string
+          calculation_data?: Json
+          summary?: string | null
+          status?: "pending" | "in_progress" | "completed" | "filed"
+          created_at?: string
+          updated_at?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "client_module_calculations_company_id_fkey"
+            columns: ["company_id"]
+            isOneToOne: false
+            referencedRelation: "companies"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+      client_notice_data_room: {
+        Row: {
+          id: string
+          company_id: string
+          ca_user_id: string
+          financial_year: string
+          readiness_score: number
+          total_modules_completed: number
+          executive_summary: string | null
+          key_financials: Json
+          created_at: string
+          updated_at: string
+        }
+        Insert: {
+          id?: string
+          company_id: string
+          ca_user_id: string
+          financial_year: string
+          readiness_score?: number
+          total_modules_completed?: number
+          executive_summary?: string | null
+          key_financials?: Json
+          created_at?: string
+          updated_at?: string
+        }
+        Update: {
+          id?: string
+          company_id?: string
+          ca_user_id?: string
+          financial_year?: string
+          readiness_score?: number
+          total_modules_completed?: number
+          executive_summary?: string | null
+          key_financials?: Json
+          created_at?: string
+          updated_at?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "client_notice_data_room_company_id_fkey"
+            columns: ["company_id"]
+            isOneToOne: false
+            referencedRelation: "companies"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+      ca_clients: {
+        Row: {
+          id: string
+          ca_user_id: string
+          company_id: string | null
+          company_name: string
+          gstin: string | null
+          pan: string | null
+          cin: string | null
+          contact_email: string | null
+          contact_phone: string | null
+          industry: string | null
+          compliance_health_score: number | null
+          risk_level: "Low" | "Medium" | "High" | null
+          status: "active" | "inactive" | "pending" | "waiting_for_client"
+          onboarded_at: string | null
+          created_at: string
+          updated_at: string
+        }
+        Insert: {
+          id?: string
+          ca_user_id: string
+          company_id?: string | null
+          company_name: string
+          gstin?: string | null
+          pan?: string | null
+          cin?: string | null
+          contact_email?: string | null
+          contact_phone?: string | null
+          industry?: string | null
+          compliance_health_score?: number | null
+          risk_level?: "Low" | "Medium" | "High" | null
+          status?: "active" | "inactive" | "pending" | "waiting_for_client"
+          onboarded_at?: string | null
+          created_at?: string
+          updated_at?: string
+        }
+        Update: {
+          id?: string
+          ca_user_id?: string
+          company_id?: string | null
+          company_name?: string
+          gstin?: string | null
+          pan?: string | null
+          cin?: string | null
+          contact_email?: string | null
+          contact_phone?: string | null
+          industry?: string | null
+          compliance_health_score?: number | null
+          risk_level?: "Low" | "Medium" | "High" | null
+          status?: "active" | "inactive" | "pending" | "waiting_for_client"
+          onboarded_at?: string | null
+          created_at?: string
+          updated_at?: string
+        }
+        Relationships: []
+      }
+      audit_trail_events: {
+        Row: {
+          id: string
+          ca_user_id: string
+          company_id: string | null
+          event_type: string
+          entity_type: string | null
+          entity_id: string | null
+          action: string
+          old_values: Json | null
+          new_values: Json | null
+          metadata: Json
+          ip_address: string | null
+          user_agent: string | null
+          created_at: string
+        }
+        Insert: {
+          id?: string
+          ca_user_id: string
+          company_id?: string | null
+          event_type: string
+          entity_type?: string | null
+          entity_id?: string | null
+          action: string
+          old_values?: Json | null
+          new_values?: Json | null
+          metadata?: Json
+          ip_address?: string | null
+          user_agent?: string | null
+          created_at?: string
+        }
+        Update: {
+          id?: string
+          ca_user_id?: string
+          company_id?: string | null
+          event_type?: string
+          entity_type?: string | null
+          entity_id?: string | null
+          action?: string
+          old_values?: Json | null
+          new_values?: Json | null
+          metadata?: Json
+          ip_address?: string | null
+          user_agent?: string | null
+          created_at?: string
+        }
+        Relationships: []
+      }
+      compliance_scores: {
+        Row: {
+          id: string
+          ca_user_id: string
+          company_id: string
+          score: number
+          score_date: string
+          breakdown: Json
+          notes: string | null
+          created_at: string
+        }
+        Insert: {
+          id?: string
+          ca_user_id: string
+          company_id: string
+          score: number
+          score_date?: string
+          breakdown?: Json
+          notes?: string | null
+          created_at?: string
+        }
+        Update: {
+          id?: string
+          ca_user_id?: string
+          company_id?: string
+          score?: number
+          score_date?: string
+          breakdown?: Json
+          notes?: string | null
+          created_at?: string
+        }
+        Relationships: []
+      }
+      compliance_reports: {
+        Row: {
+          id: string
+          ca_user_id: string
+          company_id: string | null
+          report_name: string
+          report_type: string
+          period_from: string | null
+          period_to: string | null
+          content: Json
+          file_path: string | null
+          status: "draft" | "generated" | "published" | "archived"
+          generated_at: string | null
+          created_at: string
+          updated_at: string
+        }
+        Insert: {
+          id?: string
+          ca_user_id: string
+          company_id?: string | null
+          report_name: string
+          report_type: string
+          period_from?: string | null
+          period_to?: string | null
+          content?: Json
+          file_path?: string | null
+          status?: "draft" | "generated" | "published" | "archived"
+          generated_at?: string | null
+          created_at?: string
+          updated_at?: string
+        }
+        Update: {
+          id?: string
+          ca_user_id?: string
+          company_id?: string | null
+          report_name?: string
+          report_type?: string
+          period_from?: string | null
+          period_to?: string | null
+          content?: Json
+          file_path?: string | null
+          status?: "draft" | "generated" | "published" | "archived"
+          generated_at?: string | null
+          created_at?: string
+          updated_at?: string
+        }
+        Relationships: []
+      }
+      data_retention_policies: {
+        Row: {
+          id: string
+          ca_user_id: string
+          policy_name: string
+          entity_type: string
+          retention_days: number
+          auto_delete: boolean
+          is_active: boolean
+          created_at: string
+          updated_at: string
+        }
+        Insert: {
+          id?: string
+          ca_user_id: string
+          policy_name: string
+          entity_type: string
+          retention_days?: number
+          auto_delete?: boolean
+          is_active?: boolean
+          created_at?: string
+          updated_at?: string
+        }
+        Update: {
+          id?: string
+          ca_user_id?: string
+          policy_name?: string
+          entity_type?: string
+          retention_days?: number
+          auto_delete?: boolean
+          is_active?: boolean
+          created_at?: string
+          updated_at?: string
+        }
+        Relationships: []
+      }
+      audit_alert_subscriptions: {
+        Row: {
+          id: string
+          ca_user_id: string
+          alert_type: string
+          conditions: Json
+          channels: Json
+          is_active: boolean
+          created_at: string
+          updated_at: string
+        }
+        Insert: {
+          id?: string
+          ca_user_id: string
+          alert_type: string
+          conditions?: Json
+          channels?: Json
+          is_active?: boolean
+          created_at?: string
+          updated_at?: string
+        }
+        Update: {
+          id?: string
+          ca_user_id?: string
+          alert_type?: string
+          conditions?: Json
+          channels?: Json
+          is_active?: boolean
+          created_at?: string
+          updated_at?: string
+        }
+        Relationships: []
+      }
+      compliance_calendar_events: {
+        Row: {
+          id: string
+          ca_user_id: string
+          company_id: string | null
+          title: string
+          description: string | null
+          event_type: "deadline" | "filing" | "payment" | "meeting" | "reminder" | "holiday"
+          event_date: string
+          due_date: string | null
+          regulator: string | null
+          priority: "critical" | "high" | "medium" | "low"
+          status: "pending" | "in_progress" | "completed" | "overdue" | "cancelled"
+          recurrence: string | null
+          metadata: Json
+          created_at: string
+          updated_at: string
+        }
+        Insert: {
+          id?: string
+          ca_user_id: string
+          company_id?: string | null
+          title: string
+          description?: string | null
+          event_type?: "deadline" | "filing" | "payment" | "meeting" | "reminder" | "holiday"
+          event_date: string
+          due_date?: string | null
+          regulator?: string | null
+          priority?: "critical" | "high" | "medium" | "low"
+          status?: "pending" | "in_progress" | "completed" | "overdue" | "cancelled"
+          recurrence?: string | null
+          metadata?: Json
+          created_at?: string
+          updated_at?: string
+        }
+        Update: {
+          id?: string
+          ca_user_id?: string
+          company_id?: string | null
+          title?: string
+          description?: string | null
+          event_type?: "deadline" | "filing" | "payment" | "meeting" | "reminder" | "holiday"
+          event_date?: string
+          due_date?: string | null
+          regulator?: string | null
+          priority?: "critical" | "high" | "medium" | "low"
+          status?: "pending" | "in_progress" | "completed" | "overdue" | "cancelled"
+          recurrence?: string | null
+          metadata?: Json
+          created_at?: string
+          updated_at?: string
+        }
+        Relationships: []
+      }
+      deadline_reminders: {
+        Row: {
+          id: string
+          ca_user_id: string
+          event_id: string | null
+          company_id: string | null
+          reminder_type: "email" | "whatsapp" | "sms" | "in_app"
+          remind_at: string
+          message: string | null
+          is_sent: boolean
+          sent_at: string | null
+          created_at: string
+        }
+        Insert: {
+          id?: string
+          ca_user_id: string
+          event_id?: string | null
+          company_id?: string | null
+          reminder_type?: "email" | "whatsapp" | "sms" | "in_app"
+          remind_at: string
+          message?: string | null
+          is_sent?: boolean
+          sent_at?: string | null
+          created_at?: string
+        }
+        Update: {
+          id?: string
+          ca_user_id?: string
+          event_id?: string | null
+          company_id?: string | null
+          reminder_type?: "email" | "whatsapp" | "sms" | "in_app"
+          remind_at?: string
+          message?: string | null
+          is_sent?: boolean
+          sent_at?: string | null
+          created_at?: string
+        }
+        Relationships: []
+      }
+      escalation_rules: {
+        Row: {
+          id: string
+          ca_user_id: string
+          rule_name: string
+          trigger_condition: string
+          escalate_to: string | null
+          channels: Json
+          is_active: boolean
+          created_at: string
+          updated_at: string
+        }
+        Insert: {
+          id?: string
+          ca_user_id: string
+          rule_name: string
+          trigger_condition: string
+          escalate_to?: string | null
+          channels?: Json
+          is_active?: boolean
+          created_at?: string
+          updated_at?: string
+        }
+        Update: {
+          id?: string
+          ca_user_id?: string
+          rule_name?: string
+          trigger_condition?: string
+          escalate_to?: string | null
+          channels?: Json
+          is_active?: boolean
+          created_at?: string
+          updated_at?: string
+        }
+        Relationships: []
+      }
+      escalation_logs: {
+        Row: {
+          id: string
+          ca_user_id: string
+          rule_id: string | null
+          event_id: string | null
+          company_id: string | null
+          triggered_at: string
+          resolved_at: string | null
+          outcome: string | null
+          created_at: string
+        }
+        Insert: {
+          id?: string
+          ca_user_id: string
+          rule_id?: string | null
+          event_id?: string | null
+          company_id?: string | null
+          triggered_at?: string
+          resolved_at?: string | null
+          outcome?: string | null
+          created_at?: string
+        }
+        Update: {
+          id?: string
+          ca_user_id?: string
+          rule_id?: string | null
+          event_id?: string | null
+          company_id?: string | null
+          triggered_at?: string
+          resolved_at?: string | null
+          outcome?: string | null
+          created_at?: string
+        }
+        Relationships: []
+      }
+      lawyer_review_requests: {
+        Row: {
+          id: string
+          ca_user_id: string
+          company_id: string | null
+          draft_id: string | null
+          notice_id: string | null
+          request_type: string
+          priority: "critical" | "high" | "medium" | "low"
+          description: string | null
+          draft_content: string | null
+          lawyer_notes: string | null
+          status: "pending" | "assigned" | "in_review" | "completed" | "rejected"
+          assigned_to: string | null
+          completed_at: string | null
+          created_at: string
+          updated_at: string
+        }
+        Insert: {
+          id?: string
+          ca_user_id: string
+          company_id?: string | null
+          draft_id?: string | null
+          notice_id?: string | null
+          request_type?: string
+          priority?: "critical" | "high" | "medium" | "low"
+          description?: string | null
+          draft_content?: string | null
+          lawyer_notes?: string | null
+          status?: "pending" | "assigned" | "in_review" | "completed" | "rejected"
+          assigned_to?: string | null
+          completed_at?: string | null
+          created_at?: string
+          updated_at?: string
+        }
+        Update: {
+          id?: string
+          ca_user_id?: string
+          company_id?: string | null
+          draft_id?: string | null
+          notice_id?: string | null
+          request_type?: string
+          priority?: "critical" | "high" | "medium" | "low"
+          description?: string | null
+          draft_content?: string | null
+          lawyer_notes?: string | null
+          status?: "pending" | "assigned" | "in_review" | "completed" | "rejected"
+          assigned_to?: string | null
+          completed_at?: string | null
+          created_at?: string
+          updated_at?: string
+        }
+        Relationships: []
+      }
+      draft_runs: {
+        Row: {
+          id: string
+          ca_user_id: string
+          company_id: string | null
+          notice_id: string | null
+          document_type: string
+          draft_mode: "ai" | "manual" | "template"
+          draft_content: string | null
+          status: "pending" | "generating" | "generated" | "under_review" | "approved" | "rejected"
+          ca_action: string | null
+          content_hash: string | null
+          worm_seal: string | null
+          metadata: Json
+          created_at: string
+          updated_at: string
+        }
+        Insert: {
+          id?: string
+          ca_user_id: string
+          company_id?: string | null
+          notice_id?: string | null
+          document_type: string
+          draft_mode?: "ai" | "manual" | "template"
+          draft_content?: string | null
+          status?: "pending" | "generating" | "generated" | "under_review" | "approved" | "rejected"
+          ca_action?: string | null
+          content_hash?: string | null
+          worm_seal?: string | null
+          metadata?: Json
+          created_at?: string
+          updated_at?: string
+        }
+        Update: {
+          id?: string
+          ca_user_id?: string
+          company_id?: string | null
+          notice_id?: string | null
+          document_type?: string
+          draft_mode?: "ai" | "manual" | "template"
+          draft_content?: string | null
+          status?: "pending" | "generating" | "generated" | "under_review" | "approved" | "rejected"
+          ca_action?: string | null
+          content_hash?: string | null
+          worm_seal?: string | null
+          metadata?: Json
+          created_at?: string
+          updated_at?: string
+        }
+        Relationships: []
+      }
+      ca_firm_members: {
+        Row: {
+          id: string
+          firm_id: string
+          user_id: string
+          name: string | null
+          email: string | null
+          role: "partner" | "manager" | "associate" | "intern" | "admin"
+          status: "active" | "inactive" | "pending"
+          joined_at: string | null
+          created_at: string
+          updated_at: string
+        }
+        Insert: {
+          id?: string
+          firm_id: string
+          user_id: string
+          name?: string | null
+          email?: string | null
+          role?: "partner" | "manager" | "associate" | "intern" | "admin"
+          status?: "active" | "inactive" | "pending"
+          joined_at?: string | null
+          created_at?: string
+          updated_at?: string
+        }
+        Update: {
+          id?: string
+          firm_id?: string
+          user_id?: string
+          name?: string | null
+          email?: string | null
+          role?: "partner" | "manager" | "associate" | "intern" | "admin"
+          status?: "active" | "inactive" | "pending"
+          joined_at?: string | null
+          created_at?: string
+          updated_at?: string
+        }
+        Relationships: []
+      }
+      ca_firm_clients: {
+        Row: {
+          id: string
+          firm_id: string
+          company_id: string | null
+          client_name: string
+          gstin: string | null
+          pan: string | null
+          email: string | null
+          phone: string | null
+          status: "active" | "inactive" | "pending" | "onboarding"
+          risk_level: "Low" | "Medium" | "High" | null
+          created_at: string
+          updated_at: string
+        }
+        Insert: {
+          id?: string
+          firm_id: string
+          company_id?: string | null
+          client_name: string
+          gstin?: string | null
+          pan?: string | null
+          email?: string | null
+          phone?: string | null
+          status?: "active" | "inactive" | "pending" | "onboarding"
+          risk_level?: "Low" | "Medium" | "High" | null
+          created_at?: string
+          updated_at?: string
+        }
+        Update: {
+          id?: string
+          firm_id?: string
+          company_id?: string | null
+          client_name?: string
+          gstin?: string | null
+          pan?: string | null
+          email?: string | null
+          phone?: string | null
+          status?: "active" | "inactive" | "pending" | "onboarding"
+          risk_level?: "Low" | "Medium" | "High" | null
+          created_at?: string
+          updated_at?: string
+        }
+        Relationships: []
+      }
+      ca_assignments: {
+        Row: {
+          id: string
+          firm_id: string
+          firm_member_id: string | null
+          firm_client_id: string
+          assignment_type: string | null
+          status: "active" | "completed" | "cancelled"
+          assigned_at: string
+          completed_at: string | null
+          created_at: string
+        }
+        Insert: {
+          id?: string
+          firm_id: string
+          firm_member_id?: string | null
+          firm_client_id: string
+          assignment_type?: string | null
+          status?: "active" | "completed" | "cancelled"
+          assigned_at?: string
+          completed_at?: string | null
+          created_at?: string
+        }
+        Update: {
+          id?: string
+          firm_id?: string
+          firm_member_id?: string | null
+          firm_client_id?: string
+          assignment_type?: string | null
+          status?: "active" | "completed" | "cancelled"
+          assigned_at?: string
+          completed_at?: string | null
+          created_at?: string
+        }
+        Relationships: []
+      }
     }
     Views: {
-      [_ in never]: never
-    }
+      upcoming_deadlines_detailed: {
+        Row: {
+          id: string | null
+          ca_user_id: string | null
+          company_id: string | null
+          company_name: string | null
+          title: string | null
+          event_type: string | null
+          event_date: string | null
+          due_date: string | null
+          regulator: string | null
+          priority: string | null
+          status: string | null
+          days_remaining: number | null
+        }
+        Relationships: []
+      }
+      calendar_dashboard_summary: {
+        Row: {
+          ca_user_id: string | null
+          pending_count: number | null
+          overdue_count: number | null
+          due_today_count: number | null
+          due_this_week_count: number | null
+        }
+        Relationships: []
+      }
+
     Functions: {
       has_role: {
         Args: {

@@ -159,8 +159,8 @@ export default function ComplianceHealthChangeLog({
       // Fetch recent government notices for these clients
       const clientIds = clients.map((c: any) => c.id);
       const { data: notices } = await supabase
-        .from('govt_notices')
-        .select('company_id, notice_type, authority, created_at, status')
+        .from('client_govt_notices')
+        .select('company_id, notice_type, department, created_at, status')
         .in('company_id', clientIds)
         .order('created_at', { ascending: false })
         .limit(50);
@@ -187,14 +187,14 @@ export default function ComplianceHealthChangeLog({
           change_percentage: Math.abs(score - prevScore),
           change_type: score >= prevScore ? 'increase' : 'decrease',
           reason: hasNotices
-            ? `${clientNotices.length} govt notice(s) received — ${latestNotice.notice_type} from ${latestNotice.authority}`
+            ? `${clientNotices.length} govt notice(s) received — ${latestNotice.notice_type} from ${latestNotice.department}`
             : score >= 80
             ? 'All filings up to date — No pending compliance action'
             : 'Compliance score below threshold — review required',
           reason_category: hasNotices ? 'govt_notice' : score < 60 ? 'deadline_missed' : 'system_update',
           action_by: 'SANNIDH AI Swarm',
           affected_compliance: hasNotices
-            ? clientNotices.map((n: any) => n.authority).filter((v: string, i: number, a: string[]) => a.indexOf(v) === i)
+            ? clientNotices.map((n: any) => n.department).filter((v: string, i: number, a: string[]) => a.indexOf(v) === i)
             : ['GST', 'MCA', 'Income Tax'],
           timestamp: hasNotices ? latestNotice.created_at : new Date().toISOString(),
           ai_analysis: client.risk_level === 'High'
