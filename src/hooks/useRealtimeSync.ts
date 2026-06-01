@@ -19,8 +19,7 @@ const WATCHED_TABLES = [
   'compliance_tasks',
   'ca_clients',
   'consent_requests',
-  'document_vault',
-  'regulatory_news_feed',
+  'documents',
   'ca_firm_invoices',
 ];
 
