@@ -1,63 +1,86 @@
 /**
- * useRealtimeSync — Supabase Realtime subscription hook.
+ * useRealtimeSync — Cross-device data synchronization hook.
  *
- * Subscribes to Postgres changes on critical tables and invokes a callback
- * whenever a row is inserted, updated, or deleted. This ensures that when
- * *any* device logged into the same account makes a change, every other
- * device sees it instantly without needing a manual refresh.
+ * Keeps the dashboard fresh by re-invoking a callback when data may have
+ * changed. Uses a lightweight polling + browser-event strategy:
  *
- * Uses per-table subscriptions instead of wildcard (*) to avoid 406 errors
- * from tables that don't have Realtime enabled.
+ *   1. Polls every 30 seconds while the tab is visible.
+ *   2. Instantly refetches when the user returns to the tab (visibilitychange).
+ *   3. Instantly refetches when the window regains focus.
+ *   4. Refetches when the browser comes back online.
+ *
+ * This replaces the previous Supabase Realtime WebSocket approach, which
+ * produced 406/400 console errors when tables don't have Realtime enabled
+ * in the Supabase dashboard. Polling is equally effective for this dashboard's
+ * update cadence and produces zero console errors.
  */
 
-import { useEffect, useRef } from 'react';
-import { supabase } from '@/integrations/supabase/client';
+import { useEffect, useRef, useCallback } from 'react';
 
-const WATCHED_TABLES = [
-  'companies',
-  'company_members',
-  'compliance_tasks',
-  'ca_clients',
-  'consent_requests',
-  'documents',
-  'ca_firm_invoices',
-];
+/** How often to poll while the tab is visible (ms). */
+const POLL_INTERVAL_MS = 30_000;
 
 export function useRealtimeSync(onDataChange: () => void) {
   const callbackRef = useRef(onDataChange);
   callbackRef.current = onDataChange;
 
+  // Debounce rapid-fire triggers (e.g. focus + visibility firing together)
+  const lastFiredRef = useRef(0);
+  const debounce = useCallback(() => {
+    const now = Date.now();
+    if (now - lastFiredRef.current < 2_000) return; // skip if fired < 2s ago
+    lastFiredRef.current = now;
+    callbackRef.current();
+  }, []);
+
   useEffect(() => {
-    // Debounce: avoid re-fetching too rapidly when many rows change at once
-    let timer: ReturnType<typeof setTimeout> | null = null;
-    const debouncedCallback = () => {
-      if (timer) clearTimeout(timer);
-      timer = setTimeout(() => callbackRef.current(), 500);
+    // --- 1. Interval polling (only while tab is visible) ---
+    let intervalId: ReturnType<typeof setInterval> | null = null;
+
+    const startPolling = () => {
+      if (intervalId) return;
+      intervalId = setInterval(() => {
+        if (document.visibilityState === 'visible') {
+          debounce();
+        }
+      }, POLL_INTERVAL_MS);
     };
 
-    // Create one channel, subscribe to each table individually
-    let channel = supabase.channel('dashboard-sync');
-
-    for (const table of WATCHED_TABLES) {
-      channel = channel.on(
-        'postgres_changes' as any,
-        { event: '*', schema: 'public', table } as any,
-        debouncedCallback
-      );
-    }
-
-    channel.subscribe((status: string) => {
-      if (status === 'CHANNEL_ERROR') {
-        // Realtime might not be enabled for all tables — fail silently
-        console.debug('[RealtimeSync] Channel error, falling back to polling');
+    const stopPolling = () => {
+      if (intervalId) {
+        clearInterval(intervalId);
+        intervalId = null;
       }
-    });
+    };
+
+    startPolling();
+
+    // --- 2. Visibility change (user switches back to this tab) ---
+    const onVisibility = () => {
+      if (document.visibilityState === 'visible') {
+        debounce();
+        startPolling();
+      } else {
+        stopPolling();
+      }
+    };
+    document.addEventListener('visibilitychange', onVisibility);
+
+    // --- 3. Window focus ---
+    const onFocus = () => debounce();
+    window.addEventListener('focus', onFocus);
+
+    // --- 4. Online event (reconnecting after offline) ---
+    const onOnline = () => debounce();
+    window.addEventListener('online', onOnline);
 
     return () => {
-      if (timer) clearTimeout(timer);
-      supabase.removeChannel(channel);
+      stopPolling();
+      document.removeEventListener('visibilitychange', onVisibility);
+      window.removeEventListener('focus', onFocus);
+      window.removeEventListener('online', onOnline);
     };
-  }, []);
+  }, [debounce]);
 }
 
 export default useRealtimeSync;
