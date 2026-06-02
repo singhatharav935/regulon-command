@@ -37,5 +37,15 @@ export const supabase = createClient<Database>(
     autoRefreshToken: true,
     detectSessionInUrl: true,
     flowType: 'pkce',
-  }
+  },
+  // Disable Realtime WebSocket connections to prevent 406/400 console errors.
+  // Supabase Realtime requires tables to be added to the supabase_realtime
+  // publication on the server side. Without that, subscription attempts
+  // produce network-level 406/400 errors that JavaScript cannot suppress.
+  // Dashboard sync uses polling instead (see useRealtimeSync hook).
+  realtime: {
+    params: {
+      eventsPerSecond: -1,
+    },
+  },
 });
