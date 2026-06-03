@@ -282,13 +282,80 @@ const OrchestratorContext = createContext<OrchestratorContextValue | null>(null)
 // ================================================================
 
 export const AgentOrchestratorProvider: React.FC<{ children: React.ReactNode }> = ({ children }) => {
-  const [agents, setAgents] = useState<AgentDefinition[]>(createInitialAgents);
-  const [messages, setMessages] = useState<AgentMessage[]>([]);
-  const [isRunning, setIsRunning] = useState(true);
-  const [totalMessagesExchanged, setTotalMessagesExchanged] = useState(0);
-  const [totalTasksCompleted, setTotalTasksCompleted] = useState(0);
+  const [isRunning, setIsRunning] = useState<boolean>(() => {
+    const saved = localStorage.getItem('sannidh:company-swarm-running');
+    return saved !== null ? saved === 'true' : false; // Default to false
+  });
+
+  const [agents, setAgents] = useState<AgentDefinition[]>(() => {
+    const saved = localStorage.getItem('sannidh:company-swarm-agents');
+    if (saved) {
+      try {
+        return JSON.parse(saved);
+      } catch (e) {
+        console.error('Error parsing company-swarm-agents', e);
+      }
+    }
+    const initial = createInitialAgents();
+    const savedRunning = localStorage.getItem('sannidh:company-swarm-running');
+    const isCurrentlyRunning = savedRunning !== null ? savedRunning === 'true' : false;
+    if (!isCurrentlyRunning) {
+      return initial.map(a => ({ ...a, status: 'paused' as AgentStatus, currentTask: 'Paused by CA' }));
+    }
+    return initial;
+  });
+
+  const [messages, setMessages] = useState<AgentMessage[]>(() => {
+    const saved = localStorage.getItem('sannidh:company-swarm-messages');
+    if (saved) {
+      try {
+        return JSON.parse(saved);
+      } catch (e) {
+        console.error('Error parsing company-swarm-messages', e);
+      }
+    }
+    return [];
+  });
+
+  const [totalMessagesExchanged, setTotalMessagesExchanged] = useState<number>(() => {
+    const saved = localStorage.getItem('sannidh:company-swarm-total-messages');
+    return saved !== null ? parseInt(saved, 10) : 0;
+  });
+
+  const [totalTasksCompleted, setTotalTasksCompleted] = useState<number>(() => {
+    const saved = localStorage.getItem('sannidh:company-swarm-total-tasks');
+    return saved !== null ? parseInt(saved, 10) : 0;
+  });
+
   const [systemUptime] = useState(0);
-  const [lastSyncTime, setLastSyncTime] = useState(new Date().toISOString());
+
+  const [lastSyncTime, setLastSyncTime] = useState<string>(() => {
+    return localStorage.getItem('sannidh:company-swarm-last-sync') || new Date().toISOString();
+  });
+
+  useEffect(() => {
+    localStorage.setItem('sannidh:company-swarm-running', String(isRunning));
+  }, [isRunning]);
+
+  useEffect(() => {
+    localStorage.setItem('sannidh:company-swarm-agents', JSON.stringify(agents));
+  }, [agents]);
+
+  useEffect(() => {
+    localStorage.setItem('sannidh:company-swarm-messages', JSON.stringify(messages));
+  }, [messages]);
+
+  useEffect(() => {
+    localStorage.setItem('sannidh:company-swarm-total-messages', String(totalMessagesExchanged));
+  }, [totalMessagesExchanged]);
+
+  useEffect(() => {
+    localStorage.setItem('sannidh:company-swarm-total-tasks', String(totalTasksCompleted));
+  }, [totalTasksCompleted]);
+
+  useEffect(() => {
+    localStorage.setItem('sannidh:company-swarm-last-sync', lastSyncTime);
+  }, [lastSyncTime]);
 
   // Generate unique message ID
   const genId = () => `msg-${Date.now()}-${Math.random().toString(36).substr(2, 6)}`;

@@ -184,25 +184,25 @@ const createInitialCAAgents = (): CAAgentDefinition[] => [
     id: 'A1_PRIME', groupId: 'ANALYSER', name: 'ORACLE', fullName: 'Regulatory Data Extractor',
     section: 'Regulatory News & Rule Impact',
     description: 'Extracts regulatory requirements and data from CBDT/CBIC/MCA notifications for draft generation. Pulls latest circulars, amendments, and compliance rules.',
-    status: 'idle', currentTask: 'Standby — waiting for Start', lastActivity: new Date().toISOString(),
+    status: 'active', currentTask: 'Scanning live CBIC and CBDT notifications...', lastActivity: new Date().toISOString(),
     wiredTo: ['A2_CROSS', 'A3_AUDIT', 'D1_MAKER', 'R1_TAX'],
-    metrics: { ...ZERO_METRICS }, color: 'text-cyan-400', bgColor: 'bg-cyan-500/20', icon: 'Database'
+    metrics: { ...ZERO_METRICS, tasksCompleted: 14, insightsGenerated: 9, messagesSent: 24, messagesReceived: 18 }, color: 'text-cyan-400', bgColor: 'bg-cyan-500/20', icon: 'Database'
   },
   {
     id: 'A2_CROSS', groupId: 'ANALYSER', name: 'RADAR', fullName: 'Applicable Rule Identifier',
     section: 'Compliance Health & Change Log',
     description: 'Identifies applicable rules on incoming notices. Checks company compliance status against MCA/GST portal. Maps notice clauses to statutory sections.',
-    status: 'idle', currentTask: 'Standby — waiting for Start', lastActivity: new Date().toISOString(),
+    status: 'active', currentTask: 'Cross-referencing notice clauses u/s 143(2)...', lastActivity: new Date().toISOString(),
     wiredTo: ['A1_PRIME', 'A3_AUDIT', 'D2_REFINER', 'R2_LEGAL'],
-    metrics: { ...ZERO_METRICS }, color: 'text-cyan-400', bgColor: 'bg-cyan-500/20', icon: 'Search'
+    metrics: { ...ZERO_METRICS, tasksCompleted: 19, insightsGenerated: 7, messagesSent: 22, messagesReceived: 21 }, color: 'text-cyan-400', bgColor: 'bg-cyan-500/20', icon: 'Search'
   },
   {
     id: 'A3_AUDIT', groupId: 'ANALYSER', name: 'METRIC', fullName: 'Risk Score Calculator',
     section: 'CA Analytics & Performance',
     description: 'Calculates risk score of the draft using compliance matrix. Evaluates penalty probability, deadline proximity, and historical default patterns.',
-    status: 'idle', currentTask: 'Standby — waiting for Start', lastActivity: new Date().toISOString(),
+    status: 'active', currentTask: 'Recalculating multi-client compliance risk scores...', lastActivity: new Date().toISOString(),
     wiredTo: ['A1_PRIME', 'A2_CROSS', 'D3_ALIGNER', 'R3_FINAL'],
-    metrics: { ...ZERO_METRICS }, color: 'text-cyan-400', bgColor: 'bg-cyan-500/20', icon: 'BarChart3'
+    metrics: { ...ZERO_METRICS, tasksCompleted: 22, insightsGenerated: 12, messagesSent: 28, messagesReceived: 26 }, color: 'text-cyan-400', bgColor: 'bg-cyan-500/20', icon: 'BarChart3'
   },
   
   // ═══════════════════════════════════════════════════════════════
@@ -212,25 +212,25 @@ const createInitialCAAgents = (): CAAgentDefinition[] => [
     id: 'D1_MAKER', groupId: 'DRAFTER', name: 'DRAFTER', fullName: 'Compliant Document Generator',
     section: 'AI Drafting Engine',
     description: 'Generates compliant documents (GSTR-3B, ITR, ROC forms). Loads documents for filling data fields. Maintains balance sheet computations in background.',
-    status: 'idle', currentTask: 'Standby — waiting for Start', lastActivity: new Date().toISOString(),
+    status: 'active', currentTask: 'Compiling draft response for GST mismatch notice...', lastActivity: new Date().toISOString(),
     wiredTo: ['D2_REFINER', 'D3_ALIGNER', 'A1_PRIME', 'R1_TAX'],
-    metrics: { ...ZERO_METRICS }, color: 'text-purple-400', bgColor: 'bg-purple-500/20', icon: 'FileText'
+    metrics: { ...ZERO_METRICS, tasksCompleted: 8, insightsGenerated: 6, messagesSent: 15, messagesReceived: 14 }, color: 'text-purple-400', bgColor: 'bg-purple-500/20', icon: 'FileText'
   },
   {
     id: 'D2_REFINER', groupId: 'DRAFTER', name: 'TASKMASTER', fullName: 'Tax Liability & Reconciliation Engine',
     section: 'Task & Filing Management',
     description: 'Calculates tax liability (CGST/SGST/IGST breakup). Generates invoice reconciliation reports (GSTR-2B vs books). Processes ITC computations.',
-    status: 'idle', currentTask: 'Standby — waiting for Start', lastActivity: new Date().toISOString(),
+    status: 'active', currentTask: 'Reconciling GSTR-2B purchase register mismatches...', lastActivity: new Date().toISOString(),
     wiredTo: ['D1_MAKER', 'D3_ALIGNER', 'A2_CROSS', 'R2_LEGAL'],
-    metrics: { ...ZERO_METRICS }, color: 'text-purple-400', bgColor: 'bg-purple-500/20', icon: 'Calculator'
+    metrics: { ...ZERO_METRICS, tasksCompleted: 11, insightsGenerated: 4, messagesSent: 18, messagesReceived: 17 }, color: 'text-purple-400', bgColor: 'bg-purple-500/20', icon: 'Calculator'
   },
   {
     id: 'D3_ALIGNER', groupId: 'DRAFTER', name: 'HERALD', fullName: 'Edge Case Handler',
     section: 'Audit & Inspection Support',
     description: 'Handles edge cases: reversed invoices, credit notes, exempted supplies (Schedule III), zero-rated exports, and composition scheme transactions.',
-    status: 'idle', currentTask: 'Standby — waiting for Start', lastActivity: new Date().toISOString(),
+    status: 'active', currentTask: 'Auditing SLM depreciation schedules...', lastActivity: new Date().toISOString(),
     wiredTo: ['D1_MAKER', 'D2_REFINER', 'A3_AUDIT', 'R3_FINAL'],
-    metrics: { ...ZERO_METRICS }, color: 'text-purple-400', bgColor: 'bg-purple-500/20', icon: 'Scale'
+    metrics: { ...ZERO_METRICS, tasksCompleted: 9, insightsGenerated: 5, messagesSent: 16, messagesReceived: 15 }, color: 'text-purple-400', bgColor: 'bg-purple-500/20', icon: 'Scale'
   },
   
   // ═══════════════════════════════════════════════════════════════
@@ -240,25 +240,25 @@ const createInitialCAAgents = (): CAAgentDefinition[] => [
     id: 'R1_TAX', groupId: 'REVIEWER', name: 'INSPECTOR', fullName: 'Regulation Validator',
     section: 'Client Dependency Tracker',
     description: 'Validates generated document against CGST/IGST Act regulations. Compares generated values with auto-populated GSTR-2B data.',
-    status: 'idle', currentTask: 'Standby — waiting for Start', lastActivity: new Date().toISOString(),
+    status: 'active', currentTask: 'Verifying input tax credit claims u/s 17(5)...', lastActivity: new Date().toISOString(),
     wiredTo: ['R2_LEGAL', 'R3_FINAL', 'D1_MAKER', 'M1_PULSE'],
-    metrics: { ...ZERO_METRICS }, color: 'text-amber-400', bgColor: 'bg-amber-500/20', icon: 'CheckSquare'
+    metrics: { ...ZERO_METRICS, tasksCompleted: 31, insightsGenerated: 14, messagesSent: 35, messagesReceived: 33 }, color: 'text-amber-400', bgColor: 'bg-amber-500/20', icon: 'CheckSquare'
   },
   {
     id: 'R2_LEGAL', groupId: 'REVIEWER', name: 'TRACKER', fullName: 'Mandatory Field & Calculation Auditor',
     section: 'Company Management',
     description: 'Checks for missing mandatory fields. Validates all calculations (ITC, tax liability, interest u/s 50). Cross-checks against previous quarterly filings.',
-    status: 'idle', currentTask: 'Standby — waiting for Start', lastActivity: new Date().toISOString(),
+    status: 'active', currentTask: 'Checking mandatory fields for ROC Form AOC-4...', lastActivity: new Date().toISOString(),
     wiredTo: ['R1_TAX', 'R3_FINAL', 'D2_REFINER', 'M2_TRACKER'],
-    metrics: { ...ZERO_METRICS }, color: 'text-amber-400', bgColor: 'bg-amber-500/20', icon: 'ShieldAlert'
+    metrics: { ...ZERO_METRICS, tasksCompleted: 27, insightsGenerated: 11, messagesSent: 32, messagesReceived: 30 }, color: 'text-amber-400', bgColor: 'bg-amber-500/20', icon: 'ShieldAlert'
   },
   {
     id: 'R3_FINAL', groupId: 'REVIEWER', name: 'PORTFOLIO', fullName: 'Draft Issue Flagger',
     section: 'Revenue & Billing',
     description: 'Flags all issues found in the generated draft. Produces final approval/rejection report with itemized discrepancies for CA sign-off.',
-    status: 'idle', currentTask: 'Standby — waiting for Start', lastActivity: new Date().toISOString(),
+    status: 'active', currentTask: 'Generating draft approval discrepancy report...', lastActivity: new Date().toISOString(),
     wiredTo: ['R1_TAX', 'R2_LEGAL', 'D3_ALIGNER', 'M3_HERALD'],
-    metrics: { ...ZERO_METRICS }, color: 'text-amber-400', bgColor: 'bg-amber-500/20', icon: 'AlertTriangle'
+    metrics: { ...ZERO_METRICS, tasksCompleted: 24, insightsGenerated: 15, messagesSent: 29, messagesReceived: 27 }, color: 'text-amber-400', bgColor: 'bg-amber-500/20', icon: 'AlertTriangle'
   },
   
   // ═══════════════════════════════════════════════════════════════
@@ -268,25 +268,25 @@ const createInitialCAAgents = (): CAAgentDefinition[] => [
     id: 'M1_PULSE', groupId: 'MONITOR', name: 'COMMAND', fullName: 'Filing Status & Reminder Engine',
     section: 'Daily Governance Brief',
     description: 'Schedules filing reminders (GSTR-1, GSTR-3B, ITR deadlines). Tracks filing status lifecycle: pending → submitted → filed → acknowledged.',
-    status: 'idle', currentTask: 'Standby — waiting for Start', lastActivity: new Date().toISOString(),
+    status: 'active', currentTask: 'Monitoring GSTR-3B statutory deadlines...', lastActivity: new Date().toISOString(),
     wiredTo: ['M2_TRACKER', 'M3_HERALD', 'R1_TAX', 'A1_PRIME'],
-    metrics: { ...ZERO_METRICS }, color: 'text-emerald-400', bgColor: 'bg-emerald-500/20', icon: 'Activity'
+    metrics: { ...ZERO_METRICS, tasksCompleted: 45, insightsGenerated: 18, messagesSent: 48, messagesReceived: 44 }, color: 'text-emerald-400', bgColor: 'bg-emerald-500/20', icon: 'Activity'
   },
   {
     id: 'M2_TRACKER', groupId: 'MONITOR', name: 'PULSE', fullName: 'Tax Authority Response Checker',
     section: 'Communication Logs',
     description: 'Checks tax authority response on filed returns (accepted/rejected/defective). Monitors DRC-01/DRC-07 notices. Tracks SCN response deadlines.',
-    status: 'idle', currentTask: 'Standby — waiting for Start', lastActivity: new Date().toISOString(),
+    status: 'active', currentTask: 'Checking GST e-filing portal server status...', lastActivity: new Date().toISOString(),
     wiredTo: ['M1_PULSE', 'M3_HERALD', 'R2_LEGAL', 'A2_CROSS'],
-    metrics: { ...ZERO_METRICS }, color: 'text-emerald-400', bgColor: 'bg-emerald-500/20', icon: 'Radio'
+    metrics: { ...ZERO_METRICS, tasksCompleted: 38, insightsGenerated: 13, messagesSent: 41, messagesReceived: 39 }, color: 'text-emerald-400', bgColor: 'bg-emerald-500/20', icon: 'Radio'
   },
   {
     id: 'M3_HERALD', groupId: 'MONITOR', name: 'OVERWATCH', fullName: 'Compliance Health Score Updater',
     section: 'Document Vault',
     description: 'Updates compliance health score after each filing cycle. Sends client notifications on status changes. Maintains historical compliance trend data.',
-    status: 'idle', currentTask: 'Standby — waiting for Start', lastActivity: new Date().toISOString(),
+    status: 'active', currentTask: 'Recalculating portfolio health metrics...', lastActivity: new Date().toISOString(),
     wiredTo: ['M1_PULSE', 'M2_TRACKER', 'R3_FINAL', 'A3_AUDIT'],
-    metrics: { ...ZERO_METRICS }, color: 'text-emerald-400', bgColor: 'bg-emerald-500/20', icon: 'Eye'
+    metrics: { ...ZERO_METRICS, tasksCompleted: 41, insightsGenerated: 21, messagesSent: 45, messagesReceived: 42 }, color: 'text-emerald-400', bgColor: 'bg-emerald-500/20', icon: 'Eye'
   },
 ];
 
@@ -312,12 +312,133 @@ const CAAgentContext = createContext<CAAgentContextType | undefined>(undefined);
 // Helper: pick random item from array
 const pick = <T,>(arr: T[]): T => arr[Math.floor(Math.random() * arr.length)];
 
+// Preloaded beautiful compliance swarm messages
+const initialDemoMessages = (): CAAgentMessage[] => [
+  {
+    id: 'msg-demo-1',
+    fromAgent: 'D1_MAKER',
+    toAgent: 'ALL',
+    type: 'APPROVAL_REQUEST',
+    priority: 'critical',
+    subject: 'GSTR-2B Mismatch Rebuttal Ready',
+    content: 'Draft Legal Notice Response prepared under Section 16(4) safe harbor for GlobalTrade India Logistics. AI has reconciled 847 invoices, resolved a ₹40,000 difference, and verified the rebuttal with Peer Agents. Awaiting final CA approval.',
+    timestamp: new Date(Date.now() - 60000).toISOString(),
+    acknowledged: false
+  },
+  {
+    id: 'msg-demo-2',
+    fromAgent: 'R3_FINAL',
+    toAgent: 'REVIEWER',
+    type: 'CONSENSUS_REACHED',
+    priority: 'medium',
+    subject: 'HSN classification consensus achieved',
+    content: 'All 3 review agents (INSPECTOR, TRACKER, PORTFOLIO) resolved classification mismatch for HSN 8471. Rule 36(4) ITC restriction verified and validated. Consolidated draft marked as compliant.',
+    timestamp: new Date(Date.now() - 180000).toISOString(),
+    acknowledged: false
+  },
+  {
+    id: 'msg-demo-3',
+    fromAgent: 'R2_LEGAL',
+    toAgent: 'A3_AUDIT',
+    type: 'ISSUE_TICKET_GENERATED',
+    priority: 'medium',
+    subject: 'DIR-3 KYC default variance resolved',
+    content: 'Dissenting agent PORTFOLIO flagged a potential KYC default. TRACKER cross-verified with MCA live portal, confirming the compliance status is active. Variance resolved, issue closed.',
+    timestamp: new Date(Date.now() - 300000).toISOString(),
+    acknowledged: false
+  },
+  {
+    id: 'msg-demo-4',
+    fromAgent: 'D2_REFINER',
+    toAgent: 'ANALYSER',
+    type: 'INSIGHT_SHARE',
+    priority: 'high',
+    subject: 'GST ITC Reconciliation completed',
+    content: 'Auto-populated GSTR-2B reconciled with purchase books. Identified ₹1,20,000 ineligible tax credit under Section 17(5) for SecurePay Solutions Ltd. Output flagged and ledger adjusted.',
+    timestamp: new Date(Date.now() - 600000).toISOString(),
+    acknowledged: false
+  },
+  {
+    id: 'msg-demo-5',
+    fromAgent: 'M1_PULSE',
+    toAgent: 'ALL',
+    type: 'DEADLINE_WARNING',
+    priority: 'high',
+    subject: 'Statutory Deadline: GSTR-3B filing',
+    content: 'Annual compliance filing deadline u/s 39 approaching in 13 days for GlobalTrade India Logistics. Automated data extraction sequence pre-scheduled.',
+    timestamp: new Date(Date.now() - 900000).toISOString(),
+    acknowledged: false
+  },
+  {
+    id: 'msg-demo-6',
+    fromAgent: 'A3_AUDIT',
+    toAgent: 'ANALYSER',
+    type: 'CONSENSUS_REACHED',
+    priority: 'low',
+    subject: 'Risk rating calculation validated',
+    content: 'Swarm consensus reached on Acme Technologies risk level. Overall compliance score set to 91% based on history, timely tax deposit trail, and ROC active filings.',
+    timestamp: new Date(Date.now() - 1200000).toISOString(),
+    acknowledged: false
+  }
+];
+
 export const CAAgentProvider: React.FC<{ children: React.ReactNode }> = ({ children }) => {
-  const [agents, setAgents] = useState<CAAgentDefinition[]>(createInitialCAAgents());
-  const [messages, setMessages] = useState<CAAgentMessage[]>([]);
-  const [isRunning, setIsRunning] = useState(false);
-  const [systemStatus, setSystemStatus] = useState<'optimal' | 'processing' | 'degraded' | 'alert'>('optimal');
-  
+  const [isRunning, setIsRunning] = useState<boolean>(() => {
+    const saved = localStorage.getItem('sannidh:ca-swarm-running');
+    return saved !== null ? saved === 'true' : false; // Default to false (Engine does NOT auto-run)
+  });
+
+  const [agents, setAgents] = useState<CAAgentDefinition[]>(() => {
+    const saved = localStorage.getItem('sannidh:ca-swarm-agents');
+    if (saved) {
+      try {
+        return JSON.parse(saved);
+      } catch (e) {
+        console.error('Error parsing ca-swarm-agents', e);
+      }
+    }
+    const initial = createInitialCAAgents();
+    const savedRunning = localStorage.getItem('sannidh:ca-swarm-running');
+    const isCurrentlyRunning = savedRunning !== null ? savedRunning === 'true' : false;
+    if (!isCurrentlyRunning) {
+      return initial.map(a => ({ ...a, status: 'paused' as CAAgentStatus, currentTask: 'Paused by CA' }));
+    }
+    return initial;
+  });
+
+  const [messages, setMessages] = useState<CAAgentMessage[]>(() => {
+    const saved = localStorage.getItem('sannidh:ca-swarm-messages');
+    if (saved) {
+      try {
+        return JSON.parse(saved);
+      } catch (e) {
+        console.error('Error parsing ca-swarm-messages', e);
+      }
+    }
+    return initialDemoMessages();
+  });
+
+  const [systemStatus, setSystemStatus] = useState<'optimal' | 'processing' | 'degraded' | 'alert'>(() => {
+    const saved = localStorage.getItem('sannidh:ca-swarm-system-status');
+    return (saved as 'optimal' | 'processing' | 'degraded' | 'alert') || 'optimal';
+  });
+
+  useEffect(() => {
+    localStorage.setItem('sannidh:ca-swarm-running', String(isRunning));
+  }, [isRunning]);
+
+  useEffect(() => {
+    localStorage.setItem('sannidh:ca-swarm-agents', JSON.stringify(agents));
+  }, [agents]);
+
+  useEffect(() => {
+    localStorage.setItem('sannidh:ca-swarm-messages', JSON.stringify(messages));
+  }, [messages]);
+
+  useEffect(() => {
+    localStorage.setItem('sannidh:ca-swarm-system-status', systemStatus);
+  }, [systemStatus]);
+
   const tickRef = useRef<NodeJS.Timeout>();
 
   const publishMessage = useCallback((msg: Omit<CAAgentMessage, 'id' | 'timestamp' | 'acknowledged'>) => {
@@ -423,7 +544,7 @@ export const CAAgentProvider: React.FC<{ children: React.ReactNode }> = ({ child
               return a;
             }));
             setSystemStatus('optimal');
-          }, 4000);
+          }, 2000);
 
         } else {
           // SUCCESS — all 3 agents agree. Increment metrics.
@@ -443,10 +564,10 @@ export const CAAgentProvider: React.FC<{ children: React.ReactNode }> = ({ child
           }));
           setSystemStatus('optimal');
         }
-      }, 2000);
+      }, 1500);
     };
 
-    tickRef.current = setInterval(runConsensusCycle, 15000);
+    tickRef.current = setInterval(runConsensusCycle, 6000);
     return () => clearInterval(tickRef.current);
   }, [isRunning, agents, publishMessage, updateAgentStatus]);
 
