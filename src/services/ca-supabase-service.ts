@@ -6,6 +6,12 @@
 
 import { supabase } from "@/integrations/supabase/client";
 
+const isDemoMode = () => {
+  if (typeof window === 'undefined') return false;
+  const path = window.location.pathname;
+  return path === '/ca-dashboard' || path === '/ca-dashboard/' || path.startsWith('/ca-dashboard/');
+};
+
 // ─────────────────────────────────────────
 // CONSENT REQUESTS
 // ─────────────────────────────────────────
@@ -313,6 +319,64 @@ export async function addCAClient(form: CAClientForm): Promise<{ success: boolea
 }
 
 export async function loadCAClients(): Promise<CAClient[]> {
+  const isDemo = isDemoMode();
+  if (isDemo) {
+    return [
+      {
+        id: "demo-client-1",
+        name: "Acme Technologies Pvt Ltd",
+        industry: "SaaS & Cloud Infrastructure",
+        health: 94,
+        risk: "Low",
+        gaps: 2,
+        deadline: "18/05/2026",
+        status: "Verified",
+        gstin: "07AAACA1234Z1ZP",
+        pan: "AAACA1234Z",
+        created_at: new Date().toISOString(),
+      },
+      {
+        id: "demo-client-2",
+        name: "GlobalTrade India Logistics",
+        industry: "Import & Supply Chain Logistics",
+        health: 68,
+        risk: "High",
+        gaps: 5,
+        deadline: "12/05/2026",
+        status: "Waiting for CA",
+        gstin: "27AABCG5678K2ZQ",
+        pan: "AABCG5678K",
+        created_at: new Date().toISOString(),
+      },
+      {
+        id: "demo-client-3",
+        name: "SecurePay Solutions Ltd",
+        industry: "Fintech & Payment Gateway",
+        health: 82,
+        risk: "Medium",
+        gaps: 3,
+        deadline: "20/05/2026",
+        status: "Verified",
+        gstin: "29AACCJ9012J3ZR",
+        pan: "AACCJ9012J",
+        created_at: new Date().toISOString(),
+      },
+      {
+        id: "demo-client-4",
+        name: "Vertex EduTech Services",
+        industry: "E-Learning Platform",
+        health: 89,
+        risk: "Low",
+        gaps: 1,
+        deadline: "15/05/2026",
+        status: "Verified",
+        gstin: "19AADCV3456N4ZS",
+        pan: "AADCV3456N",
+        created_at: new Date().toISOString(),
+      }
+    ];
+  }
+
   try {
     const { data: { user } } = await supabase.auth.getUser();
     if (!user) return [];
@@ -364,6 +428,19 @@ export interface CAMetrics {
 }
 
 export async function getCAMetricsFromDB(): Promise<CAMetrics> {
+  const isDemo = isDemoMode();
+  if (isDemo) {
+    return {
+      assigned_companies: 4,
+      high_risk_alerts: 1,
+      pending_filings_week: 3,
+      active_tasks: 11,
+      monthly_revenue: 240000,
+      overdue_dependencies: 2,
+      last_updated: new Date().toISOString(),
+    };
+  }
+
   try {
     const { data: { user } } = await supabase.auth.getUser();
     if (!user) return defaultMetrics();
@@ -491,6 +568,54 @@ export function getLiveRegulatoryNews(): RegNews[] {
 // ─────────────────────────────────────────
 
 export async function getClientGovtNotices(): Promise<any[]> {
+  const isDemo = isDemoMode();
+  if (isDemo) {
+    return [
+      {
+        id: "notice-demo-1",
+        company: "GlobalTrade India Logistics",
+        company_id: "demo-client-2".substring(0, 8),
+        task: "GSTR-2B Mismatch Demand (SCN-829412)",
+        authority: "GST",
+        filing_type: "Notice Response",
+        dueDate: "12/06/2026",
+        days_remaining: 10,
+        penalty: "₹2,40,000 demand",
+        dependency: "Pending CA Review",
+        urgency: "high",
+        status: "pending",
+      },
+      {
+        id: "notice-demo-2",
+        company: "SecurePay Solutions Ltd",
+        company_id: "demo-client-3".substring(0, 8),
+        task: "MCA Section 454 Active Compliance Query",
+        authority: "MCA",
+        filing_type: "ROC Board Response",
+        dueDate: "05/06/2026",
+        days_remaining: 3,
+        penalty: "₹50,000 late fee",
+        dependency: "Pending Board Resolution",
+        urgency: "critical",
+        status: "pending",
+      },
+      {
+        id: "notice-demo-3",
+        company: "Acme Technologies Pvt Ltd",
+        company_id: "demo-client-1".substring(0, 8),
+        task: "Income Tax Assessment u/s 143(2) (Scrutiny)",
+        authority: "Income Tax",
+        filing_type: "Assessment Rebuttal",
+        dueDate: "20/06/2026",
+        days_remaining: 18,
+        penalty: "Audit Scrutiny u/s 143(3)",
+        dependency: "Awaiting Ledger Audit",
+        urgency: "medium",
+        status: "pending",
+      }
+    ];
+  }
+
   try {
     const { data: { user } } = await supabase.auth.getUser();
     if (!user) return [];
@@ -531,6 +656,45 @@ export async function getClientGovtNotices(): Promise<any[]> {
 }
 
 export async function getCADependencies(): Promise<any[]> {
+  const isDemo = isDemoMode();
+  if (isDemo) {
+    return [
+      {
+        id: "dep-demo-1",
+        company: "GlobalTrade India Logistics",
+        company_id: "demo-client-2",
+        document: "Purchase Register Ledger (April 2026)",
+        type: "Required Document",
+        dueDate: "10/05/2026",
+        days_remaining: -23,
+        status: "uploaded",
+        urgency: "critical",
+      },
+      {
+        id: "dep-demo-2",
+        company: "SecurePay Solutions Ltd",
+        company_id: "demo-client-3",
+        document: "ROC Active-3 Board Resolution Form",
+        type: "Required Document",
+        dueDate: "03/06/2026",
+        days_remaining: 1,
+        status: "pending",
+        urgency: "high",
+      },
+      {
+        id: "dep-demo-3",
+        company: "Vertex EduTech Services",
+        company_id: "demo-client-4",
+        document: "DIR-3 KYC Self-Attested PAN Copy",
+        type: "Required Document",
+        dueDate: "15/06/2026",
+        days_remaining: 13,
+        status: "pending",
+        urgency: "medium",
+      }
+    ];
+  }
+
   try {
     const { data: { user } } = await supabase.auth.getUser();
     if (!user) return [];
@@ -568,6 +732,60 @@ export async function getCADependencies(): Promise<any[]> {
 }
 
 export async function getCommunicationLogs(): Promise<any[]> {
+  const isDemo = isDemoMode();
+  if (isDemo) {
+    return [
+      {
+        id: "log-demo-1",
+        type: "message",
+        direction: "incoming",
+        company_id: "demo-client-2",
+        company_name: "GlobalTrade India Logistics",
+        subject: "GSTIN OTP Auth",
+        content: "Director approved Aadhar digital signature u/s 16(4) with OTP 893121.",
+        sender: "Director (GlobalTrade)",
+        recipient: "Sannidh AI",
+        status: "read",
+        priority: "medium",
+        category: "general",
+        timestamp: new Date(Date.now() - 3600000).toISOString(),
+        ai_summary: "Automated digital e-signature attached to rebuttal successfully.",
+      },
+      {
+        id: "log-demo-2",
+        type: "email",
+        direction: "outgoing",
+        company_id: "demo-client-3",
+        company_name: "SecurePay Solutions Ltd",
+        subject: "WORM Vault Locked Notice",
+        content: "Cryptographic signature attached to balance sheet and securely WORM-sealed.",
+        sender: "Sannidh AI",
+        recipient: "compliance@securepay.in",
+        status: "read",
+        priority: "medium",
+        category: "general",
+        timestamp: new Date(Date.now() - 7200000).toISOString(),
+        ai_summary: "Auto-generated SHA-256 seal logged into audit register.",
+      },
+      {
+        id: "log-demo-3",
+        type: "system",
+        direction: "system",
+        company_id: "demo-client-1",
+        company_name: "Acme Technologies Pvt Ltd",
+        subject: "Swarm Scan Complete",
+        content: "12-agent consensus achieved on Income Tax 143(2) response. Demands drops to ₹0.",
+        sender: "Oracle Agent",
+        recipient: "CA Rajesh Kumar",
+        status: "read",
+        priority: "medium",
+        category: "general",
+        timestamp: new Date(Date.now() - 10800000).toISOString(),
+        ai_summary: "Consensus reached among INSPECTOR, TRACKER, and PORTFOLIO.",
+      }
+    ];
+  }
+
   try {
     const { data: { user } } = await supabase.auth.getUser();
     if (!user) return [];
@@ -603,6 +821,33 @@ export async function getCommunicationLogs(): Promise<any[]> {
 }
 
 export async function getUnbilledTasks(): Promise<any[]> {
+  const isDemo = isDemoMode();
+  if (isDemo) {
+    return [
+      {
+        id: "unbill-demo-1",
+        client: "GlobalTrade India Logistics",
+        task_name: "GST Notice Rebuttal (SCN-829412) Draft & File u/s 16(4)",
+        date_completed: "02/06/2026",
+        suggested_fee: 15000,
+      },
+      {
+        id: "unbill-demo-2",
+        client: "SecurePay Solutions Ltd",
+        task_name: "ROC Balance Sheet compilation u/s 454 & WORM Audit Trail",
+        date_completed: "28/05/2026",
+        suggested_fee: 25000,
+      },
+      {
+        id: "unbill-demo-3",
+        client: "Acme Technologies Pvt Ltd",
+        task_name: "Income Tax Scrutiny Response preparation",
+        date_completed: "25/05/2026",
+        suggested_fee: 35000,
+      }
+    ];
+  }
+
   try {
     const { data: { user } } = await supabase.auth.getUser();
     if (!user) return [];
@@ -630,6 +875,16 @@ export async function getUnbilledTasks(): Promise<any[]> {
 }
 
 export async function getBillingStats(): Promise<any> {
+  const isDemo = isDemoMode();
+  if (isDemo) {
+    return {
+      accounts_receivable: 75000,
+      overdue_invoices: 1,
+      collected_this_month: 125000,
+      collected_change_pct: 12,
+    };
+  }
+
   try {
     const { data: { user } } = await supabase.auth.getUser();
     if (!user) return null;

@@ -27,25 +27,1463 @@ if (!hasSupabaseEnv) {
 // Import the supabase client like this:
 // import { supabase } from "@/integrations/supabase/client";
 
-export const supabase = createClient<Database>(
+const realSupabase = createClient<Database>(
   hasSupabaseEnv ? SUPABASE_URL : fallbackUrl,
   hasSupabaseEnv ? SUPABASE_KEY : fallbackKey,
   {
-  auth: {
-    storage: localStorage,
-    persistSession: true,
-    autoRefreshToken: true,
-    detectSessionInUrl: true,
-    flowType: 'pkce',
-  },
-  // Disable Realtime WebSocket connections to prevent 406/400 console errors.
-  // Supabase Realtime requires tables to be added to the supabase_realtime
-  // publication on the server side. Without that, subscription attempts
-  // produce network-level 406/400 errors that JavaScript cannot suppress.
-  // Dashboard sync uses polling instead (see useRealtimeSync hook).
-  realtime: {
-    params: {
-      eventsPerSecond: -1,
+    auth: {
+      storage: localStorage,
+      persistSession: true,
+      autoRefreshToken: true,
+      detectSessionInUrl: true,
+      flowType: 'pkce',
     },
+    // Disable Realtime WebSocket connections to prevent 406/400 console errors.
+    // Supabase Realtime requires tables to be added to the supabase_realtime
+    // publication on the server side. Without that, subscription attempts
+    // produce network-level 406/400 errors that JavaScript cannot suppress.
+    // Dashboard sync uses polling instead (see useRealtimeSync hook).
+    realtime: {
+      params: {
+        eventsPerSecond: -1,
+      },
+    },
+  }
+);
+
+// ─────────────────────────────────────────────────────────────────────────────
+// HIGH-FIDELITY SIMULATION LAYER FOR DEDICATED DEMO DASHBOARD (/ca-dashboard)
+// Allows 100% interactive, coordinates-consistent simulation across every tab.
+// ─────────────────────────────────────────────────────────────────────────────
+
+const isDemo = () => {
+  if (typeof window === 'undefined') return false;
+  const path = window.location.pathname;
+  return path === '/ca-dashboard' || path === '/ca-dashboard/' || path.startsWith('/ca-dashboard/');
+};
+
+const getStorageItem = (key: string, defaultValue: any) => {
+  if (typeof window === 'undefined') return defaultValue;
+  const val = localStorage.getItem(key);
+  if (!val) {
+    localStorage.setItem(key, JSON.stringify(defaultValue));
+    return defaultValue;
+  }
+  try {
+    return JSON.parse(val);
+  } catch {
+    return defaultValue;
+  }
+};
+
+const setStorageItem = (key: string, value: any) => {
+  if (typeof window !== 'undefined') {
+    localStorage.setItem(key, JSON.stringify(value));
+  }
+};
+
+// 1. Core Corporate Entities (4 assigned clients)
+const defaultEntities = [
+  {
+    id: "demo-client-1",
+    ca_user_id: "00000000-0000-0000-0000-000000000000",
+    entity_name: "Acme Technologies Pvt Ltd",
+    entity_type: "company",
+    pan: "AAACA1234Z",
+    cin: "U72200DL2021PTC384920",
+    gstin: "07AAACA1234Z1ZP",
+    tan: "DELA12345B",
+    incorporation_date: "2021-06-15",
+    financial_year_end: "31-03",
+    industry: "SaaS & Cloud Infrastructure",
+    turnover_bracket: "5cr_10cr",
+    entity_status: "active",
+    metadata: {},
+    created_at: new Date().toISOString(),
+    updated_at: new Date().toISOString(),
   },
-});
+  {
+    id: "demo-client-2",
+    ca_user_id: "00000000-0000-0000-0000-000000000000",
+    entity_name: "GlobalTrade India Logistics",
+    entity_type: "company",
+    pan: "AABCG5678K",
+    cin: "U63090MH2018PTC311204",
+    gstin: "27AABCG5678K2ZQ",
+    tan: "MUMA56789C",
+    incorporation_date: "2018-04-12",
+    financial_year_end: "31-03",
+    industry: "Import & Supply Chain Logistics",
+    turnover_bracket: "10cr_50cr",
+    entity_status: "active",
+    metadata: {},
+    created_at: new Date().toISOString(),
+    updated_at: new Date().toISOString(),
+  },
+  {
+    id: "demo-client-3",
+    ca_user_id: "00000000-0000-0000-0000-000000000000",
+    entity_name: "SecurePay Solutions Ltd",
+    entity_type: "company",
+    pan: "AACCJ9012J",
+    cin: "L65191KA2015PLC082931",
+    gstin: "29AACCJ9012J3ZR",
+    tan: "BLRA90123D",
+    incorporation_date: "2015-09-20",
+    financial_year_end: "31-03",
+    industry: "Fintech & Payment Gateway",
+    turnover_bracket: "50cr_250cr",
+    entity_status: "active",
+    metadata: {},
+    created_at: new Date().toISOString(),
+    updated_at: new Date().toISOString(),
+  },
+  {
+    id: "demo-client-4",
+    ca_user_id: "00000000-0000-0000-0000-000000000000",
+    entity_name: "Vertex EduTech Services",
+    entity_type: "company",
+    pan: "AADCV3456N",
+    cin: "U80902WB2020PTC239851",
+    gstin: "19AADCV3456N4ZS",
+    tan: "CCUA34567E",
+    incorporation_date: "2020-11-15",
+    financial_year_end: "31-03",
+    industry: "E-Learning Platform",
+    turnover_bracket: "1cr_5cr",
+    entity_status: "active",
+    metadata: {},
+    created_at: new Date().toISOString(),
+    updated_at: new Date().toISOString(),
+  }
+];
+
+// 2. Entity Groups (holding groups)
+const defaultGroups = [
+  {
+    id: "group-demo-1",
+    ca_user_id: "00000000-0000-0000-0000-000000000000",
+    group_name: "Tech & SaaS Corporate Cluster",
+    group_type: "holding_subsidiary",
+    description: "Consolidated view of software, fintech, and education entities under management.",
+    color_tag: "#06b6d4",
+    created_at: new Date().toISOString(),
+    updated_at: new Date().toISOString(),
+  },
+  {
+    id: "group-demo-2",
+    ca_user_id: "00000000-0000-0000-0000-000000000000",
+    group_name: "Import-Logistics Alliance",
+    group_type: "custom",
+    description: "Entities involved in trade and supply chain coordination.",
+    color_tag: "#10b981",
+    created_at: new Date().toISOString(),
+    updated_at: new Date().toISOString(),
+  }
+];
+
+// 3. Entity Group Members
+const defaultMembers = [
+  {
+    id: "mem-demo-1",
+    group_id: "group-demo-1",
+    entity_id: "demo-client-1",
+    role_in_group: "parent",
+    ownership_percent: 100,
+    created_at: new Date().toISOString(),
+    entity: defaultEntities[0],
+  },
+  {
+    id: "mem-demo-2",
+    group_id: "group-demo-1",
+    entity_id: "demo-client-3",
+    role_in_group: "subsidiary",
+    ownership_percent: 74,
+    created_at: new Date().toISOString(),
+    entity: defaultEntities[2],
+  },
+  {
+    id: "mem-demo-3",
+    group_id: "group-demo-2",
+    entity_id: "demo-client-2",
+    role_in_group: "member",
+    ownership_percent: 51,
+    created_at: new Date().toISOString(),
+    entity: defaultEntities[1],
+  }
+];
+
+// 4. Portal Credentials
+const defaultCredentials = [
+  {
+    id: "cred-demo-1",
+    ca_user_id: "00000000-0000-0000-0000-000000000000",
+    portal: "gst_portal",
+    portal_username: "CA_RAJESH_GSTN",
+    gstin: "07AAACA1234Z1ZP",
+    is_verified: true,
+    created_at: new Date().toISOString(),
+    updated_at: new Date().toISOString(),
+  },
+  {
+    id: "cred-demo-2",
+    ca_user_id: "00000000-0000-0000-0000-000000000000",
+    portal: "mca21",
+    portal_username: "CA_RAJESH_MCA",
+    pan: "AAACA1234Z",
+    is_verified: true,
+    created_at: new Date().toISOString(),
+    updated_at: new Date().toISOString(),
+  },
+  {
+    id: "cred-demo-3",
+    ca_user_id: "00000000-0000-0000-0000-000000000000",
+    portal: "income_tax",
+    portal_username: "RAJESH_IT_PAN",
+    pan: "AAACA1234Z",
+    is_verified: false,
+    created_at: new Date().toISOString(),
+    updated_at: new Date().toISOString(),
+  }
+];
+
+// 5. E-Filing Jobs
+const defaultEfilingJobs = [
+  {
+    id: "job-demo-1",
+    ca_user_id: "00000000-0000-0000-0000-000000000000",
+    entity_id: "demo-client-2",
+    filing_type: "gstr3b",
+    portal: "gst_portal",
+    filing_title: "GSTR-3B for GlobalTrade India Logistics — April 2026",
+    period_start: "2026-04-01",
+    period_end: "2026-04-30",
+    due_date: "2026-05-20",
+    status: "acknowledged",
+    status_message: "Filing completed and Acknowledged by GST portal.",
+    progress_percent: 100,
+    ack_number: "GSTIN-ARN-29384812",
+    ack_date: "2026-05-18T10:14:00Z",
+    form_data: {},
+    computation_data: {},
+    ca_approved: true,
+    created_at: new Date().toISOString(),
+    updated_at: new Date().toISOString(),
+  },
+  {
+    id: "job-demo-2",
+    ca_user_id: "00000000-0000-0000-0000-000000000000",
+    entity_id: "demo-client-1",
+    filing_type: "gstr1",
+    portal: "gst_portal",
+    filing_title: "GSTR-1 Outward Supplies for Acme Technologies",
+    period_start: "2026-04-01",
+    period_end: "2026-04-30",
+    due_date: "2026-05-11",
+    status: "approved",
+    status_message: "Approved by CA. Ready for immediate gateway submission.",
+    progress_percent: 90,
+    form_data: {},
+    computation_data: {},
+    ca_approved: true,
+    created_at: new Date().toISOString(),
+    updated_at: new Date().toISOString(),
+  },
+  {
+    id: "job-demo-3",
+    ca_user_id: "00000000-0000-0000-0000-000000000000",
+    entity_id: "demo-client-3",
+    filing_type: "mca_aoc4",
+    portal: "mca21",
+    filing_title: "MCA AOC-4 Board Financials for SecurePay Solutions Ltd",
+    period_start: "2025-04-01",
+    period_end: "2026-03-31",
+    due_date: "2026-10-30",
+    status: "draft",
+    status_message: "Compilation in progress. Awaiting balance sheet verify.",
+    progress_percent: 45,
+    form_data: {},
+    computation_data: {},
+    ca_approved: false,
+    created_at: new Date().toISOString(),
+    updated_at: new Date().toISOString(),
+  }
+];
+
+// 6. Tax Liabilities
+const defaultLiabilities = [
+  {
+    id: "liab-demo-1",
+    ca_user_id: "00000000-0000-0000-0000-000000000000",
+    entity_id: "demo-client-2",
+    tax_type: "gst_igst",
+    tax_label: "GST IGST Outward Liability (SCN Match)",
+    period_start: "2026-04-01",
+    period_end: "2026-04-30",
+    due_date: "2026-06-20",
+    gross_liability_paise: 24000000,
+    itc_available_paise: 0,
+    net_liability_paise: 24000000,
+    interest_paise: 180000,
+    penalty_paise: 0,
+    late_fee_paise: 10000,
+    total_due_paise: 24190000,
+    amount_paid_paise: 0,
+    balance_due_paise: 24190000,
+    is_paid: false,
+    is_nil_return: false,
+    created_at: new Date().toISOString(),
+    entities: defaultEntities[1]
+  },
+  {
+    id: "liab-demo-2",
+    ca_user_id: "00000000-0000-0000-0000-000000000000",
+    entity_id: "demo-client-1",
+    tax_type: "tds",
+    tax_label: "TDS Section 194J Professional Fees",
+    period_start: "2026-04-01",
+    period_end: "2026-04-30",
+    due_date: "2026-06-07",
+    gross_liability_paise: 4500000,
+    itc_available_paise: 0,
+    net_liability_paise: 4500000,
+    interest_paise: 0,
+    penalty_paise: 0,
+    late_fee_paise: 0,
+    total_due_paise: 4500000,
+    amount_paid_paise: 4500000,
+    balance_due_paise: 0,
+    is_paid: true,
+    is_nil_return: false,
+    created_at: new Date().toISOString(),
+    entities: defaultEntities[0]
+  }
+];
+
+// 7. Transactions
+const defaultTransactions = [
+  {
+    id: "tx-demo-1",
+    ca_user_id: "00000000-0000-0000-0000-000000000000",
+    liability_id: "liab-demo-2",
+    entity_id: "demo-client-1",
+    gateway: "razorpay",
+    amount_paise: 4500000,
+    currency: "INR",
+    status: "success",
+    gateway_payment_id: "pay_Q82941029412",
+    bank_reference_no: "BANK9291240124",
+    bank_name: "HDFC Bank",
+    payment_mode: "netbanking",
+    payment_date: "2026-05-06",
+    description: "TDS payment for April 2026",
+    created_at: new Date().toISOString(),
+  }
+];
+
+// 8. Module Calculations
+const defaultModuleCalculations = [
+  {
+    id: "mod-calc-1",
+    company_id: "demo-client-1",
+    financial_year: "2025-26",
+    module_id: "gst_gstr3b",
+    module_label: "GSTR-3B Reconciliation Module",
+    status: "completed",
+    summary: "Reconciled purchase register with GSTR-2B. Found variance of ₹0.",
+    calculation_data: {
+      turnover: 1250000,
+      tax_rate: 18,
+      igst: 225000,
+      cgst: 0,
+      sgst: 0,
+      itc_claimed: 150000,
+      net_payable: 75000
+    }
+  },
+  {
+    id: "mod-calc-2",
+    company_id: "demo-client-2",
+    financial_year: "2025-26",
+    module_id: "gst_gstr3b",
+    module_label: "GSTR-3B Reconciliation Module",
+    status: "completed",
+    summary: "Mismatch of ₹2,40,000 detected u/s 16(4). Draft response prepared.",
+    calculation_data: {
+      turnover: 2500000,
+      tax_rate: 18,
+      igst: 450000,
+      cgst: 0,
+      sgst: 0,
+      itc_claimed: 210000,
+      net_payable: 240000
+    }
+  }
+];
+
+// 9. Data Rooms
+const defaultDataRooms = [
+  {
+    id: "room-1",
+    company_id: "demo-client-1",
+    financial_year: "2025-26",
+    readiness_score: 95,
+    total_modules_completed: 6,
+    executive_summary: "Acme Technologies is fully compliant. Books match statutory portals 100%.",
+    key_financials: { total_revenue: 12500000, total_expenses: 8400000, profit_before_tax: 4100000 }
+  },
+  {
+    id: "room-2",
+    company_id: "demo-client-2",
+    financial_year: "2025-26",
+    readiness_score: 62,
+    total_modules_completed: 3,
+    executive_summary: "High risk notice detected u/s 16(4). Urgent reconciliation required.",
+    key_financials: { total_revenue: 45000000, total_expenses: 38000000, profit_before_tax: 7000000 }
+  }
+];
+
+// 10. Bank Transactions Ledger overrides
+const defaultBankTransactions = [
+  {
+    id: "bank-tx-1",
+    company_id: "demo-client-1",
+    transaction_date: "2026-05-18",
+    description: "INTEREST INCOME RECEIVED - HDFC BANK",
+    amount: 125000,
+    ai_category: "Income from Other Sources",
+    status: "reconciled"
+  },
+  {
+    id: "bank-tx-2",
+    company_id: "demo-client-2",
+    transaction_date: "2026-05-12",
+    description: "VENDOR PAYMENT - GLOBAL SHIPPING CO",
+    amount: -24000000,
+    ai_category: "Direct Expense (Freight)",
+    status: "flagged_mismatch"
+  }
+];
+
+// 11. Regional Language notice translations
+const defaultBilingualNotices = [
+  {
+    id: "binot-1",
+    ca_user_id: "00000000-0000-0000-0000-000000000000",
+    client_name: "GlobalTrade India Logistics",
+    notice_title: "Show Cause Notice u/s 73 - GSTR-2B ITC Mismatch",
+    issuing_authority: "GSTIN",
+    source_language: "Hindi",
+    original_text: "केंद्रीय कर आयुक्त कार्यालय की ओर से धारा 73 के तहत इनपुट टैक्स क्रेडिट विसंगति का नोटिस। विसंगति राशि: ₹2,40,000",
+    translated_text: "Intimation Notice under Section 73 from the Commissioner of Central Tax for Input Tax Credit mismatch. Discrepancy amount: ₹2,40,000",
+    status: "pending_action",
+    notice_date: "2026-05-25",
+    due_date: "2026-06-15",
+    extracted_action_items: [
+      { task_title: "File GST SCN Section 73 Rebuttal for mismatch", due_date: "2026-06-15", severity: "critical" }
+    ],
+    metadata: { ocr_confidence_score: 98.6 },
+    created_at: new Date().toISOString()
+  }
+];
+
+// 12. Webhooks
+const defaultWebhooks = [
+  {
+    id: "wh-demo-1",
+    ca_user_id: "00000000-0000-0000-0000-000000000000",
+    url: "https://api.acme.com/v1/regulon-webhooks",
+    description: "Acme Production Webhook Listener",
+    secret_prefix: "whsec_abcd",
+    events: ["filing.submitted", "notice.received", "payment.success"],
+    is_active: true,
+    failure_count: 0,
+    max_failures_before_disable: 10,
+    created_at: new Date().toISOString(),
+    updated_at: new Date().toISOString(),
+  }
+];
+
+// 13. Audit logs
+const defaultAuditLogs = [
+  {
+    id: "aud-demo-1",
+    timestamp: new Date().toISOString(),
+    ca_user_id: "00000000-0000-0000-0000-000000000000",
+    ca_email: "ca@sannidh.ai",
+    actor_name: "CA Rajesh Kumar",
+    action: "approve_filing_draft",
+    module: "ai_drafting",
+    document_type: "GST Notice Response (SCN-829412)",
+    client_name: "GlobalTrade India Logistics",
+    content_hash_sha256: "ea8294bd8294ab92bc92401bcda90",
+    worm_seal: "SANNIDH-WORM-EA8294BD8294",
+  }
+];
+
+// --- Notifications Hub Mock Defaults ---
+const defaultNotificationChannels = [
+  {
+    id: "nc-demo-1",
+    ca_user_id: "00000000-0000-0000-0000-000000000000",
+    channel_type: "email",
+    channel_name: "Primary SMTP Connection",
+    is_enabled: true,
+    config: { host: "smtp.sannidh.ai", port: 587 },
+    rate_limit_per_hour: 100,
+    rate_limit_per_day: 1000,
+    total_sent: 432,
+    last_tested_at: new Date().toISOString(),
+    test_status: "pass",
+    created_at: new Date().toISOString(),
+    updated_at: new Date().toISOString()
+  },
+  {
+    id: "nc-demo-2",
+    ca_user_id: "00000000-0000-0000-0000-000000000000",
+    channel_type: "sms",
+    channel_name: "Twilio Gateway Provider",
+    is_enabled: true,
+    config: { account_sid: "AC12345" },
+    rate_limit_per_hour: 200,
+    rate_limit_per_day: 2000,
+    total_sent: 125,
+    last_tested_at: new Date().toISOString(),
+    test_status: "pass",
+    created_at: new Date().toISOString(),
+    updated_at: new Date().toISOString()
+  },
+  {
+    id: "nc-demo-3",
+    ca_user_id: "00000000-0000-0000-0000-000000000000",
+    channel_type: "whatsapp",
+    channel_name: "Meta Cloud API",
+    is_enabled: true,
+    config: { phone_number_id: "10294812" },
+    rate_limit_per_hour: 500,
+    rate_limit_per_day: 5000,
+    total_sent: 89,
+    last_tested_at: new Date().toISOString(),
+    test_status: "pass",
+    created_at: new Date().toISOString(),
+    updated_at: new Date().toISOString()
+  }
+];
+
+const defaultNotificationTemplates = [
+  {
+    id: "nt-demo-1",
+    ca_user_id: "00000000-0000-0000-0000-000000000000",
+    template_name: "GST GSTR-3B Filing Deadline Reminder",
+    channel_type: "email",
+    category: "deadline_reminder",
+    subject: "Urgent: GSTR-3B Return Filing Due for {{client_name}}",
+    body: "Dear {{client_name}},\n\nYour GSTR-3B filing for the tax period ending {{period_end}} is due on {{due_date}}. The computed net tax payable is {{amount}}.\n\nPlease approve the computational draft so we can proceed with gate entry submission.\n\nRegards,\nSannidh AI Compliance Core",
+    variables: ["client_name", "period_end", "due_date", "amount"],
+    is_active: true,
+    use_count: 24,
+    created_at: new Date().toISOString(),
+    updated_at: new Date().toISOString()
+  },
+  {
+    id: "nt-demo-2",
+    ca_user_id: "00000000-0000-0000-0000-000000000000",
+    template_name: "TDS Tax Deposit Outstanding Alert",
+    channel_type: "whatsapp",
+    category: "payment_due",
+    body: "Hi Rajesh,\n\nThis is a quick warning that TDS deposit Section 194J is outstanding. Amount: {{amount}}. Due date is {{due_date}}.\n\nPlease initiate bank payment from client portal ledger.",
+    variables: ["amount", "due_date"],
+    is_active: true,
+    use_count: 12,
+    created_at: new Date().toISOString(),
+    updated_at: new Date().toISOString()
+  }
+];
+
+const defaultNotificationAlertRules = [
+  {
+    id: "nr-demo-1",
+    ca_user_id: "00000000-0000-0000-0000-000000000000",
+    rule_name: "Upcoming GST Return Due (7 Days Advance)",
+    trigger_event: "gst_return_due",
+    channel_ids: ["nc-demo-1", "nc-demo-3"],
+    template_id: "nt-demo-1",
+    advance_days: 7,
+    is_enabled: true,
+    scope: "all_clients",
+    client_filter: {},
+    time_of_day: "10:00 AM",
+    repeat_interval: "daily",
+    trigger_count: 5,
+    created_at: new Date().toISOString(),
+    updated_at: new Date().toISOString()
+  }
+];
+
+const defaultNotificationRecipients = [
+  {
+    id: "nrc-demo-1",
+    ca_user_id: "00000000-0000-0000-0000-000000000000",
+    full_name: "Ramesh Patel",
+    email: "ramesh@acme.com",
+    phone: "+919876543210",
+    whatsapp_number: "+919876543210",
+    company_name: "Acme Technologies Pvt Ltd",
+    company_id: "demo-client-1",
+    tags: ["primary", "finance"],
+    is_opted_in_email: true,
+    is_opted_in_sms: true,
+    is_opted_in_whatsapp: true,
+    custom_metadata: {},
+    created_at: new Date().toISOString(),
+    updated_at: new Date().toISOString()
+  },
+  {
+    id: "nrc-demo-2",
+    ca_user_id: "00000000-0000-0000-0000-000000000000",
+    full_name: "Sanya Malhotra",
+    email: "sanya@globaltrade.in",
+    phone: "+919876543211",
+    whatsapp_number: "+919876543211",
+    company_name: "GlobalTrade India Logistics",
+    company_id: "demo-client-2",
+    tags: ["operations"],
+    is_opted_in_email: true,
+    is_opted_in_sms: false,
+    is_opted_in_whatsapp: true,
+    custom_metadata: {},
+    created_at: new Date().toISOString(),
+    updated_at: new Date().toISOString()
+  }
+];
+
+const defaultNotificationDispatches = [
+  {
+    id: "nd-demo-1",
+    ca_user_id: "00000000-0000-0000-0000-000000000000",
+    rule_id: "nr-demo-1",
+    template_id: "nt-demo-1",
+    channel_id: "nc-demo-1",
+    recipient_id: "nrc-demo-1",
+    channel_type: "email",
+    recipient_email: "ramesh@acme.com",
+    subject: "Urgent GSTR-3B due for Acme",
+    body_rendered: "Dear Acme Technologies,\n\nYour GSTR-3B filing is due on 2026-05-20. Computed liability: ₹2,40,000.",
+    status: "delivered",
+    provider_response: { status: "success", msg_id: "smtp_9829" },
+    retry_count: 0,
+    max_retries: 3,
+    sent_at: new Date().toISOString(),
+    delivered_at: new Date().toISOString(),
+    cost_inr: 0.1,
+    created_at: new Date().toISOString(),
+    updated_at: new Date().toISOString()
+  }
+];
+
+const defaultNotificationDeliveryStats = [
+  {
+    id: "nds-demo-1",
+    ca_user_id: "00000000-0000-0000-0000-000000000000",
+    channel_type: "email",
+    stat_date: new Date().toISOString().split('T')[0],
+    total_sent: 50,
+    total_delivered: 49,
+    total_failed: 1,
+    total_bounced: 0,
+    total_opened: 38,
+    total_clicked: 12,
+    total_cost_inr: 5.0,
+    created_at: new Date().toISOString(),
+    updated_at: new Date().toISOString()
+  }
+];
+
+// --- Team & RBAC Mock Defaults ---
+const defaultRbacTeams = [
+  {
+    id: "team-demo-1",
+    ca_user_id: "00000000-0000-0000-0000-000000000000",
+    team_name: "Tech & SaaS Corporate Squad",
+    description: "Granular audit squads handling SaaS clients and tech corporations.",
+    created_at: new Date().toISOString(),
+    updated_at: new Date().toISOString()
+  },
+  {
+    id: "team-demo-2",
+    ca_user_id: "00000000-0000-0000-0000-000000000000",
+    team_name: "Indirect Tax Squad",
+    description: "GST return compilation and show cause notice rebuttals desk.",
+    created_at: new Date().toISOString(),
+    updated_at: new Date().toISOString()
+  }
+];
+
+const defaultRbacRoles = [
+  { id: "role-demo-partner", ca_user_id: "00000000-0000-0000-0000-000000000000", role_name: "Partner", role_code: "partner", description: "Full administrative authority.", is_system: true, created_at: new Date().toISOString(), updated_at: new Date().toISOString() },
+  { id: "role-demo-manager", ca_user_id: "00000000-0000-0000-0000-000000000000", role_name: "Manager", role_code: "manager", description: "Oversees client files and reviews.", is_system: true, created_at: new Date().toISOString(), updated_at: new Date().toISOString() },
+  { id: "role-demo-senior", ca_user_id: "00000000-0000-0000-0000-000000000000", role_name: "Senior CA", role_code: "senior_ca", description: "Handles core filings and drafts.", is_system: true, created_at: new Date().toISOString(), updated_at: new Date().toISOString() },
+  { id: "role-demo-clerk", ca_user_id: "00000000-0000-0000-0000-000000000000", role_name: "Articled Clerk", role_code: "articled_clerk", description: "Assists in compilation.", is_system: true, created_at: new Date().toISOString(), updated_at: new Date().toISOString() },
+  { id: "role-demo-data", ca_user_id: "00000000-0000-0000-0000-000000000000", role_name: "Data Entry", role_code: "data_entry", description: "Uploads invoices and processes OCR.", is_system: true, created_at: new Date().toISOString(), updated_at: new Date().toISOString() },
+  { id: "role-demo-viewer", ca_user_id: "00000000-0000-0000-0000-000000000000", role_name: "Viewer", role_code: "viewer", description: "Read-only access.", is_system: true, created_at: new Date().toISOString(), updated_at: new Date().toISOString() }
+];
+
+const defaultRbacTeamMembers = [
+  {
+    id: "rtm-demo-1",
+    team_id: "team-demo-1",
+    user_id: "00000000-0000-0000-0000-000000000000",
+    full_name: "CA Rajesh Kumar",
+    email: "ca@sannidh.ai",
+    role_id: "role-demo-partner",
+    role_name: "Partner",
+    status: "active",
+    joined_at: new Date().toISOString(),
+    created_at: new Date().toISOString(),
+    updated_at: new Date().toISOString()
+  },
+  {
+    id: "rtm-demo-2",
+    team_id: "team-demo-1",
+    full_name: "Atharav Singh",
+    email: "atharav@sannidh.ai",
+    role_id: "role-demo-manager",
+    role_name: "Manager",
+    status: "active",
+    joined_at: new Date().toISOString(),
+    created_at: new Date().toISOString(),
+    updated_at: new Date().toISOString()
+  },
+  {
+    id: "rtm-demo-3",
+    team_id: "team-demo-2",
+    full_name: "Sanya Malhotra",
+    email: "sanya@sannidh.ai",
+    role_id: "role-demo-senior",
+    role_name: "Senior CA",
+    status: "active",
+    joined_at: new Date().toISOString(),
+    created_at: new Date().toISOString(),
+    updated_at: new Date().toISOString()
+  }
+];
+
+const defaultRbacRolePermissions = [
+  { id: "p-demo-1", role_id: "role-demo-partner", module_name: "e-filing", can_read: true, can_write: true, can_delete: true, can_admin: true, created_at: new Date().toISOString(), updated_at: new Date().toISOString() },
+  { id: "p-demo-2", role_id: "role-demo-partner", module_name: "payment", can_read: true, can_write: true, can_delete: true, can_admin: true, created_at: new Date().toISOString(), updated_at: new Date().toISOString() },
+  { id: "p-demo-3", role_id: "role-demo-partner", module_name: "team-rbac", can_read: true, can_write: true, can_delete: true, can_admin: true, created_at: new Date().toISOString(), updated_at: new Date().toISOString() },
+  { id: "p-demo-4", role_id: "role-demo-manager", module_name: "e-filing", can_read: true, can_write: true, can_delete: false, can_admin: false, created_at: new Date().toISOString(), updated_at: new Date().toISOString() },
+  { id: "p-demo-5", role_id: "role-demo-senior", module_name: "e-filing", can_read: true, can_write: true, can_delete: false, can_admin: false, created_at: new Date().toISOString(), updated_at: new Date().toISOString() },
+  { id: "p-demo-6", role_id: "role-demo-clerk", module_name: "e-filing", can_read: true, can_write: false, can_delete: false, can_admin: false, created_at: new Date().toISOString(), updated_at: new Date().toISOString() }
+];
+
+const defaultRbacInvitations = [
+  {
+    id: "ri-demo-1",
+    team_id: "team-demo-1",
+    email: "junior@sannidh.ai",
+    role_name: "Articled Clerk",
+    invited_by: "ca@sannidh.ai",
+    token: "tok_jnr123",
+    status: "pending",
+    expires_at: new Date(Date.now() + 7*24*60*60*1000).toISOString(),
+    created_at: new Date().toISOString(),
+    updated_at: new Date().toISOString()
+  }
+];
+
+const defaultRbacActivityLogs = [
+  {
+    id: "ral-demo-1",
+    team_id: "team-demo-1",
+    performed_by: "CA Rajesh Kumar",
+    activity_type: "role_created",
+    description: "Assigned role Partner to Rajesh Kumar in Tech & SaaS Team",
+    ip_address: "192.168.29.12",
+    user_agent: "Mozilla/5.0 Mac",
+    metadata: {},
+    created_at: new Date().toISOString()
+  }
+];
+
+// --- Audit Trail Mock Defaults ---
+const defaultAuditTrailEvents = [
+  {
+    id: "ae-demo-1",
+    ca_user_id: "00000000-0000-0000-0000-000000000000",
+    event_id: "ev_10294812",
+    actor_type: "ca_user",
+    actor_id: "00000000-0000-0000-0000-000000000000",
+    actor_name: "CA Rajesh Kumar",
+    actor_ip: "192.168.29.12",
+    actor_user_agent: "Mozilla/5.0 Mac",
+    module: "e-filing",
+    action: "submit_gstr1_filing",
+    resource_type: "efiling_job",
+    resource_id: "job-demo-1",
+    resource_name: "GSTR-1 for GlobalTrade Logistics",
+    metadata: {},
+    severity: "info",
+    risk_score: 5,
+    is_sensitive: false,
+    hash: "sha_ea8294bd8294",
+    created_at: new Date().toISOString()
+  },
+  {
+    id: "ae-demo-2",
+    ca_user_id: "00000000-0000-0000-0000-000000000000",
+    event_id: "ev_10294813",
+    actor_type: "api",
+    actor_id: "key-demo-1",
+    actor_name: "Acme Webhook Production Key",
+    actor_ip: "104.22.41.9",
+    module: "enterprise-api",
+    action: "read_tax_liabilities",
+    resource_type: "tax_liability_heads",
+    metadata: {},
+    severity: "info",
+    risk_score: 2,
+    is_sensitive: false,
+    created_at: new Date().toISOString()
+  }
+];
+
+const defaultComplianceScores = [
+  {
+    id: "cs-demo-1",
+    ca_user_id: "00000000-0000-0000-0000-000000000000",
+    entity_name: "Acme Technologies Pvt Ltd",
+    score_date: new Date().toISOString().split('T')[0],
+    gst_score: 95,
+    itr_score: 94,
+    tds_score: 96,
+    mca_score: 95,
+    rbi_score: 92,
+    sebi_score: 94,
+    overall_score: 95,
+    pending_filings: 0,
+    overdue_filings: 0,
+    pending_payments: 0,
+    open_notices: 0,
+    unresolved_queries: 0,
+    previous_score: 92,
+    score_delta: 3,
+    notes: "Outstanding compliance record. Highly responsive.",
+    computed_by: "Regulon Agentic Core",
+    created_at: new Date().toISOString(),
+    updated_at: new Date().toISOString()
+  },
+  {
+    id: "cs-demo-2",
+    ca_user_id: "00000000-0000-0000-0000-000000000000",
+    entity_name: "GlobalTrade India Logistics",
+    score_date: new Date().toISOString().split('T')[0],
+    gst_score: 62,
+    itr_score: 68,
+    tds_score: 65,
+    mca_score: 62,
+    rbi_score: 60,
+    sebi_score: 62,
+    overall_score: 62,
+    pending_filings: 3,
+    overdue_filings: 1,
+    pending_payments: 2,
+    open_notices: 1,
+    unresolved_queries: 3,
+    previous_score: 65,
+    score_delta: -3,
+    notes: "Requires immediate attention u/s 73 GSTR-2B mismatch.",
+    computed_by: "Regulon Agentic Core",
+    created_at: new Date().toISOString(),
+    updated_at: new Date().toISOString()
+  }
+];
+
+const defaultComplianceReports = [
+  {
+    id: "cr-demo-1",
+    ca_user_id: "00000000-0000-0000-0000-000000000000",
+    report_name: "Q1 FY26 Board Compliance Summary",
+    report_type: "board_summary",
+    period_start: "2026-04-01",
+    period_end: "2026-06-30",
+    entity_scope: ["Acme Technologies Pvt Ltd"],
+    modules_included: ["e-filing", "payment"],
+    status: "ready",
+    format: "pdf",
+    summary_data: { audit: { total_events: 125, critical_events: 0 } },
+    findings: [],
+    recommendations: [],
+    file_url: "https://avatars.storage.supabase.co/reports/q1_board.pdf",
+    file_size_bytes: 140294,
+    shared_with: ["board@acme.com"],
+    is_confidential: true,
+    created_at: new Date().toISOString(),
+    updated_at: new Date().toISOString()
+  }
+];
+
+const defaultDataRetentionPolicies = [
+  { id: "rp-demo-1", ca_user_id: "00000000-0000-0000-0000-000000000000", module: "e-filing", retention_days: 2555, auto_archive: true, legal_basis: "GST Act 2017 Section 36", records_archived: 42, records_deleted: 0, is_active: true, created_at: new Date().toISOString(), updated_at: new Date().toISOString() },
+  { id: "rp-demo-2", ca_user_id: "00000000-0000-0000-0000-000000000000", module: "doc-ocr", retention_days: 1095, auto_archive: true, legal_basis: "Companies Act 2013", records_archived: 18, records_deleted: 0, is_active: true, created_at: new Date().toISOString(), updated_at: new Date().toISOString() }
+];
+
+const defaultAuditAlertSubscriptions = [
+  { id: "aas-demo-1", ca_user_id: "00000000-0000-0000-0000-000000000000", alert_name: "Critical Compliance Failure Intimation", trigger_conditions: { severity: "critical" }, notify_email: ["ca@sannidh.ai"], is_active: true, trigger_count: 0, created_at: new Date().toISOString(), updated_at: new Date().toISOString() }
+];
+
+// --- Docs & OCR Mock Defaults ---
+const defaultDocumentVault = [
+  {
+    id: "doc-demo-1",
+    ca_user_id: "00000000-0000-0000-0000-000000000000",
+    title: "GST Show Cause Notice Section 73 (GSTR-2B)",
+    description: "SCN received under Section 73 highlighting purchase ledger mismatch.",
+    file_name: "gst_SCN_fy25_hindi.pdf",
+    file_extension: "pdf",
+    mime_type: "application/pdf",
+    file_size_bytes: 1204910,
+    storage_bucket: "documents",
+    storage_path: "00000000-0000-0000-0000-000000000000/gst_SCN_fy25_hindi.pdf",
+    category: "notice",
+    compliance_domain: "gst",
+    financial_year: "2024-25",
+    status: "active",
+    is_ocr_processed: true,
+    is_verified: true,
+    verified_by: "00000000-0000-0000-0000-000000000000",
+    verified_at: new Date().toISOString(),
+    tags: ["notice", "gstr-2b", "section-73"],
+    source: "upload",
+    metadata: {},
+    current_version: 1,
+    created_at: new Date().toISOString(),
+    updated_at: new Date().toISOString()
+  },
+  {
+    id: "doc-demo-2",
+    ca_user_id: "00000000-0000-0000-0000-000000000000",
+    title: "Audited Balance Sheet FY 2024-25",
+    description: "Certified corporate audit financials uploaded for statutory efiling.",
+    file_name: "audited_balance_sheet_fy25.xlsx",
+    file_extension: "xlsx",
+    mime_type: "application/vnd.openxmlformats-officedocument.spreadsheetml.sheet",
+    file_size_bytes: 429180,
+    storage_bucket: "documents",
+    storage_path: "00000000-0000-0000-0000-000000000000/audited_balance_sheet_fy25.xlsx",
+    category: "balance_sheet",
+    compliance_domain: "mca",
+    financial_year: "2024-25",
+    status: "active",
+    is_ocr_processed: false,
+    is_verified: false,
+    tags: ["financials", "audit", "balance-sheet"],
+    source: "upload",
+    metadata: {},
+    current_version: 1,
+    created_at: new Date().toISOString(),
+    updated_at: new Date().toISOString()
+  }
+];
+
+const defaultDocumentVersions = [
+  { id: "dv-demo-1", document_id: "doc-demo-1", version_number: 1, file_name: "gst_SCN_fy25_hindi.pdf", file_size_bytes: 1204910, storage_path: "00000000-0000-0000-0000-000000000000/gst_SCN_fy25_hindi.pdf", mime_type: "application/pdf", change_summary: "Initial notice scan upload", changed_by: "00000000-0000-0000-0000-000000000000", created_at: new Date().toISOString() }
+];
+
+const defaultOcrJobs = [
+  { id: "oj-demo-1", document_id: "doc-demo-1", ca_user_id: "00000000-0000-0000-0000-000000000000", ocr_engine: "google_vision", language_hints: ["eng", "hin"], processing_options: {}, status: "completed", progress_pct: 100, started_at: new Date().toISOString(), completed_at: new Date().toISOString(), duration_ms: 1820, pages_processed: 1, total_pages: 1, confidence_score: 0.984, word_count: 145, retry_count: 0, max_retries: 3, created_at: new Date().toISOString() }
+];
+
+const defaultOcrResults = [
+  {
+    id: "or-demo-1",
+    ocr_job_id: "oj-demo-1",
+    document_id: "doc-demo-1",
+    page_number: 1,
+    raw_text: "केंद्रीय कर आयुक्त कार्यालय। कारण बताओ नोटिस u/s 73। विसंगति राशि ₹4,85,920। अंतिम तिथि 30 मई 2026।",
+    raw_text_confidence: 0.984,
+    extracted_fields: { notice_ref: "GST/DL/2026/04118932", section: "Section 73", tax_period: "FY 2024-25", discrepancy_amount: "₹4,85,920", due_date: "2026-05-30" },
+    extracted_tables: [],
+    detected_entities: { authority: ["GSTIN"], monetary_value: ["₹4,85,920"], dates: ["30 मई 2026"] },
+    bounding_boxes: [],
+    created_at: new Date().toISOString()
+  }
+];
+
+const defaultDocumentAccessLogs = [
+  { id: "dal-demo-1", document_id: "doc-demo-1", user_id: "00000000-0000-0000-0000-000000000000", action: "view", ip_address: "192.168.29.12", user_agent: "Mozilla/5.0 Mac", metadata: {}, created_at: new Date().toISOString() }
+];
+
+// --- ERP Connections Mock Defaults ---
+const defaultErpConnections = [
+  {
+    id: "erp-demo-1",
+    ca_user_id: "00000000-0000-0000-0000-000000000000",
+    platform: "tally",
+    platform_version: "Prime 4.0",
+    connection_name: "Tally Prime Live Server",
+    description: "Connection to core Tally XML server inside local firm intranet.",
+    auth_type: "tally_xml",
+    credentials_encrypted: {},
+    base_url: "http://localhost",
+    port: 9000,
+    company_name: "Acme Technologies Pvt Ltd",
+    environment: "production",
+    status: "connected",
+    last_connected_at: new Date().toISOString(),
+    last_sync_at: new Date().toISOString(),
+    sync_direction: "pull",
+    sync_frequency_minutes: 60,
+    auto_sync_enabled: true,
+    metadata: {},
+    created_at: new Date().toISOString(),
+    updated_at: new Date().toISOString()
+  },
+  {
+    id: "erp-demo-2",
+    ca_user_id: "00000000-0000-0000-0000-000000000000",
+    platform: "zoho_books",
+    connection_name: "Zoho Books Cloud Sandbox",
+    description: "OAuth 2.0 endpoint for importing client sales journals.",
+    auth_type: "oauth2",
+    credentials_encrypted: {},
+    company_name: "GlobalTrade India Logistics",
+    environment: "sandbox",
+    status: "connected",
+    last_connected_at: new Date().toISOString(),
+    last_sync_at: new Date().toISOString(),
+    sync_direction: "bidirectional",
+    sync_frequency_minutes: 120,
+    auto_sync_enabled: false,
+    metadata: {},
+    created_at: new Date().toISOString(),
+    updated_at: new Date().toISOString()
+  }
+];
+
+const defaultErpFieldMappings = [
+  { id: "efm-demo-1", connection_id: "erp-demo-1", erp_entity: "ledger", erp_field: "Name", regulon_entity: "client_companies", regulon_field: "company_name", transform_type: "direct", transform_config: {}, is_required: true, is_active: true, sort_order: 0, created_at: new Date().toISOString(), updated_at: new Date().toISOString() },
+  { id: "efm-demo-2", connection_id: "erp-demo-1", erp_entity: "ledger", erp_field: "GSTIN", regulon_entity: "client_companies", regulon_field: "gstin", transform_type: "direct", transform_config: {}, is_required: true, is_active: true, sort_order: 1, created_at: new Date().toISOString(), updated_at: new Date().toISOString() }
+];
+
+const defaultErpSyncJobs = [
+  { id: "esj-demo-1", connection_id: "erp-demo-1", ca_user_id: "00000000-0000-0000-0000-000000000000", sync_type: "incremental", direction: "pull", entities_synced: ["ledger", "voucher"], status: "completed", progress_pct: 100, started_at: new Date().toISOString(), completed_at: new Date().toISOString(), records_fetched: 45, records_created: 2, records_updated: 43, records_skipped: 0, records_failed: 0, duration_ms: 1240, created_at: new Date().toISOString() }
+];
+
+const defaultErpSyncLogs = [
+  { id: "esl-demo-1", sync_job_id: "esj-demo-1", connection_id: "erp-demo-1", erp_entity: "ledger", erp_record_id: "led_0912", regulon_entity: "client_companies", regulon_record_id: "demo-client-1", operation: "update", status: "success", erp_data: { Name: "Acme Technologies Pvt Ltd" }, mapped_data: { company_name: "Acme Technologies Pvt Ltd" }, created_at: new Date().toISOString() }
+];
+
+const defaultErpDataCache = [
+  { id: "edc-demo-1", connection_id: "erp-demo-1", erp_entity: "ledger", erp_record_id: "led_0912", data_snapshot: { Name: "Acme Technologies" }, fetched_at: new Date().toISOString() }
+];
+
+// --- PWA Offline Tasks Mock Defaults ---
+const defaultComplianceTasks = [
+  {
+    id: "task-demo-1",
+    ca_user_id: "00000000-0000-0000-0000-000000000000",
+    client_name: "Acme Technologies Pvt Ltd",
+    task_title: "File GST GSTR-3B Return for April 2026",
+    due_date: "2026-05-20",
+    status: "pending",
+    priority: "high",
+    category: "GSTIN",
+    comments: "Draft computation is complete. Awaiting senior CA verification."
+  },
+  {
+    id: "task-demo-2",
+    ca_user_id: "00000000-0000-0000-0000-000000000000",
+    client_name: "GlobalTrade India Logistics",
+    task_title: "Respond to GST Section 73 SCN discrepancy notice",
+    due_date: "2026-05-30",
+    status: "pending",
+    priority: "high",
+    category: "GSTIN",
+    comments: "Urgent show cause response preparation. Variance is ₹4,85,920."
+  }
+];
+
+// Dynamic Table router mock mapping
+let currentQueryFilters: Record<string, any> = {};
+
+const handleTableQuery = (table: string, method: string, args: any[]) => {
+  const storeKey = `sannidh_mock_${table}`;
+  let data: any[] = [];
+
+  // Match table with mock defaults
+  if (table === 'entities' || table === 'companies' || table === 'ca_clients') data = getStorageItem(storeKey, defaultEntities);
+  else if (table === 'entity_groups') data = getStorageItem(storeKey, defaultGroups);
+  else if (table === 'entity_group_members') {
+    data = getStorageItem(storeKey, defaultMembers);
+    const ents = getStorageItem('sannidh_mock_entities', defaultEntities);
+    data = data.map(m => ({ ...m, entity: ents.find((e: any) => e.id === m.entity_id) }));
+  }
+  else if (table === 'efiling_portal_credentials') data = getStorageItem(storeKey, defaultCredentials);
+  else if (table === 'efiling_jobs') data = getStorageItem(storeKey, defaultEfilingJobs);
+  else if (table === 'tax_liability_heads') {
+    data = getStorageItem(storeKey, defaultLiabilities);
+    const ents = getStorageItem('sannidh_mock_entities', defaultEntities);
+    data = data.map(l => ({ ...l, entities: ents.find((e: any) => e.id === l.entity_id) }));
+  }
+  else if (table === 'payment_transactions') data = getStorageItem(storeKey, defaultTransactions);
+  else if (table === 'consolidated_reports') data = getStorageItem(storeKey, [
+    {
+      id: "rep-demo-1",
+      ca_user_id: "00000000-0000-0000-0000-000000000000",
+      group_id: "group-demo-1",
+      report_type: "gst_summary",
+      report_title: "GST Consolidated Summary — Q1 FY26",
+      period_start: "2026-04-01",
+      period_end: "2026-06-30",
+      status: "finalized",
+      entity_count: 2,
+      created_at: new Date().toISOString(),
+      generated_data: {
+        summary: {
+          total_entities: 2,
+          average_health_score: 88,
+          total_tasks: 8,
+          completed_tasks: 7,
+          overdue_tasks: 0,
+        }
+      }
+    }
+  ]);
+  else if (table === 'entity_compliance_snapshot') data = getStorageItem(storeKey, [
+    {
+      entity_id: "demo-client-1",
+      overall_health_score: 94,
+      pending_tasks_count: 2,
+      overdue_tasks_count: 0,
+      snapshot_date: new Date().toISOString().split('T')[0],
+      gst_status: { filed: 6, pending: 1 },
+      itr_status: { status: 'filed' },
+      tds_status: { pending_deposit: 0 },
+      mca_status: { active: true }
+    },
+    {
+      entity_id: "demo-client-2",
+      overall_health_score: 68,
+      pending_tasks_count: 5,
+      overdue_tasks_count: 1,
+      snapshot_date: new Date().toISOString().split('T')[0],
+      gst_status: { mismatch_amount: 240000 },
+      itr_status: { status: 'pending' },
+      tds_status: { pending_deposit: 12000 },
+      mca_status: { active: true }
+    },
+    {
+      entity_id: "demo-client-3",
+      overall_health_score: 82,
+      pending_tasks_count: 3,
+      overdue_tasks_count: 0,
+      snapshot_date: new Date().toISOString().split('T')[0],
+      gst_status: { filed: 5, pending: 0 },
+      itr_status: { status: 'draft' },
+      tds_status: { pending_deposit: 0 },
+      mca_status: { active: true }
+    }
+  ]);
+  else if (table === 'client_module_calculations') data = getStorageItem(storeKey, defaultModuleCalculations);
+  else if (table === 'client_notice_data_room') data = getStorageItem(storeKey, defaultDataRooms);
+  else if (table === 'client_bank_transactions') data = getStorageItem(storeKey, defaultBankTransactions);
+  else if (table === 'bilingual_notices' || table === 'client_govt_notices') data = getStorageItem(storeKey, defaultBilingualNotices);
+  else if (table === 'webhook_endpoints') data = getStorageItem(storeKey, defaultWebhooks);
+  else if (table === 'enterprise_api_keys') data = getStorageItem(storeKey, [
+    {
+      id: "key-demo-1",
+      ca_user_id: "00000000-0000-0000-0000-000000000000",
+      key_name: "Acme Webhook Production Key",
+      key_prefix: "wh_prefix_82",
+      permissions: ["read:filings", "write:notices"],
+      rate_limit_per_minute: 60,
+      rate_limit_per_day: 5000,
+      allowed_ips: [],
+      allowed_origins: [],
+      is_active: true,
+      total_requests: 312,
+      created_at: new Date().toISOString()
+    }
+  ]);
+  else if (table === 'ai_messages') data = getStorageItem(storeKey, defaultAuditLogs);
+  else if (table === 'user_language_preferences') data = getStorageItem(storeKey, [
+    {
+      user_id: "00000000-0000-0000-0000-000000000000",
+      preferred_language: "en",
+      is_rtl_layout: false,
+    }
+  ]);
+  // --- Notifications Hub Interceptions ---
+  else if (table === 'notification_channels') data = getStorageItem(storeKey, defaultNotificationChannels);
+  else if (table === 'notification_templates') data = getStorageItem(storeKey, defaultNotificationTemplates);
+  else if (table === 'notification_alert_rules') {
+    data = getStorageItem(storeKey, defaultNotificationAlertRules);
+    const templates = getStorageItem('sannidh_mock_notification_templates', defaultNotificationTemplates);
+    data = data.map(r => ({ ...r, template: templates.find((t: any) => t.id === r.template_id) }));
+  }
+  else if (table === 'notification_recipients') data = getStorageItem(storeKey, defaultNotificationRecipients);
+  else if (table === 'notification_dispatches') {
+    data = getStorageItem(storeKey, defaultNotificationDispatches);
+    const templates = getStorageItem('sannidh_mock_notification_templates', defaultNotificationTemplates);
+    const recipients = getStorageItem('sannidh_mock_notification_recipients', defaultNotificationRecipients);
+    data = data.map(d => ({
+      ...d,
+      template: templates.find((t: any) => t.id === d.template_id),
+      recipient: recipients.find((r: any) => r.id === d.recipient_id)
+    }));
+  }
+  else if (table === 'notification_delivery_stats') data = getStorageItem(storeKey, defaultNotificationDeliveryStats);
+  
+  // --- Team & RBAC Interceptions ---
+  else if (table === 'rbac_teams') data = getStorageItem(storeKey, defaultRbacTeams);
+  else if (table === 'rbac_roles') data = getStorageItem(storeKey, defaultRbacRoles);
+  else if (table === 'rbac_team_members') {
+    data = getStorageItem(storeKey, defaultRbacTeamMembers);
+    const roles = getStorageItem('sannidh_mock_rbac_roles', defaultRbacRoles);
+    data = data.map(m => ({ ...m, role: roles.find((r: any) => r.id === m.role_id) }));
+  }
+  else if (table === 'rbac_role_permissions') data = getStorageItem(storeKey, defaultRbacRolePermissions);
+  else if (table === 'rbac_team_invitations') data = getStorageItem(storeKey, defaultRbacInvitations);
+  else if (table === 'rbac_member_activity_logs') data = getStorageItem(storeKey, defaultRbacActivityLogs);
+
+  // --- Audit Trail Interceptions ---
+  else if (table === 'audit_trail_events') data = getStorageItem(storeKey, defaultAuditTrailEvents);
+  else if (table === 'compliance_scores') data = getStorageItem(storeKey, defaultComplianceScores);
+  else if (table === 'compliance_reports') data = getStorageItem(storeKey, defaultComplianceReports);
+  else if (table === 'data_retention_policies') data = getStorageItem(storeKey, defaultDataRetentionPolicies);
+  else if (table === 'audit_alert_subscriptions') data = getStorageItem(storeKey, defaultAuditAlertSubscriptions);
+
+  // --- Docs & OCR Interceptions ---
+  else if (table === 'document_vault') data = getStorageItem(storeKey, defaultDocumentVault);
+  else if (table === 'document_versions') data = getStorageItem(storeKey, defaultDocumentVersions);
+  else if (table === 'ocr_jobs') data = getStorageItem(storeKey, defaultOcrJobs);
+  else if (table === 'ocr_results') data = getStorageItem(storeKey, defaultOcrResults);
+  else if (table === 'document_access_logs') data = getStorageItem(storeKey, defaultDocumentAccessLogs);
+  
+  // --- ERP Connections Interceptions ---
+  else if (table === 'erp_connections') data = getStorageItem(storeKey, defaultErpConnections);
+  else if (table === 'erp_field_mappings') data = getStorageItem(storeKey, defaultErpFieldMappings);
+  else if (table === 'erp_sync_jobs') data = getStorageItem(storeKey, defaultErpSyncJobs);
+  else if (table === 'erp_sync_logs') data = getStorageItem(storeKey, defaultErpSyncLogs);
+  else if (table === 'erp_data_cache') data = getStorageItem(storeKey, defaultErpDataCache);
+
+  // --- PWA Offline Tasks Interceptions ---
+  else if (table === 'compliance_tasks') data = getStorageItem(storeKey, defaultComplianceTasks);
+  else data = getStorageItem(storeKey, []);
+
+
+  // Filter queries
+  if (method === 'select') {
+    let result = [...data];
+    Object.entries(currentQueryFilters).forEach(([col, val]) => {
+      if (Array.isArray(val)) {
+        result = result.filter(r => val.includes(r[col]));
+      } else {
+        result = result.filter(r => r[col] === val);
+      }
+    });
+    return result;
+  }
+  
+  if (method === 'insert') {
+    const newRows = args[0].map((r: any) => ({
+      id: r.id || `mock-${Date.now()}-${Math.random().toString(36).slice(2, 6)}`,
+      created_at: new Date().toISOString(),
+      updated_at: new Date().toISOString(),
+      ...r
+    }));
+    data = [...newRows, ...data];
+    setStorageItem(storeKey, data);
+    return args[0].length === 1 ? newRows[0] : newRows;
+  }
+
+  if (method === 'update') {
+    const updates = args[0];
+    const filterId = currentQueryFilters.id || currentQueryFilters.entity_id || currentQueryFilters.company_id || currentQueryFilters.user_id;
+    if (filterId) {
+      data = data.map((r: any) => (r.id === filterId || r.entity_id === filterId || r.company_id === filterId || r.user_id === filterId) ? { ...r, ...updates, updated_at: new Date().toISOString() } : r);
+      setStorageItem(storeKey, data);
+      const updatedRow = data.find((r: any) => r.id === filterId || r.entity_id === filterId || r.company_id === filterId || r.user_id === filterId);
+      return updatedRow;
+    }
+    return updates;
+  }
+
+  if (method === 'delete') {
+    const filterId = currentQueryFilters.id;
+    if (filterId) {
+      data = data.filter((r: any) => r.id !== filterId);
+      setStorageItem(storeKey, data);
+    }
+    return null;
+  }
+
+  return data;
+};
+
+const createQueryBuilder = (table: string) => {
+  currentQueryFilters = {};
+
+  const builder: any = {
+    select: (cols?: string) => builder,
+    insert: (rows: any[]) => {
+      builder._method = 'insert';
+      builder._args = [rows];
+      return builder;
+    },
+    update: (updates: any) => {
+      builder._method = 'update';
+      builder._args = [updates];
+      return builder;
+    },
+    delete: () => {
+      builder._method = 'delete';
+      builder._args = [];
+      return builder;
+    },
+    eq: (col: string, val: any) => {
+      currentQueryFilters[col] = val;
+      return builder;
+    },
+    in: (col: string, vals: any[]) => {
+      currentQueryFilters[col] = vals;
+      return builder;
+    },
+    gte: (col: string, val: any) => builder,
+    lte: (col: string, val: any) => builder,
+    order: (col: string, options?: any) => builder,
+    limit: (n: number) => builder,
+    single: () => {
+      builder._isSingle = true;
+      return builder;
+    },
+    maybeSingle: () => {
+      builder._isMaybeSingle = true;
+      return builder;
+    },
+    then: (onfulfilled: any, onrejected?: any) => {
+      const method = builder._method || 'select';
+      const args = builder._args || [];
+      const resData = handleTableQuery(table, method, args);
+      
+      let finalData = resData;
+      if (builder._isSingle || builder._isMaybeSingle) {
+        finalData = Array.isArray(resData) ? (resData[0] || null) : resData;
+      }
+      
+      return Promise.resolve({ data: finalData, error: null }).then(onfulfilled, onrejected);
+    }
+  };
+
+  return builder;
+};
+
+const mockAuth = {
+  getUser: async () => ({
+    data: {
+      user: {
+        id: '00000000-0000-0000-0000-000000000000',
+        email: 'ca@sannidh.ai',
+        user_metadata: { role: 'senior_ca', ca_firm_id: 'firm_demo_consolidated' }
+      }
+    },
+    error: null
+  }),
+  getSession: async () => ({
+    data: {
+      session: {
+        user: { id: '00000000-0000-0000-0000-000000000000', email: 'ca@sannidh.ai' },
+        access_token: 'mock-jwt-token'
+      }
+    },
+    error: null
+  }),
+  onAuthStateChange: (cb: any) => {
+    setTimeout(() => {
+      cb('SIGNED_IN', {
+        user: { id: '00000000-0000-0000-0000-000000000000', email: 'ca@sannidh.ai' }
+      });
+    }, 0);
+    return { data: { subscription: { unsubscribe: () => {} } } };
+  }
+};
+
+const mockStorage = {
+  from: (bucket: string) => ({
+    upload: async (filePath: string, file: any) => ({ data: { path: filePath }, error: null }),
+    remove: async (paths: string[]) => ({ data: null, error: null })
+  })
+};
+
+const mockFunctions = {
+  invoke: async (functionName: string, options?: any) => {
+    console.log(`[SANNIDH MOCK EDGE FUNCTION] Invoked: ${functionName}`, options);
+    if (functionName === 'verify-efiling-credential') {
+      return { data: { success: true }, error: null };
+    }
+    if (functionName === 'submit-efiling') {
+      return { data: { success: true, ack_number: `GST-ARN-2026-${Math.floor(100000 + Math.random() * 900000)}` }, error: null };
+    }
+    if (functionName === 'compute-tax-liability') {
+      const gross = Math.round(Number(options?.body?.input_data?.turnover || 125000) * 0.18 * 100);
+      const itc = Math.round(Number(options?.body?.input_data?.itc_available || 15000) * 100);
+      const net = Math.max(0, gross - itc);
+      return {
+        data: {
+          gross_liability_paise: gross,
+          itc_available_paise: itc,
+          net_liability_paise: net,
+          interest_paise: 0,
+          penalty_paise: 0,
+          late_fee_paise: 0,
+          total_due_paise: net,
+          computation_data: {},
+          ai_notes: 'Successfully calculated liability under mock 18% standard GST rate.'
+        },
+        error: null
+      };
+    }
+    return { data: { success: true }, error: null };
+  }
+};
+
+const hasActiveRealSession = () => {
+  if (typeof window === 'undefined') return false;
+  try {
+    for (let i = 0; i < localStorage.length; i++) {
+      const key = localStorage.key(i);
+      if (key && (key.includes('auth-token') || key.includes('supabase.auth.token'))) {
+        const val = localStorage.getItem(key);
+        if (val) {
+          const parsed = JSON.parse(val);
+          if (parsed && (parsed.access_token || parsed.user || parsed.currentSession)) {
+            return true;
+          }
+        }
+      }
+    }
+  } catch {
+    // ignore
+  }
+  return false;
+};
+
+// Proxied supabase instance to selectively intercept browser routing
+export const supabase = new Proxy(realSupabase, {
+  get: (target, prop) => {
+    if (isDemo()) {
+      if (prop === 'from') return createQueryBuilder;
+      if (prop === 'auth') {
+        if (hasActiveRealSession()) {
+          return Reflect.get(target, prop);
+        }
+        return mockAuth;
+      }
+      if (prop === 'storage') return mockStorage;
+      if (prop === 'functions') return mockFunctions;
+    }
+    return Reflect.get(target, prop);
+  }
+}) as any;
+

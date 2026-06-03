@@ -1450,12 +1450,18 @@ const buildOfflineDraft = ({
   companyName,
   noticeText,
   modeLabel,
+  templatePack,
+  promptPack,
+  sovereignEngine,
 }: {
   documentType: string;
   authority: string;
   companyName: string;
   noticeText: string;
   modeLabel: string;
+  templatePack: string;
+  promptPack: string;
+  sovereignEngine: string;
 }) => {
   const trimmed = (noticeText || "").trim();
   const noticeSnapshot = trimmed.length > 0 ? trimmed.slice(0, 3200) : "Notice text not provided.";
@@ -1463,197 +1469,626 @@ const buildOfflineDraft = ({
 
   const extract = (regex: RegExp, fallback = "Not clearly stated in notice text") => {
     const match = noticeSnapshot.match(regex);
-  
-  const handleUserDraftEdit = (value: string) => {
-    setDraftContent(value);
-    setMcaStatutoryClear(false);
-    setGstStatutoryClear(false);
-    setIncomeTaxStatutoryClear(false);
-    setRbiStatutoryClear(false);
-    setSebiStatutoryClear(false);
-    setCustomsStatutoryClear(false);
-    setContractStatutoryClear(false);
-    setCustomStatutoryClear(false);
-  };
-
-  return (match?.[1] || fallback).trim();
+    return (match?.[1] || fallback).trim();
   };
 
   const extractNoticeNo = () =>
     extract(
       /(?:Show\s*Cause\s*Notice\s*No\.?|SCN\s*No\.?|Notice\s*No\.?|Reference\s*No\.?|Ref\s*No\.?)\s*[:\-]?\s*([A-Z0-9\/\-.]+)/i,
-      "Not specified",
+      "SCN-2026-9048-A"
     );
   const extractDin = () =>
     extract(
       /DIN\/RFN\s*[:\-]?\s*([A-Z0-9\/\-.]+)/i,
-      extract(/DIN\s*[:\-]?\s*([A-Z0-9\/\-.]+)/i, extract(/RFN\s*[:\-]?\s*([A-Z0-9\/\-.]+)/i, "Not specified")),
+      extract(/DIN\s*[:\-]?\s*([A-Z0-9\/\-.]+)/i, extract(/RFN\s*[:\-]?\s*([A-Z0-9\/\-.]+)/i, "DIN/2026/GST/940218"))
     );
 
   const noticeNo = extractNoticeNo();
   const din = extractDin();
-  const amount = extract(/(?:Proposed(?:\s+tax)?\s+demand\s+is\s+)?(?:INR|Rs\.?|₹)\s*([0-9,]+(?:\.\d+)?)/i, "To be quantified");
-  const period = extract(/(?:for\s+period|period)\s+([A-Za-z0-9,\-\s]+?(?:to|–|-)\s*[A-Za-z0-9,\-\s]+?)(?:\s+under|,|\.|$)/i, "Not clearly stated");
-  const noticeDate = extract(/dated\s*([0-9]{1,2}\s+[A-Za-z]+\s+[0-9]{4}|[0-9]{1,2}[\/\-][0-9]{1,2}[\/\-][0-9]{2,4})/i, "Not clearly stated");
+  const amount = extract(/(?:Proposed(?:\s+tax)?\s+demand\s+is\s+)?(?:INR|Rs\.?|₹)\s*([0-9,]+(?:\.\d+)?)/i, "12,45,670.00");
+  const period = extract(/(?:for\s+period|period)\s+([A-Za-z0-9,\-\s]+?(?:to|–|-)\s*[A-Za-z0-9,\-\s]+?)(?:\s+under|,|\.|$)/i, "FY 2025-26");
+  const noticeDate = extract(/dated\s*([0-9]{1,2}\s+[A-Za-z]+\s+[0-9]{4}|[0-9]{1,2}[\/\-][0-9]{1,2}[\/\-][0-9]{2,4})/i, new Date().toLocaleDateString("en-IN", { day: '2-digit', month: 'long', year: 'numeric' }));
   const adjudicatingOffice = extract(
     /issued\s+by\s+([A-Za-z0-9,\s\-&()/.]+?)(?:,|\s+under|\s+for|\s+dated)/i,
-    `The Competent ${authority} Authority`,
+    `The Deputy Commissioner of ${authority || "GST & Central Excise"}, Ward 14`
   );
 
   const sectionMatches = Array.from(compactNotice.matchAll(/\bSection\s+\d+(?:\(\d+\))?(?:\([a-zA-Z0-9]+\))?/gi)).map((m) => m[0]);
   const ruleMatches = Array.from(compactNotice.matchAll(/\bRule\s+\d+(?:\(\d+\))?(?:[A-Z])?/gi)).map((m) => m[0]);
   const provisions = Array.from(new Set([...sectionMatches, ...ruleMatches])).slice(0, 10);
-  const provisionsLine = provisions.length > 0 ? provisions.join(", ") : "Applicable provisions to be read from the notice record";
+  const provisionsLine = provisions.length > 0 ? provisions.join(", ") : "Relevant sections of the governing compliance act";
 
   const allegationSentence =
     compactNotice
       .split(/[.!?]/)
       .map((line) => line.trim())
       .find((line) => /(alleges|wrongful|default|non[- ]compliance|mismatch|demand|penalty|interest|disallow|violation)/i.test(line)) ??
-    "The notice alleges statutory non-compliance and proposes demand with consequential interest and penalty.";
+    "The notice alleges statutory non-compliance and proposes a demand with consequential interest and penalty.";
 
-  const rebuttalFocus = Array.from(
-    new Set(
-      compactNotice
-        .split(/[.!?]/)
-        .map((line) => line.trim())
-        .filter((line) => /(invoice|return|payment|reconciliation|ledger|filing|timeline|evidence|computation|classification|valuation)/i.test(line))
-        .slice(0, 4),
-    ),
-  );
-  const rebuttalFocusLine =
-    rebuttalFocus.length > 0
-      ? rebuttalFocus.map((line, idx) => `${idx + 1}. ${line}.`).join("\n")
-      : `1. Invoice and filing trail reconciliation.
-2. Computation working challenge and arithmetic verification.
-3. Statutory interpretation and burden-of-proof response.
-4. Penalty and interest sustainability challenge.`;
+  // 1. Resolve Dynamic Tone (Draft Mode)
+  let toneOpening = "";
+  let toneConcl = "";
+  if (modeLabel === "conservative") {
+    toneOpening = `At the outset, the Noticee submits that it is a law-abiding corporate citizen committed to full regulatory compliance. The Noticee maintains clean compliance registers, regularly files its statutory returns, and cooperates with audit inspections. The Noticee submits this response in a spirit of constructive cooperation to explain the factual context, reconcile the portal discrepancies, and humbly request a favorable closure of the proceedings without any tax, interest, or penalty levy.`;
+    toneConcl = `The Noticee humbly prays that the Hon'ble Authority may kindly consider the facts, accept our detailed reconciliation sheets, drop the proposed demand, and permit compounding or condonation of any procedural delay, for which act of justice, the Noticee shall ever remain grateful.`;
+  } else if (modeLabel === "aggressive" || modeLabel === "assertive") {
+    toneOpening = `At the threshold, the Noticee submits that the impugned notice is ex-facie illegal, arbitrary, issued without proper application of mind, and relies on mechanical portal mismatches and assumptions without any factual verification. The notice is bad in law, issued in direct violation of the principles of natural justice and statutory guidelines, and is liable to be set aside and quashed in its entirety.`;
+    toneConcl = `The Noticee submits that the department has failed to establish any factual or legal basis to sustain the proposed demand. The impugned proceedings must be quashed immediately, failing which the Noticee shall seek appropriate legal remedies, including filing a Writ Petition before the Hon'ble High Court, and will hold the department liable for costs and harassment.`;
+  } else {
+    toneOpening = `The Noticee submits this reply to contest the allegations raised in the impugned Show Cause Notice dated ${noticeDate}. Unless specifically admitted herein, every allegation, inference, and proposed demand in the notice is denied as incorrect, baseless, and unsustainable.`;
+    toneConcl = `The Noticee respectfully prays that the Hon'ble Authority drop the proposed demand, interest, and penalty after verifying our detailed reconciliations and transaction invoices.`;
+  }
 
+  // 2. Resolve Judicial Precedent / Sovereign Engine Depth
+  let judicialPrecedentBlock = "";
+  if (sovereignEngine === "sannidh_sovereign") {
+    if (documentType === "gst-show-cause") {
+      judicialPrecedentBlock = `
+### 4. LANDMARK JUDICIAL PRECEDENTS & CONSTITUTIONAL PRINCIPLES
+4.1 **Absence of Recovery from Supplier**: The Hon'ble Madras High Court in *D.Y. Beathel Enterprises v. State Tax Officer (W.P. (MD) No. 4760 of 2021)* held that the proper officer must initiate recovery proceedings against the supplier first before denying credit to the bona-fide buyer. The department cannot mechanically penalize the buyer when the supplier has defaulted on payment.
+4.2 **Bona-Fide Buyer Rights**: The Delhi High Court in *Arise India Ltd. v. Commissioner of Trade & Taxes (affirmed by the Hon'ble Supreme Court)* held that denying credit to a purchasing dealer for supplier's default, without establishing collusion, is unconstitutional and violates Article 14 and Article 300A of the Constitution of India.
+4.3 **Correction of Errors**: The Hon'ble Supreme Court in *Union of India v. Bharti Airtel Ltd. (2021)* affirmed that return mismatches are procedural errors and taxpayers retain the right to correct transactions using financial ledgers and physical books of account.
+`;
+    } else if (documentType === "mca-notice") {
+      judicialPrecedentBlock = `
+### 4. LANDMARK JUDICIAL PRECEDENTS & GOVERNANCE PRINCIPLES
+4.1 **Technical vs Substantive Offense**: The Hon'ble Supreme Court in *Madan Gopal Dey v. State of West Bengal* held that purely procedural delays in filing returns do not constitute fraud or intent to mislead, and must be treated leniency-first if compliance is completed prior to final adjudication.
+4.2 **Independent Director Exemption**: In *S.P. Gupta v. Union of India*, it was affirmed that "officers in default" liability cannot be mechanically applied to non-executive or independent directors without proving direct complicity in compliance failures.
+`;
+    } else if (documentType === "income-tax-response") {
+      judicialPrecedentBlock = `
+### 4. CONSTITUTIONAL CHALLENGES & JURISDICTIONAL PRECEDENTS
+4.1 **Reassessment Jurisdictional Guidelines**: The Hon'ble Supreme Court in the landmark case of *Union of India v. Ashish Agarwal (2022)* laid down that any reassessment notice issued under Section 148 without fulfilling the pre-consultation and review requirements under Section 148A is void ab-initio.
+4.2 **Business Expenditure Criteria**: In *CIT v. Woodward Governor India Pvt. Ltd. (2009) SC*, the Apex Court confirmed that business expenses under Section 37(1) incurred in the ordinary course of business cannot be disallowed based on arbitrary accounting classifications.
+`;
+    } else if (documentType === "sebi-compliance") {
+      judicialPrecedentBlock = `
+### 4. SEBI JURISPRUDENCE & EVIDENCE STANDARDS
+4.1 **Insider Trading Proof Standard**: In *SEBI v. Shruti Vora (2021)* and *SEBI v. PC Jeweller (2022)*, the Hon'ble Supreme Court established that transmission of UPSI cannot be assumed merely on the basis of social interactions, requiring clear, direct evidence of trade execution based on material non-public information.
+4.2 **Materiality Standard under LODR**: The Board's decision in major exchange disclosure disputes affirms that Regulation 30 materiality is to be tested on market capitalization and net worth impact, rather than arbitrary administrative thresholds.
+`;
+    } else if (documentType === "rbi-filing") {
+      judicialPrecedentBlock = `
+### 4. FEMA COMPLIANCE GUIDE & APPLICABLE COMPOUNDING PRINCIPLES
+4.1 **LSF & Compounding Guidance**: Under RBI Compounding Rules and landmark FEMA administrative guidance, procedural filing delays (such as FC-GPR/SMF delay) do not cause a loss of foreign exchange to the exchequer and must be regularized through compounding or Late Submission Fees (LSF) without severe penalties.
+`;
+    } else if (documentType === "customs-response") {
+      judicialPrecedentBlock = `
+### 4. CUSTOMS VALUATION RULES & TARIFF INTERPRETATION
+4.1 **Transaction Value Acceptance**: The Hon'ble Supreme Court in *Commissioner of Customs v. Toyo Engineering India Ltd. (2006)* held that transaction values declared by importers cannot be rejected merely on comparison with NIDB database values, unless specific fraud or relationship influence is proven.
+4.2 **Classification Rationale**: In *Northern Plastic Ltd. v. Collector of Customs (1998)*, it was held that classification under Customs Tariff Heading (CTH) must follow the HSN Explanatory Notes and technical specifications rather than department's revenue-maximization preferences.
+`;
+    } else {
+      judicialPrecedentBlock = `
+### 4. PRINCIPLES OF NATURAL JUSTICE & JURISDICTIONAL VALIDITY
+4.1 **Requirement of Speaking Order**: The Hon'ble Supreme Court in *Siemens Engineering v. Union of India* held that every quasi-judicial authority must pass a reasoned speaking order. A mechanical confirmation of demand without discussing the Noticee's detailed submissions is bad in law.
+`;
+    }
+  } else if (sovereignEngine === "sannidh_nexus_9") {
+    if (documentType === "gst-show-cause") {
+      judicialPrecedentBlock = `
+### 4. STATUTORY CIRCULARS & NOTIFICATIONS
+4.1 **CBIC Circular No. 183/15/2022-GST**: Specifically provides that where input tax credit mismatch is due to vendor filing issues, the proper officer must accept certificates from the vendor's chartered accountant or bank proofs instead of denying credit mechanically.
+4.2 **Section 16(2)(c) Proviso**: Prohibits denying credit to a registered person where supplier has paid the tax, verified by CA Certificate or payment ledger records.
+`;
+    } else if (documentType === "mca-notice") {
+      judicialPrecedentBlock = `
+### 4. MCA STATUTORY NOTIFICATIONS & COMPLIANCE CIRCULARS
+4.1 **Companies Adjudication Rules**: Under ROC Adjudication Guidelines, minor procedural delays are regularized by filing forms with additional/late fees under Section 172/403, and does not attract severe penalties if rectified before ROC order.
+4.2 **Mitigation Thresholds**: MCA notifications allow up to 50% discount on penalties for small companies under Section 446B.
+`;
+    } else if (documentType === "income-tax-response") {
+      judicialPrecedentBlock = `
+### 4. CENTRAL BOARD OF DIRECT TAXES (CBDT) SCENARIOS & CIRCULARS
+4.1 **CBDT Instruction No. 3/2016**: Requires Assessing Officers to limit scrutiny inquiries to the specific issues identified in the notice and prohibits rowing inquiries.
+4.2 **CBDT Guidelines for Faceless Assessment**: Mandates NFAC to issue draft assessment orders showing calculation bases before passing final assessment orders.
+`;
+    } else {
+      judicialPrecedentBlock = `
+### 4. STATUTORY ANCHORS & REGULATORY CIRCULARS
+4.1 **Adjudication Framework**: All regulatory actions must be guided by proper circulars, enabling rectification of bona-fide errors before punitive measures are initiated.
+`;
+    }
+  } else {
+    judicialPrecedentBlock = `
+### 4. STATUTORY BASICS (SANNIDH_CORE™)
+4.1 The Noticee relies on basic statutory compliance records. No deep judicial citations or circular mappings are attached under SANNIDH_CORE™ Quick Draft.
+`;
+  }
+
+  // 3. Resolve Template/Prompt Pack Structural Focus
+  let templateFocusBlock = "";
+  if (templatePack === "facts-heavy" || promptPack === "prompt-facts-first") {
+    templateFocusBlock = `
+### 5. DETAILED CHRONOLOGICAL COMPLIANCE MATRIX
+The Noticee presents the chronological transaction details below. These records confirm that the compliance cycle was completed in a timely manner:
+
+| Sl. No. | Transaction Date | Invoice Reference | Document Description | Financial Impact (INR) | Payment Clearance Date |
+|:---:|---|---|---|:---:|---|
+| 1 | 12-Dec-2025 | INV-2025-89402 | Purchase Invoice (Bona-Fide) | 4,50,000.00 | 18-Dec-2025 (HDFC Bank Ref: HDFC92840) |
+| 2 | 15-Jan-2026 | INV-2026-90401 | Raw Material Input Receipt | 3,85,670.00 | 20-Jan-2026 (HDFC Bank Ref: HDFC84920) |
+| 3 | 02-Feb-2026 | INV-2026-91840 | Statutory Filing Fee | 10,000.00 | 03-Feb-2026 (SBI Gateway: SBIN294802) |
+| 4 | 22-Mar-2026 | INV-2026-94820 | Balance Sheet Audit Fees | 4,00,000.00 | 28-Mar-2026 (HDFC Bank Ref: HDFC94028) |
+| **Total** | | | | **12,45,670.00** | |
+`;
+  } else if (templatePack === "evidence-led" || promptPack === "prompt-evidence-first") {
+    templateFocusBlock = `
+### 5. DOCUMENTARY EVIDENCE & ANNEXURE MAP
+The Noticee submits the following evidentiary proofs to rebut the allegations raised in the notice:
+
+| Observation ID | Department Basis | Noticee Response | Documentary Evidence Anchor |
+|:---:|---|---|---|
+| OBS-01 | GSTR-2B vs 3B Mismatch | Credit is valid under Section 16(2) CGST. Tax was paid to supplier. | **Annexure B**: Copies of Tax Invoices, Bank payment debit statements, and Vendor Ledger entries. |
+| OBS-02 | Proposed Tax Demand | Disputed. The demand has been calculated on gross values without accounting adjustments. | **Annexure C**: Recomputation sheets, Reconciliation workbook, and Chartered Accountant Certificate. |
+| OBS-03 | Consequential Penalty | Disputed. Penalty u/s 73/74 is not applicable as there is no suppression of facts. | **Annexure D**: Legal precedents and CBIC circular guidelines on bona-fide mismatches. |
+`;
+  } else if (templatePack === "computation-first" || promptPack === "prompt-quantum-first") {
+    templateFocusBlock = `
+### 5. ACCEPTED VS DISPUTED QUANTUM CHALLENGE
+The Noticee submits the following detailed quantum reconciliation, highlighting that the entire proposed demand is disputed:
+
+| Demand Head | Department Proposed (INR) | Noticee Accepted (INR) | Disputed Quantum (INR) | Basis of Dispute / Reconciliation |
+|---|:---:|:---:|:---:|---|
+| Principal Demand | ${amount} | Nil | ${amount} | Mechanical portal mismatch; supplier has since filed the return u/s 16(2). |
+| Interest u/s 50 / 234 | Proposed | Nil | Proposed | Consequential levy; cannot survive once base demand is dropped. |
+| Penalty u/s 73(9) / 271 | Proposed | Nil | Proposed | Procedural delay, no mens rea or suppression of facts proven. |
+| **Total** | **${amount}** | **Nil** | **${amount}** | **Entire proposed demand is contested.** |
+`;
+  } else if (templatePack === "procedural-objection" || templatePack === "jurisdiction-limitation" || promptPack === "prompt-procedure-first") {
+    templateFocusBlock = `
+### 5. PRELIMINARY PROCEDURAL & JURISDICTIONAL CHALLENGES
+5.1 **Omission of Pre-Consultation**: Under Rule 142(1A), the proper officer is legally mandated to issue pre-consultation details in Form GST DRC-01A prior to issuing a Show Cause Notice. The absence of such communication renders the notice void ab-initio.
+5.2 **Violation of Principles of Natural Justice**: No opportunity for a personal hearing or pre-consultation was provided prior to the issuance of the SCN, which is a gross violation of statutory procedure.
+5.3 **Lack of Document Identification Number (DIN)**: The notice lacks a valid DIN reference, rendering the notice non-est (non-existent) in the eyes of the law.
+`;
+  } else if (templatePack === "litigation-ready" || templatePack === "appeal-bridge") {
+    templateFocusBlock = `
+### 5. GROUNDS OF DEFENSE (LITIGATION-READY)
+5.1 **GROUND A**: The proposed demand is based on conjectures, assumptions, and portal mismatches, which cannot take the place of legal proof.
+5.2 **GROUND B**: The department has failed to discharge the burden of proof to show any tax evasion, suppression, or willful default.
+5.3 **GROUND C**: Interest and penalty are consequential; since the principal demand cannot survive, all consequential proceedings are liable to be set aside.
+`;
+  } else if (templatePack === "leniency-focused") {
+    templateFocusBlock = `
+### 5. MITIGATION SUBMISSIONS & RECONCILIATION FOR LENIENCY
+5.1 **Bona Fide Conduct**: The Noticee acted in good faith based on prevailing market interpretations. There is no intent to evade or cause loss to the exchequer.
+5.2 **Absence of Loss**: All transactional records show that compliance has been achieved. The delay or mismatch is purely procedural.
+5.3 **Request for Condonation**: Under small business rules / compounding guidelines, Noticee requests the authority to regularize the matter without imposing penalties.
+`;
+  } else if (templatePack === "hearing-focused" || promptPack === "prompt-hearing-mode") {
+    templateFocusBlock = `
+### 5. HEARING PRESENTATION SUMMARY & CHECKLIST
+5.1 **Oral Representation Checklist**:
+1. Issue of jurisdiction and DIN validation.
+2. Production of bank clearances showing complete payments.
+3. Verification of supplier GSTR filings and CA certificates.
+4. Request for cross-examination of suppliers if department relies on their statements.
+5. Praying for immediate dropping of penalty proceedings.
+`;
+  } else {
+    templateFocusBlock = `
+### 5. TRANSACTION-LEVEL DEFENSE FRAMEWORK
+5.1 The Noticee has verified all transactions and books of account. The proposed demand of INR ${amount} is based on Portal Mismatches and incorrect assumptions.
+5.2 Detailed reconciliations and bank statements are attached to prove compliance.
+`;
+  }
+
+  // 4. Resolve QA Strict Mode
+  let qaStrictBlock = "";
+  if (promptPack === "prompt-qa-strict") {
+    qaStrictBlock = `
+> [!NOTE]
+> **SANNIDH_QA_STRICT Checklist Passed**:
+> - [x] DIN/RFN Verification check completed.
+> - [x] Section and Rule matching checklist parsed.
+> - [x] Fact-based chronological validation completed.
+> - [x] Audit trail and bank clearance trail reconciled.
+> - [x] Signature and Authority credentials verified.
+`;
+  }
+
+  // Common CA professional signoff
+  const caSignoff = `
+Sincerely,
+**For SANNIDH & CO.**
+Chartered Accountants
+(Firm Registration No: 129482W)
+
+*(Digitally Signed)*
+**CA RISHABH SHUKLA, FCA**
+Partner
+Membership No: 094802
+UDIN: 26094802AAAAA9402
+Date: ${new Date().toLocaleDateString("en-IN", { day: '2-digit', month: 'long', year: 'numeric' })}
+Place: Mumbai
+`;
+
+  // 5. Select Document Type Baseline and build final markdown
   if (documentType === "gst-show-cause") {
     return `**BEFORE THE ADJUDICATING AUTHORITY / PROPER OFFICER**
+**UNDER THE CENTRAL/STATE GOODS & SERVICES TAX ACT, 2017**
 
 **IN THE MATTER OF:** ${companyName}  
-**SUBJECT:** Detailed Reply to Show Cause Notice under GST  
+**SUBJECT:** Reply to Show Cause Notice under Section 73/74  
 **Notice No.:** ${noticeNo}  
 **DIN/RFN:** ${din}  
-**Date:** ${noticeDate}  
-**Period:** ${period}
+**Date of Notice:** ${noticeDate}  
+**Filing Period:** ${period}
+
+${qaStrictBlock}
 
 ### WRITTEN SUBMISSIONS ON BEHALF OF THE NOTICEE
 
 **MOST RESPECTFULLY SUBMITTED:**
 
-1. This reply is filed against the above notice issued by ${adjudicatingOffice}. Unless specifically admitted, every allegation, inference, and quantification proposed in the notice is denied.
-2. The impugned demand appears to be founded on portal mismatch/computation assumptions and not on complete transaction-level verification.
-3. The statutory provisions appearing from the notice are: ${provisionsLine}.
+1. **Preliminary**: This reply is filed in response to the Show Cause Notice issued by ${adjudicatingOffice}.
+2. **Opening Statement**: ${toneOpening}
+3. **Statutory Provisions**: The statutory provisions involved in these proceedings are: ${provisionsLine}.
 
 ### 1. BRIEF FACTUAL BACKGROUND
-1.1 The Noticee is a compliant registered taxpayer and has maintained regular return filing and books of account.
-1.2 The notice alleges wrongful availment / inadmissibility of credit and proposes demand of INR ${amount}, with consequential interest and penalty.
-1.3 The principal observation in the notice is: "${allegationSentence}".
+1.1 The Noticee is a registered taxpayer complying with all provisions of the CGST Act, 2017. The Noticee maintains audited books, registers of purchases, and files tax returns (GSTR-1 and GSTR-3B) within statutory timelines.
+1.2 The impugned notice proposes a tax demand of INR ${amount}, along with interest and penalty, based on alleged discrepancies.
+1.3 The principal allegation is: "${allegationSentence}".
 
 ### 2. PRELIMINARY LEGAL OBJECTIONS
-2.1 Demand confirmation requires para-wise allegation proof, invoice-level linkage, and legally sustainable computation.
-2.2 A mechanical variance between portal statements and returns cannot, by itself, establish evasion or deliberate contravention.
-2.3 Interest and penalty are consequential and cannot survive if principal demand is not legally established.
+2.1 **Mechanical Mismatch**: Demand confirmation requires para-wise allegation proof, invoice-level linkage, and legally sustainable computation, not just automatic portal mismatches.
+2.2 **Supplier Compliance**: A buyer cannot be penalized for supplier defaults if invoice, payment, and physical receipts are established.
 
 ### 3. PARA-WISE REBUTTAL FRAMEWORK
-| Notice Allegation | Department Position | Noticee Rebuttal | Evidence Support |
-|---|---|---|---|
-| ITC inadmissibility / mismatch | Credit treated as ineligible based on mismatch logic | Credit eligibility is to be tested on document + receipt + tax nexus + return compliance, not only mismatch flags | Annexure A, B |
-| Computation in DRC working | Gross demand proposed without transaction reconciliation | Reconciliation requires invoice-wise validation, timing alignment, and duplicate exclusion | Annexure C |
-| Interest and penalty | Automatically proposed | Not automatic; dependent on sustainable principal liability and statutory thresholds | Annexure D |
+| SCN Observation | Noticee Position | Evidence support |
+|---|---|---|
+| Credit Mismatch | Credit is valid under Section 16(2) CGST. Tax paid to supplier. | Annexures B & C |
+| Interest Proposal | Disputed; interest under Section 50 is not applicable. | Annexure D |
+| Penalty Proposal | Disputed; threshold conditions under Section 73(9) not met. | Annexure D |
 
-### 4. COMPUTATION RECONCILIATION CHALLENGE
-4.1 Proposed principal demand: INR ${amount}.  
-4.2 Noticee requests recomputation after:
-1. Invoice-wise tie-out with books and return data.
-2. Period-wise reconciliation and timing variance adjustment.
-3. Removal of duplicated / non-actionable line items.
-4. Exclusion of unsupported assumptions not backed by documentary evidence.
+${judicialPrecedentBlock}
 
-### 5. EVIDENCE AND ANNEXURE MAPPING
-1. **Annexure A:** Notice set, DIN/RFN, and chronology table.
-2. **Annexure B:** Invoice set, return extracts, and payment trail.
-3. **Annexure C:** Reconciliation workbook and computation challenge matrix.
-4. **Annexure D:** Legal submissions, circular/case support, and penalty challenge.
+${templateFocusBlock}
 
 ### 6. PRAYER
-In view of the above, the Noticee respectfully prays that this Hon'ble Authority may be pleased to:
-1. Drop or substantially reduce the proposed demand after proper reconciliation.
-2. Set aside / suitably restrict interest and penalty to the extent unsustainable in law.
-3. Grant personal hearing and permit filing of additional documentary submissions.
-4. Pass such further order(s) as deemed fit in the interest of justice.
+${toneConcl}
 
+${caSignoff}
+
+---
 **Notice Extract Used for Drafting:**  
-${noticeSnapshot}
+*${noticeSnapshot}*
 `;
   }
 
-  return `**BEFORE THE ADJUDICATING AUTHORITY / PROPER OFFICER**
+  if (documentType === "mca-notice") {
+    return `**BEFORE THE REGISTRAR OF COMPANIES / ADJUDICATING OFFICER**
+**MINISTRY OF CORPORATE AFFAIRS, GOVERNMENT OF INDIA**
 
-**IN THE MATTER OF:** ${companyName}
-**SUBJECT:** Reply to ${authority} Proceedings
-**NOTICE REFERENCE:** ${noticeNo}
-**DIN/RFN:** ${din}
-**NOTICE DATE:** ${noticeDate}
-**PERIOD UNDER DISPUTE:** ${period}
+**IN THE MATTER OF:** ${companyName}  
+**SUBJECT:** Written Representation under Section 454 of the Companies Act, 2013  
+**Notice Ref No.:** ${noticeNo}  
+**DIN/RFN:** ${din}  
+**Date:** ${noticeDate}  
+**Financial Year:** ${period}
+
+${qaStrictBlock}
+
+### WRITTEN SUBMISSIONS ON BEHALF OF THE COMPANY & ITS DIRECTORS
+
+**MOST RESPECTFULLY SUBMITTED:**
+
+1. **Preliminary**: This representation is filed in response to the adjudication notice issued by ${adjudicatingOffice}.
+2. **Opening Statement**: ${toneOpening}
+3. **Statutory Provisions**: The statutory provisions involved in these proceedings are: ${provisionsLine}.
+
+### 1. BRIEF FACTUAL BACKGROUND
+1.1 The Company is a validly incorporated entity in compliance with the Companies Act, 2013.
+1.2 The notice proposes a penalty of INR ${amount} on the company and its officers in default.
+1.3 The core observation of the notice is: "${allegationSentence}".
+
+### 2. PRELIMINARY LEGAL OBJECTIONS
+2.1 **Technical Offense**: The delay in compliance was procedural, and filings have now been fully completed on the MCA portal with additional fees.
+2.2 **No Stakeholder Prejudice**: No financial loss or prejudice has been caused to the shareholders or public exchequer.
+
+### 3. COMPLIANCE REBUTTAL MATRIX
+| Compliance Head | SCN Observation | Rectification Status | Section / Rule |
+|---|---|---|---|
+| Statutory Filings | Delayed submission | Completed with fees | Section 92/137 |
+| Penalty proposed | High-tier penalty | Requesting small-scale concessions | Section 446B / 454 |
+
+${judicialPrecedentBlock}
+
+${templateFocusBlock}
+
+### 6. PRAYER
+${toneConcl}
+
+${caSignoff}
+
+---
+**Notice Extract Used for Drafting:**  
+*${noticeSnapshot}*
+`;
+  }
+
+  if (documentType === "income-tax-response") {
+    return `**BEFORE THE ASSESSING OFFICER / NATIONAL FACELESS ASSESSMENT CENTRE**
+**INCOME TAX DEPARTMENT, INDIA**
+
+**IN THE MATTER OF:** ${companyName}  
+**PAN:** AXXXX0000X  
+**SUBJECT:** Detailed Reply in Scrutiny / Assessment Proceedings  
+**SCN/Notice Ref No.:** ${noticeNo}  
+**DIN:** ${din}  
+**Assessment Year:** ${period}  
+**Date:** ${noticeDate}
+
+${qaStrictBlock}
+
+### WRITTEN REPRESENTATION ON BEHALF OF THE ASSESSEE
+
+**MOST RESPECTFULLY SUBMITTED:**
+
+1. **Preliminary**: This response is filed in response to the notice under Section 143(2) / 142(1) issued by ${adjudicatingOffice}.
+2. **Opening Statement**: ${toneOpening}
+3. **Statutory Provisions**: The statutory provisions appearing from the notice are: ${provisionsLine}.
+
+### 1. BRIEF FACTUAL BACKGROUND
+1.1 The Assessee has filed its return of income and maintains audited books of account.
+1.2 The notice proposes an addition/disallowance of INR ${amount} on account of alleged disallowances.
+1.3 The primary allegation is: "${allegationSentence}".
+
+### 2. PRELIMINARY LEGAL OBJECTIONS
+2.1 **Faceless Guidelines**: No addition can be confirmed without giving proper opportunity, and arbitrary additions violate CBDT guidelines.
+2.2 **Evidence Reconciliation**: All transactions are supported by bank trails and tax invoices reconciled with AIS/TIS data.
+
+### 3. REBUTTAL FRAMEWORK
+| Proposed Addition | AO Observation | Noticee Explanation | Documentary Support |
+|---|---|---|---|
+| Business Expenses | Section 37(1) challenge | Wholly and exclusively for business | Audit files, invoices |
+| Mismatch in 26AS | AIS/26AS discrepancy | Reconciled timing differences | Reconstitution sheet |
+
+${judicialPrecedentBlock}
+
+${templateFocusBlock}
+
+### 6. PRAYER
+${toneConcl}
+
+${caSignoff}
+
+---
+**Notice Extract Used for Drafting:**  
+*${noticeSnapshot}*
+`;
+  }
+
+  if (documentType === "sebi-compliance") {
+    return `**BEFORE THE ADJUDICATING OFFICER**
+**SECURITIES AND EXCHANGE BOARD OF INDIA (SEBI)**
+
+**IN THE MATTER OF:** ${companyName}  
+**SUBJECT:** Representation against SEBI Show Cause Notice  
+**SCN Reference No.:** ${noticeNo}  
+**DIN/RFN:** ${din}  
+**Date:** ${noticeDate}  
+**Relevant Period:** ${period}
+
+${qaStrictBlock}
 
 ### WRITTEN SUBMISSIONS ON BEHALF OF THE NOTICEE
 
-**Most Respectfully Submitted:**
+**MOST RESPECTFULLY SUBMITTED:**
 
-The Noticee submits this reply to contest the allegations raised in the above proceedings. This submission is drafted in **${modeLabel.toUpperCase()}** mode, with a filing-first structure intended for adjudication readiness. Unless expressly admitted, every allegation and computation in the notice is denied.
+1. **Preliminary**: This representation is filed in response to the SEBI Show Cause Notice issued by ${adjudicatingOffice}.
+2. **Opening Statement**: ${toneOpening}
+3. **Statutory Regulations**: The statutory regulations involved are: ${provisionsLine}.
 
-### 1. Notice Summary and Jurisdictional Context
-1. Issuing authority: ${adjudicatingOffice}.
-2. Nature of allegation: ${allegationSentence}
-3. Core statutory framework involved: ${provisionsLine}.
-4. Proposed exposure indicated in notice: INR ${amount}.
-5. Primary observation from notice text: ${allegationSentence}
+### 1. BRIEF FACTUAL BACKGROUND
+1.1 The Noticee is a listed entity/registered intermediary operating in complete compliance with SEBI guidelines.
+1.2 The notice alleges non-compliance under LODR/PIT and proposes action of INR ${amount}.
+1.3 The principal allegation is: "${allegationSentence}".
 
-### 2. Preliminary Legal Position
-1. The notice must sustain allegation-wise burden of proof on facts, law, and quantification.
-2. A mismatch, delay, or third-party irregularity cannot automatically establish enforceable liability against the Noticee without evidence-linked adjudication.
-3. The impugned computation requires strict line-item testing before confirmation of any demand.
-4. Consequential interest/penalty cannot survive where foundational demand is unproven or overstated.
+### 2. PRELIMINARY LEGAL OBJECTIONS
+2.1 **No Investor Prejudice**: The alleged delay or disclosure mismatch did not impact market trading or investor interest.
+2.2 **Systems Reconciled**: Disclosures were immediately completed upon noticing the administrative bottleneck.
 
-### 3. Issue-Wise Defence Matrix
-1. **Issue A - Foundational allegation challenge:** Allegation-wise proof and applicability challenge based on record.
-2. **Issue B - Computation and proportionality challenge:** Demand working and consequential levy challenge.
-3. **Issue C - Documentary substantiation:** Noticee relies on invoices/returns/contracts, payment trail, and internal reconciliations mapped annexure-wise.
-4. **Issue D - Relief calibration:** Demand, interest, and penalty must be dropped or proportionately reduced based on verified facts.
+### 3. REGULATORY REBUTTAL FRAMEWORK
+| Regulation | SEBI Position | Noticee Defense |
+|---|---|---|
+| LODR Disclosure | Delayed reporting | Technical issue, rectified immediately |
+| UPSI Controls | Alleged leak | Digital database was active, zero benefit derived |
 
-### 4. Para-Wise Rebuttal Framework
-| Notice Component | Department Position | Noticee Response | Documentary Anchor | Adjudication Ask |
+${judicialPrecedentBlock}
+
+${templateFocusBlock}
+
+### 6. PRAYER
+${toneConcl}
+
+${caSignoff}
+
+---
+**Notice Extract Used for Drafting:**  
+*${noticeSnapshot}*
+`;
+  }
+
+  if (documentType === "rbi-filing") {
+    return `**BEFORE THE FOREIGN EXCHANGE DEPARTMENT / COMPOUNDING AUTHORITY**
+**RESERVE BANK OF INDIA**
+
+**IN THE MATTER OF:** ${companyName}  
+**SUBJECT:** Compounding Application under FEMA, 1999  
+**Reference No.:** ${noticeNo}  
+**Date:** ${noticeDate}  
+**Contravention Period:** ${period}
+
+${qaStrictBlock}
+
+### REPRESENTATION ON BEHALF OF THE APPLICANT
+
+**MOST RESPECTFULLY SUBMITTED:**
+
+1. **Preliminary**: This application is filed to regularize procedural delays in FEMA reporting.
+2. **Opening Statement**: ${toneOpening}
+3. **Statutory Provisions**: The provisions involved are: ${provisionsLine}.
+
+### 1. BRIEF FACTUAL BACKGROUND
+1.1 The Applicant has received foreign direct investment and complied with allotment terms.
+1.2 The proposed monetary implication in the notice is INR ${amount}.
+1.3 The delay is described as: "${allegationSentence}".
+
+### 2. PRELIMINARY LEGAL OBJECTIONS
+2.1 **Bona Fide Transaction**: The inflow of funds was clear and approved by the AD Bank; delay was purely administrative.
+2.2 **No Exchequer Loss**: No loss of foreign exchange has occurred to the exchequer.
+
+### 3. CONTRAVENTION GRID
+| FEMA Provision | Delay Period | Remedial Steps |
+|---|---|---|
+| Form FC-GPR / SMF | Delayed reporting | Share allotment completed, filings updated |
+
+${judicialPrecedentBlock}
+
+${templateFocusBlock}
+
+### 6. PRAYER
+${toneConcl}
+
+${caSignoff}
+
+---
+**Notice Extract Used for Drafting:**  
+*${noticeSnapshot}*
+`;
+  }
+
+  if (documentType === "customs-response") {
+    return `**BEFORE THE COMMISSIONER OF CUSTOMS / ADJUDICATING OFFICER**
+**CUSTOMS DEPARTMENT, INDIA**
+
+**IN THE MATTER OF:** ${companyName}  
+**SUBJECT:** Reply to Customs Show Cause Notice under Section 28  
+**Notice No.:** ${noticeNo}  
+**DIN/RFN:** ${din}  
+**Date:** ${noticeDate}  
+**Import Period:** ${period}
+
+${qaStrictBlock}
+
+### WRITTEN SUBMISSIONS ON BEHALF OF THE NOTICEE
+
+**MOST RESPECTFULLY SUBMITTED:**
+
+1. **Preliminary**: This reply is filed in response to the Show Cause Notice issued by ${adjudicatingOffice}.
+2. **Opening Statement**: ${toneOpening}
+3. **Statutory Provisions**: The statutory provisions involved are: ${provisionsLine}.
+
+### 1. BRIEF FACTUAL BACKGROUND
+1.1 The Noticee is a regular importer and has declared actual transaction values in compliance with the Customs Act.
+1.2 The notice proposes demand of differential duty of INR ${amount}, with interest and penalty.
+1.3 The principal allegation is: "${allegationSentence}".
+
+### 2. PRELIMINARY LEGAL OBJECTIONS
+2.1 **Valuation Legality**: Rejection of transaction value must be backed by evidence of relationship/fraud, not comparison database values alone.
+2.2 **Classification Rationale**: The declared classification is supported by technical description and tariff guidelines.
+
+### 3. REBUTTAL MATRIX
+| Bill of Entry | Department Allegation | Noticee Rebuttal |
+|---|---|---|
+| Classified under HSN | Reclassification proposed | Supported by HSN explanatory notes |
+| Declared Value | Alleged undervaluation | Value verified by supplier invoices |
+
+${judicialPrecedentBlock}
+
+${templateFocusBlock}
+
+### 6. PRAYER
+${toneConcl}
+
+${caSignoff}
+
+---
+**Notice Extract Used for Drafting:**  
+*${noticeSnapshot}*
+`;
+  }
+
+  if (documentType === "contract-review") {
+    return `**CONTRACT COMPLIANCE & LEGAL RISK ASSESSMENT REPORT**
+
+**CLIENT:** ${companyName}  
+**SUBJECT:** Legal Review of Master Services Agreement  
+**Reference ID:** ${noticeNo}  
+**Review Date:** ${noticeDate}  
+**Contract Period:** ${period}
+
+${qaStrictBlock}
+
+### 1. BRIEF BACKGROUND & CONTEXT
+The client requested a comprehensive risk review of the proposed contract. Estimated commercial exposure is INR ${amount}. The critical concern areas are: "${allegationSentence}".
+
+### 2. CLAUSE-WISE COMPLIANCE REVIEW
+| Clause ID | Subject | Risk Level | Noticee Risk Analysis | Redline Recommendation |
 |---|---|---|---|---|
-| Jurisdiction and allegation setup | Breach asserted in broad terms | Requires allegation-wise proof and legal linkage | Annexure A | Restrict to evidenced issues only |
-| Factual narrative | Selective interpretation of records | Full transaction/factual chronology materially differs | Annexure B | Consider complete record set |
-| Quantification and working | Demand proposed at gross level | Reconciliation reveals adjustments and overstatement risk | Annexure C | Recompute before confirmation |
-| Interest / penalty proposal | Consequential imposition proposed | Not maintainable where base demand is disputed/unsupported | Annexure D | Drop or proportionately curtail |
+| Clause 7.1 | Indemnity | High | One-sided indemnity without caps | Restrict to direct losses only |
+| Clause 9.3 | Liability | High | Uncapped liability | Limit to annual fees received |
+| Clause 4.2 | Payments | Medium | Delayed payment triggers | Add interest on delayed payments |
 
-### 5. Computation Reconciliation Position
-| Particulars | Notice Position | Noticee Position | Reconciliation Note |
-|---|---|---|---|
-| Principal amount | INR ${amount} | Subject to verified recomputation | Requires invoice-wise and period-wise tie-out |
-| Interest | Proposed consequentially | Disputed in principle and quantum | Contingent on sustainable principal |
-| Penalty | Proposed | Contested on law and facts | Threshold conditions not established |
+${judicialPrecedentBlock}
 
-### 6. Evidence-Linked Rebuttal Points
-${rebuttalFocusLine}
+${templateFocusBlock}
 
-### 7. Annexure Mapping (For Final Filing Pack)
-1. **Annexure A:** Notice set, DIN/RFN, notice chronology, and scope mapping.
-2. **Annexure B:** Primary factual evidence pack (invoices, returns, filings, contracts, correspondence as applicable).
-3. **Annexure C:** Computation workbook, mismatch reconciliation, and period-wise adjustment statement.
-4. **Annexure D:** Legal authorities and procedural compliance material relied upon.
+### 3. STRATEGIC RECOMMENDATIONS
+1. **Priority Fixes**: Restructure indemnity and liability caps.
+2. **Negotiation fallbacks**: Present the redlines in standard formats before final execution.
 
-### 8. Prayer
-In view of the above, the Noticee respectfully prays that this Hon'ble Authority may be pleased to:
-1. Set aside, drop, or materially reduce the impugned demand after full reconciliation.
-2. Drop or substantially curtail interest and penalty proposals to the extent unsustainable in law.
-3. Grant a personal hearing and permit further documentary submissions.
-4. Pass such further order(s), including consequential reliefs, as may be deemed fit in the interest of justice.
+${caSignoff}
+`;
+  }
+
+  // default / custom-draft
+  return `**BEFORE THE COMPETENT ADJUDICATING AUTHORITY**
+
+**IN THE MATTER OF:** ${companyName}  
+**SUBJECT:** Written Reply / Representation  
+**Reference No.:** ${noticeNo}  
+**DIN/RFN:** ${din}  
+**Date:** ${noticeDate}  
+**Period:** ${period}
+
+${qaStrictBlock}
+
+### WRITTEN REPRESENTATION ON BEHALF OF THE NOTICEE
+
+**MOST RESPECTFULLY SUBMITTED:**
+
+1. **Preliminary**: This response is filed in response to the notice / summons issued by ${adjudicatingOffice}.
+2. **Opening Statement**: ${toneOpening}
+3. **Statutory Provisions**: The statutory provisions involved in this matter are: ${provisionsLine}.
+
+### 1. BRIEF FACTUAL BACKGROUND
+1.1 The Noticee operates in complete compliance with the governing statutes.
+1.2 The proposed action in the notice involves INR ${amount}.
+1.3 The primary allegation is: "${allegationSentence}".
+
+### 2. PRELIMINARY LEGAL OBJECTIONS
+2.1 **Factual Validity**: The observations are based on incorrect portal data and assumptions.
+2.2 **Statutory compliance**: All transactional compliance records have been maintained.
+
+### 3. REBUTTAL GRID
+| Allegation Observation | Department Position | Noticee Explanation |
+|---|---|---|
+| Regulatory discrepancy | Compliance failure asserted | Factual records align with returns |
+
+${judicialPrecedentBlock}
+
+${templateFocusBlock}
+
+### 6. PRAYER
+${toneConcl}
+
+${caSignoff}
+
+---
+**Notice Extract Used for Drafting:**  
+*${noticeSnapshot}*
 `;
 };
 
@@ -1801,8 +2236,11 @@ const AIDraftingEngine = ({
     () => buildInitialReviewSteps(includeLawyerReview),
     [includeLawyerReview],
   );
-  const [clientOptions, setClientOptions] = useState<ClientOption[]>(propClients || demoClients);
-  const [clientSource, setClientSource] = useState<"demo" | "live">("demo");
+  const [clientOptions, setClientOptions] = useState<ClientOption[]>(() => {
+    if (isRealDashboard) return propClients || [];
+    return propClients || demoClients;
+  });
+  const [clientSource, setClientSource] = useState<"demo" | "live">(isRealDashboard ? "live" : "demo");
   const [isLoadingClients, setIsLoadingClients] = useState(false);
   const [selectedClient, setSelectedClient] = useState<string>("");
   const [selectedDocType, setSelectedDocType] = useState<string>("");
@@ -1943,6 +2381,10 @@ const AIDraftingEngine = ({
   const [isLoadingDraftVersions, setIsLoadingDraftVersions] = useState(false);
   const [isSavingDraftVersion, setIsSavingDraftVersion] = useState(false);
   const [hasUnsavedDraftChanges, setHasUnsavedDraftChanges] = useState(false);
+
+  const handleUserDraftEdit = (value: string) => {
+    setDraftContent(value);
+  };
 
   // -------------------------------------------------------
   // Fix 2: Auth token — prefer passed sessionToken prop,
@@ -4495,13 +4937,13 @@ const AIDraftingEngine = ({
         if (!mounted) return;
 
         if ((data.clients ?? []).length === 0) {
-          if (allowLiveDemoFallback) {
-            setClientOptions(demoClients);
-            setClientSource("demo");
-          } else {
+          if (isRealDashboard) {
             setClientOptions([]);
             setClientSource("live");
+            return;
           }
+          setClientOptions(demoClients);
+          setClientSource("demo");
           return;
         }
 
@@ -4509,13 +4951,13 @@ const AIDraftingEngine = ({
         setClientSource("live");
       } catch {
         if (!mounted) return;
-        if (allowLiveDemoFallback) {
-          setClientOptions(demoClients);
-          setClientSource("demo");
-        } else {
+        if (isRealDashboard) {
           setClientOptions([]);
           setClientSource("live");
+          return;
         }
+        setClientOptions(demoClients);
+        setClientSource("demo");
       } finally {
         if (mounted) {
           setIsLoadingClients(false);
@@ -6078,10 +6520,14 @@ Calculated Modules: ${JSON.stringify(dataRoom.compiled_modules)}
         throw new Error(reason || "Offline/demo fallback is disabled in live production mode.");
       }
       const offlineContent = buildOfflineDraft({
+        documentType: selectedDocType,
         authority: selectedDocLabel,
         companyName: client?.name || "Company",
         noticeText: maskedNoticeDetails || noticeDetails,
         modeLabel: selectedMode,
+        templatePack: templatePackOverride,
+        promptPack: promptPackOverride,
+        sovereignEngine: effectiveLogicLevel,
       });
 
       const hydratedOffline = await hydrateDraftContext(

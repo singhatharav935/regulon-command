@@ -14,31 +14,46 @@ export default function MultiClientMasterHub() {
 
   const fetchClients = async () => {
     setIsLoading(true);
-    try {
-      const { default: apiService } = await import('@/lib/api-service-complete');
-      const data = await apiService.getCAClients();
-      
-      if (data && Array.isArray(data)) {
-        setClients(data.map((c: any) => ({
-          id: c.id,
-          name: c.company_name || c.name || 'Unnamed Company',
-          industry: c.industry_type || c.industry || 'Unknown',
-          score: c.health_score || c.compliance_score || 0,
-          status: c.status || c.legal_status || 'pending',
-          nextDeadline: c.onboarding_date ? new Date(c.onboarding_date).toLocaleDateString() : '--',
-        })));
-      }
-    } catch (e) {
-      console.log('Failed to fetch client portfolio', e);
-    } finally {
+    // Simulated mock portfolio data for the SANNIDH Client Vault Demo
+    setTimeout(() => {
+      setClients([
+        {
+          id: "demo-client-1",
+          name: "Acme Technologies Pvt Ltd",
+          industry: "SaaS & Cloud Infrastructure",
+          score: 94,
+          status: "Compliant",
+          nextDeadline: "18/05/2026",
+        },
+        {
+          id: "demo-client-2",
+          name: "GlobalTrade India Logistics",
+          industry: "Import & Supply Chain Logistics",
+          score: 68,
+          status: "Alert",
+          nextDeadline: "12/05/2026",
+        },
+        {
+          id: "demo-client-3",
+          name: "SecurePay Solutions Ltd",
+          industry: "Fintech & Payment Gateway",
+          score: 82,
+          status: "Compliant",
+          nextDeadline: "20/05/2026",
+        },
+        {
+          id: "demo-client-4",
+          name: "Vertex EduTech Services",
+          industry: "E-Learning Platform",
+          score: 89,
+          status: "Compliant",
+          nextDeadline: "15/05/2026",
+        }
+      ]);
       setIsLoading(false);
-    }
+    }, 400);
   };
 
-  useEffect(() => {
-    fetchClients();
-  }, []);
-  
   const filteredClients = clients.filter(c => 
     c.name.toLowerCase().includes(searchTerm.toLowerCase()) || 
     c.id.toLowerCase().includes(searchTerm.toLowerCase())

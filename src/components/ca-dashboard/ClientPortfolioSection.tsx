@@ -104,7 +104,73 @@ const ClientPortfolioSection = ({
       loadCAClients(),
       getPendingConsentRequests(),
     ]);
-    setClients(clientData);
+    
+    // Fallback to rich mock portfolio if the Supabase database is fresh/empty
+    if (!clientData || clientData.length === 0) {
+      const isReal = typeof window !== 'undefined' && window.location.pathname.includes('real-');
+      if (isReal) {
+        setClients([]);
+      } else {
+        const mockClients: CAClient[] = [
+          {
+            id: "demo-client-1",
+            name: "Acme Technologies Pvt Ltd",
+            industry: "SaaS & Cloud Infrastructure",
+            health: 94,
+            risk: "Low",
+            gaps: 2,
+            deadline: "18/05/2026",
+            status: "Verified",
+            gstin: "07AAACA1234Z1ZP",
+            pan: "AAACA1234Z",
+            created_at: new Date().toISOString(),
+          },
+          {
+            id: "demo-client-2",
+            name: "GlobalTrade India Logistics",
+            industry: "Import & Supply Chain Logistics",
+            health: 68,
+            risk: "High",
+            gaps: 5,
+            deadline: "12/05/2026",
+            status: "Waiting for CA",
+            gstin: "27AABCG5678K2ZQ",
+            pan: "AABCG5678K",
+            created_at: new Date().toISOString(),
+          },
+          {
+            id: "demo-client-3",
+            name: "SecurePay Solutions Ltd",
+            industry: "Fintech & Payment Gateway",
+            health: 82,
+            risk: "Medium",
+            gaps: 3,
+            deadline: "20/05/2026",
+            status: "Verified",
+            gstin: "29AACCJ9012J3ZR",
+            pan: "AACCJ9012J",
+            created_at: new Date().toISOString(),
+          },
+          {
+            id: "demo-client-4",
+            name: "Vertex EduTech Services",
+            industry: "E-Learning Platform",
+            health: 89,
+            risk: "Low",
+            gaps: 1,
+            deadline: "15/05/2026",
+            status: "Verified",
+            gstin: "19AADCV3456N4ZS",
+            pan: "AADCV3456N",
+            created_at: new Date().toISOString(),
+          }
+        ];
+        setClients(mockClients);
+      }
+    } else {
+      setClients(clientData);
+    }
+    
     setConsentRequests(consentData);
     setIsLoading(false);
   }, []);

@@ -40,17 +40,45 @@ function decodeJWT(token: string): Record<string, unknown> | null {
   }
 }
 
+const hasActiveRealSession = () => {
+  if (typeof window === 'undefined') return false;
+  try {
+    for (let i = 0; i < localStorage.length; i++) {
+      const key = localStorage.key(i);
+      if (key && (key.includes('auth-token') || key.includes('supabase.auth.token'))) {
+        const val = localStorage.getItem(key);
+        if (val) {
+          const parsed = JSON.parse(val);
+          if (parsed && (parsed.access_token || parsed.user || parsed.currentSession)) {
+            return true;
+          }
+        }
+      }
+    }
+  } catch {
+    // ignore
+  }
+  return false;
+};
+
 export function useCAIdentity(): CAIdentity {
-  const [identity, setIdentity] = useState<CAIdentity>({
-    caId: null,
-    caFirmId: null,
-    email: '',
-    role: 'default',
-    isLoading: true,
-    isAuthenticated: false,
+  const isDemo = typeof window !== 'undefined' && (window.location.pathname === '/ca-dashboard' || window.location.pathname === '/ca-dashboard/' || window.location.pathname.startsWith('/ca-dashboard/'));
+
+  const [identity, setIdentity] = useState<CAIdentity>(() => {
+    const hasReal = hasActiveRealSession();
+    const useMock = isDemo && !hasReal;
+    return {
+      caId: useMock ? '00000000-0000-0000-0000-000000000000' : null,
+      caFirmId: useMock ? 'firm_demo_consolidated' : null,
+      email: useMock ? 'ca@sannidh.ai' : '',
+      role: useMock ? 'senior_ca' : 'default',
+      isLoading: useMock ? false : true,
+      isAuthenticated: useMock ? true : false,
+    };
   });
 
   useEffect(() => {
+    if (isDemo && !hasActiveRealSession()) return;
     let mounted = true;
 
     const resolve = async () => {
