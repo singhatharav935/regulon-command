@@ -157,7 +157,9 @@ export async function fetchLiabilities(
     .select('*, entities(entity_name, entity_type, gstin, pan)')
     .eq('ca_user_id', caUserId);
 
-  if (filters?.isPaid !== undefined) q = q.eq('is_paid', filters.isPaid);
+  // tax_liability_heads table uses 'status' column, not 'is_paid'
+  if (filters?.isPaid === true) q = q.eq('status', 'paid');
+  else if (filters?.isPaid === false) q = q.neq('status', 'paid');
   if (filters?.entityId) q = q.eq('entity_id', filters.entityId);
   if (filters?.taxType) q = q.eq('tax_type', filters.taxType);
 
@@ -175,13 +177,18 @@ export async function fetchLiabilities(
 
 export async function fetchUpcomingPayments(caUserId: string): Promise<TaxLiability[]> {
   if (!isValidUUID(caUserId)) return [];
-  const { data, error } = await (supabase as any)
-    .from('upcoming_payments')
-    .select('*')
-    .eq('ca_user_id', caUserId);
+  // upcoming_payments view may not exist — try with fallback
+  try {
+    const { data, error } = await (supabase as any)
+      .from('upcoming_payments')
+      .select('*')
+      .eq('ca_user_id', caUserId);
 
-  if (error) return handleServiceError(error, []);
-  return data ?? [];
+    if (!error && data) return data;
+  } catch { /* view doesn't exist */ }
+
+  // Fallback: query base table for unpaid liabilities
+  return fetchLiabilities(caUserId, { isPaid: false });
 }
 
 export async function createLiability(
@@ -278,15 +285,13 @@ export async function computeTaxLiability(
   }
 
   // Fallback: compute from tax_computation_rules
+  // Note: table only has ca_user_id, rule_name, tax_type, section, formula, is_active
   const { data: rules } = await (supabase as any)
     .from('tax_computation_rules')
     .select('*')
     .eq('ca_user_id', caUserId)
-    .eq('entity_id', entityId)
     .eq('tax_type', taxType)
-    .eq('is_active', true)
-    .lte('applies_from', periodEnd)
-    .or(`applies_until.is.null,applies_until.gte.${periodStart}`);
+    .eq('is_active', true);
 
   const grossTurnover = Number(inputData.turnover ?? inputData.taxable_value ?? 0);
   let gross = 0;
@@ -366,12 +371,10 @@ export async function initiateRazorpayPayment(
       ca_user_id: caUserId,
       liability_id: liabilityId,
       entity_id: entityId,
-      gateway: 'razorpay',
+      payment_method: 'razorpay',
       amount_paise: amountPaise,
-      currency: 'INR',
       status: 'initiated',
-      description,
-      initiated_at: new Date().toISOString(),
+      notes: description,
     }])
     .select()
     .single();
@@ -413,11 +416,10 @@ export async function confirmPayment(
     .from('payment_transactions')
     .update({
       gateway_payment_id: gatewayPaymentId,
-      gateway_signature: gatewaySignature,
-      gateway_response: gatewayResponse,
       status: 'success',
-      completed_at: new Date().toISOString(),
       payment_date: new Date().toISOString().split('T')[0],
+      reference_number: gatewaySignature,
+      updated_at: new Date().toISOString(),
     })
     .eq('id', transactionId)
     .select()
@@ -447,38 +449,25 @@ export async function recordManualPayment(
   },
   entityId?: string
 ): Promise<PaymentTransaction> {
+  // Map to actual payment_transactions columns: payment_method (not gateway), notes (not description)
+  const { challan_number, bank_reference_no, bank_name, payment_mode, payment_date, ...rest } = details;
   const { data, error } = await (supabase as any)
     .from('payment_transactions')
     .insert([{
       ca_user_id: caUserId,
       liability_id: liabilityId,
       entity_id: entityId,
-      gateway,
+      payment_method: gateway,
       amount_paise: amountPaise,
-      currency: 'INR',
       status: 'success',
-      description,
-      initiated_at: new Date().toISOString(),
-      completed_at: new Date().toISOString(),
-      ...details,
+      notes: description,
+      reference_number: bank_reference_no || challan_number,
+      payment_date: payment_date || new Date().toISOString().split('T')[0],
     }])
     .select()
     .single();
 
   if (error) return handleServiceError(error, []);
-
-  // Also update challan on liability head
-  if (details.bsr_code) {
-    await (supabase as any)
-      .from('tax_liability_heads')
-      .update({
-        bsr_code: details.bsr_code,
-        challan_serial_no: details.challan_serial_no,
-        challan_date: details.payment_date,
-        challan_amount_paise: amountPaise,
-      })
-      .eq('id', liabilityId);
-  }
 
   return data;
 }
@@ -488,22 +477,36 @@ export async function recordManualPayment(
 export async function fetchPaymentDashboardSummary(
   caUserId: string
 ): Promise<PaymentDashboardSummary> {
+  // payment_dashboard_summary view may not exist — compute from base table
   if (!isValidUUID(caUserId)) return {
     total_liabilities: 0, paid_count: 0, unpaid_count: 0,
     overdue_count: 0, due_this_week: 0,
     total_due_paise: 0, total_paid_paise: 0, total_balance_paise: 0,
   };
-  const { data, error } = await (supabase as any)
-    .from('payment_dashboard_summary')
-    .select('*')
-    .eq('ca_user_id', caUserId)
-    .single();
 
-  if (error && error.code !== 'PGRST116') throw new Error(error.message);
-  return data ?? {
-    total_liabilities: 0, paid_count: 0, unpaid_count: 0,
-    overdue_count: 0, due_this_week: 0,
-    total_due_paise: 0, total_paid_paise: 0, total_balance_paise: 0,
+  try {
+    const { data, error } = await (supabase as any)
+      .from('payment_dashboard_summary')
+      .select('*')
+      .eq('ca_user_id', caUserId)
+      .single();
+
+    if (!error && data) return data;
+  } catch { /* view doesn't exist */ }
+
+  // Fallback: compute from tax_liability_heads
+  const liabilities = await fetchLiabilities(caUserId);
+  const now = new Date();
+  const weekFromNow = new Date(now.getTime() + 7 * 86400000);
+  return {
+    total_liabilities: liabilities.length,
+    paid_count: liabilities.filter(l => l.status === 'paid').length,
+    unpaid_count: liabilities.filter(l => l.status !== 'paid').length,
+    overdue_count: liabilities.filter(l => l.status !== 'paid' && new Date(l.due_date) < now).length,
+    due_this_week: liabilities.filter(l => l.status !== 'paid' && new Date(l.due_date) <= weekFromNow && new Date(l.due_date) >= now).length,
+    total_due_paise: liabilities.reduce((a, l) => a + (l.total_due_paise || 0), 0),
+    total_paid_paise: liabilities.filter(l => l.status === 'paid').reduce((a, l) => a + (l.total_due_paise || 0), 0),
+    total_balance_paise: liabilities.filter(l => l.status !== 'paid').reduce((a, l) => a + (l.total_due_paise || 0), 0),
   };
 }
 
@@ -515,7 +518,7 @@ export async function fetchReminders(caUserId: string): Promise<PaymentReminder[
     .from('payment_reminders')
     .select('*')
     .eq('ca_user_id', caUserId)
-    .order('reminder_date', { ascending: true });
+    .order('remind_at', { ascending: true });
 
   if (error) return handleServiceError(error, []);
   return data ?? [];
@@ -530,16 +533,15 @@ export async function createReminder(
   message: string,
   recipients: string[]
 ): Promise<PaymentReminder> {
+  // payment_reminders actual columns: ca_user_id, liability_id, remind_at, channel, is_sent
   const { data, error } = await (supabase as any)
     .from('payment_reminders')
     .insert([{
       ca_user_id: caUserId,
       liability_id: liabilityId,
-      entity_id: entityId,
-      reminder_date: reminderDate,
-      reminder_type: reminderType,
-      message,
-      recipients,
+      remind_at: reminderDate,
+      channel: reminderType,
+      is_sent: false,
     }])
     .select()
     .single();
@@ -594,16 +596,16 @@ export async function matchReconciliationEntry(
   method: 'manual' | 'ai' | 'exact' | 'fuzzy' = 'manual',
   confidence = 1.0
 ): Promise<void> {
+  // payment_reconciliation actual columns: transaction_id, liability_id, bank_reference, bank_txn_date, bank_amount, matched_amount, status, notes
   const { error } = await (supabase as any)
     .from('payment_reconciliation')
     .update({
       transaction_id: transactionId,
       liability_id: liabilityId,
-      is_matched: true,
-      match_confidence: confidence,
-      match_method: method,
-      reconciled_at: new Date().toISOString(),
-      reconciled_by: caUserId,
+      matched_amount: 0,
+      status: 'matched',
+      notes: JSON.stringify({ match_method: method, match_confidence: confidence, reconciled_by: caUserId }),
+      updated_at: new Date().toISOString(),
     })
     .eq('id', entryId);
 

@@ -189,23 +189,19 @@ export async function createApiKey(
   if (!isValidUUID(caUserId)) throw new Error('Not authenticated');
   const { plainText, hash, prefix } = await generateApiKey();
 
+  // Map to actual enterprise_api_keys columns: key_name, key_hash, key_prefix, scopes, rate_limit, is_active, expires_at
   const { data, error } = await (supabase as any)
     .from('enterprise_api_keys')
     .insert([
       {
         ca_user_id: caUserId,
-        entity_id: params.entity_id ?? null,
         key_name: params.key_name,
         key_hash: hash,
         key_prefix: prefix,
-        permissions: params.permissions,
-        rate_limit_per_minute: params.rate_limit_per_minute ?? 60,
-        rate_limit_per_day: params.rate_limit_per_day ?? 10000,
-        allowed_ips: params.allowed_ips ?? [],
-        allowed_origins: params.allowed_origins ?? [],
+        scopes: params.permissions,
+        rate_limit: params.rate_limit_per_minute ?? 60,
         is_active: true,
         expires_at: params.expires_at ?? null,
-        total_requests: 0,
       },
     ])
     .select()
@@ -326,6 +322,7 @@ export async function createWebhook(
   if (!isValidUUID(caUserId)) throw new Error('Not authenticated');
   const { plainText, hash, prefix } = await generateWebhookSecret();
 
+  // Map to actual webhook_endpoints columns: ca_user_id, api_key_id, url, events, secret_hash, is_active, description
   const { data, error } = await (supabase as any)
     .from('webhook_endpoints')
     .insert([
@@ -335,12 +332,8 @@ export async function createWebhook(
         url: params.url,
         description: params.description ?? '',
         secret_hash: hash,
-        secret_prefix: prefix,
         events: params.events,
         is_active: true,
-        failure_count: 0,
-        max_failures_before_disable: params.max_failures_before_disable ?? 10,
-        metadata: {},
       },
     ])
     .select()
@@ -410,17 +403,15 @@ export async function testWebhookEndpoint(webhookId: string): Promise<WebhookDel
     data: { message: 'Webhook test ping from Regulon' },
   };
 
-  // Insert delivery record as 'pending'
+  // Map to actual webhook_deliveries columns: webhook_id, event_type, payload, status, attempt
   const { data: delivery, error: insertErr } = await (supabase as any)
     .from('webhook_deliveries')
     .insert([
       {
         webhook_id: webhookId,
         event_type: 'test.ping',
-        event_id: eventId,
         payload: testPayload,
-        attempt_number: 1,
-        max_attempts: 1,
+        attempt: 1,
         status: 'pending',
       },
     ])
@@ -444,13 +435,10 @@ export async function testWebhookEndpoint(webhookId: string): Promise<WebhookDel
     const { data: updated, error: updateErr } = await (supabase as any)
       .from('webhook_deliveries')
       .update({
-        http_status: result?.http_status ?? null,
+        response_status: result?.http_status ?? null,
         response_body: result?.response_body ?? null,
         response_time_ms: result?.response_time_ms ?? null,
         status: result?.success ? 'delivered' : 'failed',
-        delivered_at: result?.success ? new Date().toISOString() : null,
-        failed_at: result?.success ? null : new Date().toISOString(),
-        error_message: result?.error ?? null,
       })
       .eq('id', delivery.id)
       .select()
@@ -464,7 +452,6 @@ export async function testWebhookEndpoint(webhookId: string): Promise<WebhookDel
       .from('webhook_deliveries')
       .update({
         status: 'pending',
-        error_message: 'Edge function not available — delivery queued',
       })
       .eq('id', delivery.id)
       .select()
@@ -575,10 +562,7 @@ export async function retryDelivery(deliveryId: string): Promise<WebhookDelivery
     .from('webhook_deliveries')
     .update({
       status: 'retrying',
-      attempt_number: nextAttempt,
-      error_message: null,
-      failed_at: null,
-      next_retry_at: null,
+      attempt: nextAttempt,
     })
     .eq('id', deliveryId)
     .select()
@@ -604,13 +588,10 @@ export async function retryDelivery(deliveryId: string): Promise<WebhookDelivery
     const { data: updated, error: updateErr } = await (supabase as any)
       .from('webhook_deliveries')
       .update({
-        http_status: result?.http_status ?? null,
+        response_status: result?.http_status ?? null,
         response_body: result?.response_body ?? null,
         response_time_ms: result?.response_time_ms ?? null,
         status: result?.success ? 'delivered' : 'failed',
-        delivered_at: result?.success ? new Date().toISOString() : null,
-        failed_at: result?.success ? null : new Date().toISOString(),
-        error_message: result?.error ?? null,
       })
       .eq('id', data.id)
       .select()

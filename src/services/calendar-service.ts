@@ -233,14 +233,21 @@ export async function fetchCalendarEvents(
 
 export async function fetchUpcomingDeadlines(caUserId: string): Promise<CalendarEvent[]> {
   if (!isValidUUID(caUserId)) return [];
-  const { data, error } = await supabase
-    .from('upcoming_deadlines_detailed')
-    .select('*')
-    .eq('ca_user_id', caUserId)
-    .order('due_date', { ascending: true });
+  // upcoming_deadlines_detailed view may not exist — try with fallback
+  try {
+    const { data, error } = await supabase
+      .from('upcoming_deadlines_detailed')
+      .select('*')
+      .eq('ca_user_id', caUserId)
+      .order('due_date', { ascending: true });
 
-  if (error) return handleServiceError(error, []);
-  return (data || []) as CalendarEvent[];
+    if (!error && data) return data as CalendarEvent[];
+  } catch { /* view doesn't exist */ }
+
+  // Fallback: query base table for upcoming/active/overdue/due_today events
+  return fetchCalendarEvents(caUserId, {
+    status: ['upcoming', 'active', 'due_today', 'overdue'],
+  });
 }
 
 export async function createCalendarEvent(
@@ -311,14 +318,38 @@ export async function fetchCalendarDashboard(
   caUserId: string
 ): Promise<CalendarDashboardSummary | null> {
   if (!isValidUUID(caUserId)) return null;
-  const { data, error } = await supabase
-    .from('calendar_dashboard_summary')
-    .select('*')
-    .eq('ca_user_id', caUserId)
-    .maybeSingle();
+  // calendar_dashboard_summary view may not exist — try with fallback
+  try {
+    const { data, error } = await supabase
+      .from('calendar_dashboard_summary')
+      .select('*')
+      .eq('ca_user_id', caUserId)
+      .maybeSingle();
 
-  if (error) return handleServiceError(error, []);
-  return data as CalendarDashboardSummary | null;
+    if (!error && data) return data as CalendarDashboardSummary;
+  } catch { /* view doesn't exist */ }
+
+  // Fallback: compute from base table
+  const events = await fetchCalendarEvents(caUserId);
+  const now = new Date();
+  const weekFromNow = new Date(now.getTime() + 7 * 86400000);
+  const monthFromNow = new Date(now.getTime() + 30 * 86400000);
+  const upcoming = events.filter(e => !['completed', 'cancelled'].includes(e.status));
+
+  return {
+    ca_user_id: caUserId,
+    total_events: events.length,
+    upcoming_count: events.filter(e => e.status === 'upcoming').length,
+    active_count: events.filter(e => e.status === 'active').length,
+    due_today_count: events.filter(e => e.status === 'due_today').length,
+    overdue_count: events.filter(e => e.status === 'overdue').length,
+    completed_count: events.filter(e => e.status === 'completed').length,
+    critical_pending: upcoming.filter(e => e.priority === 'critical').length,
+    sla_breached_count: events.filter(e => e.sla_breached).length,
+    due_this_week: upcoming.filter(e => new Date(e.due_date) <= weekFromNow).length,
+    due_this_month: upcoming.filter(e => new Date(e.due_date) <= monthFromNow).length,
+    next_due_date: upcoming.length > 0 ? upcoming[0].due_date : null,
+  };
 }
 
 // ─── Reminders CRUD ─────────────────────────────────────────────────────

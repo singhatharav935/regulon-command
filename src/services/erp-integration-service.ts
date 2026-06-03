@@ -280,28 +280,29 @@ export async function createErpConnection(
   }
 ): Promise<ErpConnection> {
   if (!isValidUUID(caUserId)) throw new Error('Not authenticated');
+  // Map to actual erp_connections columns: erp_type, connection_name, config, auth_config, sync_frequency, entity_id
   const { data, error } = await (supabase as any)
     .from('erp_connections')
     .insert([
       {
         ca_user_id: caUserId,
         entity_id: params.entity_id ?? null,
-        platform: params.platform,
-        platform_version: params.platform_version ?? null,
+        erp_type: params.platform,
         connection_name: params.connection_name,
-        description: params.description ?? '',
-        auth_type: params.auth_type,
-        credentials_encrypted: params.credentials_encrypted,
-        base_url: params.base_url ?? null,
-        port: params.port ?? null,
-        company_name: params.company_name ?? null,
-        environment: params.environment ?? 'production',
+        config: {
+          platform_version: params.platform_version,
+          description: params.description ?? '',
+          base_url: params.base_url,
+          port: params.port,
+          company_name: params.company_name,
+          environment: params.environment ?? 'production',
+          sync_direction: params.sync_direction ?? 'pull',
+          auto_sync_enabled: params.auto_sync_enabled ?? false,
+          sync_start_date: params.sync_start_date,
+        },
+        auth_config: params.credentials_encrypted,
         status: 'disconnected',
-        sync_direction: params.sync_direction ?? 'pull',
-        sync_frequency_minutes: params.sync_frequency_minutes ?? 60,
-        auto_sync_enabled: params.auto_sync_enabled ?? false,
-        sync_start_date: params.sync_start_date ?? null,
-        metadata: {},
+        sync_frequency: params.sync_frequency_minutes ?? 60,
       },
     ])
     .select()
@@ -383,8 +384,7 @@ export async function testErpConnection(connectionId: string): Promise<{
       .from('erp_connections')
       .update({
         status: result?.success ? 'connected' : 'error',
-        last_connected_at: result?.success ? new Date().toISOString() : conn.last_connected_at,
-        last_error: result?.success ? null : (result?.message ?? 'Connection test failed'),
+        last_sync_at: result?.success ? new Date().toISOString() : undefined,
         updated_at: new Date().toISOString(),
       })
       .eq('id', connectionId);
@@ -403,7 +403,6 @@ export async function testErpConnection(connectionId: string): Promise<{
       .from('erp_connections')
       .update({
         status: 'error',
-        last_error: 'Edge function test-erp-connection not deployed. Deploy it to enable live testing.',
         updated_at: new Date().toISOString(),
       })
       .eq('id', connectionId);
@@ -481,20 +480,23 @@ export async function createFieldMapping(
     validation_regex?: string;
   }
 ): Promise<ErpFieldMapping> {
+  // Map to actual erp_field_mappings columns: source_entity, source_field, target_entity, target_field, transform, transform_config
   const { data, error } = await (supabase as any)
     .from('erp_field_mappings')
     .insert([
       {
         connection_id: connectionId,
-        erp_entity: params.erp_entity,
-        erp_field: params.erp_field,
-        regulon_entity: params.regulon_entity,
-        regulon_field: params.regulon_field,
-        transform_type: params.transform_type ?? 'direct',
-        transform_config: params.transform_config ?? {},
-        is_required: params.is_required ?? false,
-        default_value: params.default_value ?? null,
-        validation_regex: params.validation_regex ?? null,
+        source_entity: params.erp_entity,
+        source_field: params.erp_field,
+        target_entity: params.regulon_entity,
+        target_field: params.regulon_field,
+        transform: params.transform_type ?? 'direct',
+        transform_config: {
+          ...(params.transform_config ?? {}),
+          is_required: params.is_required ?? false,
+          default_value: params.default_value ?? null,
+          validation_regex: params.validation_regex ?? null,
+        },
         is_active: true,
       },
     ])
@@ -543,20 +545,19 @@ export async function seedDefaultMappings(
 
   const rows = templates.map((t, idx) => ({
     connection_id: connectionId,
-    erp_entity: t.erp_entity,
-    erp_field: t.erp_field,
-    regulon_entity: t.regulon_entity,
-    regulon_field: t.regulon_field,
-    transform_type: t.transform_type,
+    source_entity: t.erp_entity,
+    source_field: t.erp_field,
+    target_entity: t.regulon_entity,
+    target_field: t.regulon_field,
+    transform: t.transform_type,
     transform_config: {},
-    is_required: false,
     is_active: true,
     sort_order: idx,
   }));
 
   const { data, error } = await (supabase as any)
     .from('erp_field_mappings')
-    .upsert(rows, { onConflict: 'connection_id,erp_entity,erp_field,regulon_entity,regulon_field' })
+    .upsert(rows, { onConflict: 'connection_id,source_entity,source_field,target_entity,target_field' })
     .select();
 
   if (error) throw new Error(error.message);
@@ -620,7 +621,7 @@ export async function triggerSyncJob(
   const direction = params?.direction ?? 'pull';
   const entities = params?.entities ?? [];
 
-  // Create the job record
+  // Map to actual erp_sync_jobs columns: connection_id, ca_user_id, sync_type, direction, status, records_synced, records_failed
   const { data: job, error: insertErr } = await (supabase as any)
     .from('erp_sync_jobs')
     .insert([
@@ -629,13 +630,8 @@ export async function triggerSyncJob(
         ca_user_id: caUserId,
         sync_type: syncType,
         direction: direction,
-        entities_synced: entities,
         status: 'queued',
-        progress_pct: 0,
-        records_fetched: 0,
-        records_created: 0,
-        records_updated: 0,
-        records_skipped: 0,
+        records_synced: 0,
         records_failed: 0,
       },
     ])
@@ -671,7 +667,7 @@ export async function triggerSyncJob(
     await (supabase as any)
       .from('erp_sync_jobs')
       .update({
-        error_message: 'Edge function process-erp-sync not deployed. Job queued for manual processing.',
+        error_summary: 'Edge function process-erp-sync not deployed. Job queued for manual processing.',
       })
       .eq('id', job.id);
   }
@@ -708,11 +704,11 @@ export async function fetchSyncLogs(
   let q = (supabase as any)
     .from('erp_sync_logs')
     .select('*')
-    .eq('sync_job_id', syncJobId)
+    .eq('job_id', syncJobId)
     .order('created_at', { ascending: false });
 
-  if (opts?.operation) q = q.eq('operation', opts.operation);
-  if (opts?.status) q = q.eq('status', opts.status);
+  if (opts?.operation) q = q.eq('level', opts.operation);
+  if (opts?.status) q = q.eq('level', opts.status);
   if (opts?.limit) q = q.limit(opts.limit);
   else q = q.limit(200);
 
@@ -732,8 +728,8 @@ export async function fetchCachedData(
     .from('erp_data_cache')
     .select('*')
     .eq('connection_id', connectionId)
-    .eq('erp_entity', erpEntity)
-    .order('fetched_at', { ascending: false });
+    .eq('entity_type', erpEntity)
+    .order('created_at', { ascending: false });
 
   if (opts?.limit) q = q.limit(opts.limit);
   else q = q.limit(100);
@@ -749,7 +745,7 @@ export async function clearCache(connectionId: string, erpEntity?: string): Prom
     .delete()
     .eq('connection_id', connectionId);
 
-  if (erpEntity) q = q.eq('erp_entity', erpEntity);
+  if (erpEntity) q = q.eq('entity_type', erpEntity);
 
   const { error } = await q;
   if (error) return handleServiceError(error, []);

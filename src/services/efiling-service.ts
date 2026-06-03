@@ -187,22 +187,23 @@ export async function verifyCredential(credentialId: string): Promise<{ success:
     });
     if (error) throw error;
     if (data?.success) {
+      // Map to actual columns: status, last_login_at, last_login_status
       await (supabase as any)
         .from('efiling_portal_credentials')
-        .update({ is_verified: true, last_verified_at: new Date().toISOString(), last_error: null })
+        .update({ status: 'active', last_login_at: new Date().toISOString(), last_login_status: 'success' })
         .eq('id', credentialId);
       return { success: true };
     }
     await (supabase as any)
       .from('efiling_portal_credentials')
-      .update({ is_verified: false, last_error: data?.error ?? 'Verification failed' })
+      .update({ status: 'error', last_login_status: data?.error ?? 'Verification failed' })
       .eq('id', credentialId);
     return { success: false, error: data?.error };
   } catch (err: any) {
     // Edge function not yet deployed — mark as pending verification
     await (supabase as any)
       .from('efiling_portal_credentials')
-      .update({ is_verified: false, last_error: 'Edge function not deployed yet' })
+      .update({ status: 'error', last_login_status: 'Edge function not deployed yet' })
       .eq('id', credentialId);
     return { success: false, error: 'Verification service unavailable' };
   }
@@ -404,8 +405,7 @@ export async function uploadJobDocument(
       document_name: file.name,
       document_type: documentType,
       file_path: filePath,
-      file_size_bytes: file.size,
-      mime_type: file.type,
+      file_size: file.size,
     }])
     .select()
     .single();
@@ -464,17 +464,30 @@ export async function fetchDashboardSummary(
     acknowledged_count: 0, approved_count: 0, rejected_count: 0,
     overdue_count: 0, due_this_week: 0,
   };
-  const { data, error } = await (supabase as any)
-    .from('efiling_dashboard_summary')
-    .select('*')
-    .eq('ca_user_id', caUserId)
-    .single();
+  // efiling_dashboard_summary view may not exist — try with fallback
+  try {
+    const { data, error } = await (supabase as any)
+      .from('efiling_dashboard_summary')
+      .select('*')
+      .eq('ca_user_id', caUserId)
+      .single();
 
-  if (error && error.code !== 'PGRST116') throw new Error(error.message);
+    if (!error && data) return data;
+  } catch { /* view doesn't exist */ }
 
-  return data ?? {
-    total_filings: 0, draft_count: 0, ready_count: 0, submitted_count: 0,
-    acknowledged_count: 0, approved_count: 0, rejected_count: 0,
-    overdue_count: 0, due_this_week: 0,
+  // Fallback: compute from efiling_jobs table
+  const jobs = await fetchFilingJobs(caUserId);
+  const now = new Date();
+  const weekFromNow = new Date(now.getTime() + 7 * 86400000);
+  return {
+    total_filings: jobs.length,
+    draft_count: jobs.filter(j => j.status === 'draft').length,
+    ready_count: jobs.filter(j => j.status === 'ready_to_submit').length,
+    submitted_count: jobs.filter(j => j.status === 'submitted').length,
+    acknowledged_count: jobs.filter(j => j.status === 'acknowledged').length,
+    approved_count: jobs.filter(j => j.status === 'approved').length,
+    rejected_count: jobs.filter(j => j.status === 'rejected').length,
+    overdue_count: jobs.filter(j => j.due_date && j.status !== 'acknowledged' && new Date(j.due_date) < now).length,
+    due_this_week: jobs.filter(j => j.due_date && new Date(j.due_date) <= weekFromNow && new Date(j.due_date) >= now).length,
   };
 }

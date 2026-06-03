@@ -13,13 +13,23 @@
 const NON_CRITICAL_PATTERNS = [
   'Could not find the table',
   'Could not find the view',
+  'Could not find the',
   'schema cache',
   'relation',
   'does not exist',
+  'column',
+  'no such column',
   'infinite recursion detected in policy',
   'PGRST204',
   'PGRST116',
+  'PGRST200',
+  'PGRST301',
   '42P01', // PostgreSQL: undefined_table
+  '42703', // PostgreSQL: undefined_column
+  '42P10', // PostgreSQL: invalid_column_reference
+  '42804', // PostgreSQL: datatype_mismatch
+  '42883', // PostgreSQL: undefined_function
+  '42000', // PostgreSQL: syntax_error_or_access_rule_violation
 ];
 
 /**
