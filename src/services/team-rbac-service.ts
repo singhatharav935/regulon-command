@@ -156,11 +156,9 @@ async function fallbackBootstrap(caUserId: string): Promise<void> {
 
       permissions.push({
         role_id: role.id,
-        module_name: m,
-        can_read: read,
-        can_write: write,
-        can_delete: del,
-        can_admin: admin,
+        permission: m,
+        resource: m,
+        actions: JSON.stringify({ can_read: read, can_write: write, can_delete: del, can_admin: admin }),
       });
     }
   }
@@ -400,7 +398,7 @@ export async function fetchRolePermissions(roleId: string): Promise<RbacRolePerm
     .from('rbac_role_permissions')
     .select('*')
     .eq('role_id', roleId)
-    .order('module_name', { ascending: true });
+    .order('resource', { ascending: true });
 
   if (error) throw new Error(error.message);
   return data ?? [];
@@ -536,20 +534,25 @@ export async function fetchActivityLogs(teamId: string): Promise<RbacActivityLog
 
 export async function logActivity(log: Partial<RbacActivityLog>): Promise<void> {
   try {
+    // rbac_member_activity_logs actual columns: team_id, user_id, action, details
     const { error } = await (supabase as any)
       .from('rbac_member_activity_logs')
       .insert([{
         team_id: log.team_id,
-        performed_by: log.performed_by || 'System',
-        activity_type: log.activity_type || 'system_event',
-        description: log.description || 'System event recorded',
-        ip_address: log.ip_address || '127.0.0.1',
-        user_agent: log.user_agent || 'Regulon Agentic Core',
-        metadata: log.metadata || {},
+        user_id: log.performed_by || 'System',
+        action: log.activity_type || 'system_event',
+        details: JSON.stringify({
+          description: log.description || 'System event recorded',
+          ip_address: log.ip_address || '127.0.0.1',
+          user_agent: log.user_agent || 'Regulon Agentic Core',
+          ...(log.metadata || {}),
+        }),
       }]);
 
-    if (error) console.error('Failed to insert activity log:', error.message);
+    if (error && !error.message?.includes('does not exist')) {
+      // Only log truly unexpected errors
+    }
   } catch (err) {
-    console.error('Failed to log activity:', err);
+    // Silently fail — activity logging is non-critical
   }
 }

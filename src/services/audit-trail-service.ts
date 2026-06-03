@@ -202,20 +202,21 @@ export async function fetchAuditEvents(
     .eq('ca_user_id', caUserId)
     .order('created_at', { ascending: false });
 
-  if (opts.module) query = query.eq('module', opts.module);
-  if (opts.severity) query = query.eq('severity', opts.severity);
-  if (opts.actorId) query = query.eq('actor_id', opts.actorId);
+  // Filter on columns that actually exist in audit_trail_events
+  if (opts.module) query = query.eq('entity_type', opts.module);
+  if (opts.severity) query = query.ilike('action', `%${opts.severity}%`);
+  if (opts.actorId) query = query.eq('entity_id', opts.actorId);
   if (opts.fromDate) query = query.gte('created_at', opts.fromDate);
   if (opts.toDate) query = query.lte('created_at', opts.toDate);
   if (opts.search) {
-    query = query.or(`actor_name.ilike.%${opts.search}%,action.ilike.%${opts.search}%,resource_name.ilike.%${opts.search}%`);
+    query = query.or(`action.ilike.%${opts.search}%,event_type.ilike.%${opts.search}%`);
   }
 
   query = query.limit(opts.limit ?? 100);
   if (opts.offset) query = query.range(opts.offset, (opts.offset + (opts.limit ?? 100)) - 1);
 
   const { data, error, count } = await query;
-  if (error) return handleServiceError(error, []);
+  if (error) return handleServiceError(error, { events: [], total: 0 });
   return { events: data ?? [], total: count ?? 0 };
 }
 
@@ -223,12 +224,29 @@ export async function fetchAuditEvents(
  * Append an immutable audit event. Once inserted, it cannot be updated/deleted via RLS.
  */
 export async function logAuditEvent(event: Omit<AuditTrailEvent, 'id' | 'event_id' | 'hash' | 'previous_hash' | 'created_at'>): Promise<AuditTrailEvent> {
+  // Map to actual audit_trail_events columns: ca_user_id, event_type, entity_type, entity_id, action, old_values, new_values, metadata, ip_address, user_agent
+  const dbEvent = {
+    ca_user_id: event.ca_user_id,
+    event_type: event.action || 'system_event',
+    entity_type: (event as any).module || (event as any).resource_type || 'unknown',
+    entity_id: (event as any).resource_id || (event as any).actor_id || null,
+    action: event.action,
+    metadata: {
+      ...(event.metadata || {}),
+      actor_type: (event as any).actor_type,
+      actor_name: (event as any).actor_name,
+      resource_name: (event as any).resource_name,
+      severity: (event as any).severity,
+      risk_score: (event as any).risk_score,
+      is_sensitive: (event as any).is_sensitive,
+    },
+  };
   const { data, error } = await (supabase as any)
     .from('audit_trail_events')
-    .insert([event])
+    .insert([dbEvent])
     .select()
     .single();
-  if (error) return handleServiceError(error, []);
+  if (error) return handleServiceError(error, {} as AuditTrailEvent);
   return data;
 }
 
@@ -250,10 +268,10 @@ export async function upsertComplianceScore(
 ): Promise<ComplianceScore> {
   const { data, error } = await (supabase as any)
     .from('compliance_scores')
-    .upsert([score], { onConflict: 'ca_user_id,entity_id,score_date' })
+    .upsert([score], { onConflict: 'ca_user_id,company_id,score_date' })
     .select()
     .single();
-  if (error) return handleServiceError(error, []);
+  if (error) return handleServiceError(error, {} as ComplianceScore);
   return data;
 }
 
@@ -364,22 +382,26 @@ export async function generateComplianceReport(
   };
 
   // 4. Insert the report record
+  // Map to actual compliance_reports columns: period_from, period_to, content (jsonb)
   const { data, error } = await (supabase as any)
     .from('compliance_reports')
     .insert([{
       ca_user_id: caUserId,
       report_name: opts.reportName,
       report_type: opts.reportType,
-      period_start: opts.periodStart,
-      period_end: opts.periodEnd,
-      modules_included: opts.modulesIncluded ?? Object.keys(moduleBreakdown),
+      period_from: opts.periodStart,
+      period_to: opts.periodEnd,
       status: 'ready',
-      format: opts.format ?? 'pdf',
-      summary_data: summaryData,
-      findings,
-      recommendations: findings.map((f) => f.recommendation),
-      is_confidential: opts.isConfidential ?? false,
-      generated_by: 'Regulon Agentic Core',
+      content: {
+        modules_included: opts.modulesIncluded ?? Object.keys(moduleBreakdown),
+        format: opts.format ?? 'pdf',
+        summary_data: summaryData,
+        findings,
+        recommendations: findings.map((f) => f.recommendation),
+        is_confidential: opts.isConfidential ?? false,
+        generated_by: 'Regulon Agentic Core',
+      },
+      generated_at: new Date().toISOString(),
     }])
     .select()
     .single();
@@ -435,7 +457,7 @@ export async function fetchRetentionPolicies(caUserId: string): Promise<DataRete
     .from('data_retention_policies')
     .select('*')
     .eq('ca_user_id', caUserId)
-    .order('module', { ascending: true });
+    .order('entity_type', { ascending: true });
   if (error) return handleServiceError(error, []);
   return data ?? [];
 }
@@ -462,7 +484,7 @@ export async function fetchAuditAlerts(caUserId: string): Promise<AuditAlertSubs
     .from('audit_alert_subscriptions')
     .select('*')
     .eq('ca_user_id', caUserId)
-    .order('alert_name', { ascending: true });
+    .order('alert_type', { ascending: true });
   if (error) return handleServiceError(error, []);
   return data ?? [];
 }

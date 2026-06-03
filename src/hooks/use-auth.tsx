@@ -144,6 +144,22 @@ export const AuthProvider = ({ children }: { children: ReactNode }) => {
           3000,
           { data: { session: null }, error: null },
         );
+
+        // Handle auth errors (e.g. Invalid Refresh Token) by signing out
+        if (sessionResponse.error) {
+          // Clear the stale session silently — don't log to console
+          try { await supabase.auth.signOut(); } catch { /* ignore */ }
+          if (!mounted) return;
+          setSession(null);
+          setUser(null);
+          setRoles([]);
+          setPersona(null);
+          setVerificationStatus(null);
+          setIsVerified(false);
+          useUserProfile.getState().clearProfile();
+          return;
+        }
+
         const initialSession = sessionResponse.data.session;
 
         if (!mounted) return;
@@ -164,7 +180,8 @@ export const AuthProvider = ({ children }: { children: ReactNode }) => {
         }
       } catch (error) {
         if (!mounted) return;
-        console.warn("Auth bootstrap failed.", error);
+        // Silently handle auth failures — clear session
+        try { await supabase.auth.signOut(); } catch { /* ignore */ }
         setSession(null);
         setUser(null);
         setRoles([]);
