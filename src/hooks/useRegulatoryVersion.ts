@@ -135,12 +135,12 @@ export function useCompanyEvaluations(newsId: string | null) {
 
   const changeStatus = useCallback(async (
     evaluationId: string,
-    status: CompanyEvaluation['evaluation_status'],
+    result: string,
     notes?: string
   ) => {
     try {
-      const updated = await updateEvaluationStatus(evaluationId, status, notes);
-      setEvaluations(prev => prev.map(ev => ev.id === evaluationId ? { ...ev, evaluation_status: updated.evaluation_status, notes: updated.notes, updated_at: updated.updated_at } : ev));
+      const updated = await updateEvaluationStatus(evaluationId, result, notes);
+      setEvaluations(prev => prev.map(ev => ev.id === evaluationId ? { ...ev, result: updated?.result, notes: updated?.notes } : ev));
       toast.success('Client compliance evaluation status updated');
       return updated;
     } catch (err: any) {
@@ -152,7 +152,6 @@ export function useCompanyEvaluations(newsId: string | null) {
   const notifyClient = useCallback(async (evaluationId: string) => {
     try {
       await sendRegulatoryNotification(evaluationId);
-      setEvaluations(prev => prev.map(ev => ev.id === evaluationId ? { ...ev, notification_sent: true, notified_at: new Date().toISOString() } : ev));
       toast.success('Regulatory change alert sent to client');
     } catch (err: any) {
       toast.error('Failed to notify client', { description: err.message });

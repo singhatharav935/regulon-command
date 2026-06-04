@@ -65,8 +65,7 @@ const AuthReal = () => {
   const [resetToken, setResetToken] = useState("");
   const [showPassword, setShowPassword] = useState(false);
   const [isLoading, setIsLoading] = useState(false);
-  const [rememberMe, setRememberMe] = useState(false);
-  const [trustDevice, setTrustDevice] = useState(false);
+  const [rememberMe, setRememberMe] = useState(true);
 
   // State for email waiting page
   const [waitingEmail, setWaitingEmail] = useState("");
@@ -192,7 +191,7 @@ const AuthReal = () => {
     setIsLoading(true);
 
     try {
-      const response = await enhancedAuth.login(email.trim(), password, rememberMe, trustDevice);
+      const response = await enhancedAuth.login(email.trim(), password, rememberMe, rememberMe);
 
       // Use the role from Supabase user metadata
       const effectiveRole = response.user.registration_role || 'company_owner';
@@ -661,7 +660,7 @@ const AuthReal = () => {
                         className="border-white/30 data-[state=checked]:bg-primary"
                       />
                       <Label htmlFor="remember" className="text-sm text-gray-300">
-                        Remember me
+                        Remember this device
                       </Label>
                     </div>
 
@@ -672,18 +671,6 @@ const AuthReal = () => {
                     >
                       Forgot password?
                     </button>
-                  </div>
-
-                  <div className="flex items-center space-x-2">
-                    <Checkbox
-                      id="trust-device"
-                      checked={trustDevice}
-                      onCheckedChange={setTrustDevice}
-                      className="border-white/30 data-[state=checked]:bg-primary"
-                    />
-                    <Label htmlFor="trust-device" className="text-sm text-gray-300">
-                      Trust this device
-                    </Label>
                   </div>
 
                   <Button
