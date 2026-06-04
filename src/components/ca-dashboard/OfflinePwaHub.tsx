@@ -82,21 +82,43 @@ export const OfflinePwaHub: React.FC = () => {
   useEffect(() => {
     async function loadCachedRecords() {
       try {
-        const { data: companiesData } = await supabase
+        // Actual companies columns: id, name, gstin, pan (no company_name, gst_number, risk)
+        const { data: companiesData, error: compErr } = await supabase
           .from('companies' as any)
-          .select('id, company_name, gst_number, risk');
-        setCachedCompanies(companiesData || []);
+          .select('id, name, gstin, pan');
+        if (!compErr && companiesData) {
+          setCachedCompanies(companiesData.map((c: any) => ({
+            id: c.id,
+            company_name: c.name,
+            gst_number: c.gstin,
+            pan_number: c.pan,
+            risk: 'Medium',
+          })));
+        } else {
+          throw new Error('companies query failed');
+        }
 
-        const { data: tasksData } = await supabase
-          .from('compliance_tasks' as any)
-          .select('id, client_name, task_title, due_date, status, priority')
-          .limit(10);
-        setCachedTasks(tasksData || []);
+        // compliance_tasks table may not exist yet
+        try {
+          const { data: tasksData, error: taskErr } = await supabase
+            .from('compliance_tasks' as any)
+            .select('id, client_name, task_title, due_date, status, priority')
+            .limit(10);
+          if (!taskErr && tasksData) {
+            setCachedTasks(tasksData);
+          } else {
+            throw new Error('tasks query failed');
+          }
+        } catch {
+          setCachedTasks([
+            { id: '1', client_name: 'Shree Balaji Logistics', task_title: 'GST Scrutiny Reply Section 73', due_date: '2026-05-30', status: 'pending', priority: 'high' }
+          ]);
+        }
       } catch (err) {
         // Fallbacks if tables fail
         setCachedCompanies([
           { id: '1', company_name: 'Shree Balaji Logistics', gst_number: '07AAAAA1111A1Z1', risk: 'High' },
-          { id: '2', company_name: 'Venkateshwara Agro Ltd', gstin: '33AAAAA2222B1Z2', risk: 'Medium' },
+          { id: '2', company_name: 'Venkateshwara Agro Ltd', gst_number: '33AAAAA2222B1Z2', risk: 'Medium' },
         ]);
         setCachedTasks([
           { id: '1', client_name: 'Shree Balaji Logistics', task_title: 'GST Scrutiny Reply Section 73', due_date: '2026-05-30', status: 'pending', priority: 'high' }

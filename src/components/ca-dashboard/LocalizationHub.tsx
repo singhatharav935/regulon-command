@@ -93,15 +93,22 @@ export const LocalizationHub: React.FC = () => {
     if (!caId) return;
     setClientsLoading(true);
     try {
-      // Fetch corporate clients from existing tables
+      // Fetch corporate clients — actual columns: id, name, gstin, pan
       const { data, error } = await supabase
         .from('companies' as any)
-        .select('id, company_name, gst_number, pan_number');
+        .select('id, name, gstin, pan');
       
       if (error) throw error;
-      setClients(data || []);
-      if (data && data.length > 0 && !selectedClient) {
-        setSelectedClient(data[0].company_name);
+      // Map to expected shape for UI
+      const mapped = (data || []).map((c: any) => ({
+        id: c.id,
+        company_name: c.name,
+        gst_number: c.gstin,
+        pan_number: c.pan,
+      }));
+      setClients(mapped);
+      if (mapped.length > 0 && !selectedClient) {
+        setSelectedClient(mapped[0].company_name);
       }
     } catch (err: any) {
       // Fallback custom clients if table empty/inaccessible
