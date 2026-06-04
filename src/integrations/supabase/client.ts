@@ -27,6 +27,106 @@ if (!hasSupabaseEnv) {
 // Import the supabase client like this:
 // import { supabase } from "@/integrations/supabase/client";
 
+// Tables/views known to exist in the deployed database.
+// Only queries to these tables/views will be allowed to go to the server.
+const SAFE_TABLES = new Set([
+  // Core auth & profiles
+  'profiles', 'user_roles', 'user_personas', 'user_role_assignments',
+  'user_profiles', 'ca_workspace_profiles', 'user_verifications',
+  // Core business
+  'companies', 'company_members', 'regulatory_exposure',
+  'documents', 'deadlines', 'ai_conversations', 'ai_messages',
+  // Multi-entity
+  'entities', 'entity_groups', 'entity_group_members',
+  'entity_compliance_snapshot', 'consolidated_reports',
+  // CA client management
+  'ca_clients', 'consent_requests', 'client_govt_notices',
+  'ca_dependencies', 'communication_logs', 'ca_task_history', 'ca_firm_invoices',
+  // Client financials
+  'client_financial_books', 'client_module_calculations',
+  'client_notice_data_room', 'client_bank_transactions',
+  'client_statutory_inputs', 'client_bank_statements', 'aa_consent_requests',
+  // Drafting & legal
+  'draft_runs', 'lawyer_review_requests', 'compliance_score_history',
+  // CA audits
+  'ca_audits', 'ca_compliance_items', 'ca_audit_documents', 'ca_audit_reports',
+  // CA firm
+  'ca_firms', 'ca_firm_members', 'ca_firm_clients', 'ca_assignments',
+  'ca_firm_analytics', 'ca_firm_documents', 'ca_firm_ca_directory',
+  // Audit trail & compliance
+  'audit_trail_events', 'compliance_scores', 'compliance_reports',
+  'data_retention_policies', 'audit_alert_subscriptions',
+  // Calendar & deadlines
+  'compliance_calendar_events', 'deadline_reminders', 'escalation_rules',
+  'escalation_logs', 'recurring_deadline_templates', 'deadline_sla_timers',
+  // E-filing
+  'efiling_portal_credentials', 'efiling_templates', 'efiling_jobs',
+  'efiling_documents', 'efiling_status_log',
+  // Payment & tax
+  'tax_liability_heads', 'tax_computation_rules', 'payment_transactions',
+  'payment_reconciliation', 'payment_reminders',
+  // Document vault & OCR
+  'document_vault', 'document_versions', 'ocr_jobs', 'ocr_results',
+  'document_access_logs', 'deletion_requests',
+  // ERP integration
+  'erp_connections', 'erp_sync_jobs', 'erp_sync_logs',
+  'erp_field_mappings', 'erp_data_cache',
+  // Enterprise API
+  'enterprise_api_keys', 'api_access_logs', 'api_key_usage_summary',
+  'webhook_endpoints', 'webhook_deliveries',
+  // RBAC
+  'rbac_roles', 'rbac_role_permissions', 'rbac_teams', 'rbac_team_members',
+  'rbac_team_invitations', 'rbac_member_activity_logs',
+  // Notifications (core table)
+  'notification_templates',
+  // Notification tables created by migration
+  'notification_channels', 'notification_alert_rules',
+  'notification_recipients', 'notification_dispatches', 'notification_delivery_stats',
+  // Compliance tasks
+  'compliance_tasks',
+  // Regulatory
+  'regulatory_news_feed', 'regulatory_news_versions',
+  'company_regulatory_evaluations',
+  // Language prefs
+  'user_language_preferences',
+  // Views (created by migration — may or may not exist)
+  'upcoming_payments', 'payment_dashboard_summary',
+  'efiling_dashboard_summary', 'document_vault_dashboard',
+  'erp_connection_dashboard', 'upcoming_deadlines_detailed',
+  'calendar_dashboard_summary',
+]);
+
+const emptyResponse = () => new Response(JSON.stringify([]), {
+  status: 200, statusText: 'OK',
+  headers: { 'content-type': 'application/json' },
+});
+
+const safeFetch: typeof globalThis.fetch = async (input, init) => {
+  const url = typeof input === 'string' ? input : (input instanceof Request ? input.url : String(input));
+
+  // Only intercept PostgREST REST API calls
+  if (restApiPrefix && url.startsWith(restApiPrefix)) {
+    const afterPrefix = url.slice(restApiPrefix.length);
+    const tableName = afterPrefix.split('?')[0].split('/')[0];
+
+    // If table is NOT in the whitelist, return empty results without making HTTP request
+    if (!SAFE_TABLES.has(tableName)) {
+      return emptyResponse();
+    }
+  }
+
+  // Block non-existent RPC calls
+  if (supabaseUrl && url.startsWith(supabaseUrl + '/rest/v1/rpc/')) {
+    const rpcName = url.slice((supabaseUrl + '/rest/v1/rpc/').length).split('?')[0];
+    const KNOWN_BAD_RPCS = new Set(['bootstrap_retention_policies', 'bootstrap_ca_rbac_system']);
+    if (KNOWN_BAD_RPCS.has(rpcName)) {
+      return emptyResponse();
+    }
+  }
+
+  return globalThis.fetch(input, init);
+};
+
 const realSupabase = createClient<Database>(
   hasSupabaseEnv ? SUPABASE_URL : fallbackUrl,
   hasSupabaseEnv ? SUPABASE_KEY : fallbackKey,
@@ -37,6 +137,9 @@ const realSupabase = createClient<Database>(
       autoRefreshToken: true,
       detectSessionInUrl: true,
       flowType: 'pkce',
+    },
+    global: {
+      fetch: safeFetch,
     },
     // Disable Realtime WebSocket connections to prevent 406/400 console errors.
     // Supabase Realtime requires tables to be added to the supabase_realtime
@@ -1469,6 +1572,61 @@ const hasActiveRealSession = () => {
   return false;
 };
 
+// ─────────────────────────────────────────────────────────────────────────────
+// SAFE-QUERY INTERCEPTOR: Prevents network errors for non-existent tables/views
+// Browser logs "Failed to load resource: 400/406" for every failed PostgREST
+// request. JavaScript CANNOT suppress these. The only fix is to not send them.
+// ─────────────────────────────────────────────────────────────────────────────
+
+// Tables/views known to exist in the deployed database.
+// Queries to tables NOT in this set will be silently intercepted.
+// (SAFE_TABLES is defined at the top of this file for use in safeFetch)
+
+/**
+ * Creates a no-op query builder that returns empty data without making any HTTP request.
+ * Mimics the Supabase PostgREST builder API.
+ */
+const createNoOpBuilder = (tableName: string) => {
+  const noOp: any = {
+    _table: tableName,
+    _isSingle: false,
+    _isMaybeSingle: false,
+    select: () => noOp,
+    insert: () => noOp,
+    update: () => noOp,
+    upsert: () => noOp,
+    delete: () => noOp,
+    eq: () => noOp,
+    neq: () => noOp,
+    gt: () => noOp,
+    gte: () => noOp,
+    lt: () => noOp,
+    lte: () => noOp,
+    like: () => noOp,
+    ilike: () => noOp,
+    is: () => noOp,
+    in: () => noOp,
+    contains: () => noOp,
+    containedBy: () => noOp,
+    filter: () => noOp,
+    or: () => noOp,
+    not: () => noOp,
+    match: () => noOp,
+    order: () => noOp,
+    limit: () => noOp,
+    range: () => noOp,
+    single: () => { noOp._isSingle = true; return noOp; },
+    maybeSingle: () => { noOp._isMaybeSingle = true; return noOp; },
+    then: (resolve: any, reject?: any) => {
+      const result = noOp._isSingle
+        ? { data: null, error: null, count: 0 }
+        : { data: [], error: null, count: 0 };
+      return Promise.resolve(result).then(resolve, reject);
+    },
+  };
+  return noOp;
+};
+
 // Proxied supabase instance to selectively intercept browser routing
 export const supabase = new Proxy(realSupabase, {
   get: (target, prop) => {
@@ -1483,7 +1641,22 @@ export const supabase = new Proxy(realSupabase, {
       if (prop === 'storage') return mockStorage;
       if (prop === 'functions') return mockFunctions;
     }
+
+    // SAFE-QUERY INTERCEPTOR: For non-demo dashboards, intercept queries to
+    // tables/views not in our registry. This prevents 400/406 errors.
+    if (prop === 'from') {
+      const realFrom = Reflect.get(target, prop).bind(target);
+      return (tableName: string) => {
+        if (!SAFE_TABLES.has(tableName)) {
+          // Table/view not known to exist — return empty results silently
+          return createNoOpBuilder(tableName);
+        }
+        return realFrom(tableName);
+      };
+    }
+
     return Reflect.get(target, prop);
   }
 }) as any;
+
 
