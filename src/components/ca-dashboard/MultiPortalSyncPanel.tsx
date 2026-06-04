@@ -123,26 +123,26 @@ export default function MultiPortalSyncPanel() {
 
   const fetchReconciliation = async () => {
     try {
-      const { supabase } = await import('@/lib/supabase');
-      const { data, error } = await supabase
+      const { supabase } = await import('@/integrations/supabase/client');
+      const { data, error } = await (supabase as any)
         .from('client_module_calculations')
-        .select('company_id, module_label, calculation_data, status, ca_clients(company_name)')
+        .select('company_id, module_label, calculation_data, status')
         .eq('status', 'action_required')
-        .not('calculation_data->missing_inputs', 'is', null);
+        .limit(20);
 
       if (error || !data) {
         setReconciliationItems([]);
         return;
       }
 
-      const mismatches = data.map(row => ({
-        client: row.ca_clients?.company_name || 'Unknown Client',
+      const mismatches = data.map((row: any) => ({
+        client: row.company_id || 'Unknown Client',
         type: row.module_label,
         portal: 'Pending Data',
         books: 'Pending Data',
         diff: 'Action Required',
         status: 'warning',
-        desc: `Missing inputs: ${(row.calculation_data.missing_inputs || []).join(', ')}`,
+        desc: `Missing inputs: ${(row.calculation_data?.missing_inputs || []).join(', ') || 'Review required'}`,
       }));
       setReconciliationItems(mismatches);
     } catch { setReconciliationItems([]); }
