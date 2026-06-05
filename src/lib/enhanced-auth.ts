@@ -419,9 +419,22 @@ class EnhancedAuthService {
         this.currentUser = this.buildAuthUser(data.user);
         localStorage.setItem('sannidh_user', JSON.stringify(this.currentUser));
       }
-    } catch (error) {
+    } catch (error: any) {
       console.warn('Token refresh failed:', error);
-      this.logout();
+      
+      // Keep session alive if the failure is just a temporary network/fetch error.
+      // Only logout for definitive invalid session errors.
+      const errorMsg = error?.message?.toLowerCase() || '';
+      const isNetworkError = errorMsg.includes('fetch') || 
+                            errorMsg.includes('network') || 
+                            errorMsg.includes('load failed') || 
+                            errorMsg.includes('failed to fetch') ||
+                            errorMsg.includes('abort') ||
+                            errorMsg.includes('timeout');
+      
+      if (!isNetworkError) {
+        this.logout();
+      }
       throw error;
     }
   }

@@ -250,15 +250,9 @@ export async function updateApiKey(
 export async function fetchApiKeyUsageSummary(
   caUserId: string
 ): Promise<ApiKeyUsageSummary[]> {
-  // Query from a DB view if available, otherwise build from joins
-  const { data: viewData, error: viewError } = await (supabase as any)
-    .from('api_key_usage_summary')
-    .select('*')
-    .eq('ca_user_id', caUserId);
+  if (!isValidUUID(caUserId)) return [];
 
-  if (!viewError && viewData) return viewData;
-
-  // Fallback: build summary from the keys table + webhook counts
+  // Bypass view query to prevent 400 console error, constructing summary directly
   const { data: keys, error: keysErr } = await (supabase as any)
     .from('enterprise_api_keys')
     .select('id, key_name, key_prefix, is_active, total_requests, last_used_at')

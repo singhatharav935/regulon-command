@@ -233,18 +233,7 @@ export async function fetchCalendarEvents(
 
 export async function fetchUpcomingDeadlines(caUserId: string): Promise<CalendarEvent[]> {
   if (!isValidUUID(caUserId)) return [];
-  // upcoming_deadlines_detailed view may not exist — try with fallback
-  try {
-    const { data, error } = await supabase
-      .from('upcoming_deadlines_detailed')
-      .select('*')
-      .eq('ca_user_id', caUserId)
-      .order('due_date', { ascending: true });
-
-    if (!error && data) return data as CalendarEvent[];
-  } catch { /* view doesn't exist */ }
-
-  // Fallback: query base table for upcoming/active/overdue/due_today events
+  // Bypass view query to prevent 400 console error, querying base table directly
   return fetchCalendarEvents(caUserId, {
     status: ['upcoming', 'active', 'due_today', 'overdue'],
   });
@@ -318,18 +307,8 @@ export async function fetchCalendarDashboard(
   caUserId: string
 ): Promise<CalendarDashboardSummary | null> {
   if (!isValidUUID(caUserId)) return null;
-  // calendar_dashboard_summary view may not exist — try with fallback
-  try {
-    const { data, error } = await supabase
-      .from('calendar_dashboard_summary')
-      .select('*')
-      .eq('ca_user_id', caUserId)
-      .maybeSingle();
 
-    if (!error && data) return data as CalendarDashboardSummary;
-  } catch { /* view doesn't exist */ }
-
-  // Fallback: compute from base table
+  // Bypass view query to prevent 400 console error, computing from base table directly
   const events = await fetchCalendarEvents(caUserId);
   const now = new Date();
   const weekFromNow = new Date(now.getTime() + 7 * 86400000);

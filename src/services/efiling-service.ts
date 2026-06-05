@@ -456,7 +456,7 @@ export async function createTemplate(
 
 // ─── Dashboard Summary ────────────────────────────────────────────────────────
 
-export async function fetchDashboardSummary(
+export async function fetchEfilingSummary(
   caUserId: string
 ): Promise<EfilingDashboardSummary> {
   if (!isValidUUID(caUserId)) return {
@@ -464,18 +464,8 @@ export async function fetchDashboardSummary(
     acknowledged_count: 0, approved_count: 0, rejected_count: 0,
     overdue_count: 0, due_this_week: 0,
   };
-  // efiling_dashboard_summary view may not exist — try with fallback
-  try {
-    const { data, error } = await (supabase as any)
-      .from('efiling_dashboard_summary')
-      .select('*')
-      .eq('ca_user_id', caUserId)
-      .single();
 
-    if (!error && data) return data;
-  } catch { /* view doesn't exist */ }
-
-  // Fallback: compute from efiling_jobs table
+  // Bypass view query to prevent 400 console error, computing from efiling_jobs directly
   const jobs = await fetchFilingJobs(caUserId);
   const now = new Date();
   const weekFromNow = new Date(now.getTime() + 7 * 86400000);
