@@ -213,44 +213,35 @@ export async function fetchDocuments(
 
 export async function fetchDocumentDashboard(caUserId: string): Promise<DocumentDashboard[]> {
   if (!isValidUUID(caUserId)) return [];
-  const { data, error } = await (supabase as any)
-    .from('document_vault_dashboard')
-    .select('*')
-    .eq('ca_user_id', caUserId)
-    .order('created_at', { ascending: false })
-    .limit(200);
-
-  if (error) {
-    // Fallback if view doesn't exist
-    const docs = await fetchDocuments(caUserId);
-    return docs.map((d) => ({
-      document_id: d.id,
-      ca_user_id: d.ca_user_id,
-      title: d.title,
-      file_name: d.file_name,
-      file_extension: d.file_extension,
-      mime_type: d.mime_type,
-      file_size_bytes: d.file_size_bytes,
-      category: d.category,
-      sub_category: d.sub_category,
-      compliance_domain: d.compliance_domain,
-      financial_year: d.financial_year,
-      status: d.status,
-      is_ocr_processed: d.is_ocr_processed,
-      is_verified: d.is_verified,
-      tags: d.tags,
-      source: d.source,
-      current_version: d.current_version,
-      created_at: d.created_at,
-      updated_at: d.updated_at,
-      total_versions: 1,
-      ocr_job_count: 0,
-      last_ocr_status: undefined,
-      last_ocr_confidence: undefined,
-      total_accesses: 0,
-    }));
-  }
-  return data ?? [];
+  
+  // Directly query the base table to bypass the view, preventing 400 console errors
+  const docs = await fetchDocuments(caUserId);
+  return docs.map((d) => ({
+    document_id: d.id,
+    ca_user_id: d.ca_user_id,
+    title: d.title,
+    file_name: d.file_name,
+    file_extension: d.file_extension,
+    mime_type: d.mime_type,
+    file_size_bytes: d.file_size_bytes,
+    category: d.category,
+    sub_category: d.sub_category,
+    compliance_domain: d.compliance_domain,
+    financial_year: d.financial_year,
+    status: d.status,
+    is_ocr_processed: d.is_ocr_processed,
+    is_verified: d.is_verified,
+    tags: d.tags,
+    source: d.source,
+    current_version: d.current_version,
+    created_at: d.created_at,
+    updated_at: d.updated_at,
+    total_versions: 1,
+    ocr_job_count: 0,
+    last_ocr_status: undefined,
+    last_ocr_confidence: undefined,
+    total_accesses: 0,
+  }));
 }
 
 /**

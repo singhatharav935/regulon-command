@@ -419,15 +419,8 @@ export async function fetchConnectionDashboard(
   caUserId: string
 ): Promise<ErpConnectionDashboard[]> {
   if (!isValidUUID(caUserId)) return [];
-  // Try the view first
-  const { data: viewData, error: viewErr } = await (supabase as any)
-    .from('erp_connection_dashboard')
-    .select('*')
-    .eq('ca_user_id', caUserId);
 
-  if (!viewErr && viewData) return viewData;
-
-  // Fallback: just return connections
+  // Bypass view query to prevent 400 console error, using fallback logic directly
   const conns = await fetchErpConnections(caUserId);
   return conns.map((c) => ({
     connection_id: c.id,

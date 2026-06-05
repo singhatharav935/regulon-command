@@ -477,24 +477,13 @@ export async function recordManualPayment(
 export async function fetchPaymentDashboardSummary(
   caUserId: string
 ): Promise<PaymentDashboardSummary> {
-  // payment_dashboard_summary view may not exist — compute from base table
   if (!isValidUUID(caUserId)) return {
     total_liabilities: 0, paid_count: 0, unpaid_count: 0,
     overdue_count: 0, due_this_week: 0,
     total_due_paise: 0, total_paid_paise: 0, total_balance_paise: 0,
   };
 
-  try {
-    const { data, error } = await (supabase as any)
-      .from('payment_dashboard_summary')
-      .select('*')
-      .eq('ca_user_id', caUserId)
-      .single();
-
-    if (!error && data) return data;
-  } catch { /* view doesn't exist */ }
-
-  // Fallback: compute from tax_liability_heads
+  // Bypass view query to prevent 400 console error, computing from tax_liability_heads directly
   const liabilities = await fetchLiabilities(caUserId);
   const now = new Date();
   const weekFromNow = new Date(now.getTime() + 7 * 86400000);

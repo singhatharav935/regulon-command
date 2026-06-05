@@ -2,6 +2,8 @@ import React, { createContext, useContext, useEffect, useState } from 'react';
 import { useNavigate, useLocation } from 'react-router-dom';
 import { enhancedAuth, type AuthUser } from '@/lib/enhanced-auth';
 import { useToast } from '@/hooks/use-toast';
+import { supabase } from '@/integrations/supabase/client';
+import { isValidUUID } from '@/lib/uuid-guard';
 
 interface EnhancedAuthContextValue {
   user: AuthUser | null;
@@ -27,12 +29,89 @@ export const EnhancedAuthProvider: React.FC<EnhancedAuthProviderProps> = ({ chil
 
   useEffect(() => {
     // Initialize auth state
-    const initializeAuth = () => {
-      const currentUser = enhancedAuth.getCurrentUser();
-      const isAuth = enhancedAuth.isAuthenticated();
-      
-      setUser(isAuth ? currentUser : null);
-      setIsLoading(false);
+    const initializeAuth = async () => {
+      try {
+        // Asynchronously retrieve active session, which auto-refreshes if expired
+        const { data: { session }, error } = await supabase.auth.getSession();
+        
+        if (session?.user) {
+          const meta = session.user.user_metadata || {};
+          const authUser: AuthUser = {
+            id: session.user.id,
+            email: session.user.email || '',
+            full_name: meta.full_name || '',
+            registration_role: meta.registration_role || 'company_owner',
+            verification_entity_name: meta.verification_entity_name,
+            email_verified: !!session.user.email_confirmed_at,
+            profile_completed: true,
+            created_at: session.user.created_at,
+            last_login: new Date().toISOString(),
+          };
+          
+          localStorage.setItem('sannidh_auth_token', session.access_token);
+          localStorage.setItem('sannidh_refresh_token', session.refresh_token || '');
+          localStorage.setItem('sannidh_user', JSON.stringify(authUser));
+          localStorage.setItem('auth_token', session.access_token);
+          
+          // Sync fresh role if set
+          const freshRole = localStorage.getItem('current_user_role');
+          if (freshRole && authUser.registration_role !== freshRole) {
+            authUser.registration_role = freshRole;
+          }
+          
+          setUser(authUser);
+        } else {
+          // If no active session, but we have stored tokens, try manual refresh
+          const storedRefresh = localStorage.getItem('sannidh_refresh_token');
+          if (storedRefresh) {
+            try {
+              const { data: refreshData, error: refreshErr } = await supabase.auth.refreshSession();
+              if (!refreshErr && refreshData.session) {
+                const session = refreshData.session;
+                const meta = session.user.user_metadata || {};
+                const authUser: AuthUser = {
+                  id: session.user.id,
+                  email: session.user.email || '',
+                  full_name: meta.full_name || '',
+                  registration_role: meta.registration_role || 'company_owner',
+                  verification_entity_name: meta.verification_entity_name,
+                  email_verified: !!session.user.email_confirmed_at,
+                  profile_completed: true,
+                  created_at: session.user.created_at,
+                  last_login: new Date().toISOString(),
+                };
+                
+                localStorage.setItem('sannidh_auth_token', session.access_token);
+                localStorage.setItem('sannidh_refresh_token', session.refresh_token || '');
+                localStorage.setItem('sannidh_user', JSON.stringify(authUser));
+                localStorage.setItem('auth_token', session.access_token);
+                
+                setUser(authUser);
+                setIsLoading(false);
+                return;
+              }
+            } catch (e) {
+              console.warn('Initial session refresh failed:', e);
+            }
+          }
+          
+          // Default to fallback if no active session
+          const storedUser = localStorage.getItem('sannidh_user');
+          if (storedUser) {
+            setUser(JSON.parse(storedUser));
+          } else {
+            setUser(null);
+          }
+        }
+      } catch (err) {
+        console.error('Initial session check failed:', err);
+        // Fallback to local storage if offline (keeps user logged in)
+        const currentUser = enhancedAuth.getCurrentUser();
+        const isAuth = enhancedAuth.isAuthenticated();
+        setUser(isAuth ? currentUser : null);
+      } finally {
+        setIsLoading(false);
+      }
     };
 
     initializeAuth();
@@ -46,8 +125,16 @@ export const EnhancedAuthProvider: React.FC<EnhancedAuthProviderProps> = ({ chil
           setUser(updatedUser);
         } catch (error) {
           console.warn('Token refresh failed:', error);
-          // User will be logged out by the auth service
-          setUser(null);
+          // If refresh fails due to network error, keep user logged in.
+          // Otherwise user will be logged out by enhancedAuth service.
+          const errorMsg = (error as any)?.message?.toLowerCase() || '';
+          const isNetworkError = errorMsg.includes('fetch') || 
+                                errorMsg.includes('network') || 
+                                errorMsg.includes('load failed') || 
+                                errorMsg.includes('failed to fetch');
+          if (!isNetworkError) {
+            setUser(null);
+          }
         }
       }
     }, 15 * 60 * 1000); // Every 15 minutes
