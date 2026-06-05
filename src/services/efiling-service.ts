@@ -456,7 +456,7 @@ export async function createTemplate(
 
 // ─── Dashboard Summary ────────────────────────────────────────────────────────
 
-export async function fetchEfilingSummary(
+export async function fetchDashboardSummary(
   caUserId: string
 ): Promise<EfilingDashboardSummary> {
   if (!isValidUUID(caUserId)) return {
