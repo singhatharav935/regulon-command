@@ -1104,6 +1104,367 @@ const defaultComplianceTasks = [
   }
 ];
 
+// Helper functions for dynamic data based on localStorage demo_clients
+const getDemoClientsAsEntities = () => {
+  const clients = getStorageItem('demo_clients', []);
+  return clients.map((c: any) => ({
+    id: c.id,
+    ca_user_id: "00000000-0000-0000-0000-000000000000",
+    entity_name: c.name || c.entity_name,
+    entity_type: "company",
+    pan: c.pan || "AABCT1234Q",
+    cin: c.cin || "U72200DL2021PTC384920",
+    gstin: c.gstin || "27AABCT1234Q1Z5",
+    tan: c.tan || "DELA12345B",
+    incorporation_date: "2021-06-15",
+    financial_year_end: "31-03",
+    industry: c.industry || "General",
+    turnover_bracket: "5cr_10cr",
+    entity_status: "active",
+    metadata: {},
+    created_at: c.created_at || new Date().toISOString(),
+    updated_at: c.created_at || new Date().toISOString(),
+  }));
+};
+
+const getDemoEntityGroups = () => {
+  const storeKey = 'sannidh_mock_entity_groups';
+  let groups = localStorage.getItem(storeKey);
+  if (groups) {
+    try { return JSON.parse(groups); } catch { }
+  }
+  
+  const clients = getDemoClientsAsEntities();
+  if (clients.length === 0) return [];
+  
+  const defaultGroup = {
+    id: "group-dynamic-1",
+    ca_user_id: "00000000-0000-0000-0000-000000000000",
+    group_name: "Consolidated Enterprise Group",
+    group_type: "holding_subsidiary",
+    description: "Automated group containing all registered clients for cross-entity compliance analysis.",
+    color_tag: "#6366f1",
+    created_at: new Date().toISOString(),
+    updated_at: new Date().toISOString(),
+  };
+  localStorage.setItem(storeKey, JSON.stringify([defaultGroup]));
+  return [defaultGroup];
+};
+
+const getDemoEntityGroupMembers = () => {
+  const storeKey = 'sannidh_mock_entity_group_members';
+  let members = localStorage.getItem(storeKey);
+  if (members) {
+    try { return JSON.parse(members); } catch { }
+  }
+  
+  const clients = getDemoClientsAsEntities();
+  if (clients.length === 0) return [];
+  
+  const defaultMembers = clients.map((c, idx) => ({
+    id: `mem-dynamic-${c.id}`,
+    group_id: "group-dynamic-1",
+    entity_id: c.id,
+    role_in_group: idx === 0 ? "parent" : "subsidiary",
+    ownership_percent: idx === 0 ? 100 : 75,
+    created_at: new Date().toISOString(),
+    entity: c
+  }));
+  localStorage.setItem(storeKey, JSON.stringify(defaultMembers));
+  return defaultMembers;
+};
+
+const getDemoComplianceSnapshots = () => {
+  const clients = getDemoClientsAsEntities();
+  return clients.map((c: any) => {
+    const completed = localStorage.getItem(`swarm_completed_${c.id}`) === 'true';
+    const health = completed ? 100 : 75;
+    
+    return {
+      id: `snap-${c.id}`,
+      entity_id: c.id,
+      overall_health_score: health,
+      pending_tasks_count: completed ? 0 : 2,
+      overdue_tasks_count: 0,
+      snapshot_date: new Date().toISOString().split('T')[0],
+      gst_status: completed ? { filed: 7, pending: 0 } : { filed: 6, pending: 1 },
+      itr_status: { status: completed ? 'filed' : 'pending' },
+      tds_status: completed ? { pending_deposit: 0 } : { pending_deposit: 12000 },
+      mca_status: { active: true },
+      created_at: new Date().toISOString(),
+      updated_at: new Date().toISOString(),
+    };
+  });
+};
+
+const getDemoConsolidatedReports = () => {
+  const storeKey = 'demo_consolidated_reports';
+  let reports = localStorage.getItem(storeKey);
+  if (reports) {
+    try { return JSON.parse(reports); } catch { }
+  }
+  
+  const clients = getDemoClientsAsEntities();
+  if (clients.length === 0) return [];
+  
+  const defaultReport = {
+    id: "rep-dynamic-1",
+    ca_user_id: "00000000-0000-0000-0000-000000000000",
+    group_id: "group-dynamic-1",
+    report_type: "gst_summary",
+    report_title: "Consolidated Compliance Audit Report",
+    period_start: "2026-04-01",
+    period_end: "2026-06-30",
+    status: "finalized",
+    entity_count: clients.length,
+    created_at: new Date().toISOString(),
+    generated_data: {
+      summary: {
+        total_entities: clients.length,
+        average_health_score: Math.round(clients.reduce((acc, c) => {
+          const completed = localStorage.getItem(`swarm_completed_${c.id}`) === 'true';
+          return acc + (completed ? 100 : 75);
+        }, 0) / clients.length),
+        total_tasks: clients.length * 2,
+        completed_tasks: clients.filter(c => localStorage.getItem(`swarm_completed_${c.id}`) === 'true').length * 2,
+        overdue_tasks: 0,
+      }
+    }
+  };
+  localStorage.setItem(storeKey, JSON.stringify([defaultReport]));
+  return [defaultReport];
+};
+
+const getDemoCredentials = () => {
+  const storeKey = 'demo_efiling_credentials';
+  let creds = localStorage.getItem(storeKey);
+  if (creds) {
+    try { return JSON.parse(creds); } catch { }
+  }
+  
+  const clients = getDemoClientsAsEntities();
+  const defaultCreds: any[] = [];
+  clients.forEach(c => {
+    defaultCreds.push(
+      {
+        id: `cred-${c.id}-gst`,
+        ca_user_id: "00000000-0000-0000-0000-000000000000",
+        entity_id: c.id,
+        portal: "gst_portal",
+        portal_username: `GST_${c.entity_name.split(' ')[0].toUpperCase()}`,
+        gstin: c.gstin,
+        is_verified: true,
+        created_at: c.created_at,
+        updated_at: c.created_at,
+      },
+      {
+        id: `cred-${c.id}-mca`,
+        ca_user_id: "00000000-0000-0000-0000-000000000000",
+        entity_id: c.id,
+        portal: "mca21",
+        portal_username: `MCA_${c.entity_name.split(' ')[0].toUpperCase()}`,
+        pan: c.pan,
+        is_verified: true,
+        created_at: c.created_at,
+        updated_at: c.created_at,
+      },
+      {
+        id: `cred-${c.id}-it`,
+        ca_user_id: "00000000-0000-0000-0000-000000000000",
+        entity_id: c.id,
+        portal: "income_tax",
+        portal_username: `IT_${c.entity_name.split(' ')[0].toUpperCase()}`,
+        pan: c.pan,
+        is_verified: true,
+        created_at: c.created_at,
+        updated_at: c.created_at,
+      }
+    );
+  });
+  localStorage.setItem(storeKey, JSON.stringify(defaultCreds));
+  return defaultCreds;
+};
+
+const getDemoEfilingJobs = () => {
+  const storeKey = 'demo_efiling_jobs';
+  const clients = getDemoClientsAsEntities();
+  let jobs = localStorage.getItem(storeKey);
+  if (jobs) {
+    try {
+      const parsed = JSON.parse(jobs);
+      // If we have clients but no jobs cached for them, regenerate
+      if (clients.length > 0 && parsed.length === 0) {
+        localStorage.removeItem(storeKey);
+      } else if (parsed.length > 0) {
+        let modified = false;
+        const synced = parsed.map((j: any) => {
+          const completed = localStorage.getItem(`swarm_completed_${j.entity_id}`) === 'true';
+          if (completed && j.status !== 'acknowledged' && j.status !== 'submitted') {
+            modified = true;
+            return {
+              ...j,
+              status: 'acknowledged',
+              status_message: `Acknowledged by government portal. ARN: GST-ARN-2026-${Math.floor(100000 + Math.random() * 900000)}`,
+              progress_percent: 100,
+              ack_number: j.ack_number || `GST-ARN-2026-${Math.floor(100000 + Math.random() * 900000)}`,
+              ack_date: j.ack_date || new Date().toISOString(),
+              updated_at: new Date().toISOString()
+            };
+          }
+          return j;
+        });
+        if (modified) {
+          localStorage.setItem(storeKey, JSON.stringify(synced));
+          return synced;
+        }
+        return parsed;
+      }
+    } catch { }
+  }
+  
+  const defaultJobs: any[] = [];
+  clients.forEach(c => {
+    const completed = localStorage.getItem(`swarm_completed_${c.id}`) === 'true';
+    
+    defaultJobs.push(
+      {
+        id: `job-${c.id}-gstr3b`,
+        ca_user_id: "00000000-0000-0000-0000-000000000000",
+        entity_id: c.id,
+        filing_type: "gstr3b",
+        portal: "gst_portal",
+        filing_title: `GSTR-3B Monthly Return for ${c.entity_name} — April 2026`,
+        period_start: "2026-04-01",
+        period_end: "2026-04-30",
+        due_date: "2026-05-20",
+        status: completed ? "acknowledged" : "ready_to_submit",
+        status_message: completed 
+          ? "Acknowledged by GST portal." 
+          : "Approved by CA. Ready for gateway submission.",
+        progress_percent: completed ? 100 : 90,
+        ack_number: completed ? `GST-ARN-2026-${Math.floor(100000 + Math.random() * 900000)}` : undefined,
+        ack_date: completed ? new Date().toISOString() : undefined,
+        form_data: {},
+        computation_data: {},
+        ca_approved: true,
+        created_at: c.created_at,
+        updated_at: c.created_at,
+      },
+      {
+        id: `job-${c.id}-gstr1`,
+        ca_user_id: "00000000-0000-0000-0000-000000000000",
+        entity_id: c.id,
+        filing_type: "gstr1",
+        portal: "gst_portal",
+        filing_title: `GSTR-1 Outward Supplies for ${c.entity_name} — April 2026`,
+        period_start: "2026-04-01",
+        period_end: "2026-04-30",
+        due_date: "2026-05-11",
+        status: completed ? "acknowledged" : "draft",
+        status_message: completed 
+          ? "Acknowledged by GST portal." 
+          : "Draft prepared by SANNIDH AI. Pending review.",
+        progress_percent: completed ? 100 : 50,
+        ack_number: completed ? `GST-ARN-2026-${Math.floor(100000 + Math.random() * 900000)}` : undefined,
+        ack_date: completed ? new Date().toISOString() : undefined,
+        form_data: {},
+        computation_data: {},
+        ca_approved: completed,
+        created_at: c.created_at,
+        updated_at: c.created_at,
+      },
+      {
+        id: `job-${c.id}-aoc4`,
+        ca_user_id: "00000000-0000-0000-0000-000000000000",
+        entity_id: c.id,
+        filing_type: "mca_aoc4",
+        portal: "mca21",
+        filing_title: `MCA AOC-4 Financials for ${c.entity_name} — FY25-26`,
+        period_start: "2025-04-01",
+        period_end: "2026-03-31",
+        due_date: "2026-10-30",
+        status: completed ? "acknowledged" : "draft",
+        status_message: completed 
+          ? "Acknowledged by MCA portal." 
+          : "Draft compiled. Awaiting board resolution document verify.",
+        progress_percent: completed ? 100 : 30,
+        ack_number: completed ? `MCA-SRN-2026-${Math.floor(100000 + Math.random() * 900000)}` : undefined,
+        ack_date: completed ? new Date().toISOString() : undefined,
+        form_data: {},
+        computation_data: {},
+        ca_approved: completed,
+        created_at: c.created_at,
+        updated_at: c.created_at,
+      }
+    );
+  });
+  localStorage.setItem(storeKey, JSON.stringify(defaultJobs));
+  return defaultJobs;
+};
+
+const getDemoEfilingSummary = () => {
+  const jobs = getDemoEfilingJobs();
+  const total = jobs.length;
+  const draft = jobs.filter((j: any) => j.status === 'draft').length;
+  const ready = jobs.filter((j: any) => j.status === 'ready_to_submit').length;
+  const submitted = jobs.filter((j: any) => j.status === 'submitted').length;
+  const acknowledged = jobs.filter((j: any) => j.status === 'acknowledged').length;
+  const approved = jobs.filter((j: any) => j.status === 'approved').length;
+  const rejected = jobs.filter((j: any) => j.status === 'rejected').length;
+  // Count overdue: due_date has passed and not acknowledged/approved
+  const now = Date.now();
+  const overdue = jobs.filter((j: any) => {
+    if (!j.due_date) return false;
+    if (['acknowledged', 'approved', 'cancelled'].includes(j.status)) return false;
+    return new Date(j.due_date).getTime() < now;
+  }).length;
+  
+  return {
+    total_filings: total,
+    draft_count: draft,
+    ready_count: ready,
+    submitted_count: submitted,
+    acknowledged_count: acknowledged,
+    approved_count: approved,
+    rejected_count: rejected,
+    overdue_count: overdue,
+    due_this_week: ready + draft,
+  };
+};
+
+const getDemoReconciliationEntries = () => {
+  const ents = getDemoClientsAsEntities();
+  const entries: any[] = [];
+  ents.forEach((c: any) => {
+    entries.push(
+      {
+        id: `recon-${c.id}-1`,
+        ca_user_id: "00000000-0000-0000-0000-000000000000",
+        bank_txn_date: "2026-06-02",
+        bank_txn_amount_paise: 24190000,
+        bank_narration: `GST PMT-06 challan payment for ${c.entity_name}`,
+        bank_reference: `TXN-REF-${Math.floor(100000 + Math.random() * 900000)}`,
+        is_matched: false,
+        match_confidence: 0.95,
+        match_method: "exact_amount",
+        liability_id: `liab-${c.id}-gst`
+      },
+      {
+        id: `recon-${c.id}-2`,
+        ca_user_id: "00000000-0000-0000-0000-000000000000",
+        bank_txn_date: "2026-06-03",
+        bank_txn_amount_paise: 1500000,
+        bank_narration: "Professional Tax challan",
+        bank_reference: `TXN-REF-${Math.floor(100000 + Math.random() * 900000)}`,
+        is_matched: false,
+        match_confidence: 0.30,
+        match_method: "none",
+      }
+    );
+  });
+  return entries;
+};
+
 // Dynamic Table router mock mapping
 let currentQueryFilters: Record<string, any> = {};
 
@@ -1112,79 +1473,172 @@ const handleTableQuery = (table: string, method: string, args: any[]) => {
   let data: any[] = [];
 
   // Match table with mock defaults
-  if (table === 'entities' || table === 'companies' || table === 'ca_clients') data = getStorageItem(storeKey, defaultEntities);
-  else if (table === 'entity_groups') data = getStorageItem(storeKey, defaultGroups);
+  if (table === 'entities' || table === 'companies' || table === 'ca_clients') data = getDemoClientsAsEntities();
+  else if (table === 'entity_groups') data = getDemoEntityGroups();
   else if (table === 'entity_group_members') {
-    data = getStorageItem(storeKey, defaultMembers);
-    const ents = getStorageItem('sannidh_mock_entities', defaultEntities);
+    data = getDemoEntityGroupMembers();
+    const ents = getDemoClientsAsEntities();
     data = data.map(m => ({ ...m, entity: ents.find((e: any) => e.id === m.entity_id) }));
   }
-  else if (table === 'efiling_portal_credentials') data = getStorageItem(storeKey, defaultCredentials);
-  else if (table === 'efiling_jobs') data = getStorageItem(storeKey, defaultEfilingJobs);
+  else if (table === 'efiling_portal_credentials') data = getStorageItem('demo_efiling_credentials', getDemoCredentials());
+  else if (table === 'efiling_jobs') data = getStorageItem('demo_efiling_jobs', getDemoEfilingJobs());
+  else if (table === 'efiling_dashboard_summary') {
+    return getDemoEfilingSummary();
+  }
+  else if (table === 'consolidated_reports') data = getDemoConsolidatedReports();
+  else if (table === 'entity_compliance_snapshot') data = getDemoComplianceSnapshots();
   else if (table === 'tax_liability_heads') {
-    data = getStorageItem(storeKey, defaultLiabilities);
-    const ents = getStorageItem('sannidh_mock_entities', defaultEntities);
+    const ents = getDemoClientsAsEntities();
+    const defaultLiabList: any[] = [];
+    ents.forEach((c: any) => {
+      defaultLiabList.push(
+        {
+          id: `liab-${c.id}-gst`,
+          ca_user_id: "00000000-0000-0000-0000-000000000000",
+          entity_id: c.id,
+          tax_type: "gst_igst",
+          tax_label: "GST IGST Outward Liability (SCN Match)",
+          period_start: "2026-04-01",
+          period_end: "2026-04-30",
+          due_date: "2026-06-20",
+          gross_liability_paise: 24000000,
+          itc_available_paise: 0,
+          net_liability_paise: 24000000,
+          interest_paise: 180000,
+          penalty_paise: 0,
+          late_fee_paise: 10000,
+          total_due_paise: 24190000,
+          amount_paid_paise: 0,
+          balance_due_paise: 24190000,
+          is_paid: false,
+          is_nil_return: false,
+          created_at: c.created_at,
+        }
+      );
+    });
+    data = getStorageItem(storeKey, defaultLiabList);
     data = data.map(l => ({ ...l, entities: ents.find((e: any) => e.id === l.entity_id) }));
   }
-  else if (table === 'payment_transactions') data = getStorageItem(storeKey, defaultTransactions);
-  else if (table === 'consolidated_reports') data = getStorageItem(storeKey, [
-    {
-      id: "rep-demo-1",
-      ca_user_id: "00000000-0000-0000-0000-000000000000",
-      group_id: "group-demo-1",
-      report_type: "gst_summary",
-      report_title: "GST Consolidated Summary — Q1 FY26",
-      period_start: "2026-04-01",
-      period_end: "2026-06-30",
-      status: "finalized",
-      entity_count: 2,
-      created_at: new Date().toISOString(),
-      generated_data: {
-        summary: {
-          total_entities: 2,
-          average_health_score: 88,
-          total_tasks: 8,
-          completed_tasks: 7,
-          overdue_tasks: 0,
-        }
+  else if (table === 'upcoming_payments') {
+    const ents = getDemoClientsAsEntities();
+    const liabKey = 'sannidh_mock_tax_liability_heads';
+    let liabilities = getStorageItem(liabKey, []);
+    if (liabilities.length === 0) {
+      const defaultLiabList: any[] = [];
+      ents.forEach((c: any) => {
+        defaultLiabList.push({
+          id: `liab-${c.id}-gst`,
+          ca_user_id: "00000000-0000-0000-0000-000000000000",
+          entity_id: c.id,
+          tax_type: "gst_igst",
+          tax_label: "GST IGST Outward Liability (SCN Match)",
+          period_start: "2026-04-01",
+          period_end: "2026-04-30",
+          due_date: "2026-06-20",
+          gross_liability_paise: 24000000,
+          itc_available_paise: 0,
+          net_liability_paise: 24000000,
+          interest_paise: 180000,
+          penalty_paise: 0,
+          late_fee_paise: 10000,
+          total_due_paise: 24190000,
+          amount_paid_paise: 0,
+          balance_due_paise: 24190000,
+          is_paid: false,
+          is_nil_return: false,
+          created_at: c.created_at,
+        });
+      });
+      setStorageItem(liabKey, defaultLiabList);
+      liabilities = defaultLiabList;
+    }
+    const now = Date.now();
+    const thirtyDaysSec = 30 * 24 * 60 * 60 * 1000;
+    data = liabilities.filter((h: any) => {
+      if (h.is_paid) return false;
+      const dueTime = new Date(h.due_date).getTime();
+      return dueTime >= now - (7 * 24 * 60 * 60 * 1000) && dueTime <= now + thirtyDaysSec;
+    });
+    data = data.map(l => ({ ...l, entities: ents.find((e: any) => e.id === l.entity_id) }));
+  }
+  else if (table === 'payment_dashboard_summary') {
+    const ents = getDemoClientsAsEntities();
+    const liabKey = 'sannidh_mock_tax_liability_heads';
+    let liabilities = getStorageItem(liabKey, []);
+    if (liabilities.length === 0) {
+      const defaultLiabList: any[] = [];
+      ents.forEach((c: any) => {
+        defaultLiabList.push({
+          id: `liab-${c.id}-gst`,
+          ca_user_id: "00000000-0000-0000-0000-000000000000",
+          entity_id: c.id,
+          tax_type: "gst_igst",
+          tax_label: "GST IGST Outward Liability (SCN Match)",
+          period_start: "2026-04-01",
+          period_end: "2026-04-30",
+          due_date: "2026-06-20",
+          gross_liability_paise: 24000000,
+          itc_available_paise: 0,
+          net_liability_paise: 24000000,
+          interest_paise: 180000,
+          penalty_paise: 0,
+          late_fee_paise: 10000,
+          total_due_paise: 24190000,
+          amount_paid_paise: 0,
+          balance_due_paise: 24190000,
+          is_paid: false,
+          is_nil_return: false,
+          created_at: c.created_at,
+        });
+      });
+      setStorageItem(liabKey, defaultLiabList);
+      liabilities = defaultLiabList;
+    }
+    const total = liabilities.length;
+    const paid = liabilities.filter((h: any) => h.is_paid).length;
+    const unpaid = total - paid;
+    
+    const now = Date.now();
+    const overdue = liabilities.filter((h: any) => !h.is_paid && new Date(h.due_date).getTime() < now).length;
+    const dueThisWeek = liabilities.filter((h: any) => {
+      if (h.is_paid) return false;
+      const dueTime = new Date(h.due_date).getTime();
+      return dueTime >= now - (7 * 24 * 60 * 60 * 1000) && dueTime <= now + (7 * 24 * 60 * 60 * 1000);
+    }).length;
+
+    const totalDue = liabilities.reduce((sum: number, h: any) => sum + (h.total_due_paise || 0), 0);
+    const totalPaid = liabilities.reduce((sum: number, h: any) => sum + (h.amount_paid_paise || 0), 0);
+    const totalBalance = liabilities.reduce((sum: number, h: any) => sum + (h.balance_due_paise || 0), 0);
+
+    return {
+      total_liabilities: total,
+      paid_count: paid,
+      unpaid_count: unpaid,
+      overdue_count: overdue,
+      due_this_week: dueThisWeek,
+      total_due_paise: totalDue,
+      total_paid_paise: totalPaid,
+      total_balance_paise: totalBalance,
+    };
+  }
+  else if (table === 'payment_reconciliation') {
+    data = getStorageItem(storeKey, getDemoReconciliationEntries());
+  }
+  else if (table === 'payment_reminders') {
+    data = getStorageItem(storeKey, [
+      {
+        id: "rem-1",
+        ca_user_id: "00000000-0000-0000-0000-000000000000",
+        reminder_date: "2026-06-15",
+        reminder_type: "email",
+        message: "GST Filing due date reminder",
+        recipients: ["taxpayer@client.com"],
+        is_sent: false,
+        created_at: new Date().toISOString()
       }
-    }
-  ]);
-  else if (table === 'entity_compliance_snapshot') data = getStorageItem(storeKey, [
-    {
-      entity_id: "demo-client-1",
-      overall_health_score: 94,
-      pending_tasks_count: 2,
-      overdue_tasks_count: 0,
-      snapshot_date: new Date().toISOString().split('T')[0],
-      gst_status: { filed: 6, pending: 1 },
-      itr_status: { status: 'filed' },
-      tds_status: { pending_deposit: 0 },
-      mca_status: { active: true }
-    },
-    {
-      entity_id: "demo-client-2",
-      overall_health_score: 68,
-      pending_tasks_count: 5,
-      overdue_tasks_count: 1,
-      snapshot_date: new Date().toISOString().split('T')[0],
-      gst_status: { mismatch_amount: 240000 },
-      itr_status: { status: 'pending' },
-      tds_status: { pending_deposit: 12000 },
-      mca_status: { active: true }
-    },
-    {
-      entity_id: "demo-client-3",
-      overall_health_score: 82,
-      pending_tasks_count: 3,
-      overdue_tasks_count: 0,
-      snapshot_date: new Date().toISOString().split('T')[0],
-      gst_status: { filed: 5, pending: 0 },
-      itr_status: { status: 'draft' },
-      tds_status: { pending_deposit: 0 },
-      mca_status: { active: true }
-    }
-  ]);
+    ]);
+  }
+  else if (table === 'payment_transactions') data = getStorageItem(storeKey, defaultTransactions);
   else if (table === 'client_module_calculations') data = getStorageItem(storeKey, defaultModuleCalculations);
   else if (table === 'client_notice_data_room') data = getStorageItem(storeKey, defaultDataRooms);
   else if (table === 'client_bank_transactions') data = getStorageItem(storeKey, defaultBankTransactions);
@@ -1287,14 +1741,49 @@ const handleTableQuery = (table: string, method: string, args: any[]) => {
   }
   
   if (method === 'insert') {
-    const newRows = args[0].map((r: any) => ({
-      id: r.id || `mock-${Date.now()}-${Math.random().toString(36).slice(2, 6)}`,
-      created_at: new Date().toISOString(),
-      updated_at: new Date().toISOString(),
-      ...r
-    }));
+    const newRows = args[0].map((r: any) => {
+      let status = r.status;
+      // Demo simulation: Auto-succeed online payments
+      if (table === 'payment_transactions' && r.gateway === 'razorpay') {
+        status = 'success';
+      }
+      return {
+        id: r.id || `mock-${Date.now()}-${Math.random().toString(36).slice(2, 6)}`,
+        created_at: new Date().toISOString(),
+        updated_at: new Date().toISOString(),
+        ...r,
+        status: status || r.status
+      };
+    });
     data = [...newRows, ...data];
     setStorageItem(storeKey, data);
+
+    // Simulated Trigger: If we inserted a successful transaction into payment_transactions,
+    // update the corresponding tax_liability_heads record.
+    if (table === 'payment_transactions') {
+      newRows.forEach((txn: any) => {
+        if (txn.status === 'success' && txn.liability_id) {
+          const liabKey = 'sannidh_mock_tax_liability_heads';
+          const liabilities = getStorageItem(liabKey, []);
+          const updatedLiabilities = liabilities.map((l: any) => {
+            if (l.id === txn.liability_id) {
+              const amountPaid = (l.amount_paid_paise || 0) + txn.amount_paise;
+              const balanceDue = Math.max(0, (l.total_due_paise || 0) - amountPaid);
+              return {
+                ...l,
+                amount_paid_paise: amountPaid,
+                balance_due_paise: balanceDue,
+                is_paid: balanceDue === 0,
+                updated_at: new Date().toISOString()
+              };
+            }
+            return l;
+          });
+          setStorageItem(liabKey, updatedLiabilities);
+        }
+      });
+    }
+
     return args[0].length === 1 ? newRows[0] : newRows;
   }
 
@@ -1424,6 +1913,17 @@ const mockFunctions = {
     }
     if (functionName === 'submit-efiling') {
       return { data: { success: true, ack_number: `GST-ARN-2026-${Math.floor(100000 + Math.random() * 900000)}` }, error: null };
+    }
+    if (functionName === 'poll-efiling-status') {
+      return {
+        data: {
+          status: 'acknowledged',
+          message: `Acknowledged by government portal. ARN: GST-ARN-2026-${Math.floor(100000 + Math.random() * 900000)}`,
+          progress_percent: 100,
+          ack_number: `GST-ARN-2026-${Math.floor(100000 + Math.random() * 900000)}`
+        },
+        error: null
+      };
     }
     if (functionName === 'compute-tax-liability') {
       const gross = Math.round(Number(options?.body?.input_data?.turnover || 125000) * 0.18 * 100);

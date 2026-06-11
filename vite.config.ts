@@ -9,9 +9,13 @@ export default defineConfig(({ mode }) => {
   const supabaseUrl = env.VITE_SUPABASE_URL;
 
   return {
+    cacheDir: "/tmp/regulon-command-vite-cache",
     server: {
       host: "::",
       port: 8000,
+      watch: {
+        ignored: ["**/node_modules/**", "**/node_modules.nosync/**", "**/.git/**", "**/dist/**", "**/supabase/**"],
+      },
       hmr: {
         overlay: false,
       },
@@ -39,7 +43,7 @@ export default defineConfig(({ mode }) => {
           : {}),
       },
     },
-    plugins: [react(), mode === "development" && componentTagger()].filter(Boolean),
+    plugins: [react()].filter(Boolean),
     resolve: {
       alias: {
         "@": path.resolve(__dirname, "./src"),

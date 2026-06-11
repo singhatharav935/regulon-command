@@ -22,12 +22,15 @@ import {
   useEfilingTemplates, useEfilingDashboard,
 } from '@/hooks/useEfiling';
 import type { EfilingJob, EfilingPortal, EfilingStatus, EfilingType } from '@/services/efiling-service';
-import {
-  FileCheck2, Plus, RefreshCw, Trash2, Edit3, Shield, Send, Eye,
+import { FileCheck2, Plus, RefreshCw, Trash2, Edit3, Shield, Send, Eye,
   CheckCircle, AlertTriangle, Clock, XCircle, Loader2, Upload, Download,
   ChevronDown, ChevronRight, X, Save, Key, Globe, FileText, Activity,
   Building2, Calendar, BadgeCheck, Radio, Zap, RotateCcw, Search, Filter,
+  ExternalLink, FileDown,
 } from 'lucide-react';
+
+import { useCAAgentOrchestrator } from '@/components/agents/CAAgentOrchestrator';
+import { useNavigate } from 'react-router-dom';
 
 // ─── Constants & Helpers ──────────────────────────────────────────────────────
 
@@ -81,6 +84,40 @@ function daysUntilDue(dueDate?: string): { days: number; color: string } | null 
   const color = diff < 0 ? 'text-red-400' : diff <= 3 ? 'text-orange-400' : diff <= 7 ? 'text-yellow-400' : 'text-green-400';
   return { days: diff, color };
 }
+
+const useSafeSwarmState = () => {
+  const [isAutoMode, setIsAutoMode] = useState(() => {
+    if (typeof window === 'undefined') return false;
+    return localStorage.getItem('sannidh:dashboard-mode') === 'auto';
+  });
+  const [localRunning, setLocalRunning] = useState(() => {
+    if (typeof window === 'undefined') return false;
+    return localStorage.getItem('sannidh:ca-swarm-running') === 'true';
+  });
+  
+  useEffect(() => {
+    const handleStorageChange = () => {
+      setIsAutoMode(localStorage.getItem('sannidh:dashboard-mode') === 'auto');
+      setLocalRunning(localStorage.getItem('sannidh:ca-swarm-running') === 'true');
+    };
+    window.addEventListener('storage', handleStorageChange);
+    const interval = setInterval(handleStorageChange, 1000);
+    return () => {
+      window.removeEventListener('storage', handleStorageChange);
+      clearInterval(interval);
+    };
+  }, []);
+
+  let isRunning = localRunning;
+  try {
+    const orch = useCAAgentOrchestrator();
+    isRunning = orch.isRunning;
+  } catch (e) {
+    // fallback
+  }
+
+  return { isRunning, isAutoMode };
+};
 
 // ─── Sub-components ───────────────────────────────────────────────────────────
 
@@ -293,7 +330,67 @@ const CredentialsTab = ({ caUserId }: { caUserId: string }) => {
 // ─── Filing Jobs Tab ──────────────────────────────────────────────────────────
 
 const FilingsTab = ({ caUserId }: { caUserId: string }) => {
+  const { isRunning } = useSafeSwarmState();
+  const navigate = useNavigate();
   const { jobs, loading, submitting, polling, createJob, removeJob, approve, submit, poll, refetch } = useFilingJobs(caUserId);
+
+  // Automatically refresh filings list when swarm status or storage changes
+  useEffect(() => {
+    const handleSync = () => {
+      if (window.location.pathname.startsWith('/ca-dashboard')) {
+        localStorage.removeItem('demo_efiling_jobs');
+      }
+      refetch();
+    };
+    window.addEventListener('swarm-completed-event', handleSync);
+    window.addEventListener('swarm-status-changed', handleSync);
+    window.addEventListener('ca:metrics-updated', handleSync);
+    window.addEventListener('storage', handleSync);
+    return () => {
+      window.removeEventListener('swarm-completed-event', handleSync);
+      window.removeEventListener('swarm-status-changed', handleSync);
+      window.removeEventListener('ca:metrics-updated', handleSync);
+      window.removeEventListener('storage', handleSync);
+    };
+  }, [refetch]);
+
+  // Automated agent task execution loop for E-Filing
+  useEffect(() => {
+    if (!isRunning || !caUserId) return;
+    
+    // Check if auto mode is selected in profile settings
+    const isAuto = localStorage.getItem('sannidh:dashboard-mode') === 'auto';
+    if (!isAuto) return;
+
+    // Find first ready to submit job
+    const readyJob = jobs.find(j => j.status === 'ready_to_submit');
+    if (readyJob && submitting !== readyJob.id) {
+      const timer = setTimeout(() => {
+        toast.info(`AI Swarm: Auto-submitting return to portal...`, {
+          description: readyJob.filing_title
+        });
+        submit(readyJob.id).then(() => {
+          // Immediately trigger poll after submitting
+          setTimeout(() => {
+            poll(readyJob.id);
+          }, 3000);
+        });
+      }, 5000); // 5s delay to simulate agent working
+      return () => clearTimeout(timer);
+    }
+
+    // Find any submitted/processing job to automatically poll and complete
+    const pendingJob = jobs.find(j => ['submitted', 'under_processing'].includes(j.status));
+    if (pendingJob && polling !== pendingJob.id) {
+      const timer = setTimeout(() => {
+        toast.info(`AI Swarm: Auto-polling portal acknowledgment...`, {
+          description: pendingJob.filing_title
+        });
+        poll(pendingJob.id);
+      }, 7000);
+      return () => clearTimeout(timer);
+    }
+  }, [jobs, isRunning, caUserId, submitting, polling, submit, poll]);
   const [showCreate, setShowCreate] = useState(false);
   const [statusFilter, setStatusFilter] = useState<string>('all');
   const [portalFilter, setPortalFilter] = useState<string>('all');
@@ -379,7 +476,7 @@ const FilingsTab = ({ caUserId }: { caUserId: string }) => {
 
         <Dialog open={showCreate} onOpenChange={setShowCreate}>
           <DialogTrigger asChild>
-            <Button className="bg-cyan-600 hover:bg-cyan-700 ml-auto">
+            <Button className="bg-cyan-600 hover:bg-cyan-700 ml-auto" disabled={!isRunning}>
               <Plus className="w-4 h-4 mr-2" /> New Filing
             </Button>
           </DialogTrigger>
@@ -490,7 +587,7 @@ const FilingsTab = ({ caUserId }: { caUserId: string }) => {
                     </div>
                     <div className="flex items-center gap-3 mt-1 text-xs text-muted-foreground">
                       <span><Calendar className="w-3 h-3 inline mr-1" />{new Date(job.period_start).toLocaleDateString('en-IN')} – {new Date(job.period_end).toLocaleDateString('en-IN')}</span>
-                      {due && (
+                      {due && !['acknowledged', 'approved'].includes(job.status) && (
                         <span className={due.days < 0 ? 'text-red-400 font-medium' : due.color}>
                           <Clock className="w-3 h-3 inline mr-1" />
                           {due.days < 0 ? `${Math.abs(due.days)}d overdue` : `Due in ${due.days}d`}
@@ -510,7 +607,7 @@ const FilingsTab = ({ caUserId }: { caUserId: string }) => {
                   {/* Action Buttons */}
                   <div className="flex items-center gap-2 flex-shrink-0" onClick={e => e.stopPropagation()}>
                     {job.status === 'draft' && !job.ca_approved && (
-                      <Button size="sm" variant="outline" className="border-green-500/30 text-green-400 hover:bg-green-500/10 text-xs" onClick={() => approve(job.id)}>
+                      <Button size="sm" variant="outline" className="border-green-500/30 text-green-400 hover:bg-green-500/10 text-xs" disabled={!isRunning} onClick={() => approve(job.id)}>
                         <CheckCircle className="w-3.5 h-3.5 mr-1" /> Approve
                       </Button>
                     )}
@@ -518,7 +615,7 @@ const FilingsTab = ({ caUserId }: { caUserId: string }) => {
                       <Button
                         size="sm"
                         className="bg-cyan-600 hover:bg-cyan-700 text-xs"
-                        disabled={submitting === job.id}
+                        disabled={submitting === job.id || !isRunning}
                         onClick={() => submit(job.id)}
                       >
                         {submitting === job.id
@@ -532,13 +629,42 @@ const FilingsTab = ({ caUserId }: { caUserId: string }) => {
                         size="sm"
                         variant="outline"
                         className="text-xs"
-                        disabled={polling === job.id}
+                        disabled={polling === job.id || !isRunning}
                         onClick={() => poll(job.id)}
                       >
                         {polling === job.id
                           ? <Loader2 className="w-3.5 h-3.5 mr-1 animate-spin" />
                           : <Radio className="w-3.5 h-3.5 mr-1" />}
                         Poll Status
+                      </Button>
+                    )}
+                    {/* View ACK PDF Button - for acknowledged/approved filings */}
+                    {['acknowledged', 'approved'].includes(job.status) && (
+                      <Button
+                        size="sm"
+                        variant="outline"
+                        className="border-teal-500/30 text-teal-400 hover:bg-teal-500/10 text-xs gap-1"
+                        onClick={() => {
+                          // Store job data for PDF viewer
+                          localStorage.setItem('efiling_pdf_job', JSON.stringify({
+                            id: job.id,
+                            filing_title: job.filing_title,
+                            filing_type: job.filing_type,
+                            portal: job.portal,
+                            ack_number: job.ack_number,
+                            ack_date: job.ack_date,
+                            period_start: job.period_start,
+                            period_end: job.period_end,
+                            status: job.status,
+                            status_message: job.status_message,
+                            progress_percent: job.progress_percent,
+                            ca_approved: job.ca_approved,
+                          }));
+                          navigate('/ca-dashboard/efiling-ack-pdf');
+                        }}
+                      >
+                        <FileDown className="w-3.5 h-3.5" />
+                        View ACK
                       </Button>
                     )}
                     <Button
@@ -648,20 +774,41 @@ const FilingsTab = ({ caUserId }: { caUserId: string }) => {
   );
 };
 
-// ─── Dashboard Overview Tab ───────────────────────────────────────────────────
-
 const DashboardOverviewTab = ({ caUserId }: { caUserId: string }) => {
+  const navigate = useNavigate();
   const { summary, loading, refetch } = useEfilingDashboard(caUserId);
-  const { jobs } = useFilingJobs(caUserId);
+  const { jobs, refetch: refetchJobs } = useFilingJobs(caUserId);
 
   const recentJobs = jobs.slice(0, 5);
+
+  // Automatically refresh statistics and listings when swarm completes a task
+  useEffect(() => {
+    const handleSync = () => {
+      // Clear jobs cache so it gets regenerated in client.ts
+      if (window.location.pathname.startsWith('/ca-dashboard')) {
+        localStorage.removeItem('demo_efiling_jobs');
+      }
+      refetch();
+      refetchJobs();
+    };
+    window.addEventListener('swarm-completed-event', handleSync);
+    window.addEventListener('swarm-status-changed', handleSync);
+    window.addEventListener('ca:metrics-updated', handleSync);
+    window.addEventListener('storage', handleSync);
+    return () => {
+      window.removeEventListener('swarm-completed-event', handleSync);
+      window.removeEventListener('swarm-status-changed', handleSync);
+      window.removeEventListener('ca:metrics-updated', handleSync);
+      window.removeEventListener('storage', handleSync);
+    };
+  }, [refetch, refetchJobs]);
 
   const statCards = [
     { label: 'Total Filings', value: summary.total_filings, color: 'cyan', icon: FileCheck2 },
     { label: 'Draft', value: summary.draft_count, color: 'gray', icon: FileText },
     { label: 'Ready to Submit', value: summary.ready_count, color: 'blue', icon: CheckCircle },
     { label: 'Submitted', value: summary.submitted_count, color: 'cyan', icon: Send },
-    { label: 'Approved', value: summary.approved_count, color: 'green', icon: BadgeCheck },
+    { label: 'Approved', value: (summary.approved_count || 0) + (summary.acknowledged_count || 0), color: 'green', icon: BadgeCheck },
     { label: 'Rejected', value: summary.rejected_count, color: 'red', icon: XCircle },
     { label: 'Overdue', value: summary.overdue_count, color: 'red', icon: AlertTriangle },
     { label: 'Due This Week', value: summary.due_this_week, color: 'orange', icon: Clock },
@@ -711,7 +858,7 @@ const DashboardOverviewTab = ({ caUserId }: { caUserId: string }) => {
               <div className="grid grid-cols-2 md:grid-cols-4 gap-3">
                 {Object.entries(PORTAL_META).map(([portal, m]) => {
                   const portalJobs = jobs.filter(j => j.portal === portal);
-                  const approved = portalJobs.filter(j => j.status === 'approved').length;
+                  const completed = portalJobs.filter(j => j.status === 'acknowledged' || j.status === 'approved').length;
                   return (
                     <div key={portal} className="p-3 rounded-lg border border-border/30 bg-card/20">
                       <div className="flex items-center gap-2 mb-2">
@@ -719,7 +866,7 @@ const DashboardOverviewTab = ({ caUserId }: { caUserId: string }) => {
                         <span className="text-xs font-medium">{m.label}</span>
                       </div>
                       <div className="flex items-baseline gap-1">
-                        <span className="text-lg font-bold text-green-400">{approved}</span>
+                        <span className="text-lg font-bold text-green-400">{completed}</span>
                         <span className="text-xs text-muted-foreground">/ {portalJobs.length} filed</span>
                       </div>
                     </div>
@@ -736,6 +883,7 @@ const DashboardOverviewTab = ({ caUserId }: { caUserId: string }) => {
               <div className="space-y-2">
                 {recentJobs.map(job => {
                   const due = daysUntilDue(job.due_date);
+                  const isCompleted = ['acknowledged', 'approved'].includes(job.status);
                   return (
                     <div key={job.id} className="flex items-center justify-between p-3 rounded-xl border border-border/30 bg-card/20 hover:bg-card/30 transition-all">
                       <div className="flex items-center gap-3">
@@ -748,8 +896,37 @@ const DashboardOverviewTab = ({ caUserId }: { caUserId: string }) => {
                         </div>
                       </div>
                       <div className="flex items-center gap-2">
-                        {due && <span className={`text-xs ${due.color}`}>{due.days < 0 ? `${Math.abs(due.days)}d overdue` : `${due.days}d left`}</span>}
+                        {due && !isCompleted && <span className={`text-xs ${due.color}`}>{due.days < 0 ? `${Math.abs(due.days)}d overdue` : `${due.days}d left`}</span>}
                         <StatusBadge status={job.status} />
+                        
+                        {isCompleted && (
+                          <Button
+                            size="sm"
+                            variant="outline"
+                            className="border-teal-500/30 text-teal-400 hover:bg-teal-500/10 text-xs gap-1 ml-2"
+                            onClick={(e) => {
+                              e.stopPropagation();
+                              localStorage.setItem('efiling_pdf_job', JSON.stringify({
+                                id: job.id,
+                                filing_title: job.filing_title,
+                                filing_type: job.filing_type,
+                                portal: job.portal,
+                                ack_number: job.ack_number,
+                                ack_date: job.ack_date,
+                                period_start: job.period_start,
+                                period_end: job.period_end,
+                                status: job.status,
+                                status_message: job.status_message,
+                                progress_percent: job.progress_percent,
+                                ca_approved: job.ca_approved,
+                              }));
+                              navigate('/ca-dashboard/efiling-ack-pdf');
+                            }}
+                          >
+                            <FileDown className="w-3.5 h-3.5" />
+                            View ACK
+                          </Button>
+                        )}
                       </div>
                     </div>
                   );
@@ -768,9 +945,34 @@ const DashboardOverviewTab = ({ caUserId }: { caUserId: string }) => {
 const EFilingIntegration = () => {
   const [caUserId, setCaUserId] = useState<string | null>(null);
   const [activeTab, setActiveTab] = useState('overview');
+  const { isRunning, isAutoMode } = useSafeSwarmState();
 
   useEffect(() => {
     supabase.auth.getUser().then(({ data }) => setCaUserId(data.user?.id ?? null));
+  }, []);
+
+  // Force re-generate demo data on mount if stale or empty
+  useEffect(() => {
+    // Only run demo data management in demo mode (URL path /ca-dashboard)
+    const isDemoPath = typeof window !== 'undefined' && (
+      window.location.pathname === '/ca-dashboard' ||
+      window.location.pathname.startsWith('/ca-dashboard/')
+    );
+    if (!isDemoPath) return;
+
+    const demoClients = (() => {
+      try { return JSON.parse(localStorage.getItem('demo_clients') || '[]'); } catch { return []; }
+    })();
+    if (demoClients.length > 0) {
+      // Clear stale cached jobs so they regenerate from current clients
+      const cachedJobs = (() => {
+        try { return JSON.parse(localStorage.getItem('demo_efiling_jobs') || '[]'); } catch { return []; }
+      })();
+      if (cachedJobs.length === 0) {
+        localStorage.removeItem('demo_efiling_jobs');
+        localStorage.removeItem('demo_efiling_credentials');
+      }
+    }
   }, []);
 
   if (!caUserId) {
@@ -790,22 +992,37 @@ const EFilingIntegration = () => {
     >
       {/* Header */}
       <div className="p-6 rounded-2xl bg-gradient-to-r from-blue-500/10 via-transparent to-cyan-500/10 border border-blue-500/20">
-        <div className="flex items-center gap-3 mb-2">
-          <div className="p-2.5 rounded-xl bg-gradient-to-br from-blue-500 to-cyan-600">
-            <FileCheck2 className="w-6 h-6 text-white" />
+        <div className="flex flex-col md:flex-row md:items-center justify-between gap-4 mb-2">
+          <div className="flex items-center gap-3">
+            <div className="p-2.5 rounded-xl bg-gradient-to-br from-blue-500 to-cyan-600">
+              <FileCheck2 className="w-6 h-6 text-white" />
+            </div>
+            <div>
+              <h2 className="text-2xl font-bold text-blue-400">E-Filing Integration</h2>
+              <p className="text-sm text-muted-foreground">
+                Connect to GST Portal, MCA21, Income Tax, TRACES, EPFO — review and submit filings directly
+              </p>
+            </div>
           </div>
-          <div>
-            <h2 className="text-2xl font-bold text-blue-400">E-Filing Integration</h2>
-            <p className="text-sm text-muted-foreground">
-              Connect to GST Portal, MCA21, Income Tax, TRACES, EPFO — review and submit filings directly
-            </p>
-          </div>
-          <div className="ml-auto flex items-center gap-2">
-            <div className="w-2 h-2 bg-green-400 rounded-full animate-pulse" />
-            <span className="text-xs text-green-400">Live Portal Connectors</span>
+          <div className="flex flex-wrap items-center gap-3">
+            {/* Swarm Status Indicator */}
+            <div className={`flex items-center gap-1.5 px-3 py-1 rounded-full border text-xs font-semibold tracking-wide ${
+              isRunning 
+                ? 'bg-emerald-500/10 text-emerald-400 border-emerald-500/20' 
+                : 'bg-rose-500/10 text-rose-400 border-rose-500/20'
+            }`}>
+              <span className={`w-2 h-2 rounded-full ${isRunning ? 'bg-emerald-400 animate-pulse' : 'bg-rose-400'}`} />
+              SWARM: {isRunning ? 'ONLINE' : 'OFFLINE'}
+            </div>
+
+            {/* Automation Mode Indicator */}
+            <div className="flex items-center gap-1.5 px-3 py-1 rounded-full border border-cyan-500/20 bg-cyan-500/10 text-cyan-400 text-xs font-semibold tracking-wide">
+              <Zap className="w-3.5 h-3.5" />
+              MODE: {isAutoMode ? 'AUTOMATIC' : 'MANUAL'}
+            </div>
           </div>
         </div>
-        <div className="flex flex-wrap gap-2 mt-3">
+        <div className="flex flex-wrap gap-2 mt-4 pt-2 border-t border-border/20">
           {Object.values(PORTAL_META).map(m => (
             <Badge key={m.label} variant="outline" className={`text-xs ${m.color}`}>
               {m.icon} {m.label}
@@ -813,6 +1030,20 @@ const EFilingIntegration = () => {
           ))}
         </div>
       </div>
+
+      {/* Swarm Offline Warning Banner */}
+      {!isRunning && (
+        <div className="p-4 rounded-xl bg-rose-500/10 border border-rose-500/20 flex items-start gap-3 shadow-lg backdrop-blur-md">
+          <AlertTriangle className="w-5 h-5 text-rose-400 flex-shrink-0 mt-0.5 animate-bounce" />
+          <div className="flex-1">
+            <h4 className="text-sm font-semibold text-rose-400">AI Swarm Engine Offline</h4>
+            <p className="text-xs text-muted-foreground mt-1">
+              All automated compliance scanning, portal checks, and e-filing submissions are locked. 
+              Please turn on the <strong>AI Swarm Engine</strong> in settings to enable filing submissions and live database updates.
+            </p>
+          </div>
+        </div>
+      )}
 
       {/* Tabs */}
       <Tabs value={activeTab} onValueChange={setActiveTab}>

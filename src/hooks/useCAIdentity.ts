@@ -62,7 +62,9 @@ const hasActiveRealSession = () => {
 };
 
 export function useCAIdentity(): CAIdentity {
-  const isDemo = typeof window !== 'undefined' && (window.location.pathname === '/ca-dashboard' || window.location.pathname === '/ca-dashboard/' || window.location.pathname.startsWith('/ca-dashboard/'));
+  const isDemo = typeof window !== 'undefined' && (
+    window.location.pathname === '/ca-dashboard' || window.location.pathname === '/ca-dashboard/' || window.location.pathname.startsWith('/ca-dashboard/')
+  );
 
   const [identity, setIdentity] = useState<CAIdentity>(() => {
     const hasReal = hasActiveRealSession();

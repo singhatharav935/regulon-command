@@ -147,6 +147,11 @@ export function useFilingJobs(
       const updated = await approveFilingJob(id, caUserId);
       setJobs(prev => prev.map(j => j.id === id ? updated : j));
       toast.success('Filing approved — ready to submit');
+      
+      // Dispatch events to sync other dashboard sections
+      window.dispatchEvent(new CustomEvent('swarm-status-changed'));
+      window.dispatchEvent(new CustomEvent('ca:metrics-updated'));
+      
       return updated;
     } catch (err: any) {
       toast.error('Failed to approve', { description: err.message });
@@ -163,6 +168,11 @@ export function useFilingJobs(
         toast.success('Filing submitted successfully', {
           description: result.ack_number ? `ARN: ${result.ack_number}` : undefined,
         });
+        
+        // Dispatch events to sync other dashboard sections
+        window.dispatchEvent(new CustomEvent('swarm-completed-event'));
+        window.dispatchEvent(new CustomEvent('swarm-status-changed'));
+        window.dispatchEvent(new CustomEvent('ca:metrics-updated'));
       } else {
         toast.warning('Filed — awaiting government portal response', {
           description: 'Status will update automatically when portal responds.',
@@ -181,6 +191,11 @@ export function useFilingJobs(
       const updated = await pollFilingStatus(id);
       setJobs(prev => prev.map(j => j.id === id ? updated : j));
       toast.info('Filing status refreshed');
+      
+      // Dispatch events to sync other dashboard sections
+      window.dispatchEvent(new CustomEvent('swarm-status-changed'));
+      window.dispatchEvent(new CustomEvent('ca:metrics-updated'));
+      
       return updated;
     } catch (err: any) {
       toast.error('Failed to poll status', { description: err.message });

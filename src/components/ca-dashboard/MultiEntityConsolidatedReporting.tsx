@@ -27,6 +27,7 @@ import {
   useConsolidatedReports, useComplianceOverview,
 } from '@/hooks/useMultiEntity';
 import type { Entity, EntityGroup, ReportType } from '@/services/multi-entity-service';
+import { useCAAgentOrchestrator } from '@/components/agents/CAAgentOrchestrator';
 import {
   Building2, Plus, Search, Download, RefreshCw, Trash2, Edit3,
   Users, BarChart3, Shield, AlertTriangle, CheckCircle, Clock,
@@ -104,6 +105,40 @@ function heatmapCellColor(score: number | null): string {
   if (score >= 60) return 'bg-yellow-500/30 text-yellow-400 border-yellow-500/30';
   return 'bg-red-500/30 text-red-400 border-red-500/30';
 }
+
+const useSafeSwarmState = () => {
+  const [isAutoMode, setIsAutoMode] = useState(() => {
+    if (typeof window === 'undefined') return false;
+    return localStorage.getItem('sannidh:dashboard-mode') === 'auto';
+  });
+  const [localRunning, setLocalRunning] = useState(() => {
+    if (typeof window === 'undefined') return false;
+    return localStorage.getItem('sannidh:ca-swarm-running') === 'true';
+  });
+  
+  useEffect(() => {
+    const handleStorageChange = () => {
+      setIsAutoMode(localStorage.getItem('sannidh:dashboard-mode') === 'auto');
+      setLocalRunning(localStorage.getItem('sannidh:ca-swarm-running') === 'true');
+    };
+    window.addEventListener('storage', handleStorageChange);
+    const interval = setInterval(handleStorageChange, 1000);
+    return () => {
+      window.removeEventListener('storage', handleStorageChange);
+      clearInterval(interval);
+    };
+  }, []);
+
+  let isRunning = localRunning;
+  try {
+    const orch = useCAAgentOrchestrator();
+    isRunning = orch.isRunning;
+  } catch (e) {
+    // fallback
+  }
+
+  return { isRunning, isAutoMode };
+};
 
 // ─── Add Entity Form ──────────────────────────────────────────────────────────
 
@@ -285,6 +320,7 @@ const EntityForm = ({ caUserId, onSave, initial, onClose }: EntityFormProps) => 
 // ─── Entity Registry Tab ──────────────────────────────────────────────────────
 
 const EntityRegistryTab = ({ caUserId }: { caUserId: string }) => {
+  const { isRunning } = useSafeSwarmState();
   const { entities, loading, refetch, addEntity, editEntity, removeEntity } = useEntities(caUserId);
   const [search, setSearch] = useState('');
   const [typeFilter, setTypeFilter] = useState('all');
@@ -359,7 +395,7 @@ const EntityRegistryTab = ({ caUserId }: { caUserId: string }) => {
 
         <Dialog open={showAddDialog} onOpenChange={setShowAddDialog}>
           <DialogTrigger asChild>
-            <Button className="bg-cyan-600 hover:bg-cyan-700 ml-auto">
+            <Button className="bg-cyan-600 hover:bg-cyan-700 ml-auto" disabled={!isRunning}>
               <Plus className="w-4 h-4 mr-2" /> Add Entity
             </Button>
           </DialogTrigger>
@@ -493,6 +529,7 @@ const EntityRegistryTab = ({ caUserId }: { caUserId: string }) => {
                           size="icon"
                           variant="ghost"
                           className="w-8 h-8 text-cyan-400 hover:bg-cyan-500/10"
+                          disabled={!isRunning}
                           onClick={() => setEditingEntity(entity)}
                         >
                           <Edit3 className="w-3.5 h-3.5" />
@@ -501,7 +538,7 @@ const EntityRegistryTab = ({ caUserId }: { caUserId: string }) => {
                           size="icon"
                           variant="ghost"
                           className="w-8 h-8 text-red-400 hover:bg-red-500/10"
-                          disabled={deletingId === entity.id}
+                          disabled={deletingId === entity.id || !isRunning}
                           onClick={() => handleDelete(entity.id)}
                         >
                           {deletingId === entity.id
@@ -579,6 +616,7 @@ const EntityRegistryTab = ({ caUserId }: { caUserId: string }) => {
 // ─── Entity Groups Tab ────────────────────────────────────────────────────────
 
 const EntityGroupsTab = ({ caUserId }: { caUserId: string }) => {
+  const { isRunning } = useSafeSwarmState();
   const { groups, loading, addGroup, removeGroup } = useEntityGroups(caUserId);
   const { entities } = useEntities(caUserId);
   const [selectedGroup, setSelectedGroup] = useState<EntityGroup | null>(null);
@@ -620,7 +658,7 @@ const EntityGroupsTab = ({ caUserId }: { caUserId: string }) => {
           </h3>
           <Dialog open={showCreateDialog} onOpenChange={setShowCreateDialog}>
             <DialogTrigger asChild>
-              <Button size="sm" className="bg-purple-600 hover:bg-purple-700">
+              <Button size="sm" className="bg-purple-600 hover:bg-purple-700" disabled={!isRunning}>
                 <Plus className="w-3.5 h-3.5 mr-1" /> New Group
               </Button>
             </DialogTrigger>
@@ -777,7 +815,7 @@ const EntityGroupsTab = ({ caUserId }: { caUserId: string }) => {
                   <Button
                     size="sm"
                     className="bg-cyan-600 hover:bg-cyan-700"
-                    disabled={!addingEntityId}
+                    disabled={!addingEntityId || !isRunning}
                     onClick={() => {
                       if (addingEntityId) {
                         addMember(addingEntityId).then(() => setAddingEntityId(''));
@@ -833,6 +871,7 @@ const EntityGroupsTab = ({ caUserId }: { caUserId: string }) => {
                       size="icon"
                       variant="ghost"
                       className="w-8 h-8 text-red-400 hover:bg-red-500/10"
+                      disabled={!isRunning}
                       onClick={() => removeMember(member.entity_id)}
                     >
                       <X className="w-3.5 h-3.5" />
@@ -851,6 +890,7 @@ const EntityGroupsTab = ({ caUserId }: { caUserId: string }) => {
 // ─── Consolidated Reports Tab ─────────────────────────────────────────────────
 
 const ConsolidatedReportsTab = ({ caUserId }: { caUserId: string }) => {
+  const { isRunning } = useSafeSwarmState();
   const { groups } = useEntityGroups(caUserId);
   const { reports, loading, generating, generateReport } = useConsolidatedReports(caUserId);
   const [selectedGroupId, setSelectedGroupId] = useState<string>('all');
@@ -939,7 +979,7 @@ const ConsolidatedReportsTab = ({ caUserId }: { caUserId: string }) => {
           <div className="mt-4 flex justify-end">
             <Button
               onClick={handleGenerate}
-              disabled={generating}
+              disabled={generating || !isRunning}
               className="bg-emerald-600 hover:bg-emerald-700 min-w-[160px]"
             >
               {generating
@@ -1219,6 +1259,36 @@ const ComplianceHeatmapTab = ({ caUserId }: { caUserId: string }) => {
 const MultiEntityConsolidatedReporting = () => {
   const [caUserId, setCaUserId] = useState<string | null>(null);
   const [activeTab, setActiveTab] = useState('registry');
+  
+  const [isAutoMode, setIsAutoMode] = useState(() => {
+    if (typeof window === 'undefined') return false;
+    return localStorage.getItem('sannidh:dashboard-mode') === 'auto';
+  });
+  const [localRunning, setLocalRunning] = useState(() => {
+    if (typeof window === 'undefined') return false;
+    return localStorage.getItem('sannidh:ca-swarm-running') === 'true';
+  });
+
+  useEffect(() => {
+    const handleStorageChange = () => {
+      setIsAutoMode(localStorage.getItem('sannidh:dashboard-mode') === 'auto');
+      setLocalRunning(localStorage.getItem('sannidh:ca-swarm-running') === 'true');
+    };
+    window.addEventListener('storage', handleStorageChange);
+    const interval = setInterval(handleStorageChange, 1000);
+    return () => {
+      window.removeEventListener('storage', handleStorageChange);
+      clearInterval(interval);
+    };
+  }, []);
+
+  let isRunning = localRunning;
+  try {
+    const orch = useCAAgentOrchestrator();
+    isRunning = orch.isRunning;
+  } catch (e) {
+    // fallback
+  }
 
   useEffect(() => {
     supabase.auth.getUser().then(({ data }) => {
@@ -1243,15 +1313,25 @@ const MultiEntityConsolidatedReporting = () => {
     >
       {/* Section Header */}
       <div className="p-6 rounded-2xl bg-gradient-to-r from-cyan-500/10 via-transparent to-purple-500/10 border border-cyan-500/20">
-        <div className="flex items-center gap-3 mb-2">
-          <div className="p-2.5 rounded-xl bg-gradient-to-br from-cyan-500 to-purple-600">
-            <Network className="w-6 h-6 text-white" />
+        <div className="flex items-center justify-between mb-2">
+          <div className="flex items-center gap-3">
+            <div className="p-2.5 rounded-xl bg-gradient-to-br from-cyan-500 to-purple-600">
+              <Network className="w-6 h-6 text-white" />
+            </div>
+            <div>
+              <h2 className="text-2xl font-bold text-cyan-400">Multi-Entity & Consolidated Reporting</h2>
+              <p className="text-sm text-muted-foreground">
+                Manage all client entities, group hierarchies, and generate consolidated compliance reports
+              </p>
+            </div>
           </div>
-          <div>
-            <h2 className="text-2xl font-bold text-cyan-400">Multi-Entity & Consolidated Reporting</h2>
-            <p className="text-sm text-muted-foreground">
-              Manage all client entities, group hierarchies, and generate consolidated compliance reports
-            </p>
+          <div className="flex items-center gap-2">
+            <Badge variant="outline" className={isRunning ? "border-green-500/30 text-green-400 bg-green-500/5 text-xs font-semibold px-3 py-1" : "border-red-500/30 text-red-400 bg-red-500/5 text-xs font-semibold px-3 py-1"}>
+              Swarm: {isRunning ? "ONLINE" : "OFFLINE"}
+            </Badge>
+            <Badge variant="outline" className="border-purple-500/30 text-purple-400 bg-purple-500/5 text-xs font-semibold px-3 py-1">
+              Mode: {isAutoMode ? "AUTOMATIC" : "MANUAL"}
+            </Badge>
           </div>
         </div>
         <div className="flex flex-wrap gap-2 mt-3">
@@ -1262,6 +1342,23 @@ const MultiEntityConsolidatedReporting = () => {
           ))}
         </div>
       </div>
+
+      {/* Swarm Engine Alert */}
+      {!isRunning && (
+        <motion.div
+          initial={{ opacity: 0, scale: 0.95 }}
+          animate={{ opacity: 1, scale: 1 }}
+          className="p-4 rounded-xl bg-red-500/10 border border-red-500/30 text-red-400 text-xs flex items-start gap-3 shadow-lg"
+        >
+          <AlertTriangle className="w-5 h-5 flex-shrink-0 animate-pulse mt-0.5 text-red-500" />
+          <div>
+            <p className="font-semibold text-sm">AI Swarm Engine Offline</p>
+            <p className="text-muted-foreground mt-0.5">
+              Consolidated reporting, multi-entity synchronizations, and statutory calculations are currently locked or running in a stale state because the Swarm Engine is de-activated. Please turn it back on in the Profile & Settings page to restore full live monitoring.
+            </p>
+          </div>
+        </motion.div>
+      )}
 
       {/* Tabs */}
       <Tabs value={activeTab} onValueChange={setActiveTab}>

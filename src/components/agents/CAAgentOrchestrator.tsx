@@ -313,83 +313,105 @@ const CAAgentContext = createContext<CAAgentContextType | undefined>(undefined);
 const pick = <T,>(arr: T[]): T => arr[Math.floor(Math.random() * arr.length)];
 
 // Preloaded beautiful compliance swarm messages
-const initialDemoMessages = (): CAAgentMessage[] => [
-  {
-    id: 'msg-demo-1',
-    fromAgent: 'D1_MAKER',
-    toAgent: 'ALL',
-    type: 'APPROVAL_REQUEST',
-    priority: 'critical',
-    subject: 'GSTR-2B Mismatch Rebuttal Ready',
-    content: 'Draft Legal Notice Response prepared under Section 16(4) safe harbor for GlobalTrade India Logistics. AI has reconciled 847 invoices, resolved a ₹40,000 difference, and verified the rebuttal with Peer Agents. Awaiting final CA approval.',
-    timestamp: new Date(Date.now() - 60000).toISOString(),
-    acknowledged: false
-  },
-  {
-    id: 'msg-demo-2',
-    fromAgent: 'R3_FINAL',
-    toAgent: 'REVIEWER',
-    type: 'CONSENSUS_REACHED',
-    priority: 'medium',
-    subject: 'HSN classification consensus achieved',
-    content: 'All 3 review agents (INSPECTOR, TRACKER, PORTFOLIO) resolved classification mismatch for HSN 8471. Rule 36(4) ITC restriction verified and validated. Consolidated draft marked as compliant.',
-    timestamp: new Date(Date.now() - 180000).toISOString(),
-    acknowledged: false
-  },
-  {
-    id: 'msg-demo-3',
-    fromAgent: 'R2_LEGAL',
-    toAgent: 'A3_AUDIT',
-    type: 'ISSUE_TICKET_GENERATED',
-    priority: 'medium',
-    subject: 'DIR-3 KYC default variance resolved',
-    content: 'Dissenting agent PORTFOLIO flagged a potential KYC default. TRACKER cross-verified with MCA live portal, confirming the compliance status is active. Variance resolved, issue closed.',
-    timestamp: new Date(Date.now() - 300000).toISOString(),
-    acknowledged: false
-  },
-  {
-    id: 'msg-demo-4',
-    fromAgent: 'D2_REFINER',
-    toAgent: 'ANALYSER',
-    type: 'INSIGHT_SHARE',
-    priority: 'high',
-    subject: 'GST ITC Reconciliation completed',
-    content: 'Auto-populated GSTR-2B reconciled with purchase books. Identified ₹1,20,000 ineligible tax credit under Section 17(5) for SecurePay Solutions Ltd. Output flagged and ledger adjusted.',
-    timestamp: new Date(Date.now() - 600000).toISOString(),
-    acknowledged: false
-  },
-  {
-    id: 'msg-demo-5',
-    fromAgent: 'M1_PULSE',
-    toAgent: 'ALL',
-    type: 'DEADLINE_WARNING',
-    priority: 'high',
-    subject: 'Statutory Deadline: GSTR-3B filing',
-    content: 'Annual compliance filing deadline u/s 39 approaching in 13 days for GlobalTrade India Logistics. Automated data extraction sequence pre-scheduled.',
-    timestamp: new Date(Date.now() - 900000).toISOString(),
-    acknowledged: false
-  },
-  {
-    id: 'msg-demo-6',
-    fromAgent: 'A3_AUDIT',
-    toAgent: 'ANALYSER',
-    type: 'CONSENSUS_REACHED',
-    priority: 'low',
-    subject: 'Risk rating calculation validated',
-    content: 'Swarm consensus reached on Acme Technologies risk level. Overall compliance score set to 91% based on history, timely tax deposit trail, and ROC active filings.',
-    timestamp: new Date(Date.now() - 1200000).toISOString(),
-    acknowledged: false
-  }
-];
+const initialDemoMessages = (): CAAgentMessage[] => {
+  let firstClientName = 'your new client';
+  let secondClientName = 'another client';
+  try {
+    const saved = localStorage.getItem('demo_clients');
+    if (saved) {
+      const parsed = JSON.parse(saved);
+      if (parsed[0]) firstClientName = parsed[0].name || parsed[0].client_name;
+      if (parsed[1]) secondClientName = parsed[1].name || parsed[1].client_name;
+      else secondClientName = firstClientName;
+    }
+  } catch (e) {}
+
+  return [
+    {
+      id: 'msg-demo-1',
+      fromAgent: 'D1_MAKER',
+      toAgent: 'ALL',
+      type: 'APPROVAL_REQUEST',
+      priority: 'critical',
+      subject: 'GSTR-2B Mismatch Rebuttal Ready',
+      content: `Draft Legal Notice Response prepared under Section 16(4) safe harbor for ${firstClientName}. AI has reconciled 847 invoices, resolved a ₹40,000 difference, and verified the rebuttal with Peer Agents. Awaiting final CA approval.`,
+      timestamp: new Date(Date.now() - 60000).toISOString(),
+      acknowledged: false
+    },
+    {
+      id: 'msg-demo-2',
+      fromAgent: 'R3_FINAL',
+      toAgent: 'REVIEWER',
+      type: 'CONSENSUS_REACHED',
+      priority: 'medium',
+      subject: 'HSN classification consensus achieved',
+      content: 'All 3 review agents (INSPECTOR, TRACKER, PORTFOLIO) resolved classification mismatch for HSN 8471. Rule 36(4) ITC restriction verified and validated. Consolidated draft marked as compliant.',
+      timestamp: new Date(Date.now() - 180000).toISOString(),
+      acknowledged: false
+    },
+    {
+      id: 'msg-demo-3',
+      fromAgent: 'R2_LEGAL',
+      toAgent: 'A3_AUDIT',
+      type: 'ISSUE_TICKET_GENERATED',
+      priority: 'medium',
+      subject: 'DIR-3 KYC default variance resolved',
+      content: `Dissenting agent PORTFOLIO flagged a potential KYC default for ${firstClientName}. TRACKER cross-verified with MCA live portal, confirming the compliance status is active. Variance resolved, issue closed.`,
+      timestamp: new Date(Date.now() - 300000).toISOString(),
+      acknowledged: false
+    },
+    {
+      id: 'msg-demo-4',
+      fromAgent: 'D2_REFINER',
+      toAgent: 'ANALYSER',
+      type: 'INSIGHT_SHARE',
+      priority: 'high',
+      subject: 'GST ITC Reconciliation completed',
+      content: `Auto-populated GSTR-2B reconciled with purchase books. Identified ₹1,20,000 ineligible tax credit under Section 17(5) for ${secondClientName}. Output flagged and ledger adjusted.`,
+      timestamp: new Date(Date.now() - 600000).toISOString(),
+      acknowledged: false
+    },
+    {
+      id: 'msg-demo-5',
+      fromAgent: 'M1_PULSE',
+      toAgent: 'ALL',
+      type: 'DEADLINE_WARNING',
+      priority: 'high',
+      subject: 'Statutory Deadline: GSTR-3B filing',
+      content: `Annual compliance filing deadline u/s 39 approaching in 13 days for ${firstClientName}. Automated data extraction sequence pre-scheduled.`,
+      timestamp: new Date(Date.now() - 900000).toISOString(),
+      acknowledged: false
+    },
+    {
+      id: 'msg-demo-6',
+      fromAgent: 'A3_AUDIT',
+      toAgent: 'ANALYSER',
+      type: 'CONSENSUS_REACHED',
+      priority: 'low',
+      subject: 'Risk rating calculation validated',
+      content: `Swarm consensus reached on ${secondClientName} risk level. Overall compliance score set to 91% based on history, timely tax deposit trail, and ROC active filings.`,
+      timestamp: new Date(Date.now() - 1200000).toISOString(),
+      acknowledged: false
+    }
+  ];
+};
+
+const isDemoMode = () => {
+  if (typeof window === 'undefined') return false;
+  const path = window.location.pathname;
+  return path === '/ca-dashboard' || path === '/ca-dashboard/' || path.startsWith('/ca-dashboard/');
+};
 
 export const CAAgentProvider: React.FC<{ children: React.ReactNode }> = ({ children }) => {
   const [isRunning, setIsRunning] = useState<boolean>(() => {
-    const saved = localStorage.getItem('sannidh:ca-swarm-running');
+    const key = isDemoMode() ? 'sannidh:ca-swarm-running' : 'real:sannidh:ca-swarm-running';
+    const saved = localStorage.getItem(key);
     return saved !== null ? saved === 'true' : false; // Default to false (Engine does NOT auto-run)
   });
 
   const [agents, setAgents] = useState<CAAgentDefinition[]>(() => {
-    const saved = localStorage.getItem('sannidh:ca-swarm-agents');
+    const key = isDemoMode() ? 'sannidh:ca-swarm-agents' : 'real:sannidh:ca-swarm-agents';
+    const saved = localStorage.getItem(key);
     if (saved) {
       try {
         return JSON.parse(saved);
@@ -398,7 +420,8 @@ export const CAAgentProvider: React.FC<{ children: React.ReactNode }> = ({ child
       }
     }
     const initial = createInitialCAAgents();
-    const savedRunning = localStorage.getItem('sannidh:ca-swarm-running');
+    const runningKey = isDemoMode() ? 'sannidh:ca-swarm-running' : 'real:sannidh:ca-swarm-running';
+    const savedRunning = localStorage.getItem(runningKey);
     const isCurrentlyRunning = savedRunning !== null ? savedRunning === 'true' : false;
     if (!isCurrentlyRunning) {
       return initial.map(a => ({ ...a, status: 'paused' as CAAgentStatus, currentTask: 'Paused by CA' }));
@@ -407,7 +430,8 @@ export const CAAgentProvider: React.FC<{ children: React.ReactNode }> = ({ child
   });
 
   const [messages, setMessages] = useState<CAAgentMessage[]>(() => {
-    const saved = localStorage.getItem('sannidh:ca-swarm-messages');
+    const key = isDemoMode() ? 'sannidh:ca-swarm-messages' : 'real:sannidh:ca-swarm-messages';
+    const saved = localStorage.getItem(key);
     if (saved) {
       try {
         return JSON.parse(saved);
@@ -415,28 +439,87 @@ export const CAAgentProvider: React.FC<{ children: React.ReactNode }> = ({ child
         console.error('Error parsing ca-swarm-messages', e);
       }
     }
-    return initialDemoMessages();
+    // Real dashboard does not load initial demo/mock message logs
+    return isDemoMode() ? initialDemoMessages() : [];
   });
 
   const [systemStatus, setSystemStatus] = useState<'optimal' | 'processing' | 'degraded' | 'alert'>(() => {
-    const saved = localStorage.getItem('sannidh:ca-swarm-system-status');
+    const key = isDemoMode() ? 'sannidh:ca-swarm-system-status' : 'real:sannidh:ca-swarm-system-status';
+    const saved = localStorage.getItem(key);
     return (saved as 'optimal' | 'processing' | 'degraded' | 'alert') || 'optimal';
   });
 
+  const [realClientNames, setRealClientNames] = useState<string[]>([]);
+
   useEffect(() => {
-    localStorage.setItem('sannidh:ca-swarm-running', String(isRunning));
+    if (isDemoMode()) return;
+    const fetchRealClients = async () => {
+      try {
+        const { loadCAClients } = await import('@/services/ca-supabase-service');
+        const dbClients = await loadCAClients();
+        if (dbClients && dbClients.length > 0) {
+          setRealClientNames(dbClients.map(c => c.name));
+        }
+      } catch (err) {
+        console.error("Error loading real client names in orchestrator:", err);
+      }
+    };
+    fetchRealClients();
+    window.addEventListener('demo-client-added', fetchRealClients);
+    window.addEventListener('ca:metrics-updated', fetchRealClients);
+    return () => {
+      window.removeEventListener('demo-client-added', fetchRealClients);
+      window.removeEventListener('ca:metrics-updated', fetchRealClients);
+    };
+  }, []);
+
+  // Update initial messages when real clients load in production
+  useEffect(() => {
+    if (isDemoMode() || realClientNames.length === 0) return;
+    
+    setMessages(prev => {
+      const firstClientName = realClientNames[0] || 'your client';
+      const secondClientName = realClientNames[1] || firstClientName;
+
+      return prev.map(m => {
+        let content = m.content;
+        let subject = m.subject;
+
+        if (m.id === 'msg-demo-1') {
+          content = `Draft Legal Notice Response prepared under Section 16(4) safe harbor for ${firstClientName}. AI has reconciled 847 invoices, resolved a ₹40,000 difference, and verified the rebuttal with Peer Agents. Awaiting final CA approval.`;
+        } else if (m.id === 'msg-demo-3') {
+          content = `Dissenting agent PORTFOLIO flagged a potential KYC default for ${firstClientName}. TRACKER cross-verified with MCA live portal, confirming the compliance status is active. Variance resolved, issue closed.`;
+        } else if (m.id === 'msg-demo-4') {
+          content = `Auto-populated GSTR-2B reconciled with purchase books. Identified ₹1,20,000 ineligible tax credit under Section 17(5) for ${secondClientName}. Output flagged and ledger adjusted.`;
+        } else if (m.id === 'msg-demo-5') {
+          content = `Annual compliance filing deadline u/s 39 approaching in 13 days for ${firstClientName}. Automated data extraction sequence pre-scheduled.`;
+        } else if (m.id === 'msg-demo-6') {
+          content = `Swarm consensus reached on ${secondClientName} risk level. Overall compliance score set to 91% based on history, timely tax deposit trail, and ROC active filings.`;
+        }
+
+        return { ...m, content, subject };
+      });
+    });
+  }, [realClientNames]);
+
+  useEffect(() => {
+    const key = isDemoMode() ? 'sannidh:ca-swarm-running' : 'real:sannidh:ca-swarm-running';
+    localStorage.setItem(key, String(isRunning));
   }, [isRunning]);
 
   useEffect(() => {
-    localStorage.setItem('sannidh:ca-swarm-agents', JSON.stringify(agents));
+    const key = isDemoMode() ? 'sannidh:ca-swarm-agents' : 'real:sannidh:ca-swarm-agents';
+    localStorage.setItem(key, JSON.stringify(agents));
   }, [agents]);
 
   useEffect(() => {
-    localStorage.setItem('sannidh:ca-swarm-messages', JSON.stringify(messages));
+    const key = isDemoMode() ? 'sannidh:ca-swarm-messages' : 'real:sannidh:ca-swarm-messages';
+    localStorage.setItem(key, JSON.stringify(messages));
   }, [messages]);
 
   useEffect(() => {
-    localStorage.setItem('sannidh:ca-swarm-system-status', systemStatus);
+    const key = isDemoMode() ? 'sannidh:ca-swarm-system-status' : 'real:sannidh:ca-swarm-system-status';
+    localStorage.setItem(key, systemStatus);
   }, [systemStatus]);
 
   const tickRef = useRef<NodeJS.Timeout>();
@@ -490,9 +573,28 @@ export const CAAgentProvider: React.FC<{ children: React.ReactNode }> = ({ child
       const [Agent1, Agent2, Agent3] = groupAgents;
       const groupMsgs = GROUP_CONSENSUS_MESSAGES[activeGroup];
       
+      let clientName = '';
+      const isDemo = isDemoMode();
+
+      if (isDemo) {
+        try {
+          const saved = localStorage.getItem('demo_clients');
+          if (saved) {
+            const parsed = JSON.parse(saved);
+            if (parsed[0]) clientName = parsed[0].name || parsed[0].client_name;
+          }
+        } catch(e) {}
+      } else {
+        if (realClientNames.length > 0) {
+          clientName = realClientNames[Math.floor(Math.random() * realClientNames.length)];
+        }
+      }
+      const targetStr = clientName ? ` for ${clientName}` : '';
+
       // Phase 1: All 3 agents begin their domain-specific task
       setSystemStatus('processing');
-      const task = pick(groupMsgs.tasks);
+      const taskRaw = pick(groupMsgs.tasks);
+      const task = taskRaw.replace('...', '') + targetStr + '...';
       groupAgents.forEach(a => updateAgentStatus(a.id, 'consensus_check', task));
 
       const isConflict = Math.random() < 0.15;
@@ -501,9 +603,10 @@ export const CAAgentProvider: React.FC<{ children: React.ReactNode }> = ({ child
         if (isConflict) {
           // CONFLICT — one agent rejects another's output
           const dissenter = Math.random() > 0.5 ? Agent2 : Agent3;
-          const conflictMsg = pick(groupMsgs.conflicts);
+          const conflictMsgRaw = pick(groupMsgs.conflicts);
+          const conflictMsg = conflictMsgRaw + targetStr;
           
-          updateAgentStatus(dissenter.id, 'alert', 'Discrepancy detected — generating issue ticket...');
+          updateAgentStatus(dissenter.id, 'alert', `Discrepancy detected${targetStr} — generating issue ticket...`);
           updateAgentStatus(Agent1.id, 'resolving_conflict', 'Correcting output based on peer review...');
           
           publishMessage({
@@ -526,7 +629,8 @@ export const CAAgentProvider: React.FC<{ children: React.ReactNode }> = ({ child
 
           // Phase 2: Auto-resolve after peer correction
           setTimeout(() => {
-            const resolution = pick(groupMsgs.resolutions);
+            const resolutionRaw = pick(groupMsgs.resolutions);
+            const resolution = resolutionRaw + targetStr;
             updateAgentStatus(dissenter.id, 'active', 'Peer review complete. Consensus achieved.');
             updateAgentStatus(Agent1.id, 'active', 'Output corrected and verified by all peers.');
             updateAgentStatus(Agent3.id, 'active', 'Cross-validation confirmed.');
@@ -569,7 +673,7 @@ export const CAAgentProvider: React.FC<{ children: React.ReactNode }> = ({ child
 
     tickRef.current = setInterval(runConsensusCycle, 6000);
     return () => clearInterval(tickRef.current);
-  }, [isRunning, agents, publishMessage, updateAgentStatus]);
+  }, [isRunning, agents, publishMessage, updateAgentStatus, realClientNames]);
 
   const resumeAgent = useCallback((id: CAAgentId) => updateAgentStatus(id, 'active', 'Agent resumed by CA'), [updateAgentStatus]);
   const pauseAgent = useCallback((id: CAAgentId) => updateAgentStatus(id, 'paused', 'Force paused by CA'), [updateAgentStatus]);

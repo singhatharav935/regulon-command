@@ -12,7 +12,7 @@ import {
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 
-const demoStats = [
+const defaultStats = [
   { label: "Assigned Companies", value: "24", icon: Building2, color: "text-cyan-400" },
   { label: "Pending Tasks", value: "18", icon: FileText, color: "text-yellow-400" },
   { label: "Due in 7 Days", value: "5", icon: Clock, color: "text-orange-400" },
@@ -32,7 +32,7 @@ const CAHomeSection: React.FC<CAHomeSectionProps> = ({
   realData, 
   apiEndpoint 
 }) => {
-  const [stats, setStats] = useState(demoStats);
+  const [stats, setStats] = useState(defaultStats);
   const [loading, setLoading] = useState(false);
   const [lastUpdated, setLastUpdated] = useState<string | null>(null);
 
@@ -102,10 +102,10 @@ const CAHomeSection: React.FC<CAHomeSectionProps> = ({
         setStats(realStats);
         setLastUpdated(new Date().toLocaleString());
       } else {
-        console.log("Real API not available, using demo data");
+        console.log("Real API not available, using default data");
       }
     } catch (error) {
-      console.log("Error loading real stats, using demo data:", error);
+      console.log("Error loading real stats, using default data:", error);
     } finally {
       setLoading(false);
     }

@@ -7,52 +7,79 @@ import { Input } from '@/components/ui/input';
 import { Badge } from '@/components/ui/badge';
 import { CASectionAgentBadge } from '../agents/CASectionAgentBadge';
 
-export default function MultiClientMasterHub() {
+interface MultiClientMasterHubProps {
+  // Explicit prop takes priority over URL-path detection.
+  // Real dashboard passes isDemo={false}. Demo dashboard passes isDemo={true}.
+  // If not passed, falls back to URL path detection (backward-compatible).
+  isDemo?: boolean;
+}
+
+export default function MultiClientMasterHub({ isDemo }: MultiClientMasterHubProps = {}) {
   const [searchTerm, setSearchTerm] = useState('');
   const [clients, setClients] = useState<any[]>([]);
   const [isLoading, setIsLoading] = useState(true);
 
   const fetchClients = async () => {
     setIsLoading(true);
-    // Simulated mock portfolio data for the SANNIDH Client Vault Demo
-    setTimeout(() => {
-      setClients([
-        {
-          id: "demo-client-1",
-          name: "Acme Technologies Pvt Ltd",
-          industry: "SaaS & Cloud Infrastructure",
-          score: 94,
-          status: "Compliant",
-          nextDeadline: "18/05/2026",
-        },
-        {
-          id: "demo-client-2",
-          name: "GlobalTrade India Logistics",
-          industry: "Import & Supply Chain Logistics",
-          score: 68,
-          status: "Alert",
-          nextDeadline: "12/05/2026",
-        },
-        {
-          id: "demo-client-3",
-          name: "SecurePay Solutions Ltd",
-          industry: "Fintech & Payment Gateway",
-          score: 82,
-          status: "Compliant",
-          nextDeadline: "20/05/2026",
-        },
-        {
-          id: "demo-client-4",
-          name: "Vertex EduTech Services",
-          industry: "E-Learning Platform",
-          score: 89,
-          status: "Compliant",
-          nextDeadline: "15/05/2026",
-        }
-      ]);
-      setIsLoading(false);
-    }, 400);
+
+    // Explicit prop takes ABSOLUTE priority — never falls back to URL check if prop is set
+    const isDemoMode = isDemo !== undefined
+      ? isDemo
+      : (typeof window !== 'undefined' && (
+          window.location.pathname === '/ca-dashboard' ||
+          window.location.pathname === '/ca-dashboard/' ||
+          window.location.pathname.startsWith('/ca-dashboard/')
+        ));
+
+    if (isDemoMode) {
+      // DEMO ONLY: load from localStorage demo_clients
+      setTimeout(() => {
+        let loadedClients: any[] = [];
+        try {
+          const saved = localStorage.getItem('demo_clients');
+          if (saved) {
+            const parsed = JSON.parse(saved);
+            loadedClients = parsed.map((c: any, index: number) => ({
+              id: c.id || `demo-client-${index + 1}`,
+              name: c.name || c.client_name || 'Unknown Client',
+              industry: c.industry || 'Technology',
+              score: c.health || c.compliance_score || 95,
+              status: c.status || 'Compliant',
+              nextDeadline: new Date(Date.now() + 86400000 * 7).toLocaleDateString('en-GB'),
+            }));
+          }
+        } catch (e) {}
+        setClients(loadedClients);
+        setIsLoading(false);
+      }, 400);
+    } else {
+      // PRODUCTION: load from real Supabase database only
+      try {
+        const { loadCAClients } = await import('@/services/ca-supabase-service');
+        const dbClients = await loadCAClients();
+        setClients(dbClients.map((c: any, index: number) => ({
+          id: c.id || `client-${index + 1}`,
+          name: c.name || 'Unknown Client',
+          industry: c.industry || 'General',
+          score: c.health || 75,
+          status: c.status || 'Compliant',
+          nextDeadline: c.deadline || new Date(Date.now() + 86400000 * 7).toLocaleDateString('en-GB'),
+        })));
+      } catch (err) {
+        console.error("Error loading CA clients:", err);
+      } finally {
+        setIsLoading(false);
+      }
+    }
   };
+
+  useEffect(() => {
+    fetchClients();
+    // Auto-refresh when tab is focused to pick up new clients
+    window.addEventListener('focus', fetchClients);
+    return () => window.removeEventListener('focus', fetchClients);
+  // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [isDemo]);
 
   const filteredClients = clients.filter(c => 
     c.name.toLowerCase().includes(searchTerm.toLowerCase()) || 
