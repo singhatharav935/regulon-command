@@ -31,6 +31,8 @@ import { useUserProfile } from "@/store/useUserProfile";
 import { getDashboardRoute } from "@/lib/dashboard-routes";
 import { toast } from "sonner";
 import { motion } from "framer-motion";
+import { useCAAgentOrchestrator } from "@/components/agents/CAAgentOrchestrator";
+import { Bot, AlertTriangle } from "lucide-react";
 
 const ProfileSettings = () => {
   const navigate = useNavigate();
@@ -55,6 +57,28 @@ const ProfileSettings = () => {
   const [localName, setLocalName] = useState(displayName || "");
   const [localFirm, setLocalFirm] = useState(firmName || "");
   const [localIcai, setLocalIcai] = useState(icaiNumber || "");
+
+  // Swarm Orchestrator and Dashboard automation controls
+  const { isRunning, startAllAgents, pauseAllAgents } = useCAAgentOrchestrator();
+  const [dashboardMode, setDashboardMode] = useState<'auto' | 'manual'>(() => {
+    return (localStorage.getItem('sannidh:dashboard-mode') as 'auto' | 'manual') || 'manual';
+  });
+
+  const handleSetDashboardMode = (mode: 'auto' | 'manual') => {
+    setDashboardMode(mode);
+    localStorage.setItem('sannidh:dashboard-mode', mode);
+    toast.success(`Dashboard mode set to ${mode === 'auto' ? 'Automatic' : 'Manual'}`);
+  };
+
+  const handleToggleSwarm = () => {
+    if (isRunning) {
+      pauseAllAgents();
+      toast.success("AI Swarm Engine deactivated.");
+    } else {
+      startAllAgents();
+      toast.success("AI Swarm Engine activated.");
+    }
+  };
 
   // ── Fetch full_name and other metadata from Supabase user_metadata ──
   useEffect(() => {
@@ -385,6 +409,81 @@ const ProfileSettings = () => {
                     Save Changes
                   </Button>
                 </div>
+              </CardContent>
+            </Card>
+          </motion.div>
+
+          {/* ─── Section: AI Swarm & Dashboard Settings ─────────── */}
+          <motion.div
+            initial={{ opacity: 0, y: 20 }}
+            animate={{ opacity: 1, y: 0 }}
+            transition={{ delay: 0.15 }}
+          >
+            <Card className="bg-card/50 border-border/40 backdrop-blur-sm">
+              <CardHeader className="pb-4">
+                <CardTitle className="text-lg flex items-center gap-2">
+                  <div className="p-2 rounded-lg bg-purple-500/10">
+                    <Bot className="w-5 h-5 text-purple-400" />
+                  </div>
+                  AI Swarm & Dashboard Settings
+                </CardTitle>
+              </CardHeader>
+              <CardContent className="space-y-6">
+                
+                {/* Swarm Engine Status (On / Off Toggle) */}
+                <div className="flex items-center justify-between p-4 rounded-xl bg-background/50 border border-border/40">
+                  <div className="space-y-1">
+                    <h4 className="text-sm font-semibold text-foreground flex items-center gap-2">
+                      AI Swarm Consensus Engine
+                      <Badge className={isRunning ? "bg-green-500/20 text-green-400 border-green-500/30 text-xs" : "bg-red-500/20 text-red-400 border-red-500/30 text-xs"}>
+                        {isRunning ? "ACTIVE" : "OFFLINE"}
+                      </Badge>
+                    </h4>
+                    <p className="text-xs text-muted-foreground">
+                      Enable or disable the background multi-agent simulation for automated tax/regulatory audits.
+                    </p>
+                  </div>
+                  <Button
+                    variant={isRunning ? "destructive" : "default"}
+                    className={isRunning ? "" : "bg-indigo-600 hover:bg-indigo-700 text-white"}
+                    onClick={handleToggleSwarm}
+                  >
+                    {isRunning ? "Turn Off" : "Turn On"}
+                  </Button>
+                </div>
+
+                {/* Automation Preference (Automatic vs Manual) */}
+                <div className="flex flex-col md:flex-row md:items-center justify-between p-4 rounded-xl bg-background/50 border border-border/40 gap-4">
+                  <div className="space-y-1">
+                    <h4 className="text-sm font-semibold text-foreground flex items-center gap-2">
+                      Task Execution Mode
+                      <Badge className={dashboardMode === 'auto' ? "bg-purple-500/20 text-purple-400 border-purple-500/30 text-xs" : "bg-blue-500/20 text-blue-400 border-blue-500/30 text-xs"}>
+                        {dashboardMode === 'auto' ? "AUTOMATIC" : "MANUAL"}
+                      </Badge>
+                    </h4>
+                    <p className="text-xs text-muted-foreground">
+                      <b>Automatic:</b> AI Swarm automatically consumes and resolves statutory notice tasks.<br />
+                      <b>Manual:</b> You must manually click the "Run Swarm" button on each task to resolve it.
+                    </p>
+                  </div>
+                  <div className="flex gap-2 shrink-0">
+                    <Button
+                      variant={dashboardMode === 'manual' ? "default" : "outline"}
+                      className={dashboardMode === 'manual' ? "bg-cyan-600 hover:bg-cyan-700 text-white border-cyan-500/30 h-9" : "border-border/50 h-9"}
+                      onClick={() => handleSetDashboardMode('manual')}
+                    >
+                      Manual
+                    </Button>
+                    <Button
+                      variant={dashboardMode === 'auto' ? "default" : "outline"}
+                      className={dashboardMode === 'auto' ? "bg-purple-600 hover:bg-purple-700 text-white border-purple-500/30 h-9" : "border-border/50 h-9"}
+                      onClick={() => handleSetDashboardMode('auto')}
+                    >
+                      Automatic
+                    </Button>
+                  </div>
+                </div>
+
               </CardContent>
             </Card>
           </motion.div>

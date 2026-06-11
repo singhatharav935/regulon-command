@@ -1,41 +1,42 @@
+import { CAAgentProvider } from "@/components/agents-demo/CAAgentOrchestrator";
 import { useState, useEffect, useRef, useCallback, Suspense, lazy } from "react";
 import { isCABackendConfigured } from "@/lib/ca-backend-guard";
 import { getLiveRegulatoryNews, getStatutoryDeadlines } from "@/services/ca-supabase-service";
 import { GST_TEMPLATE, MCA_TEMPLATE, IT_TEMPLATE, SEBI_TEMPLATE, RBI_TEMPLATE, CUSTOMS_TEMPLATE, LEGAL_TEMPLATE } from "@/lib/draftTemplates";
-const MultiClientMasterHub = lazy(() => import("@/components/ca-dashboard/MultiClientMasterHub"));
-const PracticeBillingPanel = lazy(() => import("@/components/ca-dashboard/PracticeBillingPanel"));
-const SecureFileSharingPanel = lazy(() => import("@/components/ca-dashboard/SecureFileSharingPanel"));
-const StatutoryDeadlineCalendar = lazy(() => import("@/components/ca-dashboard/StatutoryDeadlineCalendar"));
+const MultiClientMasterHub = lazy(() => import("@/components/ca-dashboard-demo/MultiClientMasterHub"));
+const PracticeBillingPanel = lazy(() => import("@/components/ca-dashboard-demo/PracticeBillingPanel"));
+const SecureFileSharingPanel = lazy(() => import("@/components/ca-dashboard-demo/SecureFileSharingPanel"));
+const StatutoryDeadlineCalendar = lazy(() => import("@/components/ca-dashboard-demo/StatutoryDeadlineCalendar"));
 import { useNavigate } from "react-router-dom";
 import { motion, AnimatePresence } from "framer-motion";
 import Navbar from "@/components/layout/Navbar";
 import Footer from "@/components/layout/Footer";
 const SannidhAIAgent = lazy(() => import("@/components/ai-agent/SannidhAIAgent"));
-const AIDraftingEngine = lazy(() => import("@/components/ca-dashboard/AIDraftingEngine"));
-const TaskFilingManagement = lazy(() => import("@/components/ca-dashboard/TaskFilingManagement"));
-const ClientDependencyTracker = lazy(() => import("@/components/ca-dashboard/ClientDependencyTracker"));
-const RegulatoryNewsRuleImpact = lazy(() => import("@/components/ca-dashboard/RegulatoryNewsRuleImpact"));
-const ComplianceHealthChangeLog = lazy(() => import("@/components/ca-dashboard/ComplianceHealthChangeLog"));
-const AuditInspectionSupport = lazy(() => import("@/components/ca-dashboard/AuditInspectionSupport"));
-const CommunicationLogsLive = lazy(() => import("@/components/ca-dashboard/CommunicationLogsLive"));
-const CAAnalyticsPerformance = lazy(() => import("@/components/ca-dashboard/CAAnalyticsPerformance"));
-const FirmBrandingSettings = lazy(() => import("@/components/ca-dashboard/FirmBrandingSettings"));
+const AIDraftingEngine = lazy(() => import("@/components/ca-dashboard-demo/AIDraftingEngine"));
+const TaskFilingManagement = lazy(() => import("@/components/ca-dashboard-demo/TaskFilingManagement"));
+const ClientDependencyTracker = lazy(() => import("@/components/ca-dashboard-demo/ClientDependencyTracker"));
+const RegulatoryNewsRuleImpact = lazy(() => import("@/components/ca-dashboard-demo/RegulatoryNewsRuleImpact"));
+const ComplianceHealthChangeLog = lazy(() => import("@/components/ca-dashboard-demo/ComplianceHealthChangeLog"));
+const AuditInspectionSupport = lazy(() => import("@/components/ca-dashboard-demo/AuditInspectionSupport"));
+const CommunicationLogsLive = lazy(() => import("@/components/ca-dashboard-demo/CommunicationLogsLive"));
+const CAAnalyticsPerformance = lazy(() => import("@/components/ca-dashboard-demo/CAAnalyticsPerformance"));
+const FirmBrandingSettings = lazy(() => import("@/components/ca-dashboard-demo/FirmBrandingSettings"));
 
-const ComplianceModulesHub = lazy(() => import("@/components/ca-dashboard/compliance-modules/ComplianceModulesHub"));
-const ApprovalWorkflowHub = lazy(() => import("@/components/ca-dashboard/ApprovalWorkflowHub"));
-const ClientPortfolioSection = lazy(() => import("@/components/ca-dashboard/ClientPortfolioSection"));
-const ClientFinancialVault = lazy(() => import("@/components/ca-dashboard/ClientFinancialVault"));
-const MultiEntityConsolidatedReporting = lazy(() => import("@/components/ca-dashboard/MultiEntityConsolidatedReporting"));
-const EFilingIntegration = lazy(() => import("@/components/ca-dashboard/EFilingIntegration"));
-const PaymentTaxLiability = lazy(() => import("@/components/ca-dashboard/PaymentTaxLiability"));
-const EnterpriseApiWebhooks = lazy(() => import("@/components/ca-dashboard/EnterpriseApiWebhooks"));
-const ErpIntegrationHub = lazy(() => import("@/components/ca-dashboard/ErpIntegrationHub"));
-const DocumentOcrHub = lazy(() => import("@/components/ca-dashboard/DocumentOcrHub"));
-const TeamRbacHub = lazy(() => import("@/components/ca-dashboard/TeamRbacHub"));
-const NotificationAlertHub = lazy(() => import("@/components/ca-dashboard/NotificationAlertHub"));
-const AuditTrailHub = lazy(() => import("@/components/ca-dashboard/AuditTrailHub"));
-const LocalizationHub = lazy(() => import("@/components/ca-dashboard/LocalizationHub"));
-const OfflinePwaHub = lazy(() => import("@/components/ca-dashboard/OfflinePwaHub"));
+const ComplianceModulesHub = lazy(() => import("@/components/ca-dashboard-demo/compliance-modules/ComplianceModulesHub"));
+const ApprovalWorkflowHub = lazy(() => import("@/components/ca-dashboard-demo/ApprovalWorkflowHub"));
+const ClientPortfolioSection = lazy(() => import("@/components/ca-dashboard-demo/ClientPortfolioSection"));
+const ClientFinancialVault = lazy(() => import("@/components/ca-dashboard-demo/ClientFinancialVault"));
+const MultiEntityConsolidatedReporting = lazy(() => import("@/components/ca-dashboard-demo/MultiEntityConsolidatedReporting"));
+const EFilingIntegration = lazy(() => import("@/components/ca-dashboard-demo/EFilingIntegration"));
+const PaymentTaxLiability = lazy(() => import("@/components/ca-dashboard-demo/PaymentTaxLiability"));
+const EnterpriseApiWebhooks = lazy(() => import("@/components/ca-dashboard-demo/EnterpriseApiWebhooks"));
+const ErpIntegrationHub = lazy(() => import("@/components/ca-dashboard-demo/ErpIntegrationHub"));
+const DocumentOcrHub = lazy(() => import("@/components/ca-dashboard-demo/DocumentOcrHub"));
+const TeamRbacHub = lazy(() => import("@/components/ca-dashboard-demo/TeamRbacHub"));
+const NotificationAlertHub = lazy(() => import("@/components/ca-dashboard-demo/NotificationAlertHub"));
+const AuditTrailHub = lazy(() => import("@/components/ca-dashboard-demo/AuditTrailHub"));
+const LocalizationHub = lazy(() => import("@/components/ca-dashboard-demo/LocalizationHub"));
+const OfflinePwaHub = lazy(() => import("@/components/ca-dashboard-demo/OfflinePwaHub"));
 import { isOnline } from "@/services/offline-sync-service";
 import { useLanguage, LANGUAGE_LABELS } from "@/contexts/LanguageContext";
 import { Globe2, Wifi, WifiOff } from "lucide-react";
@@ -97,6 +98,7 @@ import {
   Database,
   FileSearch,
   BellRing,
+  FolderCheck,
 } from "lucide-react";
 import { toast } from "sonner";
 import useCAMetrics from "@/hooks/useCAMetrics";
@@ -104,100 +106,158 @@ import { useCAIdentity } from "@/hooks/useCAIdentity";
 import { useRealtimeSync } from "@/hooks/useRealtimeSync";
 import { addCompany as addCompanyAPI } from "@/services/api";
 // CAAgentProvider is now global — provided at App.tsx level
-import { CACommandCenterHeader } from "@/components/agents/CACommandCenterHeader";
-import { CAActionInbox } from "@/components/agents/CAActionInbox";
+import { useCAAgentOrchestrator } from "@/components/agents-demo/CAAgentOrchestrator";
+import { CACommandCenterHeader } from "@/components/agents-demo/CACommandCenterHeader";
+import { CAActionInbox } from "@/components/agents-demo/CAActionInbox";
 
 // Daily Governance Brief Component
 const DailyGovernanceBrief = () => {
+  const { isRunning } = useCAAgentOrchestrator();
   const [briefData, setBriefData] = useState(null);
   const [loading, setLoading] = useState(false);
   const [lastRefresh, setLastRefresh] = useState(new Date());
+  const [swarmCompletedAt, setSwarmCompletedAt] = useState<number | null>(null);
 
   const fetchDailyBrief = async () => {
     setLoading(true);
     try {
-      // Mock portfolio values specifically for the CA Demo Dashboard so they do not show zeros
-      const mockMetrics = {
-        assigned_companies: 4,
-        high_risk_alerts: 1,
-        active_tasks: 11,
-        overdue_dependencies: 2,
-        monthly_revenue: 240000,
-      };
+      let count = 0;
+      let demoClients: any[] = [];
+      try {
+        const saved = localStorage.getItem('demo_clients');
+        if (saved) {
+          demoClients = JSON.parse(saved);
+          count = demoClients.length;
+        }
+      } catch (e) {}
 
-      const mockClients = [
-        { name: "GlobalTrade India Logistics", risk: "High" },
-        { name: "Acme Technologies Pvt Ltd", risk: "Low" },
-        { name: "SecurePay Solutions Ltd", risk: "Medium" },
-        { name: "Vertex EduTech Services", risk: "Low" }
-      ];
+      if (count === 0) {
+        setBriefData({
+          aiSummary: `Waiting for data... Add a client to begin AI monitoring.`,
+          totalCompanies: 0,
+          pendingTasks: 0,
+          completedToday: 0,
+          workloadAnalysis: { utilizationPercent: 0 },
+          todaysFocus: [],
+          prioritizedAssignments: [],
+          aiRecommendations: [],
+          criticalAlerts: [],
+          liveUpdates: [],
+        });
+      } else {
+        const firstClientName = demoClients[0]?.name || demoClients[0]?.client_name || 'your new client';
+        
+        // Load assignments from localStorage
+        const savedAssignmentsStr = localStorage.getItem('demo:prioritized-assignments');
+        let persistedAssignments: any[] = [];
+        if (savedAssignmentsStr) {
+          try {
+            persistedAssignments = JSON.parse(savedAssignmentsStr);
+          } catch (e) {}
+        }
 
-      setBriefData({
-        aiSummary: `You have ${mockMetrics.assigned_companies} client(s) under management. ${mockMetrics.high_risk_alerts} require immediate attention. AI has scanned all compliance deadlines and prepared your priority queue for today.`,
-        totalCompanies: mockMetrics.assigned_companies,
-        pendingTasks: mockMetrics.active_tasks,
-        completedToday: 3,
-        workloadAnalysis: { utilizationPercent: 82 },
-        todaysFocus: [
+        // Validate and re-initialize assignments if active clients have changed
+        const activeClientNames = demoClients.map(c => c.name || c.client_name);
+        const persistedClientNames = Array.from(new Set(persistedAssignments.map(a => a.client)));
+        const hasNewClient = activeClientNames.some(name => !persistedClientNames.includes(name));
+        const hasDeletedClient = persistedClientNames.some(name => !activeClientNames.includes(name));
+
+        if (persistedAssignments.length === 0 || hasNewClient || hasDeletedClient) {
+          const newAssignments: any[] = [];
+          
+          // Keep existing ones for clients that still exist
+          persistedAssignments.forEach(a => {
+            if (activeClientNames.includes(a.client)) {
+              newAssignments.push(a);
+            }
+          });
+
+          // Add default tasks for any new active client
+          demoClients.forEach((client, idx) => {
+            const cName = client.name || client.client_name;
+            const clientHasTasks = persistedClientNames.includes(cName);
+            if (!clientHasTasks) {
+              newAssignments.push({
+                id: `init-${idx}-gst-${client.id || Math.random()}`,
+                title: 'Draft GSTR-2B Notice Reply',
+                client: cName,
+                priority: 'critical',
+                status: 'pending_approval',
+                daysUntilDue: 1,
+                aiRecommendation: 'Review draft response immediately.',
+                draftType: 'GST_SCN_Rebuttal'
+              });
+              newAssignments.push({
+                id: `init-${idx}-mca-${client.id || Math.random()}`,
+                title: 'MCA AOC-4 Filing',
+                client: cName,
+                priority: 'high',
+                status: 'pending_approval',
+                daysUntilDue: 2,
+                aiRecommendation: 'Review draft response immediately.',
+                draftType: 'MCA_AOC4_Filing'
+              });
+            }
+          });
+
+          persistedAssignments = newAssignments;
+          localStorage.setItem('demo:prioritized-assignments', JSON.stringify(persistedAssignments));
+        }
+
+        // Filter out completed tasks for UI display
+        const visibleAssignments = persistedAssignments.filter((a: any) => a.status !== 'completed');
+        const pendingTasks = visibleAssignments.length;
+        const completedToday = persistedAssignments.filter((a: any) => a.status === 'completed').length;
+
+        const todaysFocus = pendingTasks > 0 ? [
           {
-            title: 'GST Notice Response & Rebuttal',
-            count: 1,
-            description: 'GSTR-2B Mismatch Mismatch response (SCN-829412) u/s 16(4) for GlobalTrade India Logistics is ready for CA submission.',
-            aiAdvice: 'Open Document Draft tab or click Review in the AI Action Inbox to submit before the upcoming statutory deadline.'
-          },
-          {
-            title: 'MCA Active-3 filing preparation',
-            count: 1,
-            description: 'Statutory deadline u/s 454 approaching for SecurePay Solutions Ltd in 3 days.',
-            aiAdvice: 'Deploy the AI Drafting Engine to automatically extract ledger data and build the board packs.'
+            title: visibleAssignments[0].title,
+            count: pendingTasks,
+            description: `${visibleAssignments[0].title} response for ${visibleAssignments[0].client} is ready for CA submission.`,
+            aiAdvice: 'Review draft in the AI Action Inbox to submit before the statutory deadline.'
           }
-        ],
-        prioritizedAssignments: [
-          {
-            title: 'Draft GSTR-2B Notice Reply',
-            client: 'GlobalTrade India Logistics',
-            priority: 'critical',
-            status: 'pending_approval',
-            daysUntilDue: 1,
-            aiRecommendation: 'Review draft response immediately. Reconciled discrepancy is ₹2,40,000.',
-          },
-          {
-            title: 'MCA AOC-4 Filing',
-            client: 'SecurePay Solutions Ltd',
-            priority: 'high',
-            status: 'in_progress',
-            daysUntilDue: 3,
-            aiRecommendation: 'Execute compliance audit checks on active directorship registers.',
-          },
-          {
-            title: 'Income Tax Scrutiny Response u/s 143(2)',
-            client: 'Acme Technologies Pvt Ltd',
-            priority: 'medium',
-            status: 'drafting',
-            daysUntilDue: 5,
-            aiRecommendation: 'AI swarm currently cross-referencing audit registers against CBDT portal.',
-          }
-        ],
-        aiRecommendations: [
-          {
-            title: 'Audit Warning',
-            priority: 'medium',
-            description: 'DIR-3 KYC verification alert detected for Vertex EduTech directors. Swarm is standing by to resolve KYC records.',
-          }
-        ],
-        criticalAlerts: [
-          {
-            severity: 'high',
-            title: 'GSTR-2B vs GSTR-3B Mismatch Detected',
-            description: 'GlobalTrade India Logistics has a mismatch of ₹2,40,000 in input tax credit claims.',
-            action: 'Review the drafted rebuttal in AI Action Inbox.'
-          }
-        ],
-        liveUpdates: [
-          { message: 'AI Swarm completed GST reconciliation for SecurePay Solutions.', timestamp: new Date(Date.now() - 300000).toISOString() },
+        ] : [];
+
+        const liveUpdates = [
+          { message: `AI Swarm monitored compliance run for active clients.`, timestamp: new Date().toISOString() },
           { message: 'WORM secure audit fingerprint logged successfully.', timestamp: new Date(Date.now() - 600000).toISOString() }
-        ],
-      });
+        ];
+
+        setBriefData({
+          aiSummary: pendingTasks === 0
+            ? `AI Swarm successfully completed all compliance calculations. Financial books, tax calculations, and 26 statutory modules are fully verified and loaded into the Client Vault.`
+            : `You have ${count} active client(s) under management. SANNIDH has prepared your priority queue.`,
+          totalCompanies: count,
+          pendingTasks: pendingTasks,
+          completedToday: completedToday,
+          workloadAnalysis: { utilizationPercent: pendingTasks === 0 ? 95 : Math.min(100, 30 + count * 15 + pendingTasks * 2) },
+          todaysFocus: todaysFocus,
+          prioritizedAssignments: visibleAssignments,
+          aiRecommendations: pendingTasks > 0 ? [
+            {
+              title: 'Audit Warning',
+              priority: 'medium',
+              description: `DIR-3 KYC verification alert detected for ${firstClientName}. Swarm is standing by to resolve.`,
+            }
+          ] : [],
+          criticalAlerts: pendingTasks > 0 ? [
+            {
+              severity: 'high',
+              title: 'GSTR-2B vs GSTR-3B Mismatch Detected',
+              description: `${firstClientName} has a mismatch in input tax credit claims.`,
+              action: 'Review the drafted rebuttal.'
+            }
+          ] : [],
+          liveUpdates: liveUpdates,
+        });
+
+        // Set completed timestamp if all completed
+        if (pendingTasks === 0) {
+          setSwarmCompletedAt(Date.now() - 30000);
+        } else {
+          setSwarmCompletedAt(null);
+        }
+      }
       setLastRefresh(new Date());
     } catch {
       // Silent fail
@@ -212,15 +272,334 @@ const DailyGovernanceBrief = () => {
     const onVisible = () => { if (document.visibilityState === 'visible') fetchDailyBrief(); };
     document.addEventListener('visibilitychange', onVisible);
     window.addEventListener('focus', fetchDailyBrief);
+    
+    // Refresh brief on custom events
+    window.addEventListener('swarm-completed-event', fetchDailyBrief);
+    window.addEventListener('swarm-status-changed', fetchDailyBrief);
+    window.addEventListener('ca:metrics-updated', fetchDailyBrief);
+
     return () => {
       clearInterval(interval);
       document.removeEventListener('visibilitychange', onVisible);
       window.removeEventListener('focus', fetchDailyBrief);
+      window.removeEventListener('swarm-completed-event', fetchDailyBrief);
+      window.removeEventListener('swarm-status-changed', fetchDailyBrief);
+      window.removeEventListener('ca:metrics-updated', fetchDailyBrief);
     };
   }, []);
 
+  // ─── MASTER TASK POOL (20 unique Indian statutory notice types) ─────────
+  const taskPool = [
+    { title: "Reconcile GSTR-2B vs GSTR-3B Mismatch", priority: "critical", aiRecommendation: "A mismatch of ₹1,80,000 detected in ITC. Draft rebuttal ready.", focusTitle: "GST Notice Response & Rebuttal", focusDescription: "ITC mismatch response is ready for CA submission.", focusAdvice: "Review draft in the AI Action Inbox before statutory deadline.", draftType: "GST_SCN_Rebuttal" },
+    { title: "Draft Board Resolution for Director Appointment", priority: "medium", aiRecommendation: "Verify DIR-3 KYC and Aadhaar link status.", focusTitle: "MCA Onboarding & Compliance", focusDescription: "DIR-3 KYC verification alert detected.", focusAdvice: "Verify Aadhaar OTP link with the director.", draftType: "MCA_Board_Resolution" },
+    { title: "Compile FY26 Balance Sheet Schedule III", priority: "high", aiRecommendation: "Reclassify long-term borrowings under current liabilities.", focusTitle: "Annual Audit Preparation", focusDescription: "Balance sheet schedule reclassification required.", focusAdvice: "Confirm classification with the client account lead.", draftType: "Balance_Sheet_Schedule_III" },
+    { title: "Form AOC-4 Annual Filing Preparation", priority: "critical", aiRecommendation: "Validate XBRL taxonomy schema before portal upload.", focusTitle: "MCA Annual Filings", focusDescription: "AOC-4 filing preparation and schema validation.", focusAdvice: "Execute pre-scrutiny checks on the government portal tool.", draftType: "MCA_AOC4_Filing" },
+    { title: "Quarterly TDS Return Form 26Q Reconciliation", priority: "high", aiRecommendation: "Reconcile Interest on Late Payment u/s 201(1A).", focusTitle: "Income Tax TDS Compliance", focusDescription: "TDS Form 26Q interest calculations need review.", focusAdvice: "Verify Challan details from OLTAS portal.", draftType: "TDS_26Q_Reconciliation" },
+    { title: "Income Tax Scrutiny Notice Response u/s 143(3)", priority: "critical", aiRecommendation: "Explanations for cash deposit during demonetization drafted.", focusTitle: "Tax Assessment Defense", focusDescription: "Submit detailed response to Assessing Officer query.", focusAdvice: "Review bank statement annexures in the client vault.", draftType: "IT_Scrutiny_143_Response" },
+    { title: "Advance Tax Q3 Liability Estimation", priority: "high", aiRecommendation: "Calculate safe harbor margins based on revised turnover.", focusTitle: "Corporate Tax Planning", focusDescription: "Estimate Q3 advance tax installment to avoid Section 234B/C interest.", focusAdvice: "Confirm projected revenue metrics with the CFO.", draftType: "Advance_Tax_Estimation" },
+    { title: "Reconcile PF & ESIC Contribution Registers", priority: "medium", aiRecommendation: "Resolve mismatch in 3 employee UAN registrations.", focusTitle: "Payroll & Labor Law", focusDescription: "UAN mismatch in labor registers detected.", focusAdvice: "Validate worker details against Aadhaar registers.", draftType: "PF_ESIC_Reconciliation" },
+    { title: "Draft Response to GST DRC-01 Show Cause Notice", priority: "critical", aiRecommendation: "Respond to differential tax liability on zero-rated supplies.", focusTitle: "GST Litigation Defense", focusDescription: "DRC-01 response on zero-rated export supplies.", focusAdvice: "Cross-reference LUT filing dates for FY26.", draftType: "GST_DRC01_Response" },
+    { title: "ROC Form MGT-7 Shareholding Audit", priority: "medium", aiRecommendation: "Audit transfer of 5,000 equity shares to IEPF.", focusTitle: "MCA Secretarial Audit", focusDescription: "Verify share transfer documents and IEPF transfer receipts.", focusAdvice: "Ensure board resolution copy is attached to the docket.", draftType: "ROC_MGT7_Audit" },
+    { title: "GST Annual Return GSTR-9 Compilation", priority: "critical", aiRecommendation: "Cross-verify auto-populated GSTR-9 with books of accounts.", focusTitle: "GST Annual Compliance", focusDescription: "GSTR-9 annual return compilation for FY25-26.", focusAdvice: "Reconcile HSN summary with purchase/sales registers.", draftType: "GSTR9_Annual_Return" },
+    { title: "Income Tax Appeal CIT(A) Preparation", priority: "high", aiRecommendation: "Prepare grounds of appeal and statement of facts.", focusTitle: "Tax Litigation Support", focusDescription: "CIT(A) appeal preparation against assessment order.", focusAdvice: "Compile annexures with supporting case law citations.", draftType: "CIT_Appeal_Preparation" },
+    { title: "Transfer Pricing Documentation & Report", priority: "high", aiRecommendation: "Prepare TP study report with comparable analysis.", focusTitle: "International Tax Compliance", focusDescription: "Transfer pricing documentation for related party transactions.", focusAdvice: "Verify arm's length price computations.", draftType: "Transfer_Pricing_Report" },
+    { title: "GST Refund Application RFD-01", priority: "medium", aiRecommendation: "Calculate eligible ITC refund on zero-rated exports.", focusTitle: "GST Refund Processing", focusDescription: "RFD-01 refund application for accumulated ITC.", focusAdvice: "Attach shipping bills and bank realization certificates.", draftType: "GST_RFD01_Refund" },
+    { title: "Statutory Audit Working Papers Preparation", priority: "high", aiRecommendation: "Prepare lead schedules and analytical review procedures.", focusTitle: "Statutory Audit Support", focusDescription: "Audit working papers compilation for FY25-26.", focusAdvice: "Ensure all management representations are obtained.", draftType: "Statutory_Audit_Workpapers" },
+    { title: "SEBI Insider Trading Compliance Report", priority: "critical", aiRecommendation: "Verify trading window closure notifications sent to designated persons.", focusTitle: "SEBI Compliance", focusDescription: "Quarterly insider trading compliance certification.", focusAdvice: "Cross-check with depository holding statements.", draftType: "SEBI_Insider_Trading" },
+    { title: "GST E-Way Bill Reconciliation", priority: "medium", aiRecommendation: "Match e-way bills with GSTR-1 outward supply invoices.", focusTitle: "GST Transport Compliance", focusDescription: "E-way bill vs invoice reconciliation for goods movement.", focusAdvice: "Flag unmatched consignments for physical verification.", draftType: "EWayBill_Reconciliation" },
+    { title: "Professional Tax Registration & Returns", priority: "medium", aiRecommendation: "File monthly PT returns for Maharashtra establishment.", focusTitle: "State Tax Compliance", focusDescription: "Professional tax return filing for current month.", focusAdvice: "Verify employee salary brackets for correct PT deduction.", draftType: "Professional_Tax_Return" },
+    { title: "RBI FEMA Compliance – ECB Reporting", priority: "high", aiRecommendation: "File ECB-2 return for external commercial borrowing.", focusTitle: "RBI/FEMA Compliance", focusDescription: "Quarterly ECB reporting to Reserve Bank of India.", focusAdvice: "Verify all-in-cost ceiling compliance.", draftType: "RBI_ECB_Reporting" },
+    { title: "Companies Act CSR Compliance Report", priority: "medium", aiRecommendation: "Prepare CSR-2 form with expenditure details.", focusTitle: "Corporate Social Responsibility", focusDescription: "Annual CSR compliance reporting as per Companies Act.", focusAdvice: "Verify CSR spend against 2% net profit threshold.", draftType: "CSR_Compliance_Report" },
+  ];
+
+  // 2-minute unique notice generator loop
+  useEffect(() => {
+    if (!isRunning) return;
+    const generatorInterval = setInterval(() => {
+      // Don't generate if there are still pending tasks — wait for them to finish first
+      const savedAssignmentsStr = localStorage.getItem('demo:prioritized-assignments');
+      let persistedAssignments: any[] = [];
+      if (savedAssignmentsStr) {
+        try {
+          persistedAssignments = JSON.parse(savedAssignmentsStr);
+        } catch (e) {}
+      }
+
+      const hasPending = persistedAssignments.some(
+        (a: any) => a.status === 'pending_approval' || a.status === 'pending'
+      );
+      if (hasPending) return;
+
+      // Fetch active client names
+      let demoClients: any[] = [];
+      try {
+        const saved = localStorage.getItem('demo_clients');
+        if (saved) demoClients = JSON.parse(saved);
+      } catch (e) {}
+      if (demoClients.length === 0) return;
+
+      const client = demoClients[Math.floor(Math.random() * demoClients.length)];
+      const clientName = client.name || client.client_name || "TechCorp Pvt Ltd";
+
+      // Pick a UNIQUE task (never repeats until all 20 exhausted) directly from localStorage for this specific client
+      const companyKey = `demo:used-task-indices:${clientName}`;
+      let currentUsed: number[] = [];
+      try {
+        const saved = localStorage.getItem(companyKey);
+        if (saved) currentUsed = JSON.parse(saved);
+      } catch (e) {}
+
+      let available = Array.from({ length: taskPool.length }, (_, i) => i).filter(i => !currentUsed.includes(i));
+      if (available.length === 0) {
+        currentUsed = [];
+        available = Array.from({ length: taskPool.length }, (_, i) => i);
+      }
+      const chosenIndex = available[Math.floor(Math.random() * available.length)];
+      currentUsed.push(chosenIndex);
+      localStorage.setItem(companyKey, JSON.stringify(currentUsed));
+
+      const randomTask = taskPool[chosenIndex];
+
+      // Reset task generator timing so new notices can be generated
+      setSwarmCompletedAt(null);
+
+      // Create new assignment
+      const newAssignment = {
+        id: `task-${Date.now()}-${Math.random().toString(36).substring(2, 9)}`,
+        title: randomTask.title,
+        client: clientName,
+        priority: randomTask.priority,
+        status: "pending_approval",
+        daysUntilDue: Math.floor(Math.random() * 6) + 1,
+        aiRecommendation: randomTask.aiRecommendation,
+        draftType: randomTask.draftType,
+      };
+
+      // Append and save to localStorage
+      persistedAssignments.push(newAssignment);
+      localStorage.setItem('demo:prioritized-assignments', JSON.stringify(persistedAssignments));
+
+      // Trigger brief update
+      fetchDailyBrief();
+
+      // Notify via toast
+      toast.warning(`📋 New Government Notice Detected`, {
+        description: `${randomTask.title} — ${clientName}`,
+        duration: 5000
+      });
+
+      setLastRefresh(new Date());
+    }, 120000); // 2 minutes
+
+    return () => clearInterval(generatorInterval);
+  }, [isRunning]);
+
+  const [loadingTaskId, setLoadingTaskId] = useState<string | null>(null);
+
+  // Automatic mode execution handler — auto-processes pending tasks when in AUTO mode
+  useEffect(() => {
+    if (!isRunning) return;
+    
+    const isAutoMode = localStorage.getItem('sannidh:dashboard-mode') === 'auto';
+    if (!isAutoMode) return;
+
+    if (!briefData || !briefData.prioritizedAssignments) return;
+    if (loadingTaskId !== null) return;
+
+    // Find the first pending task
+    const pendingTask = briefData.prioritizedAssignments.find(
+      (a: any) => a.status === 'pending_approval' || a.status === 'pending'
+    );
+
+    if (pendingTask) {
+      // Auto-trigger completion after a 5 second delay to simulate autonomous agent execution
+      const timer = setTimeout(() => {
+        handleCompleteTaskOneByOne(pendingTask.id);
+      }, 5000);
+      return () => clearTimeout(timer);
+    }
+  }, [briefData, loadingTaskId, isRunning]);
+
+  const handleCompleteTaskOneByOne = async (taskId: string) => {
+    // Load from localStorage first to ensure we modify the correct persisted list
+    const savedAssignmentsStr = localStorage.getItem('demo:prioritized-assignments');
+    let persistedAssignments: any[] = [];
+    if (savedAssignmentsStr) {
+      try {
+        persistedAssignments = JSON.parse(savedAssignmentsStr);
+      } catch (e) {}
+    }
+
+    const taskIndex = persistedAssignments.findIndex((t: any) => t.id === taskId);
+    if (taskIndex === -1) return;
+    const task = persistedAssignments[taskIndex];
+    if (task.status === 'completed') return;
+
+    setLoadingTaskId(taskId);
+    toast.info(`Activating SANNIDH AI Swarm for ${task.client}...`, { 
+      description: `Resolving notice: "${task.title}"` 
+    });
+
+    // Find the client in local storage
+    let demoClients: any[] = [];
+    try {
+      const saved = localStorage.getItem('demo_clients');
+      if (saved) demoClients = JSON.parse(saved);
+    } catch (e) {}
+
+    const matchedClient = demoClients.find(c => (c.name || c.client_name) === task.client);
+
+    setTimeout(() => {
+      toast.info("AI Swarm: Reconciling bank feeds & calculating taxes...", { 
+        description: `Running 26 compliance audit modules for ${task.client}.` 
+      });
+
+      setTimeout(() => {
+        // Generate unique draft document name
+        const draftType = task.draftType || task.title.replace(/[^a-zA-Z0-9]/g, '_');
+        const timestamp = new Date().toISOString().split('T')[0];
+        const clientSlug = (task.client || 'Client').replace(/\s+/g, '_');
+        const pdfName = `Draft_${draftType}_${clientSlug}_${timestamp}.pdf`;
+
+        toast.success("AI Swarm Task Completed!", { 
+          description: `Generated: ${pdfName}` 
+        });
+
+        // Save completed task to this specific client's completed list
+        if (matchedClient) {
+          let completed = [];
+          try {
+            const saved = localStorage.getItem(`completed_tasks_${matchedClient.id}`);
+            if (saved) completed = JSON.parse(saved);
+          } catch (e) {}
+          // Save with full metadata (title + PDF name + timestamp)
+          const taskEntry = {
+            title: task.title,
+            draftType: draftType,
+            pdfName: pdfName,
+            completedAt: new Date().toISOString(),
+          };
+          // Avoid exact title duplicates in a row
+          if (!completed.find((c: any) => c.title === task.title && c.pdfName === pdfName)) {
+            completed.push(taskEntry);
+            localStorage.setItem(`completed_tasks_${matchedClient.id}`, JSON.stringify(completed));
+          }
+        }
+
+        // Save to global completed work history (date and time wise)
+        try {
+          const historySaved = localStorage.getItem('demo:sannidh:completed-work-history');
+          const history = historySaved ? JSON.parse(historySaved) : [];
+          history.unshift({
+            id: `hist-${Date.now()}-${Math.random().toString(36).substring(2, 9)}`,
+            title: task.title,
+            client: task.client,
+            draftType: draftType,
+            completedAt: new Date().toISOString(),
+            documentName: pdfName,
+          });
+          // Keep max 50 history entries
+          if (history.length > 50) history.length = 50;
+          localStorage.setItem('demo:sannidh:completed-work-history', JSON.stringify(history));
+          window.dispatchEvent(new CustomEvent('demo:sannidh:history-updated'));
+        } catch (e) {}
+
+        // Mark swarm completed for this client
+        if (matchedClient) {
+          localStorage.setItem(`swarm_completed_${matchedClient.id}`, 'true');
+        }
+
+        // Update the status of the task in persisted assignments
+        persistedAssignments[taskIndex] = {
+          ...persistedAssignments[taskIndex],
+          status: 'completed',
+          aiRecommendation: `✅ Completed. Draft saved: ${pdfName}`
+        };
+        localStorage.setItem('demo:prioritized-assignments', JSON.stringify(persistedAssignments));
+
+        // Trigger brief update
+        fetchDailyBrief();
+
+        setLoadingTaskId(null);
+        
+        // Dispatch events to notify vault and other sections
+        window.dispatchEvent(new CustomEvent('swarm-completed-event'));
+        window.dispatchEvent(new CustomEvent('swarm-status-changed'));
+      }, 1500);
+    }, 1500);
+  };
+
+  const handleNavigateToDoneWork = (assignment: any) => {
+    let demoClients: any[] = [];
+    try {
+      const saved = localStorage.getItem('demo_clients');
+      if (saved) demoClients = JSON.parse(saved);
+    } catch (e) {}
+
+    const matchedClient = demoClients.find(c => (c.name || c.client_name) === assignment.client);
+    const clientId = matchedClient ? matchedClient.id : 'demo-auto-123';
+
+    toast.success(`Opening completed work PDF for ${assignment.client}...`);
+    localStorage.setItem('selected_client_id', clientId);
+    localStorage.setItem('auto_open_pdf', 'true');
+    localStorage.setItem('auto_open_task_title', assignment.title);
+    
+    // Switch tab to Clients and select client
+    window.dispatchEvent(new CustomEvent('change-dashboard-zone', { detail: 'clients' }));
+    window.dispatchEvent(new CustomEvent('select-client-event', { 
+      detail: { clientId: clientId, autoOpenPdf: true } 
+    }));
+  };
+
+  const handleSeeAllDoneWork = () => {
+    let demoClients: any[] = [];
+    try {
+      const saved = localStorage.getItem('demo_clients');
+      if (saved) demoClients = JSON.parse(saved);
+    } catch (e) {}
+
+    if (demoClients.length === 0) {
+      toast.error("No clients under management.");
+      return;
+    }
+
+    const clientId = demoClients[0].id;
+    toast.success("Opening Client Vault to view completed work...");
+    localStorage.setItem('selected_client_id', clientId);
+    localStorage.setItem('auto_open_pdf', 'true');
+    
+    window.dispatchEvent(new CustomEvent('change-dashboard-zone', { detail: 'clients' }));
+    window.dispatchEvent(new CustomEvent('select-client-event', { 
+      detail: { clientId: clientId, autoOpenPdf: true } 
+    }));
+  };
+
   const handleRefresh = () => {
-    fetchDailyBrief();
+    setLoading(true);
+    toast.info("Resetting Daily Governance brief...", { description: "Regenerating pending statutory tasks." });
+    
+    // Clear completed flags and completed tasks list from localStorage so the tasks become visible and pending again
+    try {
+      const saved = localStorage.getItem('demo_clients');
+      if (saved) {
+        const demoClients = JSON.parse(saved);
+        demoClients.forEach((client: any) => {
+          localStorage.removeItem(`swarm_completed_${client.id}`);
+          localStorage.removeItem(`completed_tasks_${client.id}`);
+          // Clear used task indices so unique task generation starts fresh
+          const clientName = client.name || client.client_name;
+          localStorage.removeItem(`demo:used-task-indices:${clientName}`);
+        });
+      }
+    } catch (e) {}
+
+    localStorage.removeItem('demo:prioritized-assignments');
+    setSwarmCompletedAt(null);
+    
+    setTimeout(() => {
+      fetchDailyBrief();
+      toast.success("Refreshed! Portal scraper generated new pending work.");
+    }, 1000);
   };
 
   const getPriorityColor = (priority) => {
@@ -240,6 +619,25 @@ const DailyGovernanceBrief = () => {
       default: return 'text-blue-400';
     }
   };
+
+  if (!isRunning) {
+    return (
+      <motion.div
+        initial={{ opacity: 0, y: 20 }}
+        animate={{ opacity: 1, y: 0 }}
+        transition={{ delay: 0.07 }}
+        className="glass-card p-8 rounded-2xl border border-border/40 text-center py-16 bg-red-500/5 mb-16"
+      >
+        <div className="w-16 h-16 mx-auto rounded-full bg-red-500/10 flex items-center justify-center text-red-500 mb-4 border border-red-500/20">
+          <AlertTriangle className="w-8 h-8 animate-pulse" />
+        </div>
+        <h3 className="text-xl font-bold text-red-400 mb-2">Swarm is off</h3>
+        <p className="text-sm text-muted-foreground max-w-sm mx-auto">
+          The autonomous AI Swarm engine is currently deactivated. Real-time compliance monitoring, portal scanning, and draft calculations are halted. Start the engine from the Agent Control Center tab to resume.
+        </p>
+      </motion.div>
+    );
+  }
 
   return (
     <motion.div
@@ -265,6 +663,16 @@ const DailyGovernanceBrief = () => {
           <span className="text-xs text-muted-foreground">
             Last updated: {lastRefresh.toLocaleTimeString()}
           </span>
+          {briefData && briefData.pendingTasks === 0 && (
+            <Button
+              size="sm"
+              className="gap-2 bg-gradient-to-r from-green-600 to-emerald-600 hover:from-green-700 hover:to-emerald-700 text-white border-0 shadow-[0_0_15px_rgba(34,197,94,0.4)] animate-pulse"
+              onClick={handleSeeAllDoneWork}
+            >
+              <FolderCheck className="w-4 h-4" />
+              See Done Work
+            </Button>
+          )}
           <Button
             size="sm"
             variant="outline"
@@ -355,53 +763,118 @@ const DailyGovernanceBrief = () => {
 
               {/* AI-Prioritized Assignments */}
               <div>
-                <h3 className="text-lg font-semibold text-cyan-300 mb-3 flex items-center">
-                  <FileText className="w-5 h-5 mr-2" />
-                  AI-Prioritized Assignments
-                </h3>
-                <div className="space-y-3">
-                  {(briefData.prioritizedAssignments || briefData.assignments || []).map((assignment, index) => (
-                    <div
-                      key={index}
-                      className={`p-4 rounded-lg border ${getPriorityColor(assignment.priority || assignment.urgencyLevel)}`}
+                <div className="flex items-center justify-between mb-3">
+                  <h3 className="text-lg font-semibold text-cyan-300 flex items-center">
+                    <FileText className="w-5 h-5 mr-2" />
+                    AI-Prioritized Assignments
+                  </h3>
+                  {briefData.pendingTasks === 0 && (
+                    <Button
+                      size="sm"
+                      className="gap-2 bg-gradient-to-r from-green-600 to-emerald-600 hover:from-green-700 hover:to-emerald-700 text-white border-0 shadow-[0_0_15px_rgba(34,197,94,0.4)] animate-pulse"
+                      onClick={handleSeeAllDoneWork}
                     >
-                      <div className="flex items-center justify-between mb-2">
-                        <div>
-                          <p className="font-medium text-foreground">{assignment.title}</p>
-                          <p className="text-sm text-muted-foreground">Client: {assignment.client || assignment.company_name}</p>
-                          {assignment.aiRecommendation && (
-                            <p className="text-xs text-cyan-300 mt-1">🤖 AI: {assignment.aiRecommendation}</p>
+                      <FolderCheck className="w-4 h-4" />
+                      See Done Work
+                    </Button>
+                  )}
+                </div>
+
+                {briefData.pendingTasks === 0 ? (
+                  <div className="p-8 border border-green-500/30 bg-green-500/5 rounded-xl text-center space-y-4 shadow-[0_0_15px_rgba(34,197,94,0.1)]">
+                    <div className="w-12 h-12 mx-auto rounded-full bg-green-500/20 flex items-center justify-center text-green-400">
+                      <CheckCircle className="w-6 h-6 animate-pulse" />
+                    </div>
+                    <div>
+                      <h4 className="font-semibold text-green-400">All Daily Compliance Work Completed!</h4>
+                      <p className="text-xs text-muted-foreground mt-1 max-w-sm mx-auto">
+                        The SANNIDH AI Swarm has verified the bank streams, compiled financial ledgers, and checked off all 26 statutory audit modules.
+                      </p>
+                    </div>
+                    <Button 
+                      size="sm"
+                      className="gap-2 bg-gradient-to-r from-green-600 to-emerald-600 hover:from-green-700 hover:to-emerald-700 text-white border-0 shadow-[0_0_10px_rgba(34,197,94,0.3)]"
+                      onClick={handleSeeAllDoneWork}
+                    >
+                      <FolderCheck className="w-4 h-4" />
+                      See Done Work inside Client Vault
+                    </Button>
+                  </div>
+                ) : (
+                  <div className="space-y-3">
+                    {(briefData.prioritizedAssignments || briefData.assignments || []).map((assignment, index) => (
+                      <div
+                        key={index}
+                        className={`p-4 rounded-lg border flex flex-col sm:flex-row sm:items-center sm:justify-between gap-4 ${getPriorityColor(assignment.priority || assignment.urgencyLevel)}`}
+                      >
+                        <div className="flex-1 min-w-0">
+                          <div className="flex items-center justify-between mb-2">
+                            <div>
+                              <p className="font-medium text-foreground">{assignment.title}</p>
+                              <p className="text-sm text-muted-foreground">Client: {assignment.client || assignment.company_name}</p>
+                              {assignment.aiRecommendation && (
+                                <p className="text-xs text-cyan-300 mt-1">🤖 AI: {assignment.aiRecommendation}</p>
+                              )}
+                            </div>
+                          </div>
+                          {assignment.daysUntilDue !== undefined && (
+                            <div className="flex items-center gap-2 mt-2">
+                              <Clock className="w-3 h-3 text-muted-foreground" />
+                              <span className={`text-xs ${getUrgencyColor(assignment.urgencyLevel)}`}>
+                                {assignment.daysUntilDue === 0 ? 'Due today' : 
+                                 assignment.daysUntilDue === 1 ? 'Due tomorrow' :
+                                 assignment.daysUntilDue < 0 ? `${Math.abs(assignment.daysUntilDue)} days overdue` :
+                                 `Due in ${assignment.daysUntilDue} days`}
+                              </span>
+                            </div>
                           )}
                         </div>
-                        <div className="flex items-center gap-2">
-                          {assignment.aiScore && (
-                            <Badge variant="outline" className="text-xs">
-                              AI Score: {assignment.aiScore}
+                        <div className="flex items-center gap-3 shrink-0 self-end sm:self-center">
+                          <div className="flex items-center gap-2">
+                            {assignment.aiScore && (
+                              <Badge variant="outline" className="text-xs">
+                                AI Score: {assignment.aiScore}
+                              </Badge>
+                            )}
+                            <Badge 
+                              variant={assignment.priority === 'critical' || assignment.urgencyLevel === 'critical' ? 'destructive' : 
+                                     assignment.priority === 'high' || assignment.urgencyLevel === 'high' ? 'default' : 'secondary'}
+                            >
+                              {assignment.urgencyLevel || assignment.priority}
                             </Badge>
+                            <Badge variant="outline">{assignment.status}</Badge>
+                          </div>
+                          
+                          {assignment.status === 'completed' ? (
+                            <Button
+                              size="sm"
+                              variant="outline"
+                              className="gap-1 border-green-500/50 bg-green-500/10 text-green-300 hover:bg-green-500/20"
+                              onClick={() => handleNavigateToDoneWork(assignment)}
+                            >
+                              <FolderCheck className="w-3.5 h-3.5" />
+                              See Done Work
+                            </Button>
+                          ) : (
+                            <Button
+                              size="sm"
+                              className="gap-1 bg-gradient-to-r from-purple-600 to-cyan-600 hover:from-purple-700 hover:to-cyan-700 text-white border-0"
+                              onClick={() => handleCompleteTaskOneByOne(assignment.id)}
+                              disabled={loadingTaskId !== null}
+                            >
+                              {loadingTaskId === assignment.id ? (
+                                <Loader className="w-3.5 h-3.5 animate-spin" />
+                              ) : (
+                                <Zap className="w-3.5 h-3.5" />
+                              )}
+                              Run Swarm
+                            </Button>
                           )}
-                          <Badge 
-                            variant={assignment.priority === 'critical' || assignment.urgencyLevel === 'critical' ? 'destructive' : 
-                                   assignment.priority === 'high' || assignment.urgencyLevel === 'high' ? 'default' : 'secondary'}
-                          >
-                            {assignment.urgencyLevel || assignment.priority}
-                          </Badge>
-                          <Badge variant="outline">{assignment.status}</Badge>
                         </div>
                       </div>
-                      {assignment.daysUntilDue !== undefined && (
-                        <div className="flex items-center gap-2 mt-2">
-                          <Clock className="w-3 h-3" />
-                          <span className={`text-xs ${getUrgencyColor(assignment.urgencyLevel)}`}>
-                            {assignment.daysUntilDue === 0 ? 'Due today' : 
-                             assignment.daysUntilDue === 1 ? 'Due tomorrow' :
-                             assignment.daysUntilDue < 0 ? `${Math.abs(assignment.daysUntilDue)} days overdue` :
-                             `Due in ${assignment.daysUntilDue} days`}
-                          </span>
-                        </div>
-                      )}
-                    </div>
-                  ))}
-                </div>
+                    ))}
+                  </div>
+                )}
               </div>
 
               {/* AI Recommendations */}
@@ -537,93 +1010,15 @@ const LiveAIDraftingEngine = () => {
   // AI Agent State
   const [isAgentActive, setIsAgentActive] = useState(true);
   const [agentStatus, setAgentStatus] = useState<'idle' | 'monitoring' | 'working' | 'awaiting_approval'>('monitoring');
-  const [aiTasks, setAiTasks] = useState<AITask[]>([
-    {
-      id: "task-demo-1",
-      type: "notice_response",
-      title: "Draft Notice Response",
-      client: "GlobalTrade India Logistics",
-      status: "pending_approval",
-      progress: 100,
-      createdAt: new Date(Date.now() - 3600000).toISOString(),
-      description: "Drafting GSTR-2B Mismatch Rebuttal defense under Section 16(4) safe harbor for GSTIN 27AABCG5678K2ZQ.",
-      result: {
-        documentType: "GST Notice Rebuttal (SCN-29402)",
-        pages: 6,
-        sections: ["1. Preliminary Objections", "2. Ledger Reconciliation Matrix", "3. Section 16(4) Defense", "4. CBIC Circular Anchor", "5. Verification Request"],
-        generatedAt: new Date(Date.now() - 3600000).toISOString()
-      }
-    },
-    {
-      id: "task-demo-2",
-      type: "balance_sheet",
-      title: "Generate Balance Sheet",
-      client: "SecurePay Solutions Ltd",
-      status: "completed",
-      progress: 100,
-      createdAt: new Date(Date.now() - 7200000).toISOString(),
-      description: "Compiling standalone Financial Statements and Balance Sheet reconciliation for FY 2025-26 audit board pack.",
-      result: {
-        documentType: "Balance Sheet FY 2025-26",
-        pages: 14,
-        totalAssets: "₹18.4 Cr",
-        totalLiabilities: "₹12.1 Cr",
-        netWorth: "₹6.3 Cr",
-        generatedAt: new Date(Date.now() - 7200000).toISOString()
-      }
-    },
-    {
-      id: "task-demo-3",
-      type: "compliance_check",
-      title: "Compliance Check",
-      client: "Acme Technologies Pvt Ltd",
-      status: "processing",
-      progress: 65,
-      createdAt: new Date(Date.now() - 1200000).toISOString(),
-      description: "Executing deep-scan compliance audit against MCA Section 454 filings, active directorship registers, and statutory payment trail."
-    }
-  ]);
+  const [aiTasks, setAiTasks] = useState<AITask[]>([]);
   const [selectedTask, setSelectedTask] = useState<AITask | null>(null);
   const [showApprovalModal, setShowApprovalModal] = useState(false);
   
   // Real-time Data
   const [regulatoryNews, setRegulatoryNews] = useState<RegulatoryNews[]>([]);
-  const [clientDeadlines, setClientDeadlines] = useState<ClientDeadline[]>([
-    {
-      id: "deadline-demo-1",
-      client: "GlobalTrade India Logistics",
-      type: "GSTR-3B Annual Filing (FY 2025-26)",
-      deadline: "2026-06-15",
-      daysRemaining: 13,
-      status: "upcoming"
-    },
-    {
-      id: "deadline-demo-2",
-      client: "SecurePay Solutions Ltd",
-      type: "MCA Active-3 Advance Return",
-      deadline: "2026-06-05",
-      daysRemaining: 3,
-      status: "urgent"
-    },
-    {
-      id: "deadline-demo-3",
-      client: "Acme Technologies Pvt Ltd",
-      type: "Income Tax Scrutiny Response u/s 143(2)",
-      deadline: "2026-06-03",
-      daysRemaining: 1,
-      status: "overdue"
-    }
-  ]);
+  const [clientDeadlines, setClientDeadlines] = useState<ClientDeadline[]>([]);
   const [agentLogs, setAgentLogs] = useState<string[]>([
-    `[${new Date(Date.now() - 100000).toLocaleTimeString()}] 🔍 Scanning for GSTR-2B compliance updates...`,
-    `[${new Date(Date.now() - 200000).toLocaleTimeString()}] ⚙️ Multi-Client Master Hub: Re-fetching metrics from database...`,
-    `[${new Date(Date.now() - 600000).toLocaleTimeString()}] 🔒 Secure File Vault: WORM seal validated for SecurePay Solutions Ltd PDF`,
-    `[${new Date(Date.now() - 1200000).toLocaleTimeString()}] 🚀 Deploying AI Agent for Compliance Check - Acme Technologies Pvt Ltd`,
-    `[${new Date(Date.now() - 1800000).toLocaleTimeString()}] 🛡️ Compliance Guard: Active Directorship registers scanned via MCA API`,
-    `[${new Date(Date.now() - 3600000).toLocaleTimeString()}] ⏳ GST Notice Rebuttal ready for CA approval — pending CA Rajesh Kumar's review`,
-    `[${new Date(Date.now() - 4000000).toLocaleTimeString()}] ⚙️ Processing: Draft Legal Response for GlobalTrade India Logistics`,
-    `[${new Date(Date.now() - 7200000).toLocaleTimeString()}] ✨ Balance Sheet compile finished and PDF with SANNIDH AI seal generated successfully`,
-    `[${new Date(Date.now() - 7200000).toLocaleTimeString()}] 🤖 SANNIDH AI Agent v2.1 monitoring initialized.`
+    `[${new Date(Date.now() - 1000).toLocaleTimeString()}] 🤖 SANNIDH AI Agent v3.0 Live Engine Initialized. Waiting for data...`
   ]);
   
   // Document Upload
@@ -639,85 +1034,7 @@ const LiveAIDraftingEngine = () => {
   const [filingARN, setFilingARN] = useState<string | null>(null);
   
   // New Fetched Digital Notices State
-  const [digitalNotices, setDigitalNotices] = useState([
-    {
-      id: "not-dig-gst",
-      refNumber: "SCN-GST-2026-829412",
-      client: "GlobalTrade India Logistics",
-      portal: "GSTN Portal",
-      noticeType: "Section 73 SCN - ITC Mismatch",
-      issueDate: "2026-05-25",
-      dueDate: "2026-06-15",
-      mismatchAmount: "₹2,40,000",
-      status: "action_required"
-    },
-    {
-      id: "not-dig-mca",
-      refNumber: "SCN-MCA-2026-104928",
-      client: "SecurePay Solutions Ltd",
-      portal: "MCA-21 Portal",
-      noticeType: "DIR-3 KYC Non-Compliance Notice",
-      issueDate: "2026-05-20",
-      dueDate: "2026-06-10",
-      mismatchAmount: "N/A",
-      status: "action_required"
-    },
-    {
-      id: "not-dig-it",
-      refNumber: "SCN-IT-2026-559102",
-      client: "Acme Technologies Pvt Ltd",
-      portal: "Income Tax Portal",
-      noticeType: "Section 143(2) Scrutiny Notice",
-      issueDate: "2026-05-18",
-      dueDate: "2026-06-08",
-      mismatchAmount: "₹4,50,000",
-      status: "action_required"
-    },
-    {
-      id: "not-dig-sebi",
-      refNumber: "LODR-SEBI-2026-902",
-      client: "FutureRetail Ventures Ltd",
-      portal: "SEBI Portal",
-      noticeType: "Reg 30 LODR Disclosure Delay",
-      issueDate: "2026-05-19",
-      dueDate: "2026-06-05",
-      mismatchAmount: "N/A",
-      status: "action_required"
-    },
-    {
-      id: "not-dig-rbi",
-      refNumber: "FEMA-RBI-2026-339",
-      client: "GlobalTech Software Services",
-      portal: "RBI FIRMS Portal",
-      noticeType: "FEMA FLA Return Discrepancy",
-      issueDate: "2026-05-22",
-      dueDate: "2026-06-12",
-      mismatchAmount: "USD 50,000",
-      status: "action_required"
-    },
-    {
-      id: "not-dig-customs",
-      refNumber: "SCN-CUST-2026-781",
-      client: "NeoManufacturing Industries",
-      portal: "ICEGATE Customs Portal",
-      noticeType: "HSN Classification Dispute",
-      issueDate: "2026-05-21",
-      dueDate: "2026-06-11",
-      mismatchAmount: "₹1,20,000 Duty",
-      status: "action_required"
-    },
-    {
-      id: "not-dig-legal",
-      refNumber: "CIV-ARB-2026-442",
-      client: "Prime Builders & Developers",
-      portal: "Legal Notices Hub",
-      noticeType: "Breach of Contract Claim",
-      issueDate: "2026-05-15",
-      dueDate: "2026-06-02",
-      mismatchAmount: "₹50,00,000",
-      status: "action_required"
-    }
-  ]);
+  const [digitalNotices, setDigitalNotices] = useState<any[]>([]);
   const [selectedDigitalNotice, setSelectedDigitalNotice] = useState<any>(null);
   const [draftViewMode, setDraftViewMode] = useState<'text' | 'pdf'>('text');
   
@@ -982,36 +1299,35 @@ const LiveAIDraftingEngine = () => {
       addAgentLog(`🤖 SANNIDH AI Brain (OpenAI) cross-referencing ledger database & CBIC rules...`);
       
       await new Promise(resolve => setTimeout(resolve, 1500));
-      const mockReply = `BEFORE THE CENTRAL GOODS AND SERVICES TAX OFFICERS, DIVISION-I, NEW DELHI
+      let content = `
+BEFORE THE CENTRAL GOODS AND SERVICES TAX OFFICERS, DIVISION-I, NEW DELHI
 
 IN THE MATTER OF:
-M/s GlobalTrade India Logistics
+GlobalTrade India Logistics (Assessee)
 GSTIN: 27AABCG5678K2ZQ
 
 SUBJECT: REPLY TO SHOW CAUSE NOTICE REF NO: SCN-829412 DATED 25/05/2026
 
 MOST RESPECTFULLY SHOWETH:
 
-1. PRELIMINARY OBJECTIONS:
-The Assessee, M/s GlobalTrade India Logistics, submits that the impugned Show Cause Notice proposing demand of Input Tax Credit (ITC) mismatch under GSTR-2B vs GSTR-3B is legally untenable and contrary to established circulars.
+1. PRELIMINARY OBJECTIONS
+The Assessee, GlobalTrade India Logistics, submits that the impugned Show Cause Notice proposing demand of Input Tax Credit (ITC) mismatch under GSTR-2B vs GSTR-3B is legally untenable and contrary to established circulars.
 
-2. DETAILED RECONCILIATION OF INPUT TAX CREDIT:
-The variance of ₹2,40,000 has been reconciled down to invoice-level errors by our suppliers:
-- M/s Supplier A (GSTIN: 27AAAPQ9012A1Z3) filed GSTR-1 with a delay. ITC was claimed under GSTR-3B in May 2026 after verification of payments.
-- All payments were made in accordance with Section 16(2)(c) of the CGST Act.
+2. FACTUAL MATRIX & RECONCILIATION
+The discrepancy amount of ₹2,40,000 alleged in the SCN has been thoroughly reconciled. The mismatch arose primarily due to delayed filing by suppliers and genuine clerical errors which do not indicate any intent to evade tax.
 
-3. DEFENSE UNDER SECTION 16(4):
-The Assessee relies on the CBIC Circular No. 183/15/2022-GST which clarifies that clerical errors by suppliers should not lead to denial of ITC to the genuine purchaser.
+3. LEGAL DEFENSES UNDER GST LAW
+It is a settled principle that the substantive right to claim ITC under Section 16 of the CGST Act cannot be denied merely on account of procedural lapses.
 
-PRAYER:
-In view of the above, it is respectfully prayed that:
-(a) The proposed demand of ₹2,40,000 along with interest and penalty be dropped.
-(b) The Assessee be granted a personal hearing before any adverse decision.
+PRAYER
+In view of the above submissions, it is prayed that the demand proposed in the impugned Show Cause Notice may kindly be dropped in the interest of justice.
 
-For and on behalf of M/s GlobalTrade India Logistics
-Authorized Signatory (CA Rajesh Kumar Approved)`;
+For and on behalf of GlobalTrade India Logistics
+Authorized Signatory
+Date: ${new Date().toISOString().split('T')[0]}
+`;
 
-      setGeneratedDraft(mockReply);
+      setGeneratedDraft(content);
       setDraftApprovalStatus('pending');
       addAgentLog(`✅ Real Legal Draft generated successfully by OpenAI.`);
       
@@ -1066,25 +1382,33 @@ Authorized Signatory (CA Rajesh Kumar Approved)`;
     
     await new Promise(resolve => setTimeout(resolve, 1500));
     
-    let draftText = '';
-    
-    if (notice.id === 'not-dig-gst') {
-      draftText = GST_TEMPLATE(notice);
-    } else if (notice.id === 'not-dig-mca') {
-      draftText = MCA_TEMPLATE(notice);
-    } else if (notice.id === 'not-dig-it') {
-      draftText = IT_TEMPLATE(notice);
-    } else if (notice.id === 'not-dig-sebi') {
-      draftText = SEBI_TEMPLATE(notice);
-    } else if (notice.id === 'not-dig-rbi') {
-      draftText = RBI_TEMPLATE(notice);
-    } else if (notice.id === 'not-dig-customs') {
-      draftText = CUSTOMS_TEMPLATE(notice);
-    } else if (notice.id === 'not-dig-legal') {
-      draftText = LEGAL_TEMPLATE(notice);
-    } else {
-      draftText = GST_TEMPLATE(notice); // fallback
-    }
+    let draftText = `
+BEFORE THE CENTRAL GOODS AND SERVICES TAX OFFICERS, DIVISION-I, NEW DELHI
+
+IN THE MATTER OF:
+${notice.client} (Assessee)
+GSTIN: 27AABCG5678K2ZQ
+
+SUBJECT: REPLY TO SHOW CAUSE NOTICE REF NO: ${notice.refNumber} DATED ${notice.issueDate}
+
+MOST RESPECTFULLY SHOWETH:
+
+1. PRELIMINARY OBJECTIONS
+The Assessee, ${notice.client}, submits that the impugned Show Cause Notice proposing demand of Input Tax Credit (ITC) mismatch under GSTR-2B vs GSTR-3B is legally untenable and contrary to established circulars.
+
+2. FACTUAL MATRIX & RECONCILIATION
+The discrepancy amount of ${notice.mismatchAmount} alleged in the SCN has been thoroughly reconciled. The mismatch arose primarily due to delayed filing by suppliers and genuine clerical errors which do not indicate any intent to evade tax.
+
+3. LEGAL DEFENSES UNDER GST LAW
+It is a settled principle that the substantive right to claim ITC under Section 16 of the CGST Act cannot be denied merely on account of procedural lapses.
+
+PRAYER
+In view of the above submissions, it is prayed that the demand proposed in the impugned Show Cause Notice may kindly be dropped in the interest of justice.
+
+For and on behalf of ${notice.client}
+Authorized Signatory
+Date: ${new Date().toISOString().split('T')[0]}
+`;
 
     setGeneratedDraft(draftText);
     setDraftApprovalStatus('pending');
@@ -1296,7 +1620,7 @@ Authorized Signatory (CA Rajesh Kumar Approved)`;
       addAgentLog('✅ PDF locked into WORM Secure Vault successfully (SHA-256 hash verified).');
       
       await new Promise(resolve => setTimeout(resolve, 800));
-      addAgentLog('📧 Sending secure E-Signature link to client: compliance@globaltrade.in...');
+      addAgentLog('📧 Sending secure E-Signature link to client...');
       
       const signatureToken = `esign-${Date.now()}-${Math.random().toString(36).slice(2, 8)}`;
       setSignatureStatus(`Signature request sent. Token: ${signatureToken}`);
@@ -1384,6 +1708,53 @@ Authorized Signatory (CA Rajesh Kumar Approved)`;
     { type: 'compliance_check' as const, label: 'Compliance Check', icon: Shield },
     { type: 'notice_response' as const, label: 'Draft Notice Response', icon: FileText },
   ];
+
+  // ═══════════════════════════════════════════════════════════════════════════
+  // SIMULATION EVENT LISTENERS
+  // ═══════════════════════════════════════════════════════════════════════════
+  useEffect(() => {
+    const handleBankSim = (e: any) => {
+      if (!isAgentActive) return; // Only work if Engine is ON
+      const { client } = e.detail;
+      addAgentLog(`🚨 BANK SYNC: Live transaction detected for ${client} - ₹5,00,000 Vendor Payment.`);
+      deployAgentForTask('reconciliation', client, 'Auto-revising GSTR-3B & Reconciling Ledgers based on real-time bank sync');
+    };
+
+    const handleNoticeSim = (e: any) => {
+      if (!isAgentActive) return; // Only work if Engine is ON
+      const { client } = e.detail;
+      addAgentLog(`🚨 GOVT SCRAPER: New Notice detected on Income Tax Portal for ${client}.`);
+      toast.warning(`Govt Notice Detected for ${client}`, { description: 'AI Agent is fetching the notice from the portal...' });
+      
+      const newNotice = {
+        id: `not-dig-auto-${Date.now()}`,
+        refNumber: `SCN-IT-AUTO-${Date.now().toString().slice(-4)}`,
+        client: client,
+        portal: "Income Tax Portal",
+        noticeType: "Section 143(2) Scrutiny Notice",
+        issueDate: new Date().toISOString().split('T')[0],
+        dueDate: new Date(Date.now() + 15 * 86400000).toISOString().split('T')[0],
+        mismatchAmount: "₹2,50,000",
+        status: "action_required"
+      };
+      
+      setDigitalNotices(prev => [newNotice, ...prev]);
+      
+      // Auto-trigger response generation after a short delay
+      setTimeout(() => {
+        setSelectedDigitalNotice(newNotice);
+        processDigitalNotice(newNotice);
+      }, 4000);
+    };
+
+    window.addEventListener('simulate-bank-transaction', handleBankSim);
+    window.addEventListener('simulate-govt-notice', handleNoticeSim);
+
+    return () => {
+      window.removeEventListener('simulate-bank-transaction', handleBankSim);
+      window.removeEventListener('simulate-govt-notice', handleNoticeSim);
+    };
+  }, [addAgentLog, isAgentActive]); // Added isAgentActive to dependencies
 
   return (
     <motion.div
@@ -2151,13 +2522,20 @@ const CADashboard = () => {
 
   useEffect(() => {
     const handleConn = () => setDashboardOnline(isOnline());
+    const handleChangeZone = (e: any) => {
+      if (e.detail) {
+        setActiveZone(e.detail);
+      }
+    };
     window.addEventListener('ca:connectivity-change', handleConn);
     window.addEventListener('online', handleConn);
     window.addEventListener('offline', handleConn);
+    window.addEventListener('change-dashboard-zone', handleChangeZone);
     return () => {
       window.removeEventListener('ca:connectivity-change', handleConn);
       window.removeEventListener('online', handleConn);
       window.removeEventListener('offline', handleConn);
+      window.removeEventListener('change-dashboard-zone', handleChangeZone);
     };
   }, []);
 
@@ -2179,68 +2557,7 @@ const CADashboard = () => {
     { id: "plan", label: "Plan Limit", value: "0/10", icon: CreditCard, color: "text-primary" },
   ]);
 
-  const [companies, setCompanies] = useState<any[]>([
-    {
-      id: "demo-client-1",
-      name: "Acme Technologies Pvt Ltd",
-      industry: "SaaS & Cloud Infrastructure",
-      gstin: "07AAACA1234Z1ZP",
-      pan: "AAACA1234Z",
-      cin: "U72200DL2021PTC384920",
-      compliance_score: 94,
-      health: 94,
-      status: "Active",
-      risk_level: "Low",
-      lastFiling: "2026-05-18",
-      legal_status: "Active",
-      pending_tasks: 2,
-    },
-    {
-      id: "demo-client-2",
-      name: "GlobalTrade India Logistics",
-      industry: "Import & Supply Chain Logistics",
-      gstin: "27AABCG5678K2ZQ",
-      pan: "AABCG5678K",
-      cin: "U63090MH2018PTC311204",
-      compliance_score: 68,
-      health: 68,
-      status: "Critical",
-      risk_level: "High",
-      lastFiling: "2026-05-12",
-      legal_status: "Audit Pending",
-      pending_tasks: 5,
-    },
-    {
-      id: "demo-client-3",
-      name: "SecurePay Solutions Ltd",
-      industry: "Fintech & Payment Gateway",
-      gstin: "29AACCJ9012J3ZR",
-      pan: "AACCJ9012J",
-      cin: "L65191KA2015PLC082931",
-      compliance_score: 82,
-      health: 82,
-      status: "Active",
-      risk_level: "Medium",
-      lastFiling: "2026-05-20",
-      legal_status: "Active",
-      pending_tasks: 3,
-    },
-    {
-      id: "demo-client-4",
-      name: "Vertex EduTech Services",
-      industry: "E-Learning Platform",
-      gstin: "19AADCV3456N4ZS",
-      pan: "AADCV3456N",
-      cin: "U80902WB2020PTC239851",
-      compliance_score: 89,
-      health: 89,
-      status: "Active",
-      risk_level: "Low",
-      lastFiling: "2026-05-15",
-      legal_status: "Active",
-      pending_tasks: 1,
-    }
-  ]);
+  const [companies, setCompanies] = useState<any[]>([]);
   const [newCompanyPan, setNewCompanyPan] = useState("");
   const [isAddingCompany, setIsAddingCompany] = useState(false);
   const [draftText, setDraftText] = useState("");
@@ -2279,111 +2596,71 @@ const CADashboard = () => {
     // Bypassed polling to preserve simulated companies state
   }, []);
 
-  // Handle consent-based onboarding
+  // Handle consent-based onboarding (Now Fully Automated Simulation)
   const handleOnboardClient = async () => {
-    if (!onboardForm.gstin && !onboardForm.pan && !onboardForm.cin) {
-      toast.error('Enter at least one identifier (GSTIN, PAN, or CIN)');
+    if (!onboardForm.gstin && !onboardForm.pan && !onboardForm.cin && !onboardForm.client_name) {
+      toast.error('Enter Client Name and at least one identifier');
       return;
     }
-    if (!onboardForm.client_name) {
-      toast.error('Client name is required');
-      return;
-    }
-    if (!onboardForm.client_email && !onboardForm.client_phone) {
-      toast.error('Enter client email or phone for consent notification');
-      return;
-    }
+    const clientName = onboardForm.client_name || 'TechCorp Pvt Ltd';
 
     setIsOnboarding(true);
-    try {
-      const response = await fetch(`${COMPLIANCE_API}/client/onboard`, {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({
-          ca_id: caId || '',
-          ca_name: 'Rajesh Kumar, CA',
-          ca_email: 'ca@sannidh.ai',
-          ...onboardForm
-        })
-      });
+    
+    // Step 1: Send Consent
+    toast.info('Consent Request Sent!', { description: `Waiting for ${clientName} to authorize via Aadhar OTP...` });
+    
+    setTimeout(() => {
+      // Step 2: Client Approves
+      toast.success(`${clientName} Approved Consent!`, { description: 'Account Aggregator connection established.' });
       
-      const data = await response.json();
-      
-      if (data.success) {
-        toast.success('Consent request sent to client!', {
-          description: `Waiting for ${onboardForm.client_name} to authorize access`
-        });
+      setTimeout(() => {
+        // Step 3 & 4: Fetch Data & Update Dashboard
+        toast.info('AI Swarm Fetching Data...', { description: 'Retrieving 5 years of financial ledgers and tax filings.' });
         
-        // Add to pending requests
-        setPendingRequests(prev => [...prev, {
-          ...data.data,
-          client_name: onboardForm.client_name,
-          created_at: new Date().toISOString()
-        }]);
-        
-        // Reset form
-        setOnboardForm({
-          gstin: '',
-          pan: '',
-          cin: '',
-          client_name: '',
-          client_email: '',
-          client_phone: ''
-        });
+        const newClient = {
+          id: `demo-auto-${Date.now()}`,
+          name: clientName,
+          industry: "Technology & Software",
+          gstin: onboardForm.gstin || "27AABCT1234Q1Z5",
+          pan: onboardForm.pan || "AABCT1234Q",
+          cin: onboardForm.cin || "U72900MH2023PTC123456",
+          compliance_score: 100,
+          health: 100,
+          status: "Active",
+          risk_level: "Low",
+          lastFiling: new Date().toISOString().split('T')[0],
+          legal_status: "Active",
+          pending_tasks: 0,
+        };
+
+        setCompanies(prev => [newClient, ...prev]);
         setShowOnboardModal(false);
+        setIsOnboarding(false);
+        setOnboardForm({ gstin: '', pan: '', cin: '', client_name: '', client_email: '', client_phone: '' });
         
-        // Start polling for status
-        pollOnboardStatus(data.data.request_id);
-      } else {
-        toast.error(data.error || 'Failed to initiate onboarding');
-      }
-    } catch (error) {
-      console.error('Onboarding error:', error);
-      toast.error('Failed to connect to compliance service');
-    } finally {
-      setIsOnboarding(false);
-    }
+        toast.success('Data Room Populated Successfully', { description: `All 26 modules updated with ${clientName}'s financial data.` });
+
+        // Step 5: Simulate Live Bank Transaction after 12 seconds
+        setTimeout(() => {
+          toast.message('Real-Time Bank Sync Active', { description: 'Monitoring account aggregator streams...' });
+          setTimeout(() => {
+            window.dispatchEvent(new CustomEvent('simulate-bank-transaction', { detail: { client: clientName } }));
+          }, 3000);
+        }, 12000);
+
+        // Step 6: Simulate Govt Notice scraping after 35 seconds
+        setTimeout(() => {
+          window.dispatchEvent(new CustomEvent('simulate-govt-notice', { detail: { client: clientName } }));
+        }, 35000);
+
+      }, 4000); // 4 sec after approval
+
+    }, 3000); // 3 sec after request sent
   };
 
-  // Poll for onboarding status
+  // Poll for onboarding status (Bypassed for Demo)
   const pollOnboardStatus = async (requestId: string) => {
-    const checkStatus = async () => {
-      try {
-        const response = await fetch(`${COMPLIANCE_API}/onboard/${requestId}/status`);
-        const data = await response.json();
-        
-        if (data.is_complete) {
-          toast.success(`${data.company_name} onboarded successfully!`, {
-            description: `Compliance Score: ${data.health_score}%`
-          });
-          fetchClients();
-          setPendingRequests(prev => prev.filter(r => r.request_id !== requestId));
-          return true;
-        }
-        
-        if (data.consent_status === 'rejected') {
-          toast.error(`${data.company_name} rejected the consent request`);
-          setPendingRequests(prev => prev.filter(r => r.request_id !== requestId));
-          return true;
-        }
-        
-        return false;
-      } catch {
-        return false;
-      }
-    };
-
-    // Poll every 10 seconds for 10 minutes
-    const maxAttempts = 60;
-    let attempts = 0;
-    
-    const poll = setInterval(async () => {
-      attempts++;
-      const done = await checkStatus();
-      if (done || attempts >= maxAttempts) {
-        clearInterval(poll);
-      }
-    }, 10000);
+    // Deprecated for the simulation flow.
   };
 
   // View company details
@@ -2434,15 +2711,15 @@ const CADashboard = () => {
         prevStats.map((stat) => {
           switch (stat.id) {
             case "companies":
-              return { ...stat, value: String(metrics.assigned_companies || 4) };
+              return { ...stat, value: String(metrics.assigned_companies ?? 0) };
             case "tasks":
-              return { ...stat, value: String(metrics.active_tasks || 11) };
+              return { ...stat, value: String(metrics.active_tasks ?? 0) };
             case "due":
-              return { ...stat, value: String(metrics.pending_filings_week || 3) };
+              return { ...stat, value: String(metrics.pending_filings_week ?? 0) };
             case "alerts":
-              return { ...stat, value: String(metrics.high_risk_alerts || 1) };
+              return { ...stat, value: String(metrics.high_risk_alerts ?? 0) };
             case "revenue":
-              const rawRev = metrics.monthly_revenue || 240000;
+              const rawRev = metrics.monthly_revenue ?? 0;
               return {
                 ...stat,
                 value: `₹${(rawRev / 100000).toFixed(1)}L`,
@@ -2450,7 +2727,7 @@ const CADashboard = () => {
             case "plan":
               return {
                 ...stat,
-                value: `${metrics.assigned_companies || 4}/${10}`,
+                value: `${metrics.assigned_companies ?? 0}/10`,
               };
             default:
               return stat;
@@ -2593,17 +2870,17 @@ const CADashboard = () => {
               <Suspense fallback={<div className="p-12 flex justify-center items-center"><Loader className="w-8 h-8 animate-spin text-cyan-500" /></div>}>
               {/* ZONE 0: MULTI-ENTITY & CONSOLIDATED REPORTING */}
               <TabsContent value="multi-entity" className="m-0 focus-visible:outline-none focus-visible:ring-0">
-                <MultiEntityConsolidatedReporting />
+                {activeZone === "multi-entity" && <MultiEntityConsolidatedReporting />}
               </TabsContent>
 
               {/* ZONE 0B: E-FILING INTEGRATION */}
               <TabsContent value="e-filing" className="m-0 focus-visible:outline-none focus-visible:ring-0">
-                <EFilingIntegration />
+                {activeZone === "e-filing" && <EFilingIntegration />}
               </TabsContent>
 
               {/* ZONE 0C: PAYMENT & TAX-LIABILITY AUTOMATION */}
               <TabsContent value="payment" className="m-0 focus-visible:outline-none focus-visible:ring-0">
-                <PaymentTaxLiability />
+                {activeZone === "payment" && <PaymentTaxLiability />}
               </TabsContent>
 
               {/* ZONE 1: COMMAND CENTER (OVERVIEW) */}
@@ -2686,112 +2963,127 @@ const CADashboard = () => {
 
               {/* ZONE 2: CLIENT VAULT */}
               <TabsContent value="clients" className="m-0 focus-visible:outline-none focus-visible:ring-0 space-y-8">
-                <div className="p-6 rounded-2xl bg-gradient-to-r from-indigo-500/10 to-transparent border border-indigo-500/20 mb-8">
-                  <h2 className="text-2xl font-bold text-indigo-400">Client Portfolio Vault</h2>
-                  <p className="text-sm text-muted-foreground">Manage multi-entity compliance status and secure documentation.</p>
-                </div>
-                <MultiClientMasterHub />
-                <div className="my-8">
-                  <ClientFinancialVault />
-                </div>
-                
-                <div className="flex flex-col space-y-8">
-                  <TaskFilingManagement isRealDashboard={true} apiEndpoint={`${CA_API}/api/v1/ca/tasks`} governmentIntegration={true} />
-                  <ClientDependencyTracker isRealDashboard={true} apiEndpoint={`${CA_API}/api/v1/ca/dependencies`} aiEnabled={true} />
-                  <ApprovalWorkflowHub />
-                </div>
-                
+                {activeZone === "clients" && (
+                  <>
+                    <div className="p-6 rounded-2xl bg-gradient-to-r from-indigo-500/10 to-transparent border border-indigo-500/20 mb-8">
+                      <h2 className="text-2xl font-bold text-indigo-400">Client Portfolio Vault</h2>
+                      <p className="text-sm text-muted-foreground">Manage multi-entity compliance status and secure documentation.</p>
+                    </div>
+                    <MultiClientMasterHub />
+                    <div className="my-8">
+                      <ClientFinancialVault />
+                    </div>
+                    
+                    <div className="flex flex-col space-y-8">
+                      <TaskFilingManagement isRealDashboard={true} apiEndpoint={`${CA_API}/api/v1/ca/tasks`} governmentIntegration={true} />
+                      <ClientDependencyTracker isRealDashboard={true} apiEndpoint={`${CA_API}/api/v1/ca/dependencies`} aiEnabled={true} />
+                      <ApprovalWorkflowHub />
+                    </div>
+                  </>
+                )}
               </TabsContent>
 
               {/* ZONE 4: REGULATORY NEWS & CALENDAR */}
               <TabsContent value="ai-swarm" className="m-0 focus-visible:outline-none focus-visible:ring-0 space-y-8">
-                <div className="p-6 rounded-2xl bg-gradient-to-r from-amber-500/10 to-transparent border border-amber-500/20 mb-8">
-                  <h2 className="text-2xl font-bold text-amber-400">Regulatory News & Statutory Calendar</h2>
-                  <p className="text-sm text-muted-foreground">Cross-department statutory deadlines and rule updates.</p>
-                </div>
-                
-                <div className="flex flex-col space-y-8">
-                  <StatutoryDeadlineCalendar isRealDashboard={true} demoMode={false} />
-                  <RegulatoryNewsRuleImpact
-                    isRealDashboard={true}
-                    apiEndpoint={`${CA_API}/api/v1/ca/regulatory-news`}
-                    aiEnabled={true}
-                    caId={caId}
-                  />
-                  <ComplianceHealthChangeLog
-                    isRealDashboard={true}
-                    apiEndpoint={`${CA_API}/api/v1/ca`}
-                    caId={caId}
-                  />
-                </div>
+                {activeZone === "ai-swarm" && (
+                  <>
+                    <div className="p-6 rounded-2xl bg-gradient-to-r from-amber-500/10 to-transparent border border-amber-500/20 mb-8">
+                      <h2 className="text-2xl font-bold text-amber-400">Regulatory News & Statutory Calendar</h2>
+                      <p className="text-sm text-muted-foreground">Cross-department statutory deadlines and rule updates.</p>
+                    </div>
+                    
+                    <div className="flex flex-col space-y-8">
+                      <StatutoryDeadlineCalendar isRealDashboard={true} demoMode={false} />
+                      <RegulatoryNewsRuleImpact
+                        isRealDashboard={true}
+                        apiEndpoint={`${CA_API}/api/v1/ca/regulatory-news`}
+                        aiEnabled={true}
+                        caId={caId}
+                      />
+                      <ComplianceHealthChangeLog
+                        isRealDashboard={true}
+                        apiEndpoint={`${CA_API}/api/v1/ca`}
+                        caId={caId}
+                      />
+                    </div>
+                  </>
+                )}
               </TabsContent>
 
               {/* ZONE 4: FIRM OPERATIONS */}
               <TabsContent value="operations" className="m-0 focus-visible:outline-none focus-visible:ring-0 space-y-8">
-                <div className="p-6 rounded-2xl bg-gradient-to-r from-emerald-500/10 to-transparent border border-emerald-500/20 mb-8">
-                  <h2 className="text-2xl font-bold text-emerald-400">Firm Operations & Practice Management</h2>
-                  <p className="text-sm text-muted-foreground">Billing and Invoices, AES 256 Vault, Audit, and Performance.</p>
-                </div>
-                
-                <div className="flex flex-col space-y-8">
-                  <PracticeBillingPanel isRealDashboard={true} />
-                  <SecureFileSharingPanel isRealDashboard={true} />
-                  <AuditInspectionSupport isRealDashboard={true} caId={caId} />
-                  <CAAnalyticsPerformance isRealDashboard={true} caId={caId} />
-                  <CommunicationLogsLive isRealDashboard={true} caId={caId} />
-                </div>
+                {activeZone === "operations" && (
+                  <>
+                    <div className="p-6 rounded-2xl bg-gradient-to-r from-emerald-500/10 to-transparent border border-emerald-500/20 mb-8">
+                      <h2 className="text-2xl font-bold text-emerald-400">Firm Operations & Practice Management</h2>
+                      <p className="text-sm text-muted-foreground">Billing and Invoices, AES 256 Vault, Audit, and Performance.</p>
+                    </div>
+                    
+                    <div className="flex flex-col space-y-8">
+                      <PracticeBillingPanel isRealDashboard={true} />
+                      <SecureFileSharingPanel isRealDashboard={true} />
+                      <AuditInspectionSupport isRealDashboard={true} caId={caId} />
+                      <CAAnalyticsPerformance isRealDashboard={true} caId={caId} />
+                      <CommunicationLogsLive isRealDashboard={true} caId={caId} />
+                    </div>
+                  </>
+                )}
               </TabsContent>
 
               {/* ZONE 5: CALCULATORS & FORMS */}
               <TabsContent value="calculations" className="m-0 focus-visible:outline-none focus-visible:ring-0 space-y-8">
-                <div className="p-6 rounded-2xl bg-gradient-to-r from-rose-500/10 to-transparent border border-rose-500/20 mb-8">
-                  <h2 className="text-2xl font-bold text-rose-400">Calculators, Forms & Audits</h2>
-                  <p className="text-sm text-muted-foreground">Dedicated workspace for complex financial calculations, compliance forms, and audit logs.</p>
-                </div>
-                
-                <div className="flex flex-col space-y-8">
-                  <ComplianceModulesHub />
-                </div>
+                {activeZone === "calculations" && (
+                  <>
+                    <div className="p-6 rounded-2xl bg-gradient-to-r from-rose-500/10 to-transparent border border-rose-500/20 mb-8">
+                      <h2 className="text-2xl font-bold text-rose-400">Calculators, Forms & Audits</h2>
+                      <p className="text-sm text-muted-foreground">Dedicated workspace for complex financial calculations, compliance forms, and audit logs.</p>
+                    </div>
+                    
+                    <div className="flex flex-col space-y-8">
+                      <ComplianceModulesHub />
+                    </div>
+                  </>
+                )}
               </TabsContent>
 
               {/* ZONE 6: ENTERPRISE API & WEBHOOKS */}
               <TabsContent value="enterprise-api" className="m-0 focus-visible:outline-none focus-visible:ring-0 space-y-8">
-                <EnterpriseApiWebhooks />
+                {activeZone === "enterprise-api" && <EnterpriseApiWebhooks />}
               </TabsContent>
 
               {/* ZONE 7: ERP / ACCOUNTING INTEGRATION */}
               <TabsContent value="erp-integration" className="m-0 focus-visible:outline-none focus-visible:ring-0 space-y-8">
-                <ErpIntegrationHub />
+                {activeZone === "erp-integration" && <ErpIntegrationHub />}
               </TabsContent>
 
               {/* ZONE 8: DOCUMENT MANAGEMENT & OCR */}
               <TabsContent value="doc-ocr" className="m-0 focus-visible:outline-none focus-visible:ring-0 space-y-8">
-                <DocumentOcrHub />
+                {activeZone === "doc-ocr" && <DocumentOcrHub />}
               </TabsContent>
 
               {/* ZONE 9: RBAC & TEAM MANAGEMENT */}
               <TabsContent value="team-rbac" className="m-0 focus-visible:outline-none focus-visible:ring-0 space-y-8">
-                <TeamRbacHub />
+                {activeZone === "team-rbac" && <TeamRbacHub />}
               </TabsContent>
 
               {/* ZONE 10: NOTIFICATION & ALERT ENGINE */}
               <TabsContent value="notifications" className="m-0 focus-visible:outline-none focus-visible:ring-0 space-y-8">
-                <NotificationAlertHub />
+                {activeZone === "notifications" && <NotificationAlertHub />}
               </TabsContent>
 
               {/* ZONE 12: AUDIT TRAIL & COMPLIANCE REPORTING */}
               <TabsContent value="audit-trail" className="m-0 focus-visible:outline-none focus-visible:ring-0 space-y-8">
-                <AuditTrailHub />
+                {activeZone === "audit-trail" && <AuditTrailHub />}
               </TabsContent>
 
               {/* ZONE 13: MULTI-LANGUAGE & REGIONAL LOCALIZATION */}
               <TabsContent value="language-hub" className="m-0 focus-visible:outline-none focus-visible:ring-0 space-y-8">
-                <LocalizationHub />
+                {activeZone === "language-hub" && <LocalizationHub />}
               </TabsContent>
 
               {/* ZONE 15: OFFLINE MODE & PROGRESSIVE WEB APP (PWA) */}
               <TabsContent value="offline-hub" className="m-0 focus-visible:outline-none focus-visible:ring-0 space-y-8">
-                <OfflinePwaHub />
+                {activeZone === "offline-hub" && <OfflinePwaHub />}
               </TabsContent>
               </Suspense>
             </Tabs>
@@ -2887,4 +3179,11 @@ const CADashboard = () => {
   );
 };
 
-export default CADashboard;
+
+const CADashboardWrapper = () => (
+  <CAAgentProvider>
+    <CADashboard />
+  </CAAgentProvider>
+);
+
+export default CADashboardWrapper;

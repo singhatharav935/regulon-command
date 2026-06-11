@@ -42,6 +42,8 @@ import { PersonaRoute } from "./components/auth/PersonaRoute";
 const Dashboard = lazy(() => import("./pages/Dashboard"));
 const CADashboard = lazy(() => import("./pages/CADashboard"));
 const AdminDashboard = lazy(() => import("./pages/AdminDashboard"));
+const EFilingAckPdfViewer = lazy(() => import("./pages/EFilingAckPdfViewer"));
+const PaymentChallanPdfViewer = lazy(() => import("./pages/PaymentChallanPdfViewer"));
 // const AppDashboard = lazy(() => import("./pages/AppDashboard")); // Removed - use demo dashboards
 // const AppCADashboard = lazy(() => import("./pages/AppCADashboard")); // Removed - use demo dashboards
 // const AppAdminDashboard = lazy(() => import("./pages/AppAdminDashboard")); // Removed - use demo dashboards
@@ -139,6 +141,8 @@ const App = () => (
             <Route path="/persona-selector" element={<PersonaSelector />} />
             <Route path="/dashboard" element={<Dashboard />} />
             <Route path="/ca-dashboard" element={<CADashboard />} />
+            <Route path="/ca-dashboard/efiling-ack-pdf" element={<EFilingAckPdfViewer />} />
+            <Route path="/ca-dashboard/payment-challan-pdf" element={<PaymentChallanPdfViewer />} />
             <Route path="/admin-dashboard" element={<AdminDashboard />} />
             <Route path="/ca-firm-dashboard" element={<CAFirmDashboard />} />
             <Route path="/real-external-ca-dashboard" element={<ExternalCADashboardReal />} />

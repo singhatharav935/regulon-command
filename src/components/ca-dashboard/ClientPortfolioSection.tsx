@@ -18,6 +18,7 @@ import {
   triggerSync, triggerSwarm, getSwarmStatus,
 } from "@/services/ca-supabase-service";
 import { validateGSTIN, isGSTINFormatValid } from "@/lib/gstin-validator";
+import { useCAAgentOrchestrator } from "@/components/agents/CAAgentOrchestrator";
 
 const riskColors: Record<string, string> = {
   Low:    "bg-green-500/20 text-green-400 border-green-500/30",
@@ -45,6 +46,7 @@ interface ClientPortfolioSectionProps {
 const ClientPortfolioSection = ({
   governmentApiEnabled = false,
 }: ClientPortfolioSectionProps) => {
+  const { isRunning } = useCAAgentOrchestrator();
   const [clients, setClients] = useState<CAClient[]>([]);
   const [consentRequests, setConsentRequests] = useState<ConsentRequest[]>([]);
   const [isLoading, setIsLoading] = useState(false);
@@ -107,66 +109,7 @@ const ClientPortfolioSection = ({
     
     // Fallback to rich mock portfolio if the Supabase database is fresh/empty
     if (!clientData || clientData.length === 0) {
-      const isReal = typeof window !== 'undefined' && window.location.pathname.includes('real-');
-      if (isReal) {
-        setClients([]);
-      } else {
-        const mockClients: CAClient[] = [
-          {
-            id: "demo-client-1",
-            name: "Acme Technologies Pvt Ltd",
-            industry: "SaaS & Cloud Infrastructure",
-            health: 94,
-            risk: "Low",
-            gaps: 2,
-            deadline: "18/05/2026",
-            status: "Verified",
-            gstin: "07AAACA1234Z1ZP",
-            pan: "AAACA1234Z",
-            created_at: new Date().toISOString(),
-          },
-          {
-            id: "demo-client-2",
-            name: "GlobalTrade India Logistics",
-            industry: "Import & Supply Chain Logistics",
-            health: 68,
-            risk: "High",
-            gaps: 5,
-            deadline: "12/05/2026",
-            status: "Waiting for CA",
-            gstin: "27AABCG5678K2ZQ",
-            pan: "AABCG5678K",
-            created_at: new Date().toISOString(),
-          },
-          {
-            id: "demo-client-3",
-            name: "SecurePay Solutions Ltd",
-            industry: "Fintech & Payment Gateway",
-            health: 82,
-            risk: "Medium",
-            gaps: 3,
-            deadline: "20/05/2026",
-            status: "Verified",
-            gstin: "29AACCJ9012J3ZR",
-            pan: "AACCJ9012J",
-            created_at: new Date().toISOString(),
-          },
-          {
-            id: "demo-client-4",
-            name: "Vertex EduTech Services",
-            industry: "E-Learning Platform",
-            health: 89,
-            risk: "Low",
-            gaps: 1,
-            deadline: "15/05/2026",
-            status: "Verified",
-            gstin: "19AADCV3456N4ZS",
-            pan: "AADCV3456N",
-            created_at: new Date().toISOString(),
-          }
-        ];
-        setClients(mockClients);
-      }
+      setClients([]);
     } else {
       setClients(clientData);
     }
@@ -175,7 +118,18 @@ const ClientPortfolioSection = ({
     setIsLoading(false);
   }, []);
 
-  useEffect(() => { fetchData(); }, [fetchData]);
+  useEffect(() => {
+    fetchData();
+    const handleSyncEvents = () => {
+      fetchData();
+    };
+    window.addEventListener('demo-client-added', handleSyncEvents);
+    window.addEventListener('swarm-completed-event', handleSyncEvents);
+    return () => {
+      window.removeEventListener('demo-client-added', handleSyncEvents);
+      window.removeEventListener('swarm-completed-event', handleSyncEvents);
+    };
+  }, [fetchData]);
 
   // Poll every 30s for consent status updates
   useEffect(() => {
@@ -186,46 +140,200 @@ const ClientPortfolioSection = ({
     return () => clearInterval(interval);
   }, []);
 
+  // ── Demo-mode detection: ONLY /ca-dashboard is demo ──────────────────────
+  const isInDemoMode = () => {
+    if (typeof window === 'undefined') return false;
+    const p = window.location.pathname;
+    return p === '/ca-dashboard' || p === '/ca-dashboard/' || p.startsWith('/ca-dashboard/');
+  };
+
   const handleOnboardClient = async () => {
-    if (!onboardForm.gstin && !onboardForm.pan && !onboardForm.cin) {
-      toast.error("Identifier Required", { description: "Please enter at least one of: GSTIN, PAN, or CIN." });
-      return;
-    }
-    if (onboardForm.gstin && !gstinValidation?.valid) {
-      toast.error("Invalid GSTIN", { description: gstinValidation?.error || "Please check the GSTIN and try again." });
-      return;
-    }
-    if (!onboardForm.client_name.trim()) {
-      toast.error("Company Name Required");
-      return;
-    }
-    if (!onboardForm.client_email && !onboardForm.client_phone) {
-      toast.error("Contact Required", { description: "Enter client email or phone so we can send the consent request." });
+    // ── Production validation (real dashboards) ──────────────────────────
+    if (!isInDemoMode()) {
+      const name = onboardForm.client_name.trim();
+      const email = onboardForm.client_email.trim();
+      const phone = onboardForm.client_phone.trim();
+      const gstin = onboardForm.gstin.trim().toUpperCase();
+      const pan = onboardForm.pan.trim().toUpperCase();
+      const cin = onboardForm.cin.trim().toUpperCase();
+
+      // Block dummy keywords
+      const isDummyText = (str: string) => /dummy|test|mock|fake|temp|placeholder|chutiya/i.test(str);
+      const isDummyPhone = (num: string) => {
+        const cleaned = num.replace(/[\s+-]/g, '');
+        return /^(.)\1+$/.test(cleaned) || cleaned.includes('123456') || cleaned.length < 10;
+      };
+
+      if (!name) {
+        toast.error('Company Name is required');
+        return;
+      }
+      if (name.length < 3 || isDummyText(name)) {
+        toast.error('Invalid Company Name', {
+          description: 'Please enter a valid, real company name. Dummy or test names are blocked in production.',
+        });
+        return;
+      }
+
+      // Enforce at least one identifier in production
+      if (!gstin && !pan && !cin) {
+        toast.error('Identifier Required', {
+          description: 'Please enter at least one valid company identifier (GSTIN, PAN, or CIN) to onboard.',
+        });
+        return;
+      }
+
+      // Enforce format validation on identifiers if provided
+      if (gstin) {
+        const gstinVal = validateGSTIN(gstin);
+        if (!gstinVal.valid) {
+          toast.error('Invalid GSTIN', { description: gstinVal.error || 'Please enter a valid GSTIN.' });
+          return;
+        }
+      }
+      if (pan && !/^[A-Z]{5}[0-9]{4}[A-Z]$/.test(pan)) {
+        toast.error('Invalid PAN Format', { description: 'PAN must contain 5 letters, 4 digits, and 1 letter.' });
+        return;
+      }
+      if (cin && !/^[ULM][0-9]{5}[A-Z]{2}[0-9]{4}[A-Z]{3}[0-9]{6}$/.test(cin)) {
+        toast.error('Invalid CIN Format', { description: 'CIN must be a valid 21-digit Corporate Identification Number.' });
+        return;
+      }
+
+      // Enforce contact
+      if (!email && !phone) {
+        toast.error('Contact Info Required', {
+          description: 'Provide at least one contact method (Email or WhatsApp) to send the consent request.',
+        });
+        return;
+      }
+
+      // Validate contact formats
+      if (email) {
+        const emailRegex = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
+        if (!emailRegex.test(email) || isDummyText(email) || email.includes('@example.com')) {
+          toast.error('Invalid Email Address', { description: 'Please enter a valid, real client email address.' });
+          return;
+        }
+      }
+      if (phone) {
+        const phoneRegex = /^(?:\+91|0)?[6-9]\d{9}$/;
+        if (!phoneRegex.test(phone) || isDummyText(phone) || isDummyPhone(phone)) {
+          toast.error('Invalid Phone Number', { description: 'Please enter a valid 10-digit WhatsApp number.' });
+          return;
+        }
+      }
+
+      const clientName = name;
+      setIsOnboarding(true);
+
+      try {
+        const result = await initiateConsentRequest({
+          gstin: gstin || undefined,
+          pan: pan || undefined,
+          cin: cin || undefined,
+          client_name: clientName,
+          client_email: email || undefined,
+          client_phone: phone || undefined,
+        });
+
+        if (!result.success) {
+          toast.error('Failed to onboard client', { description: result.error });
+          setIsOnboarding(false);
+          return;
+        }
+
+        toast.success('Consent Request Sent!', {
+          description: `${clientName} will receive an Email${phone ? ' & WhatsApp' : ''} consent link. They appear in your portfolio once authorized.`,
+        });
+
+        if (result.emailSent) {
+          toast.info('Email dispatched', { description: `Consent email sent to ${email}` });
+        }
+        if (result.whatsappSent) {
+          toast.info('WhatsApp sent', { description: `Consent message sent to ${phone}` });
+        }
+
+        // Refresh portfolio + consent list from real DB
+        await fetchData();
+        setShowOnboardModal(false);
+        setIsOnboarding(false);
+        setOnboardForm({ gstin: '', pan: '', cin: '', client_name: '', client_email: '', client_phone: '' });
+      } catch (err: any) {
+        toast.error('Onboarding failed', { description: err?.message || 'Unexpected error. Please try again.' });
+        setIsOnboarding(false);
+      }
       return;
     }
 
-    setIsOnboarding(true);
-    const result = await initiateConsentRequest(onboardForm);
-    setIsOnboarding(false);
+    // ── DEMO SIMULATION FLOW (CA Demo Dashboard /ca-dashboard only) ───────
+    const clientName = onboardForm.client_name.trim() || 'New Client';
+    toast.info('Consent Request Sent!', { description: `Waiting for ${clientName} to authorize via Aadhar OTP...` });
+    
+    setTimeout(() => {
+      // Step 2: Client Approves
+      toast.success(`${clientName} Approved Consent!`, { description: 'Account Aggregator connection established.' });
+      
+      setTimeout(() => {
+        // Step 3 & 4: Fetch Data & Update Dashboard
+        toast.info('AI Swarm Fetching Data...', { description: 'Retrieving 5 years of financial ledgers and tax filings.' });
+        
+        const newClient: CAClient = {
+          id: `demo-auto-${Date.now()}`,
+          name: clientName,
+          industry: "Technology & Software",
+          health: 100,
+          risk: "Low",
+          gaps: 0,
+          deadline: new Date(Date.now() + 30 * 86400000).toLocaleDateString('en-GB'),
+          status: "Verified",
+          gstin: onboardForm.gstin || "27AABCT1234Q1Z5",
+          pan: onboardForm.pan || "AABCT1234Q",
+          created_at: new Date().toISOString(),
+        };
 
-    if (result.success && result.client) {
-      setClients(prev => [result.client!, ...prev]);
+        setClients(prev => {
+          const updated = [newClient, ...prev];
+          localStorage.setItem('demo_clients', JSON.stringify(updated));
+          localStorage.removeItem('sannidh:ca-swarm-messages');
+          localStorage.removeItem('sannidh:ca-swarm-agents');
+          localStorage.removeItem('sannidh:ca-swarm-system-status');
+          return updated;
+        });
+        setShowOnboardModal(false);
+        setIsOnboarding(false);
+        setOnboardForm({ gstin: '', pan: '', cin: '', client_name: '', client_email: '', client_phone: '' });
+        
+        toast.success('Data Room Populated Successfully', { description: `All 26 modules updated with ${clientName}'s financial data.` });
 
-      // Build notification status message
-      const notifParts: string[] = [];
-      if (result.emailSent)     notifParts.push("📧 Email sent");
-      if (result.whatsappSent)  notifParts.push("💬 WhatsApp sent");
-      const notifMsg = notifParts.length
-        ? notifParts.join(" · ")
-        : "⚠️ Notifications need API keys — client added to portfolio only";
+        // Trigger AI Swarm simulation visually if swarm engine is running and mode is automatic
+        const isAutoMode = localStorage.getItem('sannidh:dashboard-mode') === 'auto';
+        if (isRunning && isAutoMode) {
+          handleSwarm(newClient.id, clientName);
+        } else {
+          toast.info('Swarm run pending', { 
+            description: !isRunning 
+              ? 'Swarm engine is off. Please enable it in Settings.' 
+              : 'Swarm mode is manual. Run it using the "Run Swarm" button.'
+          });
+        }
 
-      toast.success("Client Added & Consent Requested", { description: notifMsg });
-      setShowOnboardModal(false);
-      setOnboardForm({ gstin: '', pan: '', cin: '', client_name: '', client_email: '', client_phone: '' });
-      fetchData(); // Refresh to include the new consent_request row
-    } else {
-      toast.error("Failed to Add Client", { description: result.error || "Please try again." });
-    }
+        // Step 5: Simulate Live Bank Transaction after 12 seconds
+        setTimeout(() => {
+          toast.message('Real-Time Bank Sync Active', { description: 'Monitoring account aggregator streams...' });
+          setTimeout(() => {
+            window.dispatchEvent(new CustomEvent('simulate-bank-transaction', { detail: { client: clientName } }));
+          }, 3000);
+        }, 12000);
+
+        // Step 6: Simulate Govt Notice scraping after 35 seconds
+        setTimeout(() => {
+          window.dispatchEvent(new CustomEvent('simulate-govt-notice', { detail: { client: clientName } }));
+        }, 35000);
+
+      }, 4000); // 4 sec after approval
+
+    }, 3000); // 3 sec after request sent
   };
 
   const handleSync = async (clientId: string, clientName: string) => {
@@ -267,9 +375,41 @@ const ClientPortfolioSection = ({
   };
 
   const handleSwarm = async (clientId: string, clientName: string) => {
+    if (!isRunning) {
+      toast.error("Swarm engine is off", {
+        description: "Please activate the AI Swarm engine in Profile Settings to run the compliance pipeline."
+      });
+      return;
+    }
     const fy = getCurrentFY();
     setSwarmingIds(prev => new Set(prev).add(clientId));
     setSwarmProgress(prev => ({ ...prev, [clientId]: { progress: 0, step: 'starting' } }));
+    
+    // DEMO BYPASS: Simulate swarm progress for automatically added demo clients
+    if (clientId.startsWith('demo-auto-')) {
+      toast.success(`AI Swarm started for ${clientName}`, {
+        description: `Processing FY ${fy}: bank categorization → books → 26 modules → data room`,
+      });
+      let progress = 0;
+      const steps = ['Reading Ledgers...', 'Categorizing Bank Txns...', 'Populating 26 Modules...', 'Generating Drafts...', 'Finalizing Data Room'];
+      
+      const interval = setInterval(() => {
+        progress += 20;
+        const step = steps[Math.min(Math.floor(progress / 20), 4)];
+        setSwarmProgress(prev => ({ ...prev, [clientId]: { progress, step } }));
+        
+        if (progress >= 100) {
+          clearInterval(interval);
+          setSwarmingIds(prev => { const s = new Set(prev); s.delete(clientId); return s; });
+          setSwarmDoneIds(prev => new Set(prev).add(clientId));
+          localStorage.setItem(`swarm_completed_${clientId}`, 'true');
+          toast.success(`AI Swarm processed for ${clientName}`, { description: 'Data Room Ready' });
+        }
+      }, 1500);
+      return;
+    }
+
+    // REAL FLOW
     const result = await triggerSwarm(clientId, fy);
     if (result.success) {
       toast.success(`AI Swarm started for ${clientName}`, {
@@ -476,7 +616,7 @@ const ClientPortfolioSection = ({
                           <div className="h-full bg-gradient-to-r from-purple-500 to-cyan-500 rounded-full transition-all duration-500" style={{ width: `${swarmProgress[client.id]?.progress || 0}%` }} />
                         </div>
                       </div>
-                    ) : swarmDoneIds.has(client.id) ? (
+                    ) : swarmDoneIds.has(client.id) || localStorage.getItem(`swarm_completed_${client.id}`) === 'true' ? (
                       <div className="flex items-center gap-1.5 text-green-400 text-xs">
                         <CheckCircle className="w-3 h-3" />Done
                       </div>
@@ -485,15 +625,17 @@ const ClientPortfolioSection = ({
                         size="sm"
                         variant="ghost"
                         onClick={() => handleSwarm(client.id, client.name)}
-                        className="h-7 px-2 text-xs text-purple-400 hover:text-purple-300 hover:bg-purple-500/10"
-                        title="Run AI financial pipeline: categorize → books → 26 modules → data room"
+                        className={`h-7 px-2 text-xs hover:bg-purple-500/10 ${
+                          !isRunning ? 'text-muted-foreground opacity-50 cursor-not-allowed' : 'text-purple-400 hover:text-purple-300'
+                        }`}
+                        title={!isRunning ? "AI Swarm Engine is offline" : "Run AI financial pipeline: categorize → books → 26 modules → data room"}
                       >
                         <Zap className="w-3 h-3 mr-1" />Run Swarm
                       </Button>
                     )}
                   </TableCell>
                   <TableCell>
-                    {swarmDoneIds.has(client.id) ? (
+                    {swarmDoneIds.has(client.id) || localStorage.getItem(`swarm_completed_${client.id}`) === 'true' ? (
                       <Badge className="bg-green-500/20 text-green-400 border-green-500/30 border text-xs">Ready</Badge>
                     ) : swarmingIds.has(client.id) ? (
                       <Badge className="bg-purple-500/20 text-purple-400 border-purple-500/30 border text-xs">Building...</Badge>
@@ -532,18 +674,20 @@ const ClientPortfolioSection = ({
                   </Button>
                 </div>
 
-                {/* Steps */}
-                <div className="flex items-center gap-2 mb-6 text-xs">
-                  {["Enter Details", "Client Consent", "Data Fetch", "Health Score"].map((step, i) => (
-                    <div key={step} className="flex items-center gap-1">
-                      {i > 0 && <ChevronRight className="w-3 h-3 text-muted-foreground" />}
-                      <div className={`flex items-center gap-1 ${i === 0 ? 'text-cyan-400' : 'text-muted-foreground'}`}>
-                        <div className={`w-5 h-5 rounded-full flex items-center justify-center text-xs ${i === 0 ? 'bg-cyan-500/20' : 'bg-muted/20'}`}>{i + 1}</div>
-                        <span className="hidden sm:inline">{step}</span>
+                {/* Steps — shown only in CA Demo Dashboard to illustrate workflow simulation */}
+                {isInDemoMode() && (
+                  <div className="flex items-center gap-2 mb-6 text-xs">
+                    {["Enter Details", "Client Consent", "Data Fetch", "Health Score"].map((step, i) => (
+                      <div key={step} className="flex items-center gap-1">
+                        {i > 0 && <ChevronRight className="w-3 h-3 text-muted-foreground" />}
+                        <div className={`flex items-center gap-1 ${i === 0 ? 'text-cyan-400' : 'text-muted-foreground'}`}>
+                          <div className={`w-5 h-5 rounded-full flex items-center justify-center text-xs ${i === 0 ? 'bg-cyan-500/20' : 'bg-muted/20'}`}>{i + 1}</div>
+                          <span className="hidden sm:inline">{step}</span>
+                        </div>
                       </div>
-                    </div>
-                  ))}
-                </div>
+                    ))}
+                  </div>
+                )}
 
                 <div className="space-y-4">
                   {/* Company Identifiers */}
@@ -682,7 +826,10 @@ const ClientPortfolioSection = ({
 
                   {/* Client Contact */}
                   <div className="p-4 rounded-lg bg-purple-500/5 border border-purple-500/20">
-                    <h4 className="text-sm font-semibold text-purple-400 mb-3">Client Contact (for consent notification)</h4>
+                    <h4 className="text-sm font-semibold text-purple-400 mb-3">
+                      Client Contact (for consent notification)
+                      {!isInDemoMode() && <span className="text-red-400 ml-1 font-normal text-xs">— at least Email or WhatsApp required</span>}
+                    </h4>
                     <div className="space-y-3">
                       <div>
                         <label className="text-xs text-muted-foreground mb-1 block">Company Name *</label>
@@ -696,7 +843,7 @@ const ClientPortfolioSection = ({
                       <div className="grid grid-cols-2 gap-3">
                         <div>
                           <label className="text-xs text-muted-foreground mb-1 flex items-center gap-1 block">
-                            <Mail className="w-3 h-3" /> Email
+                            <Mail className="w-3 h-3" /> Email {!isInDemoMode() && <span className="text-red-400">*</span>}
                           </label>
                           <Input
                             placeholder="finance@company.com"
@@ -708,7 +855,7 @@ const ClientPortfolioSection = ({
                         </div>
                         <div>
                           <label className="text-xs text-muted-foreground mb-1 flex items-center gap-1 block">
-                            <MessageSquare className="w-3 h-3" /> WhatsApp
+                            <MessageSquare className="w-3 h-3" /> WhatsApp {!isInDemoMode() && <span className="text-red-400">*</span>}
                           </label>
                           <Input
                             placeholder="+91 98765 43210"
@@ -718,6 +865,9 @@ const ClientPortfolioSection = ({
                           />
                         </div>
                       </div>
+                      {!isInDemoMode() && (
+                        <p className="text-xs text-amber-400/80">* At least one of Email or WhatsApp is required so the consent request can be delivered to your client.</p>
+                      )}
                     </div>
                   </div>
 
@@ -725,7 +875,10 @@ const ClientPortfolioSection = ({
                   <div className="p-3 rounded-lg border text-xs bg-blue-500/10 border-blue-500/20 text-blue-300">
                     <p className="flex items-start gap-2">
                       <Shield className="w-4 h-4 mt-0.5 flex-shrink-0" />
-                      <span>A secure consent link is sent via Email & WhatsApp. Data is only fetched after the client authorizes.</span>
+                      {isInDemoMode()
+                        ? <span>A secure consent link is sent via Email &amp; WhatsApp. Data is only fetched after the client authorizes.</span>
+                        : <span>A real consent link will be sent to your client via Email / WhatsApp. They must approve before their data is fetched. No data is accessed without consent.</span>
+                      }
                     </p>
                   </div>
 

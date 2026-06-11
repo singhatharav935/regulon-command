@@ -99,7 +99,9 @@ export const workspaceBackendRequest = async <T>(
   init?: RequestInit,
 ): Promise<T> => {
   // --- HIGH-FIDELITY INTERCEPTOR FOR DEMO CA DASHBOARD ---
-  const isDemo = typeof window !== 'undefined' && (window.location.pathname === '/ca-dashboard' || window.location.pathname === '/ca-dashboard/' || window.location.pathname.startsWith('/ca-dashboard/'));
+  const isDemo = typeof window !== 'undefined' && (
+    window.location.pathname === '/ca-dashboard' || window.location.pathname === '/ca-dashboard/' || window.location.pathname.startsWith('/ca-dashboard/')
+  );
   if (isDemo) {
     await sleep(600); // Simulate network latency
     
@@ -342,7 +344,9 @@ export const workspaceBackendStreamRequest = async (
   payload: Record<string, unknown>,
 ) => {
   // --- HIGH-FIDELITY INTERCEPTOR FOR DEMO CA DASHBOARD ---
-  const isDemo = typeof window !== 'undefined' && (window.location.pathname === '/ca-dashboard' || window.location.pathname === '/ca-dashboard/' || window.location.pathname.startsWith('/ca-dashboard/'));
+  const isDemo = typeof window !== 'undefined' && (
+    window.location.pathname === '/ca-dashboard' || window.location.pathname === '/ca-dashboard/' || window.location.pathname.startsWith('/ca-dashboard/')
+  );
   if (isDemo) {
     await sleep(600); // Simulate network latency
     

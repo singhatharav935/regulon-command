@@ -55,11 +55,19 @@ export const useCAMetrics = (): UseCAMetricsReturn => {
     };
     document.addEventListener('visibilitychange', handleVisibility);
     window.addEventListener('focus', fetchMetrics);
+    
+    // Refetch on custom events
+    window.addEventListener('swarm-completed-event', fetchMetrics);
+    window.addEventListener('swarm-status-changed', fetchMetrics);
+    window.addEventListener('ca:metrics-updated', fetchMetrics);
 
     return () => {
       clearInterval(interval);
       document.removeEventListener('visibilitychange', handleVisibility);
       window.removeEventListener('focus', fetchMetrics);
+      window.removeEventListener('swarm-completed-event', fetchMetrics);
+      window.removeEventListener('swarm-status-changed', fetchMetrics);
+      window.removeEventListener('ca:metrics-updated', fetchMetrics);
     };
   }, [fetchMetrics]);
 

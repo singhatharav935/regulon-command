@@ -9,6 +9,8 @@ import { supabase } from "@/integrations/supabase/client";
 const isDemoMode = () => {
   if (typeof window === 'undefined') return false;
   const path = window.location.pathname;
+  // ONLY the dedicated CA demo dashboard is in demo/mock mode.
+  // Real external and real inhouse dashboards must NEVER use mock data.
   return path === '/ca-dashboard' || path === '/ca-dashboard/' || path.startsWith('/ca-dashboard/');
 };
 
@@ -41,6 +43,38 @@ export async function initiateConsentRequest(form: {
   try {
     const { data: { user } } = await supabase.auth.getUser();
     if (!user) return { success: false, error: 'Not authenticated' };
+
+    // Service-level strict check to reject dummy data in production mode
+    if (!isDemoMode()) {
+      const name = form.client_name.trim();
+      const email = form.client_email?.trim() || '';
+      const phone = form.client_phone?.trim() || '';
+      const gstin = form.gstin?.trim().toUpperCase() || '';
+      const pan = form.pan?.trim().toUpperCase() || '';
+      const cin = form.cin?.trim().toUpperCase() || '';
+
+      const isDummyText = (str: string) => /dummy|test|mock|fake|temp|placeholder|chutiya/i.test(str);
+      const isDummyPhone = (num: string) => {
+        const cleaned = num.replace(/[\s+-]/g, '');
+        return /^(.)\1+$/.test(cleaned) || cleaned.includes('123456') || cleaned.length < 10;
+      };
+
+      if (!name) {
+        return { success: false, error: 'Company Name is required.' };
+      }
+      if (name.length < 3 || isDummyText(name)) {
+        return { success: false, error: 'Dummy or test names are not allowed in production.' };
+      }
+      if (!gstin && !pan && !cin) {
+        return { success: false, error: 'At least one valid government identifier (GSTIN, PAN, or CIN) is required.' };
+      }
+      if (email && (!/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(email) || isDummyText(email) || email.includes('@example.com'))) {
+        return { success: false, error: 'Invalid or dummy email address.' };
+      }
+      if (phone && (!/^(?:\+91|0)?[6-9]\d{9}$/.test(phone) || isDummyText(phone) || isDummyPhone(phone))) {
+        return { success: false, error: 'Invalid or dummy phone number.' };
+      }
+    }
 
     const { data: profile } = await supabase
       .from('profiles').select('full_name').eq('user_id', user.id).maybeSingle();
@@ -321,60 +355,15 @@ export async function addCAClient(form: CAClientForm): Promise<{ success: boolea
 export async function loadCAClients(): Promise<CAClient[]> {
   const isDemo = isDemoMode();
   if (isDemo) {
-    return [
-      {
-        id: "demo-client-1",
-        name: "Acme Technologies Pvt Ltd",
-        industry: "SaaS & Cloud Infrastructure",
-        health: 94,
-        risk: "Low",
-        gaps: 2,
-        deadline: "18/05/2026",
-        status: "Verified",
-        gstin: "07AAACA1234Z1ZP",
-        pan: "AAACA1234Z",
-        created_at: new Date().toISOString(),
-      },
-      {
-        id: "demo-client-2",
-        name: "GlobalTrade India Logistics",
-        industry: "Import & Supply Chain Logistics",
-        health: 68,
-        risk: "High",
-        gaps: 5,
-        deadline: "12/05/2026",
-        status: "Waiting for CA",
-        gstin: "27AABCG5678K2ZQ",
-        pan: "AABCG5678K",
-        created_at: new Date().toISOString(),
-      },
-      {
-        id: "demo-client-3",
-        name: "SecurePay Solutions Ltd",
-        industry: "Fintech & Payment Gateway",
-        health: 82,
-        risk: "Medium",
-        gaps: 3,
-        deadline: "20/05/2026",
-        status: "Verified",
-        gstin: "29AACCJ9012J3ZR",
-        pan: "AACCJ9012J",
-        created_at: new Date().toISOString(),
-      },
-      {
-        id: "demo-client-4",
-        name: "Vertex EduTech Services",
-        industry: "E-Learning Platform",
-        health: 89,
-        risk: "Low",
-        gaps: 1,
-        deadline: "15/05/2026",
-        status: "Verified",
-        gstin: "19AADCV3456N4ZS",
-        pan: "AADCV3456N",
-        created_at: new Date().toISOString(),
+    const savedDemoClients = localStorage.getItem('demo_clients');
+    if (savedDemoClients) {
+      try {
+        return JSON.parse(savedDemoClients);
+      } catch (e) {
+        return [];
       }
-    ];
+    }
+    return [];
   }
 
   try {
@@ -430,13 +419,18 @@ export interface CAMetrics {
 export async function getCAMetricsFromDB(): Promise<CAMetrics> {
   const isDemo = isDemoMode();
   if (isDemo) {
+    let count = 0;
+    try {
+      const saved = localStorage.getItem('demo_clients');
+      if (saved) count = JSON.parse(saved).length;
+    } catch (e) {}
     return {
-      assigned_companies: 4,
-      high_risk_alerts: 1,
-      pending_filings_week: 3,
-      active_tasks: 11,
-      monthly_revenue: 240000,
-      overdue_dependencies: 2,
+      assigned_companies: count,
+      high_risk_alerts: count > 0 ? 1 : 0,
+      pending_filings_week: count * 2,
+      active_tasks: count * 5,
+      monthly_revenue: count * 120000,
+      overdue_dependencies: count > 0 ? 1 : 0,
       last_updated: new Date().toISOString(),
     };
   }
@@ -445,24 +439,66 @@ export async function getCAMetricsFromDB(): Promise<CAMetrics> {
     const { data: { user } } = await supabase.auth.getUser();
     if (!user) return defaultMetrics();
 
-    const { data: memberships } = await supabase
+    // 1. Assigned Companies Count
+    const { count: assignedCount } = await supabase
       .from('company_members')
-      .select('company_id')
+      .select('company_id', { count: 'exact', head: true })
       .eq('user_id', user.id);
 
-    const companyIds = (memberships || []).map((m: any) => m.company_id);
-    const count = companyIds.length;
+    // 2. High Risk Alerts (Notices that are high status or urgent)
+    const { count: highRiskCount } = await supabase
+      .from('client_govt_notices')
+      .select('id', { count: 'exact', head: true })
+      .eq('ca_user_id', user.id)
+      .eq('status', 'detected');
+
+    // 3. Overdue dependencies
+    const nowStr = new Date().toISOString();
+    const { count: overdueCount } = await supabase
+      .from('ca_dependencies')
+      .select('id', { count: 'exact', head: true })
+      .eq('ca_user_id', user.id)
+      .eq('status', 'pending')
+      .lt('due_date', nowStr);
+
+    // 4. Active Tasks (Unbilled tasks that need billing/completion)
+    const { count: activeTasksCount } = await supabase
+      .from('ca_task_history')
+      .select('id', { count: 'exact', head: true })
+      .eq('ca_user_id', user.id)
+      .eq('is_billed', false);
+
+    // 5. Monthly Revenue (Total paid invoices for current month)
+    const startOfMonth = new Date(new Date().getFullYear(), new Date().getMonth(), 1).toISOString();
+    const { data: invoices } = await supabase
+      .from('ca_firm_invoices')
+      .select('total_amount')
+      .eq('firm_id', user.id)
+      .eq('payment_status', 'paid')
+      .gte('payment_received_date', startOfMonth);
+    const monthlyRev = (invoices || []).reduce((sum, inv) => sum + Number(inv.total_amount || 0), 0);
+
+    // 6. Pending Filings in next 7 days
+    const nextWeekStr = new Date(Date.now() + 7 * 86400000).toISOString();
+    const { count: pendingFilings } = await supabase
+      .from('client_govt_notices')
+      .select('id', { count: 'exact', head: true })
+      .eq('ca_user_id', user.id)
+      .eq('status', 'detected')
+      .gte('due_date', nowStr)
+      .lte('due_date', nextWeekStr);
 
     return {
-      assigned_companies: count,
-      high_risk_alerts: Math.max(0, Math.floor(count * 0.2)),
-      pending_filings_week: Math.max(0, Math.floor(count * 0.4)),
-      active_tasks: Math.max(0, count * 2),
-      monthly_revenue: count * 8500,
-      overdue_dependencies: Math.max(0, Math.floor(count * 0.1)),
+      assigned_companies: assignedCount || 0,
+      high_risk_alerts: highRiskCount || 0,
+      pending_filings_week: pendingFilings || 0,
+      active_tasks: activeTasksCount || 0,
+      monthly_revenue: monthlyRev || 0,
+      overdue_dependencies: overdueCount || 0,
       last_updated: new Date().toISOString(),
     };
-  } catch {
+  } catch (err) {
+    console.error("Failed to fetch CA metrics from DB", err);
     return defaultMetrics();
   }
 }
@@ -570,50 +606,27 @@ export function getLiveRegulatoryNews(): RegNews[] {
 export async function getClientGovtNotices(): Promise<any[]> {
   const isDemo = isDemoMode();
   if (isDemo) {
-    return [
-      {
-        id: "notice-demo-1",
-        company: "GlobalTrade India Logistics",
-        company_id: "demo-client-2".substring(0, 8),
-        task: "GSTR-2B Mismatch Demand (SCN-829412)",
-        authority: "GST",
-        filing_type: "Notice Response",
-        dueDate: "12/06/2026",
-        days_remaining: 10,
-        penalty: "₹2,40,000 demand",
-        dependency: "Pending CA Review",
-        urgency: "high",
-        status: "pending",
-      },
-      {
-        id: "notice-demo-2",
-        company: "SecurePay Solutions Ltd",
-        company_id: "demo-client-3".substring(0, 8),
-        task: "MCA Section 454 Active Compliance Query",
-        authority: "MCA",
-        filing_type: "ROC Board Response",
-        dueDate: "05/06/2026",
-        days_remaining: 3,
-        penalty: "₹50,000 late fee",
-        dependency: "Pending Board Resolution",
-        urgency: "critical",
-        status: "pending",
-      },
-      {
-        id: "notice-demo-3",
-        company: "Acme Technologies Pvt Ltd",
-        company_id: "demo-client-1".substring(0, 8),
-        task: "Income Tax Assessment u/s 143(2) (Scrutiny)",
-        authority: "Income Tax",
-        filing_type: "Assessment Rebuttal",
-        dueDate: "20/06/2026",
-        days_remaining: 18,
-        penalty: "Audit Scrutiny u/s 143(3)",
-        dependency: "Awaiting Ledger Audit",
-        urgency: "medium",
-        status: "pending",
-      }
-    ];
+    let demoClients: any[] = [];
+    try {
+      const saved = localStorage.getItem('demo_clients');
+      if (saved) demoClients = JSON.parse(saved);
+    } catch (e) {}
+    
+    if (demoClients.length === 0) return [];
+    
+    return demoClients.map((client, idx) => ({
+      id: `notice-${idx}`,
+      company_id: client.id || `demo-client-${idx}`,
+      company_name: client.name || client.client_name || 'Client',
+      notice_type: idx % 2 === 0 ? "GST 143(2)" : "MCA AOC-4",
+      department: idx % 2 === 0 ? "GST" : "MCA",
+      received_date: new Date().toISOString(),
+      due_date: new Date(Date.now() + 86400000 * (idx + 5)).toISOString(),
+      status: "pending",
+      severity: idx % 2 === 0 ? "high" : "medium",
+      ai_draft_status: "ready",
+      amount_demanded: idx % 2 === 0 ? 250000 : 0
+    }));
   }
 
   try {
@@ -658,41 +671,26 @@ export async function getClientGovtNotices(): Promise<any[]> {
 export async function getCADependencies(): Promise<any[]> {
   const isDemo = isDemoMode();
   if (isDemo) {
-    return [
-      {
-        id: "dep-demo-1",
-        company: "GlobalTrade India Logistics",
-        company_id: "demo-client-2",
-        document: "Purchase Register Ledger (April 2026)",
-        type: "Required Document",
-        dueDate: "10/05/2026",
-        days_remaining: -23,
-        status: "uploaded",
-        urgency: "critical",
-      },
-      {
-        id: "dep-demo-2",
-        company: "SecurePay Solutions Ltd",
-        company_id: "demo-client-3",
-        document: "ROC Active-3 Board Resolution Form",
-        type: "Required Document",
-        dueDate: "03/06/2026",
-        days_remaining: 1,
-        status: "pending",
-        urgency: "high",
-      },
-      {
-        id: "dep-demo-3",
-        company: "Vertex EduTech Services",
-        company_id: "demo-client-4",
-        document: "DIR-3 KYC Self-Attested PAN Copy",
-        type: "Required Document",
-        dueDate: "15/06/2026",
-        days_remaining: 13,
-        status: "pending",
-        urgency: "medium",
-      }
-    ];
+    let demoClients: any[] = [];
+    try {
+      const saved = localStorage.getItem('demo_clients');
+      if (saved) demoClients = JSON.parse(saved);
+    } catch (e) {}
+    
+    if (demoClients.length === 0) return [];
+
+    return demoClients.map((client, idx) => ({
+      id: `dep-${idx}`,
+      company_id: client.id || `demo-client-${idx}`,
+      company_name: client.name || client.client_name || 'Client',
+      dependency_name: idx % 2 === 0 ? "Bank Statements" : "Purchase Invoices",
+      requested_date: new Date(Date.now() - 86400000 * 2).toLocaleDateString('en-IN', { day: '2-digit', month: 'short', year: 'numeric' }),
+      due_date: new Date(Date.now() + 86400000 * (idx + 3)).toISOString(),
+      dueDate: new Date(Date.now() + 86400000 * (idx + 3)).toLocaleDateString('en-IN', { day: '2-digit', month: 'short', year: 'numeric' }),
+      days_remaining: idx + 3,
+      status: "pending",
+      urgency: idx % 2 === 0 ? "high" : "medium",
+    }));
   }
 
   try {
@@ -734,56 +732,30 @@ export async function getCADependencies(): Promise<any[]> {
 export async function getCommunicationLogs(): Promise<any[]> {
   const isDemo = isDemoMode();
   if (isDemo) {
-    return [
-      {
-        id: "log-demo-1",
-        type: "message",
-        direction: "incoming",
-        company_id: "demo-client-2",
-        company_name: "GlobalTrade India Logistics",
-        subject: "GSTIN OTP Auth",
-        content: "Director approved Aadhar digital signature u/s 16(4) with OTP 893121.",
-        sender: "Director (GlobalTrade)",
-        recipient: "Sannidh AI",
-        status: "read",
-        priority: "medium",
-        category: "general",
-        timestamp: new Date(Date.now() - 3600000).toISOString(),
-        ai_summary: "Automated digital e-signature attached to rebuttal successfully.",
-      },
-      {
-        id: "log-demo-2",
-        type: "email",
-        direction: "outgoing",
-        company_id: "demo-client-3",
-        company_name: "SecurePay Solutions Ltd",
-        subject: "WORM Vault Locked Notice",
-        content: "Cryptographic signature attached to balance sheet and securely WORM-sealed.",
-        sender: "Sannidh AI",
-        recipient: "compliance@securepay.in",
-        status: "read",
-        priority: "medium",
-        category: "general",
-        timestamp: new Date(Date.now() - 7200000).toISOString(),
-        ai_summary: "Auto-generated SHA-256 seal logged into audit register.",
-      },
-      {
-        id: "log-demo-3",
-        type: "system",
-        direction: "system",
-        company_id: "demo-client-1",
-        company_name: "Acme Technologies Pvt Ltd",
-        subject: "Swarm Scan Complete",
-        content: "12-agent consensus achieved on Income Tax 143(2) response. Demands drops to ₹0.",
-        sender: "Oracle Agent",
-        recipient: "CA Rajesh Kumar",
-        status: "read",
-        priority: "medium",
-        category: "general",
-        timestamp: new Date(Date.now() - 10800000).toISOString(),
-        ai_summary: "Consensus reached among INSPECTOR, TRACKER, and PORTFOLIO.",
-      }
-    ];
+    let demoClients: any[] = [];
+    try {
+      const saved = localStorage.getItem('demo_clients');
+      if (saved) demoClients = JSON.parse(saved);
+    } catch (e) {}
+    
+    if (demoClients.length === 0) return [];
+
+    return demoClients.map((client, idx) => ({
+      id: `log-demo-${idx}`,
+      type: "system",
+      direction: "system",
+      company_id: client.id || `demo-client-${idx}`,
+      company_name: client.name || client.client_name || 'Client',
+      subject: "Swarm Scan Complete",
+      content: `12-agent consensus achieved on Income Tax 143(2) response for ${client.name || 'this client'}.`,
+      sender: "Oracle Agent",
+      recipient: "CA (You)",
+      status: "read",
+      priority: "medium",
+      category: "general",
+      timestamp: new Date(Date.now() - 10800000).toISOString(),
+      ai_summary: "Consensus reached among INSPECTOR, TRACKER, and PORTFOLIO.",
+    }));
   }
 
   try {
@@ -823,29 +795,22 @@ export async function getCommunicationLogs(): Promise<any[]> {
 export async function getUnbilledTasks(): Promise<any[]> {
   const isDemo = isDemoMode();
   if (isDemo) {
-    return [
-      {
-        id: "unbill-demo-1",
-        client: "GlobalTrade India Logistics",
-        task_name: "GST Notice Rebuttal (SCN-829412) Draft & File u/s 16(4)",
-        date_completed: "02/06/2026",
-        suggested_fee: 15000,
-      },
-      {
-        id: "unbill-demo-2",
-        client: "SecurePay Solutions Ltd",
-        task_name: "ROC Balance Sheet compilation u/s 454 & WORM Audit Trail",
-        date_completed: "28/05/2026",
-        suggested_fee: 25000,
-      },
-      {
-        id: "unbill-demo-3",
-        client: "Acme Technologies Pvt Ltd",
-        task_name: "Income Tax Scrutiny Response preparation",
-        date_completed: "25/05/2026",
-        suggested_fee: 35000,
-      }
-    ];
+    let demoClients: any[] = [];
+    try {
+      const saved = localStorage.getItem('demo_clients');
+      if (saved) demoClients = JSON.parse(saved);
+    } catch (e) {}
+    
+    if (demoClients.length === 0) return [];
+
+    return demoClients.map((client, idx) => ({
+      id: `unbilled-${idx}`,
+      client: client.name || client.client_name || 'Client',
+      task_name: idx % 2 === 0 ? "GST Annual Return Filing" : "MCA Director KYC",
+      suggested_fee: 15000 + (idx * 5000),
+      date_completed: new Date().toISOString().split('T')[0],
+      status: "unbilled"
+    }));
   }
 
   try {
@@ -1061,7 +1026,6 @@ export async function exportCompliancePDF(options: {
   caName?: string;
   firmName?: string;
 }): Promise<void> {
-  const { loadCAClients, getStatutoryDeadlines, getLiveRegulatoryNews } = await import('./ca-supabase-service');
   const [clients, deadlines, news] = await Promise.all([
     loadCAClients(),
     Promise.resolve(getStatutoryDeadlines()),

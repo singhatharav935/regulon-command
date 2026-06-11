@@ -101,10 +101,11 @@ import { toast } from "sonner";
 import useCAMetrics from "@/hooks/useCAMetrics";
 import { useCAIdentity } from "@/hooks/useCAIdentity";
 import { useRealtimeSync } from "@/hooks/useRealtimeSync";
-import { addCompany as addCompanyAPI } from "@/services/api";
+// Production: uses Supabase-backed services only — no legacy api.ts
 // CAAgentProvider is now global — provided at App.tsx level
 import { CACommandCenterHeader } from "@/components/agents/CACommandCenterHeader";
 import { CAActionInbox } from "@/components/agents/CAActionInbox";
+import ProductionSetupBanner from "@/components/ca-dashboard/ProductionSetupBanner";
 
 // Daily Governance Brief Component
 const DailyGovernanceBrief = () => {
@@ -1849,11 +1850,15 @@ const ExternalCADashboardReal = () => {
   // Realtime sync: re-fetch when ANY device changes data in Supabase
   useRealtimeSync(refetch);
   const [activeZone, setActiveZone] = useState<CADashboardZone>("command");
-  const CA_API = (import.meta.env.VITE_CA_API_BASE_URL as string);
-  // Role-based access control
+  // PRODUCTION: CA_API points to Supabase Edge Functions (real backend)
+  const CA_API = (import.meta.env.VITE_SUPABASE_URL as string);
+
+  // Role-based access control — only block if a different role is explicitly stored
+  // Real external CAs won't have 'current_user_role' set at all on first login
   useEffect(() => {
     const userRole = localStorage.getItem("current_user_role");
-    if (userRole !== "external_ca") {
+    // Only redirect if a role is explicitly set AND it's not external_ca
+    if (userRole && userRole !== "external_ca" && userRole !== "") {
       navigate("/dashboard");
       return;
     }
@@ -1890,38 +1895,37 @@ const ExternalCADashboardReal = () => {
   const [isDrawerOpen, setIsDrawerOpen] = useState(false);
   const [chatDrawerOpen, setChatDrawerOpen] = useState(false);
 
-  // Compliance Service API URL
-  const COMPLIANCE_API = 'http://localhost:8001/api/v1';
+  // PRODUCTION: All data flows through Supabase directly — no local server needed
 
-  // Fetch CA's clients from compliance service
+  // Fetch CA's clients from Supabase database
   const fetchClients = async () => {
-    if (!isCABackendConfigured()) return;
     try {
-      if (!caId) return;
-      const response = await fetch(`${COMPLIANCE_API}/ca/${caId}/clients`);
-      const data = await response.json();
-      if (data.success && data.clients) {
-        setCompanies(data.clients.map((c: any) => ({
-          ...c,
-          health: c.compliance_score,
-          status: c.legal_status || 'Active',
-          lastFiling: c.last_sync ? new Date(c.last_sync).toLocaleDateString() : 'Pending'
-        })));
-      }
-    } catch {
-      // Compliance service unavailable — silently use local state
+      const { loadCAClients } = await import('@/services/ca-supabase-service');
+      const dbClients = await loadCAClients();
+      setCompanies(dbClients);
+    } catch (err) {
+      console.error("Error loading CA clients in dashboard:", err);
     }
   };
 
-  // Fetch pending consent requests
+  // Fetch pending consent requests from real Supabase database
   const fetchPendingRequests = async () => {
-    // This would fetch from your backend
-    // For now, we'll manage locally
+    try {
+      const { getPendingConsentRequests } = await import('@/services/ca-supabase-service');
+      const requests = await getPendingConsentRequests();
+      setPendingRequests(requests);
+    } catch (err) {
+      console.error('Failed to fetch pending consent requests:', err);
+    }
   };
 
   useEffect(() => {
     fetchClients();
-    const interval = setInterval(fetchClients, 30000); // Poll every 30 seconds
+    fetchPendingRequests();
+    const interval = setInterval(() => {
+      fetchClients();
+      fetchPendingRequests();
+    }, 30000); // Poll every 30 seconds
     return () => clearInterval(interval);
   }, []);
 
@@ -1942,27 +1946,24 @@ const ExternalCADashboardReal = () => {
 
     setIsOnboarding(true);
     try {
-      const response = await fetch(`${COMPLIANCE_API}/client/onboard`, {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({
-          ca_id: caId || '',
-          ca_name: 'Rajesh Kumar, CA',
-          ca_email: 'ca@sannidh.ai',
-          ...onboardForm
-        })
+      const { initiateConsentRequest } = await import('@/services/ca-supabase-service');
+      const result = await initiateConsentRequest({
+        gstin: onboardForm.gstin || undefined,
+        pan: onboardForm.pan || undefined,
+        cin: onboardForm.cin || undefined,
+        client_name: onboardForm.client_name,
+        client_email: onboardForm.client_email || undefined,
+        client_phone: onboardForm.client_phone || undefined,
       });
       
-      const data = await response.json();
-      
-      if (data.success) {
+      if (result.success) {
         toast.success('Consent request sent to client!', {
           description: `Waiting for ${onboardForm.client_name} to authorize access`
         });
         
         // Add to pending requests
         setPendingRequests(prev => [...prev, {
-          ...data.data,
+          id: result.client?.id || `req-${Date.now()}`,
           client_name: onboardForm.client_name,
           created_at: new Date().toISOString()
         }]);
@@ -1977,15 +1978,12 @@ const ExternalCADashboardReal = () => {
           client_phone: ''
         });
         setShowOnboardModal(false);
-        
-        // Start polling for status
-        pollOnboardStatus(data.data.request_id);
       } else {
-        toast.error(data.error || 'Failed to initiate onboarding');
+        toast.error(result.error || 'Failed to initiate onboarding');
       }
-    } catch (error) {
+    } catch (error: any) {
       console.error('Onboarding error:', error);
-      toast.error('Failed to connect to compliance service');
+      toast.error('Failed to onboard client: ' + error.message);
     } finally {
       setIsOnboarding(false);
     }
@@ -1993,52 +1991,23 @@ const ExternalCADashboardReal = () => {
 
   // Poll for onboarding status
   const pollOnboardStatus = async (requestId: string) => {
-    const checkStatus = async () => {
-      try {
-        const response = await fetch(`${COMPLIANCE_API}/onboard/${requestId}/status`);
-        const data = await response.json();
-        
-        if (data.is_complete) {
-          toast.success(`${data.company_name} onboarded successfully!`, {
-            description: `Compliance Score: ${data.health_score}%`
-          });
-          fetchClients();
-          setPendingRequests(prev => prev.filter(r => r.request_id !== requestId));
-          return true;
-        }
-        
-        if (data.consent_status === 'rejected') {
-          toast.error(`${data.company_name} rejected the consent request`);
-          setPendingRequests(prev => prev.filter(r => r.request_id !== requestId));
-          return true;
-        }
-        
-        return false;
-      } catch {
-        return false;
-      }
-    };
-
-    // Poll every 10 seconds for 10 minutes
-    const maxAttempts = 60;
-    let attempts = 0;
-    
-    const poll = setInterval(async () => {
-      attempts++;
-      const done = await checkStatus();
-      if (done || attempts >= maxAttempts) {
-        clearInterval(poll);
-      }
-    }, 10000);
+    // Realtime updates via Supabase triggers handle status changes
   };
 
   // View company details
   const handleViewCompany = async (company: any) => {
     try {
-      const response = await fetch(`${COMPLIANCE_API}/client/${company.id}`);
-      const data = await response.json();
-      if (data.success) {
-        setSelectedCompany(data.client);
+      const { supabase } = await import('@/integrations/supabase/client');
+      const { data, error } = await supabase
+        .from('companies')
+        .select('*')
+        .eq('id', company.id)
+        .single();
+      if (data && !error) {
+        setSelectedCompany(data);
+        setShowCompanyDetails(true);
+      } else {
+        setSelectedCompany(company);
         setShowCompanyDetails(true);
       }
     } catch {
@@ -2050,9 +2019,14 @@ const ExternalCADashboardReal = () => {
   // Refresh company data
   const handleRefreshCompany = async (companyId: string) => {
     try {
-      await fetch(`${COMPLIANCE_API}/client/${companyId}/refresh`, { method: 'POST' });
-      toast.success('Data refresh initiated');
-      setTimeout(fetchClients, 5000);
+      const { triggerSync } = await import('@/services/ca-supabase-service');
+      const result = await triggerSync(companyId);
+      if (result.success) {
+        toast.success('Data refresh sync job initiated');
+        setTimeout(fetchClients, 5000);
+      } else {
+        toast.error(result.error || 'Failed to refresh data');
+      }
     } catch {
       toast.error('Failed to refresh data');
     }
@@ -2105,6 +2079,7 @@ const ExternalCADashboardReal = () => {
     }
   }, [metrics]);
 
+  // PRODUCTION: Add company via real Supabase (consent-based onboarding preferred)
   const addCompany = async () => {
     if (!newCompanyPan.trim()) {
       toast.error("Enter valid PAN/CIN");
@@ -2113,16 +2088,18 @@ const ExternalCADashboardReal = () => {
 
     setIsAddingCompany(true);
     try {
-      const result = await addCompanyAPI({
+      const { addCAClient } = await import('@/services/ca-supabase-service');
+      const result = await addCAClient({
         pan: newCompanyPan.toUpperCase(),
-        name: newCompanyPan,
-        industry: "Not Specified",
+        client_name: newCompanyPan,
       });
 
       if (result.success) {
-        toast.success("Company added. Waiting for owner approval...");
+        toast.success("Company added to your portfolio.", {
+          description: 'Client appears in your portfolio. Use Onboard Client to send consent request.'
+        });
         setNewCompanyPan("");
-        // Refetch metrics after adding company
+        await fetchClients();
         await refetch();
       } else {
         toast.error(result.error || "Failed to add company");
@@ -2184,6 +2161,8 @@ const ExternalCADashboardReal = () => {
             </div>
           </div>
 
+          {/* Production Setup Banner — shows which API keys are still needed */}
+          <ProductionSetupBanner />
           {/* CA Command Center Header */}
           <CACommandCenterHeader />
           {/* Main Dashboard Layout with Horizontal Tabs */}
@@ -2335,14 +2314,15 @@ const ExternalCADashboardReal = () => {
                   <h2 className="text-2xl font-bold text-indigo-400">Client Portfolio Vault</h2>
                   <p className="text-sm text-muted-foreground">Manage multi-entity compliance status and secure documentation.</p>
                 </div>
-                <MultiClientMasterHub />
+                {/* isDemo={false} hardcoded — this component NEVER reads demo localStorage in real dashboard */}
+                <MultiClientMasterHub isDemo={false} />
                 <div className="my-8">
                   <ClientFinancialVault />
                 </div>
                 
                 <div className="flex flex-col space-y-8">
-                  <TaskFilingManagement isRealDashboard={true} apiEndpoint={`${CA_API}/api/v1/ca/tasks`} governmentIntegration={true} />
-                  <ClientDependencyTracker isRealDashboard={true} apiEndpoint={`${CA_API}/api/v1/ca/dependencies`} aiEnabled={true} />
+                  <TaskFilingManagement isRealDashboard={true} apiEndpoint={`${CA_API}/functions/v1/ca-tasks`} governmentIntegration={true} />
+                  <ClientDependencyTracker isRealDashboard={true} apiEndpoint={`${CA_API}/functions/v1/ca-dependencies`} aiEnabled={true} />
                   <ApprovalWorkflowHub />
                 </div>
                 
@@ -2359,13 +2339,13 @@ const ExternalCADashboardReal = () => {
                   <StatutoryDeadlineCalendar isRealDashboard={true} demoMode={false} />
                   <RegulatoryNewsRuleImpact
                     isRealDashboard={true}
-                    apiEndpoint={`${CA_API}/api/v1/ca/regulatory-news`}
+                    apiEndpoint={`${CA_API}/functions/v1/regulatory-news`}
                     aiEnabled={true}
                     caId={caId}
                   />
                   <ComplianceHealthChangeLog
                     isRealDashboard={true}
-                    apiEndpoint={`${CA_API}/api/v1/ca`}
+                    apiEndpoint={`${CA_API}/functions/v1`}
                     caId={caId}
                   />
                 </div>
@@ -2395,7 +2375,8 @@ const ExternalCADashboardReal = () => {
                 </div>
                 
                 <div className="flex flex-col space-y-8">
-                  <ComplianceModulesHub />
+                  {/* isDemo={false} hardcoded — calculators always use real client data from Supabase */}
+                  <ComplianceModulesHub isDemo={false} />
                 </div>
               </TabsContent>
 
@@ -2515,7 +2496,7 @@ const ExternalCADashboardReal = () => {
                       demoMode={false}
                       isRealDashboard={true}
                       includeLawyerReview={true}
-                      apiEndpoint={`${CA_API}/api/ca-dashboard`}
+                      apiEndpoint={`${CA_API}/functions/v1/ai-drafting-engine`}
                       openaiIntegration={true}
                       realDocumentGeneration={true}
                     />

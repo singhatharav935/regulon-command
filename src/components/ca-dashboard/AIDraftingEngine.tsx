@@ -1444,7 +1444,7 @@ type CustomRecheckReport = {
   checkedAt?: string;
 };
 
-const buildOfflineDraft = ({
+export const buildOfflineDraft = ({
   documentType,
   authority,
   companyName,
@@ -2145,7 +2145,7 @@ const documentFormatModules: Record<string, string[]> = {
   ],
 };
 
-const readyNoticeTemplates: Record<string, string> = {
+export const readyNoticeTemplates: Record<string, string> = {
   "gst-show-cause": "Show Cause Notice No. ZD070226019874A dated 07 February 2026 issued by State GST Bengaluru South, DIN/RFN GST/SCN/2026/BLR-S/44721, alleges wrongful ITC availment for period April 2024 to December 2025 under Section 73 read with Section 16(2)(c), Rule 36 and Rule 42 with Rule 86A risk reference. Proposed tax demand is INR 18,46,920, interest under Section 50 and penalty under Section 73(9). Department relies on DRC-01 working sheet dated 31 January 2026, GSTR-3B vs GSTR-2B mismatch, and vendor filing gaps. Noticee has valid invoices, receipt proof, banking payment trail, and return compliance. Prepare para-wise rebuttal matrix, allegation-wise computation challenge, annexure mapping, and complete prayer for dropping demand, interest and penalty with hearing request.",
   "mca-notice": "Adjudication Notice No. ROC/KA/ADJ/2026/112 dated 15 January 2026, DIN MCA/ROC/2026/44718, issued by Registrar of Companies under Companies Act, 2013 alleging non-compliance of Section 92 read with Rule 11 and Section 137 read with Rule 12 for FY 2023-24. Proposed penalty is INR 5,00,000 on company and INR 1,00,000 on each officer in default. Department alleges delayed statutory filing and seeks adjudication under penalty provisions. Noticee submits delay is procedural, filings have been completed with additional fees, and no stakeholder prejudice occurred. Draft issue-wise response with chronology, section-wise defense, mitigation and compounding submissions, annexure mapping, and prayer for dropping or substantial reduction of penalty with personal hearing.",
   "income-tax-response": "Income-tax Notice No. ITBA/AST/S/143(2)/2026-27/1049982 dated 28 June 2026, DIN ITD/1432/2026/88217, issued by ACIT Circle-5 for AY 2025-26 in assessment proceedings alleging disallowance under Section 37(1) and mismatch under Section 194C with proposed addition of INR 27,80,000. Department relies on AIS/TDS mismatch, ledger variance and invoice scrutiny, and proposes consequential tax, interest and penalty proceedings. Noticee provides audited books, bank trail, vendor invoices, TDS reconciliation and contract evidence showing business purpose and correct reporting. Draft para-wise rebuttal for each allegation, computation challenge table, annexure mapping, and final prayer for deletion of additions, dropping penalty initiation, and grant of personal hearing before any adverse order.",

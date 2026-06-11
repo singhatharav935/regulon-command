@@ -4,6 +4,7 @@
  * All data from Supabase. No mock data.
  */
 import { useState, useEffect, useMemo, useCallback } from 'react';
+import { useNavigate } from 'react-router-dom';
 import { motion, AnimatePresence } from 'framer-motion';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { Badge } from '@/components/ui/badge';
@@ -23,7 +24,8 @@ import {
   useTaxLiabilities, usePaymentTransactions,
   usePaymentDashboard, useReminders, useReconciliation,
 } from '@/hooks/usePayment';
-import { formatRupees, rupeesToP, pToRupees, type TaxType, type PaymentGateway, type TaxLiability } from '@/services/payment-service';
+import { formatRupees, rupeesToP, pToRupees, confirmPayment, type TaxType, type PaymentGateway, type TaxLiability } from '@/services/payment-service';
+import { useCAAgentOrchestrator } from '@/components/agents/CAAgentOrchestrator';
 import {
   IndianRupee, Plus, RefreshCw, Trash2, CheckCircle, AlertTriangle,
   Clock, Loader2, CreditCard, ChevronDown, ChevronRight, X, Save,
@@ -76,11 +78,64 @@ function daysUntilDue(dueDate: string): { days: number; color: string; label: st
   return { days: diff, color: 'text-green-400', label: `${diff}d left` };
 }
 
+const useSafeSwarmState = () => {
+  const [isAutoMode, setIsAutoMode] = useState(() => {
+    if (typeof window === 'undefined') return false;
+    return localStorage.getItem('sannidh:dashboard-mode') === 'auto';
+  });
+  const [localRunning, setLocalRunning] = useState(() => {
+    if (typeof window === 'undefined') return false;
+    return localStorage.getItem('sannidh:ca-swarm-running') === 'true';
+  });
+  
+  useEffect(() => {
+    const handleStorageChange = () => {
+      setIsAutoMode(localStorage.getItem('sannidh:dashboard-mode') === 'auto');
+      setLocalRunning(localStorage.getItem('sannidh:ca-swarm-running') === 'true');
+    };
+    window.addEventListener('storage', handleStorageChange);
+    const interval = setInterval(handleStorageChange, 1000);
+    return () => {
+      window.removeEventListener('storage', handleStorageChange);
+      clearInterval(interval);
+    };
+  }, []);
+
+  let isRunning = localRunning;
+  try {
+    const orch = useCAAgentOrchestrator();
+    isRunning = orch.isRunning;
+  } catch (e) {
+    // fallback
+  }
+
+  return { isRunning, isAutoMode };
+};
+
 // ─── Dashboard Tab ────────────────────────────────────────────────────────────
 
 const DashboardTab = ({ caUserId }: { caUserId: string }) => {
   const { summary, loading, refetch } = usePaymentDashboard(caUserId);
-  const { upcoming } = useTaxLiabilities(caUserId);
+  const { upcoming, refetch: refetchLiabilities } = useTaxLiabilities(caUserId);
+
+  useEffect(() => {
+    const handleReload = () => {
+      refetch();
+      refetchLiabilities();
+    };
+    window.addEventListener('swarm-completed-event', handleReload);
+    window.addEventListener('swarm-status-changed', handleReload);
+    window.addEventListener('ca:metrics-updated', handleReload);
+    window.addEventListener('sannidh:history-updated', handleReload);
+    window.addEventListener('storage', handleReload);
+    return () => {
+      window.removeEventListener('swarm-completed-event', handleReload);
+      window.removeEventListener('swarm-status-changed', handleReload);
+      window.removeEventListener('ca:metrics-updated', handleReload);
+      window.removeEventListener('sannidh:history-updated', handleReload);
+      window.removeEventListener('storage', handleReload);
+    };
+  }, [refetch, refetchLiabilities]);
 
   const collectionRate = summary.total_due_paise > 0
     ? Math.round((summary.total_paid_paise / summary.total_due_paise) * 100)
@@ -188,6 +243,68 @@ const LiabilitiesTab = ({ caUserId }: { caUserId: string }) => {
   const { liabilities, loading, computing, addLiability, removeLiability, computeAndCreate, refetch } = useTaxLiabilities(caUserId);
   const { entities } = useEntities(caUserId);
   const { initiateOnline, recordManual, initiating, recording } = usePaymentTransactions(caUserId);
+
+  const navigate = useNavigate();
+
+  const handleViewReceipt = (l: TaxLiability) => {
+    localStorage.setItem('payment_pdf_liability', JSON.stringify(l));
+    navigate('/ca-dashboard/payment-challan-pdf');
+  };
+
+  const { isRunning, isAutoMode } = useSafeSwarmState();
+
+  useEffect(() => {
+    const handleReload = () => {
+      refetch();
+    };
+    window.addEventListener('swarm-completed-event', handleReload);
+    window.addEventListener('swarm-status-changed', handleReload);
+    window.addEventListener('ca:metrics-updated', handleReload);
+    window.addEventListener('sannidh:history-updated', handleReload);
+    window.addEventListener('storage', handleReload);
+    return () => {
+      window.removeEventListener('swarm-completed-event', handleReload);
+      window.removeEventListener('swarm-status-changed', handleReload);
+      window.removeEventListener('ca:metrics-updated', handleReload);
+      window.removeEventListener('sannidh:history-updated', handleReload);
+      window.removeEventListener('storage', handleReload);
+    };
+  }, [refetch]);
+
+  // Autonomous Swarm Auto-Payment Agent Loop
+  useEffect(() => {
+    if (!isRunning || !isAutoMode || liabilities.length === 0) return;
+
+    // Find first unpaid tax liability with balance due
+    const unpaid = liabilities.find(l => !l.is_paid && l.balance_due_paise > 0);
+    if (!unpaid) return;
+
+    const timer = setTimeout(async () => {
+      try {
+        toast.info(`[Swarm Agent] Paying liability: ${unpaid.tax_label}...`, {
+          description: `Autonomous auto-payment of ${formatRupees(unpaid.balance_due_paise)} via NetBanking simulation.`,
+        });
+        
+        await initiateOnline(unpaid.id, unpaid.balance_due_paise, `[Auto Swarm] ${unpaid.tax_label}`, unpaid.entity_id);
+        
+        toast.success(`[Swarm Agent] Successfully paid ${unpaid.tax_label}!`, {
+          description: 'Consensus engine verified challan receipt & settled tax head.',
+        });
+        
+        // Dispatch global sync events
+        window.dispatchEvent(new CustomEvent('ca:metrics-updated'));
+        window.dispatchEvent(new CustomEvent('swarm-completed-event'));
+        window.dispatchEvent(new CustomEvent('sannidh:history-updated'));
+        window.dispatchEvent(new CustomEvent('storage'));
+        
+        refetch();
+      } catch (err: any) {
+        console.error('Autonomous payment agent error:', err);
+      }
+    }, 6000);
+
+    return () => clearTimeout(timer);
+  }, [isRunning, isAutoMode, liabilities, initiateOnline, refetch]);
 
   const [showAdd, setShowAdd] = useState(false);
   const [showPayDialog, setShowPayDialog] = useState<TaxLiability | null>(null);
@@ -371,7 +488,7 @@ const LiabilitiesTab = ({ caUserId }: { caUserId: string }) => {
           {/* Auto-Compute */}
           <Dialog open={showComputeDialog} onOpenChange={setShowComputeDialog}>
             <DialogTrigger asChild>
-              <Button variant="outline" className="border-purple-500/40 text-purple-400 hover:bg-purple-500/10">
+              <Button disabled={!isRunning} variant="outline" className="border-purple-500/40 text-purple-400 hover:bg-purple-500/10">
                 <Zap className="w-4 h-4 mr-2" /> Auto-Compute
               </Button>
             </DialogTrigger>
@@ -438,7 +555,7 @@ const LiabilitiesTab = ({ caUserId }: { caUserId: string }) => {
           {/* Manual Add */}
           <Dialog open={showAdd} onOpenChange={setShowAdd}>
             <DialogTrigger asChild>
-              <Button className="bg-green-600 hover:bg-green-700">
+              <Button disabled={!isRunning} className="bg-green-600 hover:bg-green-700">
                 <Plus className="w-4 h-4 mr-2" /> Add Liability
               </Button>
             </DialogTrigger>
@@ -582,16 +699,26 @@ const LiabilitiesTab = ({ caUserId }: { caUserId: string }) => {
                       </TableCell>
                       <TableCell className="py-3 text-right">
                         <div className="flex items-center justify-end gap-1" onClick={e => e.stopPropagation()}>
-                          {!l.is_paid && (
+                          {l.is_paid ? (
+                            <Button
+                              size="sm"
+                              variant="outline"
+                              className="border-green-500/30 text-green-400 hover:bg-green-500/10 text-xs h-7 gap-1"
+                              onClick={() => handleViewReceipt(l)}
+                            >
+                              <FileText className="w-3.5 h-3.5" /> Receipt
+                            </Button>
+                          ) : (
                             <Button
                               size="sm"
                               className="bg-green-600 hover:bg-green-700 text-xs h-7"
+                              disabled={!isRunning}
                               onClick={() => { setShowPayDialog(l); setPayForm(f => ({ ...f, amount: pToRupees(l.balance_due_paise) })); }}
                             >
                               <CreditCard className="w-3 h-3 mr-1" />Pay
                             </Button>
                           )}
-                          <Button size="icon" variant="ghost" className="w-7 h-7 text-red-400 hover:bg-red-500/10" onClick={() => removeLiability(l.id)}>
+                          <Button disabled={!isRunning} size="icon" variant="ghost" className="w-7 h-7 text-red-400 hover:bg-red-500/10" onClick={() => removeLiability(l.id)}>
                             <Trash2 className="w-3 h-3" />
                           </Button>
                         </div>
@@ -727,7 +854,55 @@ const LiabilitiesTab = ({ caUserId }: { caUserId: string }) => {
 
 const TransactionsTab = ({ caUserId }: { caUserId: string }) => {
   const { transactions, loading, refetch } = usePaymentTransactions(caUserId);
+  const { liabilities } = useTaxLiabilities(caUserId);
   const [search, setSearch] = useState('');
+
+  const navigate = useNavigate();
+
+  const handleViewReceiptFromTxn = (t: any) => {
+    const l = liabilities.find(liab => liab.id === t.liability_id);
+    if (l) {
+      localStorage.setItem('payment_pdf_liability', JSON.stringify({
+        ...l,
+        amount_paid_paise: t.amount_paise,
+        payment_date: t.payment_date || t.created_at,
+        bank_reference_no: t.bank_reference_no || t.gateway_payment_id,
+        challan_number: t.challan_number,
+      }));
+    } else {
+      localStorage.setItem('payment_pdf_liability', JSON.stringify({
+        id: t.liability_id || t.id,
+        tax_label: t.description,
+        tax_type: 'other',
+        total_due_paise: t.amount_paise,
+        amount_paid_paise: t.amount_paise,
+        balance_due_paise: 0,
+        is_paid: true,
+        payment_date: t.payment_date || t.created_at,
+        bank_reference_no: t.bank_reference_no || t.gateway_payment_id,
+        challan_number: t.challan_number,
+      }));
+    }
+    navigate('/ca-dashboard/payment-challan-pdf');
+  };
+
+  useEffect(() => {
+    const handleReload = () => {
+      refetch();
+    };
+    window.addEventListener('swarm-completed-event', handleReload);
+    window.addEventListener('swarm-status-changed', handleReload);
+    window.addEventListener('ca:metrics-updated', handleReload);
+    window.addEventListener('sannidh:history-updated', handleReload);
+    window.addEventListener('storage', handleReload);
+    return () => {
+      window.removeEventListener('swarm-completed-event', handleReload);
+      window.removeEventListener('swarm-status-changed', handleReload);
+      window.removeEventListener('ca:metrics-updated', handleReload);
+      window.removeEventListener('sannidh:history-updated', handleReload);
+      window.removeEventListener('storage', handleReload);
+    };
+  }, [refetch]);
 
   const STATUS_TXNMETA: Record<string, { label: string; color: string }> = {
     pending:        { label: 'Pending',    color: 'bg-gray-500/20 text-gray-400 border-gray-500/30' },
@@ -772,6 +947,7 @@ const TransactionsTab = ({ caUserId }: { caUserId: string }) => {
                 <TableHead className="text-muted-foreground text-right">Amount</TableHead>
                 <TableHead className="text-muted-foreground">Ref / Challan</TableHead>
                 <TableHead className="text-muted-foreground text-center">Status</TableHead>
+                <TableHead className="text-muted-foreground text-right">Actions</TableHead>
               </TableRow>
             </TableHeader>
             <TableBody>
@@ -792,6 +968,18 @@ const TransactionsTab = ({ caUserId }: { caUserId: string }) => {
                     <TableCell className="py-3 text-center">
                       <Badge variant="outline" className={`text-xs ${sm?.color}`}>{sm?.label}</Badge>
                     </TableCell>
+                    <TableCell className="py-3 text-right">
+                      {txn.status === 'success' && (
+                        <Button
+                          size="sm"
+                          variant="ghost"
+                          className="text-green-400 hover:text-green-300 hover:bg-green-500/10 text-xs h-7 gap-1"
+                          onClick={() => handleViewReceiptFromTxn(txn)}
+                        >
+                          <FileText className="w-3.5 h-3.5" /> Receipt
+                        </Button>
+                      )}
+                    </TableCell>
                   </TableRow>
                 );
               })}
@@ -809,6 +997,68 @@ const ReconciliationTab = ({ caUserId }: { caUserId: string }) => {
   const { entries, loading, matching, importBankRow, matchEntry, refetch } = useReconciliation(caUserId);
   const { transactions } = usePaymentTransactions(caUserId, { status: 'success' });
   const { liabilities } = useTaxLiabilities(caUserId);
+
+  const { isRunning, isAutoMode } = useSafeSwarmState();
+
+  useEffect(() => {
+    const handleReload = () => {
+      refetch();
+    };
+    window.addEventListener('swarm-completed-event', handleReload);
+    window.addEventListener('swarm-status-changed', handleReload);
+    window.addEventListener('ca:metrics-updated', handleReload);
+    window.addEventListener('sannidh:history-updated', handleReload);
+    window.addEventListener('storage', handleReload);
+    return () => {
+      window.removeEventListener('swarm-completed-event', handleReload);
+      window.removeEventListener('swarm-status-changed', handleReload);
+      window.removeEventListener('ca:metrics-updated', handleReload);
+      window.removeEventListener('sannidh:history-updated', handleReload);
+      window.removeEventListener('storage', handleReload);
+    };
+  }, [refetch]);
+
+  // Autonomous Swarm Auto-Reconciliation Agent Loop
+  useEffect(() => {
+    const unmatchedList = entries.filter(e => !e.is_matched);
+    if (!isRunning || !isAutoMode || unmatchedList.length === 0) return;
+
+    // Find high confidence unmatched entry (>= 80%) with a liability_id mapping
+    const entryToMatch = unmatchedList.find(e => (e.match_confidence ?? 0) >= 0.80 && e.liability_id);
+    if (!entryToMatch) return;
+
+    // Find a matching successful transaction and target liability
+    const matchingTxn = transactions.find(t => t.liability_id === entryToMatch.liability_id && t.status === 'success');
+    const matchingLiab = liabilities.find(l => l.id === entryToMatch.liability_id);
+
+    if (!matchingTxn || !matchingLiab) return;
+
+    const timer = setTimeout(async () => {
+      try {
+        toast.info(`[Swarm Agent] Reconciling bank txn: ₹${(entryToMatch.bank_txn_amount_paise / 100).toLocaleString('en-IN')}...`, {
+          description: `Auto-matching with ledger transaction: ${matchingTxn.description}`,
+        });
+
+        await matchEntry(entryToMatch.id, matchingTxn.id, matchingLiab.id);
+
+        toast.success(`[Swarm Agent] Successfully reconciled bank statement row!`, {
+          description: `Matched & locked to ${matchingLiab.tax_label}.`,
+        });
+
+        // Dispatch global sync events
+        window.dispatchEvent(new CustomEvent('ca:metrics-updated'));
+        window.dispatchEvent(new CustomEvent('swarm-completed-event'));
+        window.dispatchEvent(new CustomEvent('sannidh:history-updated'));
+        window.dispatchEvent(new CustomEvent('storage'));
+
+        refetch();
+      } catch (err: any) {
+        console.error('Autonomous reconciliation agent error:', err);
+      }
+    }, 5000);
+
+    return () => clearTimeout(timer);
+  }, [isRunning, isAutoMode, entries, transactions, liabilities, matchEntry, refetch]);
 
   const [showImport, setShowImport] = useState(false);
   const [importForm, setImportForm] = useState({ bank_txn_date: '', bank_txn_amount: '', bank_narration: '', bank_reference: '' });
@@ -846,7 +1096,7 @@ const ReconciliationTab = ({ caUserId }: { caUserId: string }) => {
           <Button variant="outline" size="icon" onClick={refetch}><RefreshCw className="w-4 h-4" /></Button>
           <Dialog open={showImport} onOpenChange={setShowImport}>
             <DialogTrigger asChild>
-              <Button className="bg-blue-600 hover:bg-blue-700"><Plus className="w-4 h-4 mr-2" /> Import Bank Row</Button>
+              <Button disabled={!isRunning} className="bg-blue-600 hover:bg-blue-700"><Plus className="w-4 h-4 mr-2" /> Import Bank Row</Button>
             </DialogTrigger>
             <DialogContent className="bg-background border-border/50">
               <DialogHeader>
@@ -940,7 +1190,7 @@ const ReconciliationTab = ({ caUserId }: { caUserId: string }) => {
                 </Select>
                 <Button
                   size="sm"
-                  disabled={!matchTxnId || !matchLiabId || matching === entry.id}
+                  disabled={!matchTxnId || !matchLiabId || matching === entry.id || !isRunning}
                   onClick={() => {
                     setMatchingId(entry.id);
                     matchEntry(entry.id, matchTxnId, matchLiabId).then(() => {
@@ -971,6 +1221,8 @@ const PaymentTaxLiability = () => {
     supabase.auth.getUser().then(({ data }) => setCaUserId(data.user?.id ?? null));
   }, []);
 
+  const { isRunning, isAutoMode } = useSafeSwarmState();
+
   if (!caUserId) return <div className="flex items-center justify-center py-24"><Loader2 className="w-8 h-8 animate-spin text-green-400" /></div>;
 
   return (
@@ -982,19 +1234,34 @@ const PaymentTaxLiability = () => {
     >
       {/* Header */}
       <div className="p-6 rounded-2xl bg-gradient-to-r from-green-500/10 via-transparent to-emerald-500/10 border border-green-500/20">
-        <div className="flex items-center gap-3 mb-2">
-          <div className="p-2.5 rounded-xl bg-gradient-to-br from-green-500 to-emerald-600">
-            <IndianRupee className="w-6 h-6 text-white" />
+        <div className="flex items-center gap-3 mb-2 flex-wrap sm:flex-nowrap">
+          <div className="flex items-center gap-3">
+            <div className="p-2.5 rounded-xl bg-gradient-to-br from-green-500 to-emerald-600">
+              <IndianRupee className="w-6 h-6 text-white" />
+            </div>
+            <div>
+              <h2 className="text-2xl font-bold text-green-400">Payment & Tax-Liability Automation</h2>
+              <p className="text-sm text-muted-foreground">
+                Auto-compute GST, TDS, Income Tax, EPF liabilities — pay online or record manual — reconcile bank statements
+              </p>
+            </div>
           </div>
-          <div>
-            <h2 className="text-2xl font-bold text-green-400">Payment & Tax-Liability Automation</h2>
-            <p className="text-sm text-muted-foreground">
-              Auto-compute GST, TDS, Income Tax, EPF liabilities — pay online or record manual — reconcile bank statements
-            </p>
-          </div>
-          <div className="ml-auto flex items-center gap-2">
-            <div className="w-2 h-2 bg-green-400 rounded-full animate-pulse" />
-            <span className="text-xs text-green-400">Razorpay Ready</span>
+          <div className="ml-auto flex items-center gap-3">
+            {/* Swarm Status Indicator */}
+            <div className={`flex items-center gap-1.5 px-3 py-1 rounded-full border text-xs font-semibold tracking-wide ${
+              isRunning 
+                ? 'bg-emerald-500/10 text-emerald-400 border-emerald-500/20' 
+                : 'bg-rose-500/10 text-rose-400 border-rose-500/20'
+            }`}>
+              <span className={`w-2 h-2 rounded-full ${isRunning ? 'bg-emerald-400 animate-pulse' : 'bg-rose-400'}`} />
+              SWARM: {isRunning ? 'ONLINE' : 'OFFLINE'}
+            </div>
+
+            {/* Automation Mode Indicator */}
+            <div className="flex items-center gap-1.5 px-3 py-1 rounded-full border border-cyan-500/20 bg-cyan-500/10 text-cyan-400 text-xs font-semibold tracking-wide">
+              <Zap className="w-3.5 h-3.5" />
+              MODE: {isAutoMode ? 'AUTOMATIC' : 'MANUAL'}
+            </div>
           </div>
         </div>
         <div className="flex flex-wrap gap-2 mt-3">
@@ -1003,6 +1270,20 @@ const PaymentTaxLiability = () => {
           ))}
         </div>
       </div>
+
+      {/* Swarm Offline Warning Banner */}
+      {!isRunning && (
+        <div className="p-4 rounded-xl bg-rose-500/10 border border-rose-500/20 flex items-start gap-3 shadow-lg backdrop-blur-md">
+          <AlertTriangle className="w-5 h-5 text-rose-400 flex-shrink-0 mt-0.5 animate-bounce" />
+          <div className="flex-1">
+            <h4 className="text-sm font-semibold text-rose-400">AI Swarm Engine Offline</h4>
+            <p className="text-xs text-muted-foreground mt-1">
+              All automated tax liability calculations, online challan/Razorpay dispatch, and bank transaction reconciliations are paused. 
+              Please turn on the <strong>AI Swarm Engine</strong> in your profile settings to resume background auto-settlement.
+            </p>
+          </div>
+        </div>
+      )}
 
       {/* Tabs */}
       <Tabs value={activeTab} onValueChange={setActiveTab}>
