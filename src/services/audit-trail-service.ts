@@ -447,12 +447,9 @@ export async function deleteReport(id: string): Promise<void> {
 // ─── Data Retention ───────────────────────────────────────────────────────────
 
 export async function fetchRetentionPolicies(caUserId: string): Promise<DataRetentionPolicy[]> {
-  // Bootstrap default policies if none exist
   if (!isValidUUID(caUserId)) return [];
-  try {
-    await supabase.rpc('bootstrap_retention_policies', { ca_id: caUserId });
-  } catch { /* graceful — proceed even if RPC not deployed */ }
-
+  // NOTE: bootstrap_retention_policies RPC does not exist in the DB schema.
+  // We skip the RPC call and query the table directly to avoid 400 errors.
   const { data, error } = await (supabase as any)
     .from('data_retention_policies')
     .select('*')

@@ -32,12 +32,15 @@ export interface TaxLiability {
   id: string;
   ca_user_id: string;
   entity_id?: string;
-  company_id?: string;
-  tax_type: TaxType;
-  tax_label: string;
-  period_start: string;
-  period_end: string;
-  due_date: string;
+  // DB column: head_name (not tax_label)
+  head_name: string;
+  tax_label: string;       // alias for head_name in the UI
+  tax_type: string;
+  // DB column: assessment_year (not period_start/period_end)
+  assessment_year?: string;
+  period_start: string;    // mapped from assessment_year in UI
+  period_end: string;      // mapped from assessment_year in UI
+  due_date?: string;
   gross_liability_paise: number;
   itc_available_paise: number;
   net_liability_paise: number;
@@ -45,21 +48,14 @@ export interface TaxLiability {
   penalty_paise: number;
   late_fee_paise: number;
   total_due_paise: number;
-  amount_paid_paise: number;
-  balance_due_paise: number;
-  computation_data: Record<string, unknown>;
-  ai_computation: boolean;
-  ai_notes?: string;
-  is_paid: boolean;
-  is_nil_return: boolean;
-  challan_type?: ChallanType;
-  bsr_code?: string;
-  challan_serial_no?: string;
-  challan_date?: string;
-  challan_amount_paise?: number;
+  // DB uses 'status' text column, not is_paid boolean
+  status: string;
+  is_paid: boolean;        // derived from status === 'paid'
+  amount?: number;         // DB column: amount (numeric)
+  notes?: string;
   created_at: string;
   updated_at: string;
-  // joined
+  // joined from entities table
   entity_name?: string;
   entity_type?: string;
   gstin?: string;
@@ -152,12 +148,13 @@ export async function fetchLiabilities(
   filters?: { isPaid?: boolean; entityId?: string; taxType?: TaxType }
 ): Promise<TaxLiability[]> {
   if (!isValidUUID(caUserId)) return [];
+  // Only select columns that actually exist in tax_liability_heads
   let q = (supabase as any)
     .from('tax_liability_heads')
-    .select('*, entities(entity_name, entity_type, gstin, pan)')
+    .select('id, ca_user_id, entity_id, head_name, tax_type, assessment_year, due_date, gross_liability_paise, itc_available_paise, net_liability_paise, interest_paise, penalty_paise, late_fee_paise, total_due_paise, amount, status, notes, created_at, updated_at, entities(entity_name, entity_type, gstin, pan)')
     .eq('ca_user_id', caUserId);
 
-  // tax_liability_heads table uses 'status' column, not 'is_paid'
+  // tax_liability_heads uses 'status' text column, not 'is_paid' boolean
   if (filters?.isPaid === true) q = q.eq('status', 'paid');
   else if (filters?.isPaid === false) q = q.neq('status', 'paid');
   if (filters?.entityId) q = q.eq('entity_id', filters.entityId);
@@ -168,6 +165,15 @@ export async function fetchLiabilities(
 
   return (data ?? []).map((row: any) => ({
     ...row,
+    // Map DB column names to interface aliases
+    tax_label: row.head_name || row.tax_type || 'Tax Liability',
+    period_start: row.assessment_year || '',
+    period_end: row.assessment_year || '',
+    is_paid: row.status === 'paid',
+    // Provide zero defaults for paise fields not stored in DB
+    amount_paid_paise: row.status === 'paid' ? (row.total_due_paise || 0) : 0,
+    balance_due_paise: row.status === 'paid' ? 0 : (row.total_due_paise || 0),
+    // Joined entity fields
     entity_name: row.entities?.entity_name,
     entity_type: row.entities?.entity_type,
     gstin: row.entities?.gstin,
@@ -192,20 +198,40 @@ export async function fetchUpcomingPayments(caUserId: string): Promise<TaxLiabil
 }
 
 export async function createLiability(
-  liability: Omit<TaxLiability, 'id' | 'balance_due_paise' | 'created_at' | 'updated_at' | 'entity_name' | 'entity_type' | 'gstin' | 'pan'>
+  liability: Omit<TaxLiability, 'id' | 'is_paid' | 'amount_paid_paise' | 'balance_due_paise' | 'created_at' | 'updated_at' | 'entity_name' | 'entity_type' | 'gstin' | 'pan'>
 ): Promise<TaxLiability> {
   // Auto-compute derived fields
-  const net = Math.max(0, liability.gross_liability_paise - liability.itc_available_paise);
-  const total = net + liability.interest_paise + liability.penalty_paise + liability.late_fee_paise;
+  const net = Math.max(0, (liability.gross_liability_paise || 0) - (liability.itc_available_paise || 0));
+  const total = net + (liability.interest_paise || 0) + (liability.penalty_paise || 0) + (liability.late_fee_paise || 0);
+
+  // Map interface fields to actual DB columns
+  const dbPayload: any = {
+    ca_user_id: liability.ca_user_id,
+    entity_id: liability.entity_id,
+    head_name: liability.tax_label || liability.head_name || liability.tax_type,
+    tax_type: liability.tax_type,
+    assessment_year: liability.assessment_year || liability.period_start,
+    due_date: liability.due_date,
+    gross_liability_paise: liability.gross_liability_paise || 0,
+    itc_available_paise: liability.itc_available_paise || 0,
+    net_liability_paise: net,
+    interest_paise: liability.interest_paise || 0,
+    penalty_paise: liability.penalty_paise || 0,
+    late_fee_paise: liability.late_fee_paise || 0,
+    total_due_paise: total,
+    amount: total / 100, // store in rupees in the 'amount' column
+    status: liability.status || 'pending',
+    notes: liability.notes,
+  };
 
   const { data, error } = await (supabase as any)
     .from('tax_liability_heads')
-    .insert([{ ...liability, net_liability_paise: net, total_due_paise: total }])
+    .insert([dbPayload])
     .select()
     .single();
 
-  if (error) return handleServiceError(error, []);
-  return data;
+  if (error) return handleServiceError(error, {} as TaxLiability);
+  return { ...data, tax_label: data.head_name, is_paid: data.status === 'paid', period_start: data.assessment_year || '', period_end: data.assessment_year || '' };
 }
 
 export async function updateLiability(

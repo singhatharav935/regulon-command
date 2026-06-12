@@ -98,14 +98,22 @@ export const OfflinePwaHub: React.FC = () => {
           throw new Error('companies query failed');
         }
 
-        // compliance_tasks table may not exist yet
+        // compliance_tasks actual columns: id, title, description, company_id, regulator, priority, status, due_date
         try {
           const { data: tasksData, error: taskErr } = await supabase
             .from('compliance_tasks' as any)
-            .select('id, client_name, task_title, due_date, status, priority')
+            .select('id, title, description, due_date, status, priority')
             .limit(10);
           if (!taskErr && tasksData) {
-            setCachedTasks(tasksData);
+            // Remap to component-expected shape
+            setCachedTasks((tasksData as any[]).map((t: any) => ({
+              id: t.id,
+              client_name: 'Client',       // No client_name column — company_id exists but not joined
+              task_title: t.title,          // Map title → task_title for display
+              due_date: t.due_date,
+              status: t.status,
+              priority: t.priority,
+            })));
           } else {
             throw new Error('tasks query failed');
           }
@@ -150,14 +158,15 @@ export const OfflinePwaHub: React.FC = () => {
   const handleSimulateOfflineMutation = (e: React.FormEvent) => {
     e.preventDefault();
 
+    // Map to actual compliance_tasks schema: title, company_id, regulator, priority, status, due_date
     const payload = {
-      client_name: clientName,
-      task_title: `[Offline] ${taskTitle}`,
+      title: `[Offline] ${taskTitle}`,
+      description: `Client: ${clientName} | ${taskTitle}`,
+      company_id: null,      // No client lookup in this simulator
+      regulator: 'GSTIN',    // maps to 'category' intent
       due_date: new Date(Date.now() + 7 * 24 * 60 * 60 * 1000).toISOString().split('T')[0],
       status: 'pending',
       priority: taskPriority,
-      category: 'GSTIN',
-      comments: 'Simulated task created while running in local Progressive Web App shell.',
     };
 
     if (!onlineStatus) {
