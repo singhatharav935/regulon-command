@@ -445,21 +445,13 @@ export async function getCAMetricsFromDB(): Promise<CAMetrics> {
       .select('company_id', { count: 'exact', head: true })
       .eq('user_id', user.id);
 
-    // 2. High Risk Alerts (Notices that are high status or urgent)
-    const { count: highRiskCount } = await supabase
-      .from('client_govt_notices')
-      .select('id', { count: 'exact', head: true })
-      .eq('ca_user_id', user.id)
-      .eq('status', 'detected');
+    // 2. High Risk Alerts — client_govt_notices table does not exist in DB schema
+    // Skip query to avoid 400 error; default to 0
+    const highRiskCount = 0;
 
-    // 3. Overdue dependencies
-    const nowStr = new Date().toISOString();
-    const { count: overdueCount } = await supabase
-      .from('ca_dependencies')
-      .select('id', { count: 'exact', head: true })
-      .eq('ca_user_id', user.id)
-      .eq('status', 'pending')
-      .lt('due_date', nowStr);
+    // 3. Overdue dependencies — ca_dependencies table does not exist in DB schema
+    // Skip query to avoid 400 error; default to 0
+    const overdueCount = 0;
 
     // 4. Active Tasks (Unbilled tasks that need billing/completion)
     // ca_task_history: is_billed is the correct column per schema
@@ -479,15 +471,8 @@ export async function getCAMetricsFromDB(): Promise<CAMetrics> {
       .gte('payment_received_date', startOfMonth);
     const monthlyRev = (invoices || []).reduce((sum, inv) => sum + Number(inv.total_amount || 0), 0);
 
-    // 6. Pending Filings in next 7 days
-    const nextWeekStr = new Date(Date.now() + 7 * 86400000).toISOString();
-    const { count: pendingFilings } = await supabase
-      .from('client_govt_notices')
-      .select('id', { count: 'exact', head: true })
-      .eq('ca_user_id', user.id)
-      .eq('status', 'detected')
-      .gte('due_date', nowStr)
-      .lte('due_date', nextWeekStr);
+    // 6. Pending Filings — client_govt_notices does not exist in DB schema, default to 0
+    const pendingFilings = 0;
 
     return {
       assigned_companies: assignedCount || 0,
@@ -634,35 +619,9 @@ export async function getClientGovtNotices(): Promise<any[]> {
     const { data: { user } } = await supabase.auth.getUser();
     if (!user) return [];
 
-    const { data, error } = await supabase
-      .from('client_govt_notices')
-      .select('*, companies(name)')
-      .eq('ca_user_id', user.id)
-      .order('due_date', { ascending: true });
-
-    if (error || !data) return [];
-    
-    return data.map((n: any) => {
-      const now = new Date();
-      const dueDate = new Date(n.due_date);
-      const diffMs = dueDate.getTime() - now.getTime();
-      const daysRemaining = Math.ceil(diffMs / (1000 * 60 * 60 * 24));
-      
-      return {
-        id: n.id,
-        company: n.companies?.name || 'Unknown Company',
-        company_id: n.company_id.substring(0, 8),
-        task: `${n.notice_type} - ${n.notice_number}`,
-        authority: n.department,
-        filing_type: 'Notice Response',
-        dueDate: dueDate.toLocaleDateString('en-IN', { day: '2-digit', month: 'short', year: 'numeric' }),
-        days_remaining: daysRemaining,
-        penalty: 'Notice Assessment',
-        dependency: n.status === 'detected' ? 'Pending AI Analysis' : n.status,
-        urgency: daysRemaining <= 3 ? 'critical' : daysRemaining <= 7 ? 'high' : daysRemaining <= 15 ? 'medium' : 'low',
-        status: daysRemaining < 0 ? 'overdue' : 'pending',
-      };
-    });
+    // client_govt_notices does NOT exist in the DB schema (not in types.ts)
+    // Return empty array to avoid 400 Bad Request errors.
+    return [];
   } catch (err) {
     console.error("Failed to fetch notices", err);
     return [];
@@ -698,32 +657,9 @@ export async function getCADependencies(): Promise<any[]> {
     const { data: { user } } = await supabase.auth.getUser();
     if (!user) return [];
 
-    const { data, error } = await supabase
-      .from('ca_dependencies')
-      .select('*, companies(name)')
-      .eq('ca_user_id', user.id)
-      .order('due_date', { ascending: true });
-
-    if (error || !data) return [];
-    
-    return data.map((d: any) => {
-      const now = new Date();
-      const dueDate = new Date(d.due_date);
-      const diffMs = dueDate.getTime() - now.getTime();
-      const daysRemaining = Math.ceil(diffMs / (1000 * 60 * 60 * 24));
-
-      return {
-        id: d.id,
-        company: d.companies?.name || 'Unknown Company',
-        company_id: d.company_id,
-        document: d.document_name,
-        type: 'Required Document',
-        dueDate: dueDate.toLocaleDateString('en-IN', { day: '2-digit', month: 'short', year: 'numeric' }),
-        days_remaining: daysRemaining,
-        status: d.status, // 'pending', 'uploaded', 'verified'
-        urgency: d.urgency, // 'critical', 'high', 'medium', 'low'
-      };
-    });
+    // ca_dependencies does NOT exist in the DB schema (not in types.ts)
+    // Return empty array to avoid 400 Bad Request errors.
+    return [];
   } catch (err) {
     console.error("Failed to fetch dependencies", err);
     return [];
