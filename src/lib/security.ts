@@ -214,31 +214,147 @@ export function isSecureContext(): boolean {
 }
 
 /**
- * Rate limiter for client-side operations
+ * Rate limiter for client-side operations.
+ * Persists attempt timestamps in localStorage so limits survive page refreshes,
+ * preventing trivial bypass by reloading the page.
  */
 export class ClientRateLimiter {
-  private timestamps: number[] = [];
   private readonly maxRequests: number;
   private readonly windowMs: number;
+  private readonly storageKey: string;
 
-  constructor(maxRequests: number = 10, windowMs: number = 60000) {
+  /**
+   * @param maxRequests Maximum allowed attempts within the window
+   * @param windowMs   Sliding window duration in milliseconds
+   * @param key        Unique localStorage key for this limiter instance
+   */
+  constructor(maxRequests: number = 10, windowMs: number = 60000, key?: string) {
     this.maxRequests = maxRequests;
     this.windowMs = windowMs;
+    this.storageKey = key || `sannidh_rl_${maxRequests}_${windowMs}`;
   }
 
+  /** Read persisted timestamps (filter expired ones) */
+  private getTimestamps(): number[] {
+    try {
+      const raw = localStorage.getItem(this.storageKey);
+      if (!raw) return [];
+      const all: number[] = JSON.parse(raw);
+      const now = Date.now();
+      return all.filter(t => now - t < this.windowMs);
+    } catch {
+      return [];
+    }
+  }
+
+  /** Persist timestamps */
+  private setTimestamps(ts: number[]): void {
+    try {
+      localStorage.setItem(this.storageKey, JSON.stringify(ts));
+    } catch { /* storage full — degrade gracefully */ }
+  }
+
+  /**
+   * Check if a new attempt is allowed. If yes, records the attempt.
+   * @returns true if the attempt can proceed
+   */
   canProceed(): boolean {
-    const now = Date.now();
-    this.timestamps = this.timestamps.filter(t => now - t < this.windowMs);
-    
-    if (this.timestamps.length >= this.maxRequests) {
+    const timestamps = this.getTimestamps();
+
+    if (timestamps.length >= this.maxRequests) {
+      // Still over limit after filtering — deny
+      this.setTimestamps(timestamps); // persist the pruned list
       return false;
     }
 
-    this.timestamps.push(now);
+    timestamps.push(Date.now());
+    this.setTimestamps(timestamps);
     return true;
   }
 
+  /** Number of attempts remaining before being rate-limited */
+  getAttemptsRemaining(): number {
+    return Math.max(0, this.maxRequests - this.getTimestamps().length);
+  }
+
+  /**
+   * Milliseconds until the next attempt slot opens.
+   * Returns 0 if attempts are available right now.
+   */
+  getRemainingWaitMs(): number {
+    const timestamps = this.getTimestamps();
+    if (timestamps.length < this.maxRequests) return 0;
+
+    // Oldest timestamp in the window determines when a slot opens
+    const oldest = Math.min(...timestamps);
+    const waitMs = this.windowMs - (Date.now() - oldest);
+    return Math.max(0, waitMs);
+  }
+
+  /** Human-readable remaining wait time (e.g. "2 min 30 sec") */
+  getRemainingWaitFormatted(): string {
+    const ms = this.getRemainingWaitMs();
+    if (ms <= 0) return '';
+    const totalSec = Math.ceil(ms / 1000);
+    const min = Math.floor(totalSec / 60);
+    const sec = totalSec % 60;
+    if (min > 0 && sec > 0) return `${min} min ${sec} sec`;
+    if (min > 0) return `${min} min`;
+    return `${sec} sec`;
+  }
+
+  /** Clear all recorded attempts */
   reset(): void {
-    this.timestamps = [];
+    try { localStorage.removeItem(this.storageKey); } catch {}
+  }
+}
+
+/**
+ * General-purpose API rate limiter (token-bucket style).
+ * Limits the total number of Supabase REST calls per window to prevent
+ * runaway queries from hammering the backend.
+ */
+export class GeneralApiRateLimiter {
+  private static instance: GeneralApiRateLimiter | null = null;
+  private callTimestamps: number[] = [];
+  private readonly maxCalls: number;
+  private readonly windowMs: number;
+
+  constructor(maxCalls: number = 60, windowMs: number = 60000) {
+    this.maxCalls = maxCalls;
+    this.windowMs = windowMs;
+  }
+
+  static getInstance(): GeneralApiRateLimiter {
+    if (!GeneralApiRateLimiter.instance) {
+      // 60 API calls per minute for general endpoints
+      GeneralApiRateLimiter.instance = new GeneralApiRateLimiter(60, 60000);
+    }
+    return GeneralApiRateLimiter.instance;
+  }
+
+  /**
+   * Check if an API call is allowed. Records the call if yes.
+   * @returns true if the call can proceed
+   */
+  canProceed(): boolean {
+    const now = Date.now();
+    this.callTimestamps = this.callTimestamps.filter(t => now - t < this.windowMs);
+
+    if (this.callTimestamps.length >= this.maxCalls) {
+      return false;
+    }
+
+    this.callTimestamps.push(now);
+    return true;
+  }
+
+  /** Milliseconds until the next call slot opens */
+  getRemainingWaitMs(): number {
+    const now = Date.now();
+    this.callTimestamps = this.callTimestamps.filter(t => now - t < this.windowMs);
+    if (this.callTimestamps.length < this.maxCalls) return 0;
+    const oldest = Math.min(...this.callTimestamps);
+    return Math.max(0, this.windowMs - (now - oldest));
   }
 }
