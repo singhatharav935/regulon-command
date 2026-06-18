@@ -1,0 +1,67 @@
+#!/bin/sh
+# ─────────────────────────────────────────────────────────────────
+# Pre-commit hook: Secret Scanning
+# Prevents commits containing API keys, tokens, or passwords.
+#
+# Install: Copy this file to .git/hooks/pre-commit
+#          Or run: cp .githooks/pre-commit .git/hooks/pre-commit
+#          Or set: git config core.hooksPath .githooks
+# ─────────────────────────────────────────────────────────────────
+
+echo "🔒 Running secret scan on staged files..."
+
+# Method 1: Use gitleaks if installed (recommended)
+if command -v gitleaks >/dev/null 2>&1; then
+    gitleaks protect --staged --config .gitleaks.toml --verbose
+    if [ $? -ne 0 ]; then
+        echo ""
+        echo "❌ SECRET DETECTED — Commit blocked."
+        echo "   Review the findings above and remove any secrets."
+        echo "   If this is a false positive, add it to .gitleaks.toml allowlist."
+        echo ""
+        exit 1
+    fi
+    echo "✅ No secrets found."
+    exit 0
+fi
+
+# Method 2: Fallback — basic pattern check using grep
+STAGED_FILES=$(git diff --cached --name-only --diff-filter=ACMR)
+
+if [ -z "$STAGED_FILES" ]; then
+    exit 0
+fi
+
+# Patterns that should never appear in committed code
+PATTERNS=(
+    'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9\.'  # Supabase/JWT keys
+    'AKIA[A-Z0-9]{16}'                           # AWS access keys
+    'AIza[a-zA-Z0-9_\-]{35}'                     # Google API keys
+    'ghp_[a-zA-Z0-9]{36}'                        # GitHub PATs
+    'sk_live_[a-zA-Z0-9]{20,}'                   # Stripe live keys
+    'rzp_live_[a-zA-Z0-9]{14,}'                  # Razorpay live keys
+    '-----BEGIN.*PRIVATE KEY-----'                # Private keys
+    'SG\.[a-zA-Z0-9_\-]{22}\.'                   # SendGrid keys
+)
+
+FOUND=0
+for pattern in "${PATTERNS[@]}"; do
+    MATCHES=$(echo "$STAGED_FILES" | xargs grep -lE "$pattern" 2>/dev/null | grep -v '\.env\.example' | grep -v '\.gitleaks\.toml' | grep -v '\.test\.' | grep -v 'node_modules')
+    if [ -n "$MATCHES" ]; then
+        echo "❌ Potential secret found matching pattern: $pattern"
+        echo "   In files: $MATCHES"
+        FOUND=1
+    fi
+done
+
+if [ $FOUND -ne 0 ]; then
+    echo ""
+    echo "❌ SECRETS DETECTED — Commit blocked."
+    echo "   Remove secrets from the files above before committing."
+    echo "   Install gitleaks for more accurate scanning: https://github.com/gitleaks/gitleaks"
+    echo ""
+    exit 1
+fi
+
+echo "✅ Basic secret scan passed. (Install gitleaks for comprehensive scanning)"
+exit 0
