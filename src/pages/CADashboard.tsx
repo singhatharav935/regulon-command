@@ -2580,7 +2580,7 @@ const CADashboard = () => {
   const [chatDrawerOpen, setChatDrawerOpen] = useState(false);
 
   // Compliance Service API URL
-  const COMPLIANCE_API = 'http://localhost:8001/api/v1';
+  const COMPLIANCE_API = (import.meta.env.VITE_CA_API_BASE_URL as string) || (import.meta.env.VITE_API_URL as string) || '/api/v1';
 
   // Fetch CA's clients from compliance service (Bypassed for Demo CA Dashboard to display mock data room simulation)
   const fetchClients = async () => {

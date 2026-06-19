@@ -1412,7 +1412,7 @@ const InhouseCADashboardReal = () => {
         body: JSON.stringify({
           ca_id: caId,
           ca_name: 'In-House Compliance Team',
-          ca_email: 'inhouse-ca@sannidh.ai',
+          ca_email: localStorage.getItem('current_user_email') || '',
           ...onboardForm
         })
       });

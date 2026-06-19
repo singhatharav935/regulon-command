@@ -18,6 +18,7 @@ import { Button } from '@/components/ui/button';
 
 const SUPABASE_URL = import.meta.env.VITE_SUPABASE_URL as string;
 const SUPABASE_ANON_KEY = import.meta.env.VITE_SUPABASE_ANON_KEY as string;
+const SUPABASE_PROJECT_REF = (import.meta.env.VITE_SUPABASE_PROJECT_ID as string) || 'your-project-ref';
 
 // ─── All secrets required to fully power the Real External CA Dashboard ───────
 
@@ -47,7 +48,7 @@ const SERVER_SIDE_KEYS = [
     where: 'https://platform.openai.com/api-keys',
     usedFor: 'AI Drafting Engine, AI Swarm Financial Pipeline, Document Vision OCR',
     priority: 'high' as const,
-    cmd: 'npx supabase secrets set OPENAI_API_KEY="sk-..." --project-ref vqomazfvyyfofzdssmaw',
+    cmd: `npx supabase secrets set OPENAI_API_KEY="sk-..." --project-ref ${SUPABASE_PROJECT_REF}`,
   },
   {
     label: 'Setu Client ID',
@@ -55,7 +56,7 @@ const SERVER_SIDE_KEYS = [
     where: 'https://bridge.setu.co',
     usedFor: 'RBI Account Aggregator — pulls real bank data upon client consent (AA Framework)',
     priority: 'high' as const,
-    cmd: 'npx supabase secrets set SETU_CLIENT_ID="your-id" --project-ref vqomazfvyyfofzdssmaw',
+    cmd: `npx supabase secrets set SETU_CLIENT_ID="your-id" --project-ref ${SUPABASE_PROJECT_REF}`,
   },
   {
     label: 'Setu Secret',
@@ -63,7 +64,7 @@ const SERVER_SIDE_KEYS = [
     where: 'https://bridge.setu.co',
     usedFor: 'RBI Account Aggregator — authentication for bank data fetch',
     priority: 'high' as const,
-    cmd: 'npx supabase secrets set SETU_SECRET="your-secret" --project-ref vqomazfvyyfofzdssmaw',
+    cmd: `npx supabase secrets set SETU_SECRET="your-secret" --project-ref ${SUPABASE_PROJECT_REF}`,
   },
   {
     label: 'GSTN GSP API Key',
@@ -71,7 +72,7 @@ const SERVER_SIDE_KEYS = [
     where: 'https://www.mastergst.com (or GSTZen / ClearTax)',
     usedFor: 'Auto-fetches 2-year GST filing history via client OTP consent (no password stored)',
     priority: 'high' as const,
-    cmd: 'npx supabase secrets set GSTN_GSP_API_KEY="your-key" --project-ref vqomazfvyyfofzdssmaw',
+    cmd: `npx supabase secrets set GSTN_GSP_API_KEY="your-key" --project-ref ${SUPABASE_PROJECT_REF}`,
   },
   {
     label: 'MCA API Key',
@@ -79,7 +80,7 @@ const SERVER_SIDE_KEYS = [
     where: 'https://www.mca.gov.in (MCA21 Developer Portal)',
     usedFor: 'Fetching ROC filings, Director data, Company information',
     priority: 'medium' as const,
-    cmd: 'npx supabase secrets set MCA_API_KEY="your-key" --project-ref vqomazfvyyfofzdssmaw',
+    cmd: `npx supabase secrets set MCA_API_KEY="your-key" --project-ref ${SUPABASE_PROJECT_REF}`,
   },
   {
     label: 'Resend API Key',
@@ -87,7 +88,7 @@ const SERVER_SIDE_KEYS = [
     where: 'https://resend.com',
     usedFor: 'Client consent emails, OTP emails, Onboarding notifications',
     priority: 'high' as const,
-    cmd: 'npx supabase secrets set RESEND_API_KEY="re_..." --project-ref vqomazfvyyfofzdssmaw',
+    cmd: `npx supabase secrets set RESEND_API_KEY="re_..." --project-ref ${SUPABASE_PROJECT_REF}`,
   },
   {
     label: 'Twilio Account SID',
@@ -95,7 +96,7 @@ const SERVER_SIDE_KEYS = [
     where: 'https://console.twilio.com',
     usedFor: 'WhatsApp consent messages to clients',
     priority: 'medium' as const,
-    cmd: 'npx supabase secrets set TWILIO_ACCOUNT_SID="AC..." --project-ref vqomazfvyyfofzdssmaw',
+    cmd: `npx supabase secrets set TWILIO_ACCOUNT_SID="AC..." --project-ref ${SUPABASE_PROJECT_REF}`,
   },
   {
     label: 'Twilio Auth Token',
@@ -103,7 +104,7 @@ const SERVER_SIDE_KEYS = [
     where: 'https://console.twilio.com',
     usedFor: 'WhatsApp consent messages to clients',
     priority: 'medium' as const,
-    cmd: 'npx supabase secrets set TWILIO_AUTH_TOKEN="..." --project-ref vqomazfvyyfofzdssmaw',
+    cmd: `npx supabase secrets set TWILIO_AUTH_TOKEN="..." --project-ref ${SUPABASE_PROJECT_REF}`,
   },
   {
     label: 'Twilio WhatsApp Number',
@@ -111,7 +112,7 @@ const SERVER_SIDE_KEYS = [
     where: 'https://console.twilio.com → Messaging → WhatsApp',
     usedFor: 'Sending WhatsApp messages from your Twilio sandbox number',
     priority: 'medium' as const,
-    cmd: 'npx supabase secrets set TWILIO_WHATSAPP_FROM="whatsapp:+1415..." --project-ref vqomazfvyyfofzdssmaw',
+    cmd: `npx supabase secrets set TWILIO_WHATSAPP_FROM="whatsapp:+1415..." --project-ref ${SUPABASE_PROJECT_REF}`,
   },
   {
     label: 'Encryption Key (32-char)',
@@ -119,7 +120,7 @@ const SERVER_SIDE_KEYS = [
     where: 'Generate yourself: run  openssl rand -hex 16  in terminal',
     usedFor: 'Encrypting client portal credentials (GSTIN passwords stored in vault)',
     priority: 'high' as const,
-    cmd: 'npx supabase secrets set ENCRYPTION_KEY="$(openssl rand -hex 16)" --project-ref vqomazfvyyfofzdssmaw',
+    cmd: `npx supabase secrets set ENCRYPTION_KEY="$(openssl rand -hex 16)" --project-ref ${SUPABASE_PROJECT_REF}`,
   },
 ];
 

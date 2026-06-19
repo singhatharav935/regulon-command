@@ -332,7 +332,7 @@ const AuthReal = () => {
       // For company_owner role, try registering with backend API
       if (formData.registrationRole === 'company_owner') {
         try {
-          const API_BASE = import.meta.env.VITE_API_URL || 'http://localhost:8001/api/v1';
+          const API_BASE = import.meta.env.VITE_API_URL || '/api/v1';
           const companyResponse = await fetch(`${API_BASE}/company/register`, {
             method: 'POST',
             headers: { 'Content-Type': 'application/json' },
