@@ -338,7 +338,7 @@ const SannidhAIAgent = () => {
       const briefText = `Good morning! I've analyzed your compliance calendar. You have ${allTasks.length} active tasks:\n\n${taskList}\n\nWould you like me to start working on any of these?`;
       setDailyBrief(briefText);
     } catch (error) {
-      // Backend unavailable — silently use empty state
+      console.warn('[SannidhAIAgent] Backend unavailable for daily brief:', error);
     }
   };
 

@@ -409,6 +409,9 @@ export default function ComplianceHealthChangeLog({
             <div className="relative flex-1">
               <Search className="absolute left-3 top-1/2 transform -translate-y-1/2 w-4 h-4 text-muted-foreground" />
               <Input
+                id="compliance-changelog-search-input"
+                name="compliance-changelog-search"
+                aria-label="Search by company, reason, compliance"
                 placeholder="Search by company, reason, compliance..."
                 value={searchQuery}
                 onChange={(e) => setSearchQuery(e.target.value)}
@@ -417,7 +420,7 @@ export default function ComplianceHealthChangeLog({
             </div>
 
             {/* Filters */}
-            <Select value={filters.changeType} onValueChange={(value) => setFilters({ ...filters, changeType: value })}>
+            <Select name="compliance-change-type-filter" value={filters.changeType} onValueChange={(value) => setFilters({ ...filters, changeType: value })}>
               <SelectTrigger className="w-[150px]">
                 <SelectValue placeholder="Change Type" />
               </SelectTrigger>
@@ -429,7 +432,7 @@ export default function ComplianceHealthChangeLog({
               </SelectContent>
             </Select>
 
-            <Select value={filters.actionBy} onValueChange={(value) => setFilters({ ...filters, actionBy: value })}>
+            <Select name="compliance-action-by-filter" value={filters.actionBy} onValueChange={(value) => setFilters({ ...filters, actionBy: value })}>
               <SelectTrigger className="w-[140px]">
                 <SelectValue placeholder="Action By" />
               </SelectTrigger>
@@ -442,7 +445,7 @@ export default function ComplianceHealthChangeLog({
               </SelectContent>
             </Select>
 
-            <Select value={filters.timeRange} onValueChange={(value) => setFilters({ ...filters, timeRange: value })}>
+            <Select name="compliance-time-range-filter" value={filters.timeRange} onValueChange={(value) => setFilters({ ...filters, timeRange: value })}>
               <SelectTrigger className="w-[130px]">
                 <SelectValue placeholder="Time Range" />
               </SelectTrigger>

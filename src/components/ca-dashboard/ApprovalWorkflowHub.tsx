@@ -100,6 +100,9 @@ export default function ApprovalWorkflowHub() {
           <div className="relative w-56">
             <Search className="w-4 h-4 absolute left-3 top-2.5 text-muted-foreground" />
             <Input
+              id="approval-search-input"
+              name="approval-search"
+              aria-label="Search document or client"
               placeholder="Search document or client..."
               className="pl-9 h-9 bg-background/50"
               value={search}

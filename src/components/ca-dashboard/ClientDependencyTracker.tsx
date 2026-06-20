@@ -342,13 +342,16 @@ ACTION REQUIRED:
 
         <div className="grid grid-cols-1 md:grid-cols-4 gap-3">
           <Input
+            id="dependency-search-input"
+            name="dependency-search"
+            aria-label="Search documents or clients"
             placeholder="Search documents or clients..."
             value={searchQuery}
             onChange={(e) => setSearchQuery(e.target.value)}
             className="md:col-span-2"
           />
 
-          <Select value={filters.status} onValueChange={(value) => setFilters({ ...filters, status: value })}>
+          <Select name="dependency-status-filter" value={filters.status} onValueChange={(value) => setFilters({ ...filters, status: value })}>
             <SelectTrigger>
               <SelectValue placeholder="All Status" />
             </SelectTrigger>
@@ -362,6 +365,7 @@ ACTION REQUIRED:
           </Select>
 
           <Select
+            name="dependency-urgency-filter"
             value={filters.urgency}
             onValueChange={(value) => setFilters({ ...filters, urgency: value })}
           >

@@ -342,6 +342,9 @@ export default function AuditInspectionSupport({
             <div className="relative flex-1">
               <Search className="absolute left-3 top-1/2 transform -translate-y-1/2 w-4 h-4 text-muted-foreground" />
               <Input
+                id="audit-search-input"
+                name="audit-search"
+                aria-label="Search by company, authority, scope"
                 placeholder="Search by company, authority, scope..."
                 value={searchQuery}
                 onChange={(e) => setSearchQuery(e.target.value)}
@@ -349,7 +352,7 @@ export default function AuditInspectionSupport({
               />
             </div>
 
-            <Select value={filters.status} onValueChange={(value) => setFilters({ ...filters, status: value })}>
+            <Select name="audit-status-filter" value={filters.status} onValueChange={(value) => setFilters({ ...filters, status: value })}>
               <SelectTrigger className="w-[150px]">
                 <SelectValue placeholder="Status" />
               </SelectTrigger>
@@ -363,7 +366,7 @@ export default function AuditInspectionSupport({
               </SelectContent>
             </Select>
 
-            <Select value={filters.priority} onValueChange={(value) => setFilters({ ...filters, priority: value })}>
+            <Select name="audit-priority-filter" value={filters.priority} onValueChange={(value) => setFilters({ ...filters, priority: value })}>
               <SelectTrigger className="w-[140px]">
                 <SelectValue placeholder="Priority" />
               </SelectTrigger>
@@ -376,7 +379,7 @@ export default function AuditInspectionSupport({
               </SelectContent>
             </Select>
 
-            <Select value={filters.authority} onValueChange={(value) => setFilters({ ...filters, authority: value })}>
+            <Select name="audit-authority-filter" value={filters.authority} onValueChange={(value) => setFilters({ ...filters, authority: value })}>
               <SelectTrigger className="w-[150px]">
                 <SelectValue placeholder="Authority" />
               </SelectTrigger>

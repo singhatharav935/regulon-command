@@ -473,8 +473,8 @@ async function logPerformanceMetric(metricName, value, unit, tags = {}) {
       metric_unit: unit,
       tags
     });
-  } catch {
-    // Silently ignore — backend monitoring endpoint unavailable
+  } catch (err) {
+    console.warn('[APIService] Performance metric logging failed (backend unavailable):', err);
   }
 }
 
@@ -489,8 +489,8 @@ async function logError(errorData) {
       ...errorData,
       user_agent: navigator.userAgent
     });
-  } catch {
-    // Silently ignore — backend error logging endpoint unavailable
+  } catch (err) {
+    console.warn('[APIService] Error logging failed (backend unavailable):', err);
   }
 }
 

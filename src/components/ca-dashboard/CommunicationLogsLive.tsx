@@ -304,6 +304,9 @@ export default function CommunicationLogs({
             <div className="relative flex-1">
               <Search className="absolute left-3 top-1/2 transform -translate-y-1/2 w-4 h-4 text-muted-foreground" />
               <Input
+                id="comms-search-input"
+                name="comms-search"
+                aria-label="Search messages, companies"
                 placeholder="Search messages, companies..."
                 value={searchQuery}
                 onChange={(e) => setSearchQuery(e.target.value)}
@@ -311,7 +314,7 @@ export default function CommunicationLogs({
               />
             </div>
 
-            <Select value={filters.type} onValueChange={(value) => setFilters({ ...filters, type: value })}>
+            <Select name="comms-type-filter" value={filters.type} onValueChange={(value) => setFilters({ ...filters, type: value })}>
               <SelectTrigger className="w-[140px]">
                 <SelectValue placeholder="Type" />
               </SelectTrigger>
@@ -325,7 +328,7 @@ export default function CommunicationLogs({
               </SelectContent>
             </Select>
 
-            <Select value={filters.status} onValueChange={(value) => setFilters({ ...filters, status: value })}>
+            <Select name="comms-status-filter" value={filters.status} onValueChange={(value) => setFilters({ ...filters, status: value })}>
               <SelectTrigger className="w-[130px]">
                 <SelectValue placeholder="Status" />
               </SelectTrigger>
@@ -338,7 +341,7 @@ export default function CommunicationLogs({
               </SelectContent>
             </Select>
 
-            <Select value={filters.category} onValueChange={(value) => setFilters({ ...filters, category: value })}>
+            <Select name="comms-category-filter" value={filters.category} onValueChange={(value) => setFilters({ ...filters, category: value })}>
               <SelectTrigger className="w-[140px]">
                 <SelectValue placeholder="Category" />
               </SelectTrigger>

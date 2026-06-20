@@ -149,8 +149,8 @@ const DailyGovernanceBrief = () => {
         liveUpdates: [{ message: 'Dashboard synced with Supabase.', timestamp: new Date().toISOString() }],
       });
       setLastRefresh(new Date());
-    } catch {
-      // Silent fail
+    } catch (err) {
+      console.error('[DailyGovernanceBrief] Failed to fetch daily brief:', err);
     } finally {
       setLoading(false);
     }
@@ -1455,6 +1455,9 @@ const LiveAIDraftingEngine = () => {
                   <h4 className="font-medium mb-3">Custom Deployment Command</h4>
                   <div className="flex gap-2">
                     <Input
+                      id="ai-deployment-command"
+                      name="ai-deployment-command"
+                      aria-label="Custom AI deployment command"
                       placeholder="e.g., Generate audit report for TechVenture..."
                       value={deploymentCommand}
                       onChange={(e) => setDeploymentCommand(e.target.value)}
@@ -1491,6 +1494,7 @@ const LiveAIDraftingEngine = () => {
                       onChange={handleFileUpload}
                       className="hidden"
                       id="document-upload"
+                      name="document-upload"
                     />
                     <label htmlFor="document-upload" className="cursor-pointer">
                       <p className="text-muted-foreground mb-2">
@@ -1536,6 +1540,9 @@ const LiveAIDraftingEngine = () => {
                 <div className="space-y-4">
                   <h3 className="text-lg font-semibold text-cyan-300">AI-Generated Draft</h3>
                   <Textarea
+                    id="ai-generated-draft"
+                    name="ai-generated-draft"
+                    aria-label="AI-generated legal draft"
                     placeholder="AI will generate legal draft here based on uploaded document..."
                     value={generatedDraft}
                     readOnly
@@ -2010,7 +2017,8 @@ const ExternalCADashboardReal = () => {
         setSelectedCompany(company);
         setShowCompanyDetails(true);
       }
-    } catch {
+    } catch (err) {
+      console.error('[ExternalCADashboard] Error viewing company:', err);
       setSelectedCompany(company);
       setShowCompanyDetails(true);
     }
@@ -2027,7 +2035,8 @@ const ExternalCADashboardReal = () => {
       } else {
         toast.error(result.error || 'Failed to refresh data');
       }
-    } catch {
+    } catch (err) {
+      console.error('[ExternalCADashboard] Error refreshing company:', err);
       toast.error('Failed to refresh data');
     }
   };
@@ -2143,6 +2152,7 @@ const ExternalCADashboardReal = () => {
                 <Globe2 className="w-3.5 h-3.5" /> Language: <strong className="text-white">{LANGUAGE_LABELS[language].label.split(' ')[0]}</strong>
               </Badge>
               <Select
+                name="dashboard-language-select"
                 value={language}
                 onValueChange={(val: any) => setLanguagePreference(val, isRtlLayout)}
               >

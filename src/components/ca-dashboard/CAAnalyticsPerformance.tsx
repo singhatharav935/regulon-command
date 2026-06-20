@@ -260,7 +260,7 @@ export default function CAAnalyticsPerformance({
                       AI Analyzing...
                     </Badge>
                   )}
-                  <Select value={timePeriod} onValueChange={setTimePeriod}>
+                  <Select name="analytics-time-period" value={timePeriod} onValueChange={setTimePeriod}>
                     <SelectTrigger className="w-[120px] h-8">
                       <SelectValue placeholder="Period" />
                     </SelectTrigger>

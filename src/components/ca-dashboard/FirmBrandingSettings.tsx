@@ -141,7 +141,7 @@ export default function FirmBrandingSettings() {
                 </>
               )}
             </div>
-            <input ref={fileRef} type="file" accept="image/*" className="hidden" onChange={handleLogoUpload} />
+            <input ref={fileRef} type="file" accept="image/*" className="hidden" onChange={handleLogoUpload} id="firm-logo-upload" name="firm-logo-upload" aria-label="Upload firm logo" />
           </CardContent>
         </Card>
 
@@ -154,34 +154,42 @@ export default function FirmBrandingSettings() {
           </CardHeader>
           <CardContent className="space-y-3">
             <div>
-              <label className="text-xs text-muted-foreground mb-1 block">Firm / Practice Name</label>
+              <label htmlFor="firm-name-input" className="text-xs text-muted-foreground mb-1 block">Firm / Practice Name</label>
               <Input
+                id="firm-name-input"
+                name="firm-name-input"
                 placeholder="e.g. Sharma & Associates, Chartered Accountants"
                 value={branding.firmName}
                 onChange={e => setBranding(prev => ({ ...prev, firmName: e.target.value }))}
               />
             </div>
             <div>
-              <label className="text-xs text-muted-foreground mb-1 block">Your Name (CA)</label>
+              <label htmlFor="ca-name-input" className="text-xs text-muted-foreground mb-1 block">Your Name (CA)</label>
               <Input
+                id="ca-name-input"
+                name="ca-name-input"
                 placeholder="e.g. CA Rahul Sharma, FCA"
                 value={branding.caName}
                 onChange={e => setBranding(prev => ({ ...prev, caName: e.target.value }))}
               />
             </div>
             <div>
-              <label className="text-xs text-muted-foreground mb-1 block">Tagline on PDF Footer</label>
+              <label htmlFor="firm-tagline-input" className="text-xs text-muted-foreground mb-1 block">Tagline on PDF Footer</label>
               <Input
+                id="firm-tagline-input"
+                name="firm-tagline-input"
                 placeholder="e.g. Powered by SANNIDH AI"
                 value={branding.tagline}
                 onChange={e => setBranding(prev => ({ ...prev, tagline: e.target.value }))}
               />
             </div>
             <div>
-              <label className="text-xs text-muted-foreground mb-1 block">Brand Accent Color</label>
+              <label htmlFor="firm-accent-color" className="text-xs text-muted-foreground mb-1 block">Brand Accent Color</label>
               <div className="flex items-center gap-2">
                 <input
                   type="color"
+                  id="firm-accent-color"
+                  name="firm-accent-color"
                   value={branding.primaryColor}
                   onChange={e => setBranding(prev => ({ ...prev, primaryColor: e.target.value }))}
                   className="w-10 h-9 rounded border border-border/50 cursor-pointer bg-transparent"

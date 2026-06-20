@@ -90,6 +90,7 @@ export const CAActionInbox = () => {
       localStorage.setItem('demo:sannidh:completed-work-history', JSON.stringify(history));
       return history;
     } catch (e) {
+      console.warn('[CAActionInbox] Failed to parse completed work history:', e);
       return [];
     }
   });
@@ -101,7 +102,9 @@ export const CAActionInbox = () => {
         if (saved) {
           setCompletedHistory(JSON.parse(saved));
         }
-      } catch (e) {}
+      } catch (e) {
+        console.warn('[CAActionInbox] Failed to parse real history update:', e);
+      }
     };
     window.addEventListener('real:sannidh:history-updated', handleUpdate);
     return () => window.removeEventListener('real:sannidh:history-updated', handleUpdate);
@@ -112,7 +115,9 @@ export const CAActionInbox = () => {
     try {
       const saved = localStorage.getItem('demo_clients');
       if (saved) demoClients = JSON.parse(saved);
-    } catch (e) {}
+    } catch (e) {
+      console.warn('[CAActionInbox] Failed to parse demo clients:', e);
+    }
 
     const matchedClient = demoClients.find(c => (c.name || c.client_name) === item.client);
     const clientId = matchedClient ? matchedClient.id : 'demo-auto-123';
