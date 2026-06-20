@@ -238,6 +238,9 @@ export const OfflinePwaHub: React.FC = () => {
                 <p className="text-[10px] text-muted-foreground">Test PWA sync queue behavior</p>
               </div>
               <Switch
+                id="simulate-offline-toggle"
+                name="simulate-offline-toggle"
+                aria-label="Simulate offline mode"
                 checked={simulatedOffline}
                 onCheckedChange={handleSimulatedOfflineToggle}
                 className="data-[state=checked]:bg-amber-600"
@@ -388,8 +391,8 @@ export const OfflinePwaHub: React.FC = () => {
               <form onSubmit={handleSimulateOfflineMutation} className="space-y-4">
                 <div className="space-y-2">
                   <Label className="text-xs text-muted-foreground">Select Client Entity</Label>
-                  <Select value={clientName} onValueChange={setClientName}>
-                    <SelectTrigger className="bg-background/40 border-border/40 text-xs h-10">
+                  <Select name="offline-client-entity" value={clientName} onValueChange={setClientName}>
+                    <SelectTrigger aria-label="Select client entity" className="bg-background/40 border-border/40 text-xs h-10">
                       <SelectValue placeholder="Select client" />
                     </SelectTrigger>
                     <SelectContent className="bg-card border-border/40 text-xs">
@@ -403,6 +406,9 @@ export const OfflinePwaHub: React.FC = () => {
                 <div className="space-y-2">
                   <Label className="text-xs text-muted-foreground">Statutory Task Title</Label>
                   <Input
+                    id="offline-task-title"
+                    name="offline-task-title"
+                    aria-label="Statutory task title"
                     placeholder="e.g. File revised GSTR-1 return"
                     value={taskTitle}
                     onChange={(e) => setTaskTitle(e.target.value)}
@@ -413,8 +419,8 @@ export const OfflinePwaHub: React.FC = () => {
 
                 <div className="space-y-2">
                   <Label className="text-xs text-muted-foreground">SLA Priority</Label>
-                  <Select value={taskPriority} onValueChange={setTaskPriority}>
-                    <SelectTrigger className="bg-background/40 border-border/40 text-xs h-10">
+                  <Select name="offline-task-priority" value={taskPriority} onValueChange={setTaskPriority}>
+                    <SelectTrigger aria-label="Select SLA priority" className="bg-background/40 border-border/40 text-xs h-10">
                       <SelectValue />
                     </SelectTrigger>
                     <SelectContent className="bg-card border-border/40 text-xs">
@@ -455,6 +461,9 @@ export const OfflinePwaHub: React.FC = () => {
           <div className="relative w-72">
             <Search className="w-4 h-4 absolute left-3 top-3 text-muted-foreground" />
             <Input
+              id="offline-cache-search"
+              name="offline-cache-search"
+              aria-label="Search local offline cache"
               placeholder="Search local offline cache..."
               value={searchCacheQuery}
               onChange={(e) => setSearchCacheQuery(e.target.value)}

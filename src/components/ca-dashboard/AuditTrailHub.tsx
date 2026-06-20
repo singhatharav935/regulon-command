@@ -419,17 +419,17 @@ const AuditTrailHub: React.FC = () => {
           <div className="flex items-center gap-3 flex-wrap">
             <div className="relative flex-1 min-w-[200px] max-w-xs">
               <Search className="absolute left-3 top-1/2 -translate-y-1/2 w-3.5 h-3.5 text-muted-foreground" />
-              <Input value={filterSearch} onChange={(e) => setFilterSearch(e.target.value)} placeholder="Search actor, action, resource…"
+              <Input id="audit-search" name="audit-search" aria-label="Search actor, action, resource" value={filterSearch} onChange={(e) => setFilterSearch(e.target.value)} placeholder="Search actor, action, resource…"
                 className="pl-9 bg-background/50 text-xs h-9" />
             </div>
-            <select value={filterModule} onChange={(e) => setFilterModule(e.target.value as any)}
+            <select id="audit-filter-module" name="audit-filter-module" aria-label="Filter by module" value={filterModule} onChange={(e) => setFilterModule(e.target.value as any)}
               className="p-2 h-9 rounded-lg border border-border/30 bg-background/50 text-xs text-foreground">
               <option value="">All Modules</option>
               {Object.entries(MODULE_LABELS).map(([k, v]) => (
                 <option key={k} value={k}>{v}</option>
               ))}
             </select>
-            <select value={filterSeverity} onChange={(e) => setFilterSeverity(e.target.value as any)}
+            <select id="audit-filter-severity" name="audit-filter-severity" aria-label="Filter by severity" value={filterSeverity} onChange={(e) => setFilterSeverity(e.target.value as any)}
               className="p-2 h-9 rounded-lg border border-border/30 bg-background/50 text-xs text-foreground">
               <option value="">All Severities</option>
               <option value="info">Info</option>
@@ -437,9 +437,9 @@ const AuditTrailHub: React.FC = () => {
               <option value="critical">Critical</option>
               <option value="emergency">Emergency</option>
             </select>
-            <Input type="date" value={filterFromDate} onChange={(e) => setFilterFromDate(e.target.value)}
+            <Input id="audit-filter-from" name="audit-filter-from" aria-label="Filter from date" type="date" value={filterFromDate} onChange={(e) => setFilterFromDate(e.target.value)}
               className="bg-background/50 text-xs h-9 w-36" />
-            <Input type="date" value={filterToDate} onChange={(e) => setFilterToDate(e.target.value)}
+            <Input id="audit-filter-to" name="audit-filter-to" aria-label="Filter to date" type="date" value={filterToDate} onChange={(e) => setFilterToDate(e.target.value)}
               className="bg-background/50 text-xs h-9 w-36" />
             <Button size="sm" variant="outline" onClick={refetchEvents} className="h-9">
               <RefreshCw className="w-3.5 h-3.5" />
@@ -547,8 +547,8 @@ const AuditTrailHub: React.FC = () => {
                   <CardHeader className="pb-2 p-4"><CardTitle className="text-sm text-indigo-400">Record Compliance Score</CardTitle></CardHeader>
                   <CardContent className="p-4 pt-0 space-y-4">
                     <div>
-                      <label className="text-[10px] text-muted-foreground uppercase block mb-1">Entity / Client Name</label>
-                      <Input value={scoreEntity} onChange={(e) => setScoreEntity(e.target.value)} placeholder="e.g. ABC Manufacturing Pvt Ltd" className="bg-background/60 text-xs h-9" />
+                      <label htmlFor="audit-score-entity" className="text-[10px] text-muted-foreground uppercase block mb-1">Entity / Client Name</label>
+                      <Input id="audit-score-entity" name="audit-score-entity" aria-label="Entity or client name" value={scoreEntity} onChange={(e) => setScoreEntity(e.target.value)} placeholder="e.g. ABC Manufacturing Pvt Ltd" className="bg-background/60 text-xs h-9" />
                     </div>
                     <div className="grid grid-cols-2 md:grid-cols-6 gap-3">
                       {[
@@ -560,25 +560,25 @@ const AuditTrailHub: React.FC = () => {
                         { label: 'SEBI Score', val: scoreSebi, set: setScoreSebi },
                       ].map((f) => (
                         <div key={f.label}>
-                          <label className="text-[10px] text-muted-foreground uppercase block mb-1">{f.label}</label>
-                          <Input type="number" min="0" max="100" value={f.val} onChange={(e) => f.set(e.target.value)}
+                          <label htmlFor={`audit-score-${f.label.toLowerCase().replace(/\s+/g, '-')}`} className="text-[10px] text-muted-foreground uppercase block mb-1">{f.label}</label>
+                          <Input id={`audit-score-${f.label.toLowerCase().replace(/\s+/g, '-')}`} name={`audit-score-${f.label.toLowerCase().replace(/\s+/g, '-')}`} aria-label={f.label} type="number" min="0" max="100" value={f.val} onChange={(e) => f.set(e.target.value)}
                             className="bg-background/60 text-xs h-9" />
                         </div>
                       ))}
                     </div>
                     <div className="grid grid-cols-2 gap-4">
                       <div>
-                        <label className="text-[10px] text-muted-foreground uppercase block mb-1">Pending Filings</label>
-                        <Input type="number" min="0" value={scorePending} onChange={(e) => setScorePending(e.target.value)} className="bg-background/60 text-xs h-9" />
+                        <label htmlFor="audit-pending-filings" className="text-[10px] text-muted-foreground uppercase block mb-1">Pending Filings</label>
+                        <Input id="audit-pending-filings" name="audit-pending-filings" aria-label="Pending filings count" type="number" min="0" value={scorePending} onChange={(e) => setScorePending(e.target.value)} className="bg-background/60 text-xs h-9" />
                       </div>
                       <div>
-                        <label className="text-[10px] text-muted-foreground uppercase block mb-1">Overdue Filings</label>
-                        <Input type="number" min="0" value={scoreOverdue} onChange={(e) => setScoreOverdue(e.target.value)} className="bg-background/60 text-xs h-9" />
+                        <label htmlFor="audit-overdue-filings" className="text-[10px] text-muted-foreground uppercase block mb-1">Overdue Filings</label>
+                        <Input id="audit-overdue-filings" name="audit-overdue-filings" aria-label="Overdue filings count" type="number" min="0" value={scoreOverdue} onChange={(e) => setScoreOverdue(e.target.value)} className="bg-background/60 text-xs h-9" />
                       </div>
                     </div>
                     <div>
-                      <label className="text-[10px] text-muted-foreground uppercase block mb-1">Notes</label>
-                      <Input value={scoreNotes} onChange={(e) => setScoreNotes(e.target.value)} placeholder="Optional remarks for board review" className="bg-background/60 text-xs h-9" />
+                      <label htmlFor="audit-score-notes" className="text-[10px] text-muted-foreground uppercase block mb-1">Notes</label>
+                      <Input id="audit-score-notes" name="audit-score-notes" aria-label="Score notes" value={scoreNotes} onChange={(e) => setScoreNotes(e.target.value)} placeholder="Optional remarks for board review" className="bg-background/60 text-xs h-9" />
                     </div>
                     <div className="flex gap-2">
                       <Button size="sm" onClick={handleSaveScore} className="bg-indigo-600 hover:bg-indigo-500 text-white">Save Score</Button>
@@ -669,12 +669,12 @@ const AuditTrailHub: React.FC = () => {
                   <CardContent className="p-4 pt-0 space-y-4">
                     <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
                       <div>
-                        <label className="text-[10px] text-muted-foreground uppercase block mb-1">Report Name</label>
-                        <Input value={reportName} onChange={(e) => setReportName(e.target.value)} placeholder="Q1 FY26 Board Compliance Summary" className="bg-background/60 text-xs h-9" />
+                        <label htmlFor="audit-report-name" className="text-[10px] text-muted-foreground uppercase block mb-1">Report Name</label>
+                        <Input id="audit-report-name" name="audit-report-name" aria-label="Report name" value={reportName} onChange={(e) => setReportName(e.target.value)} placeholder="Q1 FY26 Board Compliance Summary" className="bg-background/60 text-xs h-9" />
                       </div>
                       <div>
-                        <label className="text-[10px] text-muted-foreground uppercase block mb-1">Report Type</label>
-                        <select value={reportType} onChange={(e) => setReportType(e.target.value as ReportType)}
+                        <label htmlFor="audit-report-type" className="text-[10px] text-muted-foreground uppercase block mb-1">Report Type</label>
+                        <select id="audit-report-type" name="audit-report-type" aria-label="Report type" value={reportType} onChange={(e) => setReportType(e.target.value as ReportType)}
                           className="w-full p-2 h-9 rounded-lg border border-border/30 bg-background/60 text-xs text-foreground">
                           {Object.entries(REPORT_TYPE_LABELS).map(([k, v]) => (
                             <option key={k} value={k}>{v}</option>
@@ -682,16 +682,16 @@ const AuditTrailHub: React.FC = () => {
                         </select>
                       </div>
                       <div>
-                        <label className="text-[10px] text-muted-foreground uppercase block mb-1">Period From</label>
-                        <Input type="date" value={reportPeriodStart} onChange={(e) => setReportPeriodStart(e.target.value)} className="bg-background/60 text-xs h-9" />
+                        <label htmlFor="audit-report-from" className="text-[10px] text-muted-foreground uppercase block mb-1">Period From</label>
+                        <Input id="audit-report-from" name="audit-report-from" aria-label="Report period from" type="date" value={reportPeriodStart} onChange={(e) => setReportPeriodStart(e.target.value)} className="bg-background/60 text-xs h-9" />
                       </div>
                       <div>
-                        <label className="text-[10px] text-muted-foreground uppercase block mb-1">Period To</label>
-                        <Input type="date" value={reportPeriodEnd} onChange={(e) => setReportPeriodEnd(e.target.value)} className="bg-background/60 text-xs h-9" />
+                        <label htmlFor="audit-report-to" className="text-[10px] text-muted-foreground uppercase block mb-1">Period To</label>
+                        <Input id="audit-report-to" name="audit-report-to" aria-label="Report period to" type="date" value={reportPeriodEnd} onChange={(e) => setReportPeriodEnd(e.target.value)} className="bg-background/60 text-xs h-9" />
                       </div>
                       <div>
-                        <label className="text-[10px] text-muted-foreground uppercase block mb-1">Export Format</label>
-                        <select value={reportFormat} onChange={(e) => setReportFormat(e.target.value as ReportFormat)}
+                        <label htmlFor="audit-report-format" className="text-[10px] text-muted-foreground uppercase block mb-1">Export Format</label>
+                        <select id="audit-report-format" name="audit-report-format" aria-label="Export format" value={reportFormat} onChange={(e) => setReportFormat(e.target.value as ReportFormat)}
                           className="w-full p-2 h-9 rounded-lg border border-border/30 bg-background/60 text-xs text-foreground">
                           <option value="pdf">PDF Document</option>
                           <option value="excel">Excel Workbook</option>
@@ -700,7 +700,7 @@ const AuditTrailHub: React.FC = () => {
                         </select>
                       </div>
                       <div className="flex items-center gap-3 mt-5">
-                        <input type="checkbox" id="confidential" checked={reportConfidential} onChange={(e) => setReportConfidential(e.target.checked)}
+                        <input type="checkbox" id="confidential" name="audit-confidential" checked={reportConfidential} onChange={(e) => setReportConfidential(e.target.checked)}
                           className="w-4 h-4 rounded border-border/30" />
                         <label htmlFor="confidential" className="text-xs text-foreground">Mark as Confidential</label>
                       </div>

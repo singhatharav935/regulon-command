@@ -307,6 +307,9 @@ const DocumentOcrHub: React.FC = () => {
               <div className="relative flex-1 max-w-sm">
                 <Search className="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 text-muted-foreground" />
                 <Input
+                  id="doc-search"
+                  name="doc-search"
+                  aria-label="Search documents"
                   value={searchQuery}
                   onChange={(e) => setSearchQuery(e.target.value)}
                   placeholder="Search documents..."
@@ -314,6 +317,9 @@ const DocumentOcrHub: React.FC = () => {
                 />
               </div>
               <select
+                id="doc-filter-category"
+                name="doc-filter-category"
+                aria-label="Filter by document category"
                 value={filterCategory}
                 onChange={(e) => setFilterCategory(e.target.value as DocumentCategory | '')}
                 className="p-2 rounded-lg border border-border/30 bg-background/50 text-sm text-foreground"
@@ -345,7 +351,7 @@ const DocumentOcrHub: React.FC = () => {
                       onClick={() => fileInputRef.current?.click()}
                       className="relative border-2 border-dashed border-violet-500/30 rounded-xl p-8 text-center hover:border-violet-500/50 transition-colors cursor-pointer bg-violet-500/5"
                     >
-                      <input ref={fileInputRef} type="file" onChange={handleFileSelect} className="hidden" accept=".pdf,.jpg,.jpeg,.png,.gif,.doc,.docx,.xls,.xlsx,.csv,.txt,.tiff,.bmp" />
+                      <input ref={fileInputRef} type="file" id="doc-file-upload" name="doc-file-upload" aria-label="Upload document file" onChange={handleFileSelect} className="hidden" accept=".pdf,.jpg,.jpeg,.png,.gif,.doc,.docx,.xls,.xlsx,.csv,.txt,.tiff,.bmp" />
                       {uploadFile ? (
                         <div className="flex items-center justify-center gap-3">
                           <FileIcon ext={uploadFile.name.split('.').pop()?.toLowerCase() ?? ''} />
@@ -368,12 +374,15 @@ const DocumentOcrHub: React.FC = () => {
 
                     <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
                       <div>
-                        <label className="text-xs text-muted-foreground mb-1 block">Title *</label>
-                        <Input value={uploadTitle} onChange={(e) => setUploadTitle(e.target.value)} placeholder="Document title" className="bg-background/50" />
+                        <label htmlFor="doc-upload-title" className="text-xs text-muted-foreground mb-1 block">Title *</label>
+                        <Input id="doc-upload-title" name="doc-upload-title" aria-label="Document title" value={uploadTitle} onChange={(e) => setUploadTitle(e.target.value)} placeholder="Document title" className="bg-background/50" />
                       </div>
                       <div>
-                        <label className="text-xs text-muted-foreground mb-1 block">Category *</label>
+                        <label htmlFor="doc-upload-category" className="text-xs text-muted-foreground mb-1 block">Category *</label>
                         <select
+                          id="doc-upload-category"
+                          name="doc-upload-category"
+                          aria-label="Document category"
                           value={uploadCategory}
                           onChange={(e) => setUploadCategory(e.target.value as DocumentCategory)}
                           className="w-full p-2 rounded-lg border border-border/30 bg-background/50 text-sm text-foreground"
@@ -387,8 +396,11 @@ const DocumentOcrHub: React.FC = () => {
 
                     <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
                       <div>
-                        <label className="text-xs text-muted-foreground mb-1 block">Compliance Domain</label>
+                        <label htmlFor="doc-upload-domain" className="text-xs text-muted-foreground mb-1 block">Compliance Domain</label>
                         <select
+                          id="doc-upload-domain"
+                          name="doc-upload-domain"
+                          aria-label="Compliance domain"
                           value={uploadDomain}
                           onChange={(e) => setUploadDomain(e.target.value as ComplianceDomain | '')}
                           className="w-full p-2 rounded-lg border border-border/30 bg-background/50 text-sm text-foreground"
@@ -405,12 +417,12 @@ const DocumentOcrHub: React.FC = () => {
                         </select>
                       </div>
                       <div>
-                        <label className="text-xs text-muted-foreground mb-1 block">Financial Year</label>
-                        <Input value={uploadFY} onChange={(e) => setUploadFY(e.target.value)} placeholder="e.g. 2025-26" className="bg-background/50" />
+                        <label htmlFor="doc-upload-fy" className="text-xs text-muted-foreground mb-1 block">Financial Year</label>
+                        <Input id="doc-upload-fy" name="doc-upload-fy" aria-label="Financial year" value={uploadFY} onChange={(e) => setUploadFY(e.target.value)} placeholder="e.g. 2025-26" className="bg-background/50" />
                       </div>
                       <div>
-                        <label className="text-xs text-muted-foreground mb-1 block">Tags (comma-separated)</label>
-                        <Input value={uploadTags} onChange={(e) => setUploadTags(e.target.value)} placeholder="e.g. q1, audit, important" className="bg-background/50" />
+                        <label htmlFor="doc-upload-tags" className="text-xs text-muted-foreground mb-1 block">Tags (comma-separated)</label>
+                        <Input id="doc-upload-tags" name="doc-upload-tags" aria-label="Document tags" value={uploadTags} onChange={(e) => setUploadTags(e.target.value)} placeholder="e.g. q1, audit, important" className="bg-background/50" />
                       </div>
                     </div>
 
@@ -515,6 +527,9 @@ const DocumentOcrHub: React.FC = () => {
             <h3 className="text-lg font-semibold text-foreground">OCR Jobs</h3>
             <div className="flex items-center gap-3">
               <select
+                id="ocr-filter-doc"
+                name="ocr-filter-doc"
+                aria-label="Filter by document"
                 value={selectedDocId || ''}
                 onChange={(e) => setSelectedDocId(e.target.value || null)}
                 className="p-2 rounded-lg border border-border/30 bg-background/50 text-sm text-foreground max-w-xs"
@@ -525,6 +540,9 @@ const DocumentOcrHub: React.FC = () => {
                 ))}
               </select>
               <select
+                id="ocr-engine-select"
+                name="ocr-engine-select"
+                aria-label="Select OCR engine"
                 value={ocrEngine}
                 onChange={(e) => setOcrEngine(e.target.value as OcrEngine)}
                 className="p-2 rounded-lg border border-border/30 bg-background/50 text-sm text-foreground"
@@ -638,6 +656,9 @@ const DocumentOcrHub: React.FC = () => {
           <div className="flex items-center justify-between flex-wrap gap-3">
             <h3 className="text-lg font-semibold text-foreground">Version History</h3>
             <select
+              id="version-doc-select"
+              name="version-doc-select"
+              aria-label="Select document for version history"
               value={selectedDocId || ''}
               onChange={(e) => setSelectedDocId(e.target.value || null)}
               className="p-2 rounded-lg border border-border/30 bg-background/50 text-sm text-foreground max-w-xs"
@@ -695,6 +716,9 @@ const DocumentOcrHub: React.FC = () => {
             <h3 className="text-lg font-semibold text-foreground">Extracted OCR Data</h3>
             <div className="flex items-center gap-3">
               <select
+                id="extracted-doc-select"
+                name="extracted-doc-select"
+                aria-label="Select document for extracted data"
                 value={selectedDocId || ''}
                 onChange={(e) => { setSelectedDocId(e.target.value || null); setSelectedJobId(null); }}
                 className="p-2 rounded-lg border border-border/30 bg-background/50 text-sm text-foreground max-w-xs"

@@ -2156,7 +2156,7 @@ const ExternalCADashboardReal = () => {
                 value={language}
                 onValueChange={(val: any) => setLanguagePreference(val, isRtlLayout)}
               >
-                <SelectTrigger className="w-40 bg-background/50 border-border/40 text-xs h-9">
+                <SelectTrigger aria-label="Select dashboard language" className="w-40 bg-background/50 border-border/40 text-xs h-9">
                   <SelectValue placeholder="Select Language" />
                 </SelectTrigger>
                 <SelectContent className="bg-card border-border/40 text-xs">
