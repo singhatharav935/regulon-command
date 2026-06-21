@@ -4,7 +4,54 @@ import { Check, ChevronDown, ChevronUp } from "lucide-react";
 
 import { cn } from "@/lib/utils";
 
-const Select = SelectPrimitive.Root;
+/**
+ * Wrapped Select that patches Radix's hidden native <select> element.
+ * Radix creates a visually-hidden <select> for form submission when a `name`
+ * prop is provided or the trigger lives inside a <form>. Chrome DevTools flags
+ * this hidden element for missing id/name and missing label association.
+ * This wrapper uses a ref + MutationObserver to inject the necessary attributes.
+ */
+const Select = React.forwardRef<
+  HTMLDivElement,
+  React.ComponentPropsWithoutRef<typeof SelectPrimitive.Root> & { 'aria-label'?: string }
+>(({ children, name, 'aria-label': ariaLabel, ...props }, _ref) => {
+  const containerRef = React.useRef<HTMLDivElement>(null);
+
+  React.useEffect(() => {
+    const container = containerRef.current;
+    if (!container) return;
+
+    const patchHiddenSelect = () => {
+      const hiddenSelect = container.querySelector('select[aria-hidden="true"]');
+      if (hiddenSelect) {
+        if (name && !hiddenSelect.getAttribute('id')) {
+          hiddenSelect.setAttribute('id', `__native_${name}`);
+        }
+        if (!hiddenSelect.getAttribute('aria-label')) {
+          hiddenSelect.setAttribute('aria-label', ariaLabel || name || 'hidden select');
+        }
+      }
+    };
+
+    // Patch on mount
+    patchHiddenSelect();
+
+    // Watch for dynamic changes (Radix may re-create the hidden element)
+    const observer = new MutationObserver(patchHiddenSelect);
+    observer.observe(container, { childList: true, subtree: true });
+
+    return () => observer.disconnect();
+  }, [name, ariaLabel]);
+
+  return (
+    <div ref={containerRef} style={{ display: 'contents' }}>
+      <SelectPrimitive.Root name={name} {...props}>
+        {children}
+      </SelectPrimitive.Root>
+    </div>
+  );
+}) as React.FC<React.ComponentPropsWithoutRef<typeof SelectPrimitive.Root> & { 'aria-label'?: string }>;
+Select.displayName = "Select";
 
 const SelectGroup = SelectPrimitive.Group;
 

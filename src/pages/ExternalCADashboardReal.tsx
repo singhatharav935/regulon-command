@@ -2153,6 +2153,7 @@ const ExternalCADashboardReal = () => {
               </Badge>
               <Select
                 name="dashboard-language-select"
+                aria-label="Select dashboard language"
                 value={language}
                 onValueChange={(val: any) => setLanguagePreference(val, isRtlLayout)}
               >

@@ -314,7 +314,7 @@ export default function CommunicationLogs({
               />
             </div>
 
-            <Select name="comms-type-filter" value={filters.type} onValueChange={(value) => setFilters({ ...filters, type: value })}>
+            <Select name="comms-type-filter" aria-label="Filter by communication type" value={filters.type} onValueChange={(value) => setFilters({ ...filters, type: value })}>
               <SelectTrigger className="w-[140px]">
                 <SelectValue placeholder="Type" />
               </SelectTrigger>
@@ -328,7 +328,7 @@ export default function CommunicationLogs({
               </SelectContent>
             </Select>
 
-            <Select name="comms-status-filter" value={filters.status} onValueChange={(value) => setFilters({ ...filters, status: value })}>
+            <Select name="comms-status-filter" aria-label="Filter by status" value={filters.status} onValueChange={(value) => setFilters({ ...filters, status: value })}>
               <SelectTrigger className="w-[130px]">
                 <SelectValue placeholder="Status" />
               </SelectTrigger>
@@ -341,7 +341,7 @@ export default function CommunicationLogs({
               </SelectContent>
             </Select>
 
-            <Select name="comms-category-filter" value={filters.category} onValueChange={(value) => setFilters({ ...filters, category: value })}>
+            <Select name="comms-category-filter" aria-label="Filter by category" value={filters.category} onValueChange={(value) => setFilters({ ...filters, category: value })}>
               <SelectTrigger className="w-[140px]">
                 <SelectValue placeholder="Category" />
               </SelectTrigger>

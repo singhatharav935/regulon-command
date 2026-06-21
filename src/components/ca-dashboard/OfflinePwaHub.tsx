@@ -234,7 +234,7 @@ export const OfflinePwaHub: React.FC = () => {
             {/* Toggle Switch */}
             <div className="p-4 rounded-2xl bg-background/50 border border-border/20 flex items-center justify-between gap-6 shrink-0 w-full md:w-auto">
               <div className="space-y-0.5">
-                <Label className="text-xs font-bold text-foreground">Simulate Offline Mode</Label>
+                <Label htmlFor="simulate-offline-toggle" className="text-xs font-bold text-foreground">Simulate Offline Mode</Label>
                 <p className="text-[10px] text-muted-foreground">Test PWA sync queue behavior</p>
               </div>
               <Switch
@@ -390,8 +390,8 @@ export const OfflinePwaHub: React.FC = () => {
             <CardContent>
               <form onSubmit={handleSimulateOfflineMutation} className="space-y-4">
                 <div className="space-y-2">
-                  <Label className="text-xs text-muted-foreground">Select Client Entity</Label>
-                  <Select name="offline-client-entity" value={clientName} onValueChange={setClientName}>
+                  <Label htmlFor="offline-client-entity" className="text-xs text-muted-foreground">Select Client Entity</Label>
+                  <Select name="offline-client-entity" aria-label="Select client entity" value={clientName} onValueChange={setClientName}>
                     <SelectTrigger aria-label="Select client entity" className="bg-background/40 border-border/40 text-xs h-10">
                       <SelectValue placeholder="Select client" />
                     </SelectTrigger>
@@ -404,7 +404,7 @@ export const OfflinePwaHub: React.FC = () => {
                 </div>
 
                 <div className="space-y-2">
-                  <Label className="text-xs text-muted-foreground">Statutory Task Title</Label>
+                  <Label htmlFor="offline-task-title" className="text-xs text-muted-foreground">Statutory Task Title</Label>
                   <Input
                     id="offline-task-title"
                     name="offline-task-title"
@@ -418,8 +418,8 @@ export const OfflinePwaHub: React.FC = () => {
                 </div>
 
                 <div className="space-y-2">
-                  <Label className="text-xs text-muted-foreground">SLA Priority</Label>
-                  <Select name="offline-task-priority" value={taskPriority} onValueChange={setTaskPriority}>
+                  <Label htmlFor="offline-task-priority" className="text-xs text-muted-foreground">SLA Priority</Label>
+                  <Select name="offline-task-priority" aria-label="Select SLA priority" value={taskPriority} onValueChange={setTaskPriority}>
                     <SelectTrigger aria-label="Select SLA priority" className="bg-background/40 border-border/40 text-xs h-10">
                       <SelectValue />
                     </SelectTrigger>

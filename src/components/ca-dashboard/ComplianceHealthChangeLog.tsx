@@ -420,7 +420,7 @@ export default function ComplianceHealthChangeLog({
             </div>
 
             {/* Filters */}
-            <Select name="compliance-change-type-filter" value={filters.changeType} onValueChange={(value) => setFilters({ ...filters, changeType: value })}>
+            <Select name="compliance-change-type-filter" aria-label="Filter by change type" value={filters.changeType} onValueChange={(value) => setFilters({ ...filters, changeType: value })}>
               <SelectTrigger className="w-[150px]">
                 <SelectValue placeholder="Change Type" />
               </SelectTrigger>
@@ -432,7 +432,7 @@ export default function ComplianceHealthChangeLog({
               </SelectContent>
             </Select>
 
-            <Select name="compliance-action-by-filter" value={filters.actionBy} onValueChange={(value) => setFilters({ ...filters, actionBy: value })}>
+            <Select name="compliance-action-by-filter" aria-label="Filter by action by" value={filters.actionBy} onValueChange={(value) => setFilters({ ...filters, actionBy: value })}>
               <SelectTrigger className="w-[140px]">
                 <SelectValue placeholder="Action By" />
               </SelectTrigger>
@@ -445,7 +445,7 @@ export default function ComplianceHealthChangeLog({
               </SelectContent>
             </Select>
 
-            <Select name="compliance-time-range-filter" value={filters.timeRange} onValueChange={(value) => setFilters({ ...filters, timeRange: value })}>
+            <Select name="compliance-time-range-filter" aria-label="Filter by time range" value={filters.timeRange} onValueChange={(value) => setFilters({ ...filters, timeRange: value })}>
               <SelectTrigger className="w-[130px]">
                 <SelectValue placeholder="Time Range" />
               </SelectTrigger>

@@ -351,7 +351,7 @@ ACTION REQUIRED:
             className="md:col-span-2"
           />
 
-          <Select name="dependency-status-filter" value={filters.status} onValueChange={(value) => setFilters({ ...filters, status: value })}>
+          <Select name="dependency-status-filter" aria-label="Filter by dependency status" value={filters.status} onValueChange={(value) => setFilters({ ...filters, status: value })}>
             <SelectTrigger>
               <SelectValue placeholder="All Status" />
             </SelectTrigger>

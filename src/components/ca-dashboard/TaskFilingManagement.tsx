@@ -225,7 +225,7 @@ const TaskFilingManagement = ({
             </div>
 
             {/* Authority Filter */}
-            <Select name="task-filter-authority" value={filterAuthority} onValueChange={setFilterAuthority}>
+            <Select name="task-filter-authority" aria-label="Filter by authority" value={filterAuthority} onValueChange={setFilterAuthority}>
               <SelectTrigger aria-label="Filter by authority" className="h-9 bg-card">
                 <SelectValue placeholder="Filter by Authority" />
               </SelectTrigger>
@@ -243,7 +243,7 @@ const TaskFilingManagement = ({
             </Select>
 
             {/* Urgency Filter */}
-            <Select name="task-filter-urgency" value={filterUrgency} onValueChange={setFilterUrgency}>
+            <Select name="task-filter-urgency" aria-label="Filter by urgency" value={filterUrgency} onValueChange={setFilterUrgency}>
               <SelectTrigger aria-label="Filter by urgency" className="h-9 bg-card">
                 <SelectValue placeholder="Filter by Urgency" />
               </SelectTrigger>
@@ -257,7 +257,7 @@ const TaskFilingManagement = ({
             </Select>
 
             {/* Sort By */}
-            <Select name="task-sort-by" value={sortBy} onValueChange={setSortBy}>
+            <Select name="task-sort-by" aria-label="Sort tasks by" value={sortBy} onValueChange={setSortBy}>
               <SelectTrigger aria-label="Sort tasks by" className="h-9 bg-card">
                 <SelectValue placeholder="Sort Tasks By" />
               </SelectTrigger>

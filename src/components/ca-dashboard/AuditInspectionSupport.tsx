@@ -352,7 +352,7 @@ export default function AuditInspectionSupport({
               />
             </div>
 
-            <Select name="audit-status-filter" value={filters.status} onValueChange={(value) => setFilters({ ...filters, status: value })}>
+            <Select name="audit-status-filter" aria-label="Filter by audit status" value={filters.status} onValueChange={(value) => setFilters({ ...filters, status: value })}>
               <SelectTrigger className="w-[150px]">
                 <SelectValue placeholder="Status" />
               </SelectTrigger>
@@ -366,7 +366,7 @@ export default function AuditInspectionSupport({
               </SelectContent>
             </Select>
 
-            <Select name="audit-priority-filter" value={filters.priority} onValueChange={(value) => setFilters({ ...filters, priority: value })}>
+            <Select name="audit-priority-filter" aria-label="Filter by priority" value={filters.priority} onValueChange={(value) => setFilters({ ...filters, priority: value })}>
               <SelectTrigger className="w-[140px]">
                 <SelectValue placeholder="Priority" />
               </SelectTrigger>
@@ -379,7 +379,7 @@ export default function AuditInspectionSupport({
               </SelectContent>
             </Select>
 
-            <Select name="audit-authority-filter" value={filters.authority} onValueChange={(value) => setFilters({ ...filters, authority: value })}>
+            <Select name="audit-authority-filter" aria-label="Filter by authority" value={filters.authority} onValueChange={(value) => setFilters({ ...filters, authority: value })}>
               <SelectTrigger className="w-[150px]">
                 <SelectValue placeholder="Authority" />
               </SelectTrigger>
