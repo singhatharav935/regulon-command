@@ -1495,6 +1495,7 @@ const LiveAIDraftingEngine = () => {
                       className="hidden"
                       id="document-upload"
                       name="document-upload"
+                      aria-label="Upload document for AI analysis"
                     />
                     <label htmlFor="document-upload" className="cursor-pointer">
                       <p className="text-muted-foreground mb-2">

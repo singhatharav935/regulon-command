@@ -17,23 +17,28 @@ const Select = React.forwardRef<
 >(({ children, name, 'aria-label': ariaLabel, ...props }, _ref) => {
   const containerRef = React.useRef<HTMLDivElement>(null);
 
-  React.useEffect(() => {
+  // Use useLayoutEffect for synchronous DOM patching before paint
+  React.useLayoutEffect(() => {
     const container = containerRef.current;
     if (!container) return;
 
     const patchHiddenSelect = () => {
       const hiddenSelect = container.querySelector('select[aria-hidden="true"]');
       if (hiddenSelect) {
-        if (name && !hiddenSelect.getAttribute('id')) {
-          hiddenSelect.setAttribute('id', `__native_${name}`);
+        const effectiveName = name || `select-${Math.random().toString(36).slice(2, 8)}`;
+        if (!hiddenSelect.getAttribute('name')) {
+          hiddenSelect.setAttribute('name', effectiveName);
+        }
+        if (!hiddenSelect.getAttribute('id')) {
+          hiddenSelect.setAttribute('id', `__native_${hiddenSelect.getAttribute('name') || effectiveName}`);
         }
         if (!hiddenSelect.getAttribute('aria-label')) {
-          hiddenSelect.setAttribute('aria-label', ariaLabel || name || 'hidden select');
+          hiddenSelect.setAttribute('aria-label', ariaLabel || name || 'select');
         }
       }
     };
 
-    // Patch on mount
+    // Patch synchronously on mount
     patchHiddenSelect();
 
     // Watch for dynamic changes (Radix may re-create the hidden element)

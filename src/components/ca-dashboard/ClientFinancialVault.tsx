@@ -513,7 +513,7 @@ export default function ClientFinancialVault() {
         </div>
 
         <div className="flex items-center gap-3 w-full md:w-auto">
-          <Select value={selectedClient} onValueChange={setSelectedClient}>
+          <Select name="vault-client-select" aria-label="Select client" value={selectedClient} onValueChange={setSelectedClient}>
             <SelectTrigger className="w-[200px] border-indigo-500/30 bg-indigo-500/5">
               <SelectValue placeholder={loading ? "Loading clients..." : "Select Client"} />
             </SelectTrigger>
@@ -522,7 +522,7 @@ export default function ClientFinancialVault() {
             </SelectContent>
           </Select>
 
-          <Select value={financialYear} onValueChange={setFinancialYear}>
+          <Select name="vault-financial-year" aria-label="Select financial year" value={financialYear} onValueChange={setFinancialYear}>
             <SelectTrigger className="w-[120px]">
               <SelectValue />
             </SelectTrigger>
@@ -611,6 +611,9 @@ export default function ClientFinancialVault() {
                 <div className="relative group">
                   <input 
                     type="file" 
+                    id="vault-bank-statement-upload"
+                    name="vault-bank-statement-upload"
+                    aria-label="Upload bank statement"
                     onChange={handleFileUpload} 
                     accept=".pdf,.csv,.xlsx" 
                     disabled={uploading}
@@ -635,6 +638,9 @@ export default function ClientFinancialVault() {
                     <Fingerprint className="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 text-muted-foreground" />
                     <input 
                       type="text" 
+                      id="vault-aa-handle"
+                      name="vault-aa-handle"
+                      aria-label="Account Aggregator handle"
                       value={aaHandle}
                       onChange={(e) => setAaHandle(e.target.value)}
                       placeholder="user@finvu"

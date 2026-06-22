@@ -15,26 +15,28 @@ const Switch = React.forwardRef<
 >(({ className, id, name, "aria-label": ariaLabel, ...props }, ref) => {
   const containerRef = React.useRef<HTMLSpanElement>(null);
 
-  React.useEffect(() => {
+  // Use useLayoutEffect for synchronous DOM patching before paint
+  React.useLayoutEffect(() => {
     const container = containerRef.current;
     if (!container) return;
 
     const patchHiddenInput = () => {
       const hiddenInput = container.querySelector('input[type="checkbox"][aria-hidden="true"]');
       if (hiddenInput) {
-        if (name && !hiddenInput.getAttribute('id')) {
-          hiddenInput.setAttribute('id', `__native_${name}`);
+        const effectiveName = name || `switch-${Math.random().toString(36).slice(2, 8)}`;
+        if (!hiddenInput.getAttribute('name')) {
+          hiddenInput.setAttribute('name', effectiveName);
         }
-        if (name && !hiddenInput.getAttribute('name')) {
-          hiddenInput.setAttribute('name', name);
+        if (!hiddenInput.getAttribute('id')) {
+          hiddenInput.setAttribute('id', `__native_${hiddenInput.getAttribute('name') || effectiveName}`);
         }
         if (!hiddenInput.getAttribute('aria-label')) {
-          hiddenInput.setAttribute('aria-label', ariaLabel || name || 'hidden checkbox');
+          hiddenInput.setAttribute('aria-label', ariaLabel || name || 'switch');
         }
       }
     };
 
-    // Patch on mount
+    // Patch synchronously on mount
     patchHiddenInput();
 
     // Watch for dynamic changes
