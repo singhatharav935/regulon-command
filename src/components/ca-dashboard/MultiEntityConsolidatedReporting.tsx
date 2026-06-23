@@ -187,6 +187,9 @@ const EntityForm = ({ caUserId, onSave, initial, onClose }: EntityFormProps) => 
         <div className="md:col-span-2">
           <Label className="text-xs text-muted-foreground mb-1">Entity Name *</Label>
           <Input
+            id="entity-name"
+            name="entity-name"
+            aria-label="Entity name"
             value={form.entity_name ?? ''}
             onChange={(e) => set('entity_name', e.target.value)}
             placeholder="e.g. Acme Pvt. Ltd."
@@ -196,7 +199,7 @@ const EntityForm = ({ caUserId, onSave, initial, onClose }: EntityFormProps) => 
 
         <div>
           <Label className="text-xs text-muted-foreground mb-1">Entity Type *</Label>
-          <Select value={form.entity_type} onValueChange={(v) => set('entity_type', v)}>
+          <Select value={form.entity_type} onValueChange={(v) => set('entity_type', v)} name="entity-type" aria-label="Entity type">
             <SelectTrigger className="bg-card/50 border-border/50">
               <SelectValue />
             </SelectTrigger>
@@ -210,7 +213,7 @@ const EntityForm = ({ caUserId, onSave, initial, onClose }: EntityFormProps) => 
 
         <div>
           <Label className="text-xs text-muted-foreground mb-1">Status</Label>
-          <Select value={form.entity_status} onValueChange={(v) => set('entity_status', v)}>
+          <Select value={form.entity_status} onValueChange={(v) => set('entity_status', v)} name="entity-status" aria-label="Entity status">
             <SelectTrigger className="bg-card/50 border-border/50">
               <SelectValue />
             </SelectTrigger>
@@ -225,6 +228,9 @@ const EntityForm = ({ caUserId, onSave, initial, onClose }: EntityFormProps) => 
         <div>
           <Label className="text-xs text-muted-foreground mb-1">PAN</Label>
           <Input
+            id="entity-pan"
+            name="entity-pan"
+            aria-label="PAN"
             value={form.pan ?? ''}
             onChange={(e) => set('pan', e.target.value.toUpperCase())}
             placeholder="AAAAA0000A"
@@ -236,6 +242,9 @@ const EntityForm = ({ caUserId, onSave, initial, onClose }: EntityFormProps) => 
         <div>
           <Label className="text-xs text-muted-foreground mb-1">GSTIN</Label>
           <Input
+            id="entity-gstin"
+            name="entity-gstin"
+            aria-label="GSTIN"
             value={form.gstin ?? ''}
             onChange={(e) => set('gstin', e.target.value.toUpperCase())}
             placeholder="22AAAAA0000A1Z5"
@@ -247,6 +256,9 @@ const EntityForm = ({ caUserId, onSave, initial, onClose }: EntityFormProps) => 
         <div>
           <Label className="text-xs text-muted-foreground mb-1">CIN (for Companies/LLPs)</Label>
           <Input
+            id="entity-cin"
+            name="entity-cin"
+            aria-label="CIN"
             value={form.cin ?? ''}
             onChange={(e) => set('cin', e.target.value.toUpperCase())}
             placeholder="U12345MH2020PTC000000"
@@ -258,6 +270,9 @@ const EntityForm = ({ caUserId, onSave, initial, onClose }: EntityFormProps) => 
         <div>
           <Label className="text-xs text-muted-foreground mb-1">TAN</Label>
           <Input
+            id="entity-tan"
+            name="entity-tan"
+            aria-label="TAN"
             value={form.tan ?? ''}
             onChange={(e) => set('tan', e.target.value.toUpperCase())}
             placeholder="AAAA00000A"
@@ -269,6 +284,9 @@ const EntityForm = ({ caUserId, onSave, initial, onClose }: EntityFormProps) => 
         <div>
           <Label className="text-xs text-muted-foreground mb-1">Incorporation Date</Label>
           <Input
+            id="entity-incorporation-date"
+            name="entity-incorporation-date"
+            aria-label="Incorporation date"
             type="date"
             value={form.incorporation_date ?? ''}
             onChange={(e) => set('incorporation_date', e.target.value)}
@@ -279,6 +297,9 @@ const EntityForm = ({ caUserId, onSave, initial, onClose }: EntityFormProps) => 
         <div>
           <Label className="text-xs text-muted-foreground mb-1">Industry</Label>
           <Input
+            id="entity-industry"
+            name="entity-industry"
+            aria-label="Industry"
             value={form.industry ?? ''}
             onChange={(e) => set('industry', e.target.value)}
             placeholder="e.g. Manufacturing, IT Services"
@@ -291,6 +312,8 @@ const EntityForm = ({ caUserId, onSave, initial, onClose }: EntityFormProps) => 
           <Select
             value={form.turnover_bracket ?? ''}
             onValueChange={(v) => set('turnover_bracket', v)}
+            name="turnover-bracket"
+            aria-label="Turnover bracket"
           >
             <SelectTrigger className="bg-card/50 border-border/50">
               <SelectValue placeholder="Select turnover range" />
@@ -356,13 +379,16 @@ const EntityRegistryTab = ({ caUserId }: { caUserId: string }) => {
         <div className="relative flex-1 min-w-[200px]">
           <Search className="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 text-muted-foreground" />
           <Input
+            id="entity-search"
+            name="entity-search"
+            aria-label="Search entities"
             value={search}
             onChange={(e) => setSearch(e.target.value)}
             placeholder="Search by name, PAN, GSTIN…"
             className="pl-9 bg-card/50 border-border/50"
           />
         </div>
-        <Select value={typeFilter} onValueChange={setTypeFilter}>
+        <Select value={typeFilter} onValueChange={setTypeFilter} name="entity-type-filter" aria-label="Filter by entity type">
           <SelectTrigger className="w-40 bg-card/50 border-border/50">
             <SelectValue placeholder="Entity Type" />
           </SelectTrigger>
@@ -373,7 +399,7 @@ const EntityRegistryTab = ({ caUserId }: { caUserId: string }) => {
             ))}
           </SelectContent>
         </Select>
-        <Select value={statusFilter} onValueChange={setStatusFilter}>
+        <Select value={statusFilter} onValueChange={setStatusFilter} name="entity-status-filter" aria-label="Filter by status">
           <SelectTrigger className="w-44 bg-card/50 border-border/50">
             <SelectValue placeholder="Status" />
           </SelectTrigger>
@@ -670,6 +696,9 @@ const EntityGroupsTab = ({ caUserId }: { caUserId: string }) => {
                 <div>
                   <Label className="text-xs text-muted-foreground">Group Name *</Label>
                   <Input
+                    id="new-group-name"
+                    name="new-group-name"
+                    aria-label="Group name"
                     value={newGroupName}
                     onChange={(e) => setNewGroupName(e.target.value)}
                     placeholder="e.g. Sharma Family Holdings"
@@ -678,7 +707,7 @@ const EntityGroupsTab = ({ caUserId }: { caUserId: string }) => {
                 </div>
                 <div>
                   <Label className="text-xs text-muted-foreground">Group Type</Label>
-                  <Select value={newGroupType} onValueChange={(v: any) => setNewGroupType(v)}>
+                  <Select value={newGroupType} onValueChange={(v: any) => setNewGroupType(v)} name="new-group-type" aria-label="Group type">
                     <SelectTrigger className="mt-1 bg-card/50 border-border/50">
                       <SelectValue />
                     </SelectTrigger>
@@ -692,6 +721,9 @@ const EntityGroupsTab = ({ caUserId }: { caUserId: string }) => {
                 <div>
                   <Label className="text-xs text-muted-foreground">Description</Label>
                   <Input
+                    id="new-group-description"
+                    name="new-group-description"
+                    aria-label="Group description"
                     value={newGroupDesc}
                     onChange={(e) => setNewGroupDesc(e.target.value)}
                     placeholder="Optional description"
@@ -802,7 +834,7 @@ const EntityGroupsTab = ({ caUserId }: { caUserId: string }) => {
 
               {availableEntities.length > 0 && (
                 <div className="flex items-center gap-2">
-                  <Select value={addingEntityId} onValueChange={setAddingEntityId}>
+                  <Select value={addingEntityId} onValueChange={setAddingEntityId} name="add-entity-select" aria-label="Select entity to add">
                     <SelectTrigger className="w-52 bg-card/50 border-border/50 text-sm">
                       <SelectValue placeholder="Add entity…" />
                     </SelectTrigger>
@@ -932,7 +964,7 @@ const ConsolidatedReportsTab = ({ caUserId }: { caUserId: string }) => {
           <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-4">
             <div>
               <Label className="text-xs text-muted-foreground mb-1">Entity Group</Label>
-              <Select value={selectedGroupId} onValueChange={setSelectedGroupId}>
+              <Select value={selectedGroupId} onValueChange={setSelectedGroupId} name="report-group-select" aria-label="Select group for report">
                 <SelectTrigger className="bg-card/50 border-border/50">
                   <SelectValue />
                 </SelectTrigger>
@@ -946,7 +978,7 @@ const ConsolidatedReportsTab = ({ caUserId }: { caUserId: string }) => {
             </div>
             <div>
               <Label className="text-xs text-muted-foreground mb-1">Report Type</Label>
-              <Select value={reportType} onValueChange={(v: any) => setReportType(v)}>
+              <Select value={reportType} onValueChange={(v: any) => setReportType(v)} name="report-type" aria-label="Report type">
                 <SelectTrigger className="bg-card/50 border-border/50">
                   <SelectValue />
                 </SelectTrigger>
@@ -960,6 +992,9 @@ const ConsolidatedReportsTab = ({ caUserId }: { caUserId: string }) => {
             <div>
               <Label className="text-xs text-muted-foreground mb-1">Period Start</Label>
               <Input
+                id="report-period-start"
+                name="report-period-start"
+                aria-label="Period start date"
                 type="date"
                 value={periodStart}
                 onChange={(e) => setPeriodStart(e.target.value)}
@@ -969,6 +1004,9 @@ const ConsolidatedReportsTab = ({ caUserId }: { caUserId: string }) => {
             <div>
               <Label className="text-xs text-muted-foreground mb-1">Period End</Label>
               <Input
+                id="report-period-end"
+                name="report-period-end"
+                aria-label="Period end date"
                 type="date"
                 value={periodEnd}
                 onChange={(e) => setPeriodEnd(e.target.value)}
@@ -1140,7 +1178,7 @@ const ComplianceHeatmapTab = ({ caUserId }: { caUserId: string }) => {
             <p className="text-xs text-muted-foreground">Avg Health Score</p>
           </div>
           <div className="w-px h-12 bg-border/50" />
-          <Select value={groupFilter} onValueChange={setGroupFilter}>
+          <Select value={groupFilter} onValueChange={setGroupFilter} name="audit-group-filter" aria-label="Filter by group">
             <SelectTrigger className="w-44 bg-card/50 border-border/50 text-sm">
               <SelectValue />
             </SelectTrigger>

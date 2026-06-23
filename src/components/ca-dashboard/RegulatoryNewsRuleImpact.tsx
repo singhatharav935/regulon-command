@@ -374,7 +374,7 @@ const ClientsTab = ({ newsId }: { newsId: string }) => {
 
               <div className="space-y-1">
                 <Label className="text-[10px] text-muted-foreground uppercase font-bold">Compliance Status *</Label>
-                <Select value={evalStatus} onValueChange={v => setEvalStatus(v as any)}>
+                <Select value={evalStatus} onValueChange={v => setEvalStatus(v as any)} name="eval-status-filter" aria-label="Filter by evaluation status">
                   <SelectTrigger className="bg-card/50 border-border/50">
                     <SelectValue />
                   </SelectTrigger>
@@ -389,6 +389,9 @@ const ClientsTab = ({ newsId }: { newsId: string }) => {
               <div className="space-y-1">
                 <Label className="text-[10px] text-muted-foreground uppercase font-bold">Audit Evaluation Notes</Label>
                 <Textarea
+                  id="eval-notes"
+                  name="eval-notes"
+                  aria-label="Audit evaluation notes"
                   value={evalNotes}
                   onChange={e => setEvalNotes(e.target.value)}
                   placeholder="Record specific audit notes or checklist compliance steps..."
@@ -457,22 +460,22 @@ const AmendTab = ({ item, onUpdateSuccess }: { item: any; onUpdateSuccess: () =>
       <div className="grid grid-cols-2 gap-3">
         <div className="col-span-2">
           <Label className="text-[10px] text-muted-foreground uppercase font-bold">Circular Title *</Label>
-          <Input required value={form.title} onChange={e => setForm(f => ({ ...f, title: e.target.value }))} className="mt-1 bg-card/50 border-border/50" />
+          <Input id="rule-edit-title" name="rule-edit-title" aria-label="Rule title" required value={form.title} onChange={e => setForm(f => ({ ...f, title: e.target.value }))} className="mt-1 bg-card/50 border-border/50" />
         </div>
 
         <div>
           <Label className="text-[10px] text-muted-foreground uppercase font-bold">Effective Date *</Label>
-          <Input required type="date" value={form.effective_date} onChange={e => setForm(f => ({ ...f, effective_date: e.target.value }))} className="mt-1 bg-card/50 border-border/50" />
+          <Input id="rule-edit-effective-date" name="rule-edit-effective-date" aria-label="Effective date" required type="date" value={form.effective_date} onChange={e => setForm(f => ({ ...f, effective_date: e.target.value }))} className="mt-1 bg-card/50 border-border/50" />
         </div>
 
         <div>
           <Label className="text-[10px] text-muted-foreground uppercase font-bold">Published Date *</Label>
-          <Input required type="date" value={form.published_date} onChange={e => setForm(f => ({ ...f, published_date: e.target.value }))} className="mt-1 bg-card/50 border-border/50" />
+          <Input id="rule-edit-published-date" name="rule-edit-published-date" aria-label="Published date" required type="date" value={form.published_date} onChange={e => setForm(f => ({ ...f, published_date: e.target.value }))} className="mt-1 bg-card/50 border-border/50" />
         </div>
 
         <div>
           <Label className="text-[10px] text-muted-foreground uppercase font-bold">Impact Level *</Label>
-          <Select value={form.impact_level} onValueChange={v => setForm(f => ({ ...f, impact_level: v }))}>
+          <Select value={form.impact_level} onValueChange={v => setForm(f => ({ ...f, impact_level: v }))} name="rule-edit-impact" aria-label="Impact level">
             <SelectTrigger className="mt-1 bg-card/50 border-border/50">
               <SelectValue />
             </SelectTrigger>
@@ -487,7 +490,7 @@ const AmendTab = ({ item, onUpdateSuccess }: { item: any; onUpdateSuccess: () =>
 
         <div>
           <Label className="text-[10px] text-muted-foreground uppercase font-bold">Max Penalty Fine</Label>
-          <Input value={form.penalty_max} onChange={e => setForm(f => ({ ...f, penalty_max: e.target.value }))} placeholder="₹250 Crore" className="mt-1 bg-card/50 border-border/50" />
+          <Input id="rule-edit-penalty" name="rule-edit-penalty" aria-label="Maximum penalty" value={form.penalty_max} onChange={e => setForm(f => ({ ...f, penalty_max: e.target.value }))} placeholder="₹250 Crore" className="mt-1 bg-card/50 border-border/50" />
         </div>
 
         <div className="col-span-2">
@@ -503,12 +506,12 @@ const AmendTab = ({ item, onUpdateSuccess }: { item: any; onUpdateSuccess: () =>
 
         <div className="col-span-2">
           <Label className="text-[10px] text-muted-foreground uppercase font-bold">Circular Summary *</Label>
-          <Textarea required value={form.summary} onChange={e => setForm(f => ({ ...f, summary: e.target.value }))} className="mt-1 bg-card/50 border-border/50 h-16" />
+          <Textarea id="rule-edit-summary" name="rule-edit-summary" aria-label="Rule summary" required value={form.summary} onChange={e => setForm(f => ({ ...f, summary: e.target.value }))} className="mt-1 bg-card/50 border-border/50 h-16" />
         </div>
 
         <div className="col-span-2">
           <Label className="text-[10px] text-muted-foreground uppercase font-bold">Full Act / Circular Text</Label>
-          <Textarea value={form.full_text} onChange={e => setForm(f => ({ ...f, full_text: e.target.value }))} className="mt-1 bg-card/50 border-border/50 h-24 font-mono" />
+          <Textarea id="rule-edit-fulltext" name="rule-edit-fulltext" aria-label="Full notification text" value={form.full_text} onChange={e => setForm(f => ({ ...f, full_text: e.target.value }))} className="mt-1 bg-card/50 border-border/50 h-24 font-mono" />
         </div>
       </div>
 
@@ -678,17 +681,17 @@ export default function RegulatoryNewsRuleImpact({
               <form onSubmit={handleCreateNews} className="space-y-4 pt-2 text-xs">
                 <div>
                   <Label className="text-[10px] text-muted-foreground uppercase font-bold">Circular Title *</Label>
-                  <Input required value={addForm.title} onChange={e => setAddForm(f => ({ ...f, title: e.target.value }))} placeholder="e.g. GST Council Rate Cut SaaS Products" className="mt-1 bg-card/50 border-border/50" />
+                  <Input id="rule-add-title" name="rule-add-title" aria-label="New rule title" required value={addForm.title} onChange={e => setAddForm(f => ({ ...f, title: e.target.value }))} placeholder="e.g. GST Council Rate Cut SaaS Products" className="mt-1 bg-card/50 border-border/50" />
                 </div>
 
                 <div className="grid grid-cols-2 gap-3">
                   <div>
                     <Label className="text-[10px] text-muted-foreground uppercase font-bold">Authority *</Label>
-                    <Input required value={addForm.authority} onChange={e => setAddForm(f => ({ ...f, authority: e.target.value }))} className="mt-1 bg-card/50 border-border/50" />
+                    <Input id="rule-add-authority" name="rule-add-authority" aria-label="Issuing authority" required value={addForm.authority} onChange={e => setAddForm(f => ({ ...f, authority: e.target.value }))} className="mt-1 bg-card/50 border-border/50" />
                   </div>
                   <div>
                     <Label className="text-[10px] text-muted-foreground uppercase font-bold">Authority Code *</Label>
-                    <Select value={addForm.authority_code} onValueChange={v => setAddForm(f => ({ ...f, authority_code: v }))}>
+                    <Select value={addForm.authority_code} onValueChange={v => setAddForm(f => ({ ...f, authority_code: v }))} name="rule-add-authority-code" aria-label="Authority code">
                       <SelectTrigger className="mt-1 bg-card/50 border-border/50">
                         <SelectValue />
                       </SelectTrigger>
@@ -702,7 +705,7 @@ export default function RegulatoryNewsRuleImpact({
                 <div className="grid grid-cols-2 gap-3">
                   <div>
                     <Label className="text-[10px] text-muted-foreground uppercase font-bold">Category *</Label>
-                    <Select value={addForm.category} onValueChange={v => setAddForm(f => ({ ...f, category: v }))}>
+                    <Select value={addForm.category} onValueChange={v => setAddForm(f => ({ ...f, category: v }))} name="rule-add-category" aria-label="Rule category">
                       <SelectTrigger className="mt-1 bg-card/50 border-border/50">
                         <SelectValue />
                       </SelectTrigger>
@@ -716,7 +719,7 @@ export default function RegulatoryNewsRuleImpact({
                   </div>
                   <div>
                     <Label className="text-[10px] text-muted-foreground uppercase font-bold">Impact Level *</Label>
-                    <Select value={addForm.impact_level} onValueChange={v => setAddForm(f => ({ ...f, impact_level: v }))}>
+                    <Select value={addForm.impact_level} onValueChange={v => setAddForm(f => ({ ...f, impact_level: v }))} name="rule-add-impact" aria-label="Impact level">
                       <SelectTrigger className="mt-1 bg-card/50 border-border/50">
                         <SelectValue />
                       </SelectTrigger>
@@ -733,33 +736,33 @@ export default function RegulatoryNewsRuleImpact({
                 <div className="grid grid-cols-2 gap-3">
                   <div>
                     <Label className="text-[10px] text-muted-foreground uppercase font-bold">Effective Date *</Label>
-                    <Input required type="date" value={addForm.effective_date} onChange={e => setAddForm(f => ({ ...f, effective_date: e.target.value }))} className="mt-1 bg-card/50 border-border/50" />
+                    <Input id="rule-add-effective-date" name="rule-add-effective-date" aria-label="Effective date" required type="date" value={addForm.effective_date} onChange={e => setAddForm(f => ({ ...f, effective_date: e.target.value }))} className="mt-1 bg-card/50 border-border/50" />
                   </div>
                   <div>
                     <Label className="text-[10px] text-muted-foreground uppercase font-bold">Published Date</Label>
-                    <Input type="date" value={addForm.published_date} onChange={e => setAddForm(f => ({ ...f, published_date: e.target.value }))} className="mt-1 bg-card/50 border-border/50" />
+                    <Input id="rule-add-published-date" name="rule-add-published-date" aria-label="Published date" type="date" value={addForm.published_date} onChange={e => setAddForm(f => ({ ...f, published_date: e.target.value }))} className="mt-1 bg-card/50 border-border/50" />
                   </div>
                 </div>
 
                 <div className="grid grid-cols-2 gap-3 border-t border-border/20 pt-3">
                   <div>
                     <Label className="text-[10px] text-muted-foreground uppercase font-bold">Affected Sectors (Comma sep) *</Label>
-                    <Input required value={addForm.affected_sectors} onChange={e => setAddForm(f => ({ ...f, affected_sectors: e.target.value }))} className="mt-1 bg-card/50 border-border/50" />
+                    <Input id="rule-add-sectors" name="rule-add-sectors" aria-label="Affected sectors" required value={addForm.affected_sectors} onChange={e => setAddForm(f => ({ ...f, affected_sectors: e.target.value }))} className="mt-1 bg-card/50 border-border/50" />
                   </div>
                   <div>
                     <Label className="text-[10px] text-muted-foreground uppercase font-bold">Company Scope (Comma sep)</Label>
-                    <Input value={addForm.affected_companies} onChange={e => setAddForm(f => ({ ...f, affected_companies: e.target.value }))} className="mt-1 bg-card/50 border-border/50" />
+                    <Input id="rule-add-companies" name="rule-add-companies" aria-label="Affected companies" value={addForm.affected_companies} onChange={e => setAddForm(f => ({ ...f, affected_companies: e.target.value }))} className="mt-1 bg-card/50 border-border/50" />
                   </div>
                 </div>
 
                 <div>
                   <Label className="text-[10px] text-muted-foreground uppercase font-bold">Summary Brief *</Label>
-                  <Textarea required value={addForm.summary} onChange={e => setAddForm(f => ({ ...f, summary: e.target.value }))} className="mt-1 bg-card/50 border-border/50 h-16" />
+                  <Textarea id="rule-add-summary" name="rule-add-summary" aria-label="Rule summary" required value={addForm.summary} onChange={e => setAddForm(f => ({ ...f, summary: e.target.value }))} className="mt-1 bg-card/50 border-border/50 h-16" />
                 </div>
 
                 <div>
                   <Label className="text-[10px] text-muted-foreground uppercase font-bold">Full Text Content</Label>
-                  <Textarea value={addForm.full_text} onChange={e => setAddForm(f => ({ ...f, full_text: e.target.value }))} className="mt-1 bg-card/50 border-border/50 h-20" />
+                  <Textarea id="rule-add-fulltext" name="rule-add-fulltext" aria-label="Full text" value={addForm.full_text} onChange={e => setAddForm(f => ({ ...f, full_text: e.target.value }))} className="mt-1 bg-card/50 border-border/50 h-20" />
                 </div>
 
                 <DialogFooter className="pt-2">
@@ -828,7 +831,7 @@ export default function RegulatoryNewsRuleImpact({
             />
           </div>
 
-          <Select value={filters.authority} onValueChange={v => setFilters(f => ({ ...f, authority: v }))}>
+          <Select value={filters.authority} onValueChange={v => setFilters(f => ({ ...f, authority: v }))} name="news-authority-filter" aria-label="Filter by authority">
             <SelectTrigger className="bg-card/40 border-border/50 text-xs">
               <SelectValue placeholder="Portal Source" />
             </SelectTrigger>
@@ -838,7 +841,7 @@ export default function RegulatoryNewsRuleImpact({
             </SelectContent>
           </Select>
 
-          <Select value={filters.impactLevel} onValueChange={v => setFilters(f => ({ ...f, impactLevel: v }))}>
+          <Select value={filters.impactLevel} onValueChange={v => setFilters(f => ({ ...f, impactLevel: v }))} name="news-impact-filter" aria-label="Filter by impact level">
             <SelectTrigger className="bg-card/40 border-border/50 text-xs">
               <SelectValue placeholder="Impact Level" />
             </SelectTrigger>
@@ -848,7 +851,7 @@ export default function RegulatoryNewsRuleImpact({
             </SelectContent>
           </Select>
 
-          <Select value={filters.category} onValueChange={v => setFilters(f => ({ ...f, category: v }))}>
+          <Select value={filters.category} onValueChange={v => setFilters(f => ({ ...f, category: v }))} name="news-category-filter" aria-label="Filter by category">
             <SelectTrigger className="bg-card/40 border-border/50 text-xs">
               <SelectValue placeholder="Category" />
             </SelectTrigger>
