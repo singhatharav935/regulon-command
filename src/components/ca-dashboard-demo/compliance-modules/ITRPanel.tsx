@@ -20,10 +20,49 @@ export default function ITRPanel({ clientId, isDemo }: { clientId?: string; isDe
   const [itr4Form, setItr4Form] = useState({ turnover: '', business_type: 'service', advance_tax: '', tds: '' });
 
   useEffect(() => {
-    if (clientId) {
+    if (clientId && isDemo) {
+      const key = `sannidh:auto-calculate:${clientId}:itr`;
+      if (localStorage.getItem(key) === "true") {
+        localStorage.removeItem(key);
+        // Prefill forms
+        setItrType('itr3');
+        setItr3Form({
+          gross_profit: '1500000',
+          depreciation: '80000',
+          rent: '120000',
+          salary: '400000',
+          audit_fees: '50000',
+          entertainment: '20000',
+          foreign_travel: '30000',
+          advance_tax: '40000',
+          tds: '25000'
+        });
+        
+        // Auto calculate
+        setLoading(true);
+        const timer = setTimeout(() => {
+          setResult({
+            summary: `ITR-3 computation finalized for Assessment Year 2025-26.`,
+            assessment_year: '2025-26',
+            computation: {
+              net_taxable_income: 1200000,
+              tax_at_slab: 172500,
+              surcharge: 0,
+              health_education_cess: 6900,
+              total_tax_liability: 179400,
+              tax_payable: 114400
+            },
+            alert: 'Income exceeds ₹10L. Audit may be required under certain conditions.'
+          });
+          toast.success('ITR-3 calculated successfully (RBI AA Sync)');
+          setLoading(false);
+        }, 500);
+        return () => clearTimeout(timer);
+      }
+    } else if (clientId) {
       fetchSwarmData();
     }
-  }, [clientId]);
+  }, [clientId, isDemo]);
 
   const fetchSwarmData = async () => {
     try {

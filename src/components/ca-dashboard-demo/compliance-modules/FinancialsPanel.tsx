@@ -1,4 +1,4 @@
-import { useState } from 'react';
+import { useState, useEffect } from 'react';
 import { motion } from 'framer-motion';
 import { Building2, Upload, Download, RefreshCw, AlertTriangle, CheckCircle, FileText, XCircle, BarChart3 } from 'lucide-react';
 import { jsPDF } from 'jspdf';
@@ -18,6 +18,30 @@ export default function FinancialsPanel({ clientId, isDemo }: { clientId?: strin
   const [glFile, setGlFile] = useState<File | null>(null);
   const [plForm, setPlForm] = useState({ revenue: '', cogs: '', expenses: '', finance_charges: '', other_income: '', tax_provision: '' });
   const [cfForm, setCfForm] = useState({ pat: '', depreciation: '', debtors_change: '', inventory_change: '', creditors_change: '', asset_purchases: '', asset_sales: '', loans_received: '', loans_repaid: '', dividends_paid: '', opening_cash: '' });
+
+  useEffect(() => {
+    if (clientId && isDemo) {
+      const key = `sannidh:auto-calculate:${clientId}:financials`;
+      if (localStorage.getItem(key) === "true") {
+        localStorage.removeItem(key);
+        // Prefill balance sheet totals
+        setActiveReport('balance-sheet');
+        setLoading(true);
+        const timer = setTimeout(() => {
+          setResult({
+            totals: { is_balanced: true, total_assets: 4500000, total_liabilities_equity: 4500000 },
+            validation: { message: 'Asset = Liability + Equity (Verified via AA ledgers)' },
+            balance_sheet: { fixed_assets: { net_book_value: 2800000 }, current_assets: { total: 1700000 } },
+            equity_liabilities: { shareholders_funds: { total: 3000000 }, non_current_liabilities: { total: 1500000 } },
+            assets: { non_current_assets: { total: 2800000 }, current_assets: { total: 1700000 } }
+          });
+          toast.success('Balance Sheet generated successfully (RBI AA Sync)');
+          setLoading(false);
+        }, 500);
+        return () => clearTimeout(timer);
+      }
+    }
+  }, [clientId, isDemo]);
 
   const handleGenerate = async () => {
     if (!clientId) { toast.error('Select a client first'); return; }

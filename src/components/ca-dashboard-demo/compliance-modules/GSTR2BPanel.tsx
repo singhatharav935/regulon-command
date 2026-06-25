@@ -1,4 +1,4 @@
-import { useState } from 'react';
+import { useState, useEffect } from 'react';
 import { motion } from 'framer-motion';
 import { GitCompare, Upload, RefreshCw, AlertTriangle, CheckCircle, ArrowRight, Bell, Download, Zap } from 'lucide-react';
 import { jsPDF } from 'jspdf';
@@ -25,6 +25,50 @@ export default function GSTR2BPanel({ clientId, isDemo }: { clientId?: string; i
   const [gstr2bJSON, setGstr2bJSON] = useState('');
   const [exporting, setExporting] = useState(false);
   const { triggerAI } = useAICommunication();
+
+  useEffect(() => {
+    if (clientId && isDemo) {
+      const key = `sannidh:auto-calculate:${clientId}:gstr2b`;
+      if (localStorage.getItem(key) === "true") {
+        localStorage.removeItem(key);
+        
+        // Prefill sample JSON data
+        const sample = {
+          items: [
+            { supplier_gstin: '07AABCU9603R1ZP', invoice_number: 'INV-001', taxable_value: 100000, igst: 18000 },
+            { supplier_gstin: '27AAPFU0939F1ZV', invoice_number: 'INV-002', taxable_value: 50000, cgst: 4500, sgst: 4500 },
+            { supplier_gstin: '29AABCT1332L1ZN', invoice_number: 'INV-003', taxable_value: 25000, igst: 4500 },
+          ],
+        };
+        setPurchaseRegisterJSON(JSON.stringify({ items: [...sample.items, { supplier_gstin: '06AAACT2727Q1ZX', invoice_number: 'INV-EXTRA', taxable_value: 30000, igst: 5400 }] }, null, 2));
+        setGstr2bJSON(JSON.stringify({ items: [...sample.items, { supplier_gstin: '07AABCU9603R1ZP', invoice_number: 'INV-001', taxable_value: 90000, igst: 16200 }].slice(0, 3) }, null, 2));
+
+        // Auto calculate
+        setLoading(true);
+        const timer = setTimeout(() => {
+          setResult({
+            summary: {
+              alert: 'Reconciliation complete. 2 mismatches found. Recommend sending notices to vendors.',
+              total_mismatches: 2,
+              missing_in_2b: 1,
+              missing_in_register: 0,
+              amount_mismatches: 1,
+              purchase_register_total: 180000,
+              gstr2b_total: 162000,
+              variance: 18000
+            },
+            mismatches: [
+              { type: 'missing_in_2b', purchase: { invoice_number: 'INV-EXTRA', supplier_gstin: '06AAACT2727Q1ZX' }, action: 'Vendor hasn\'t filed GSTR-1. Send reminder.' },
+              { type: 'amount_mismatch', purchase: { invoice_number: 'INV-001', supplier_gstin: '07AABCU9603R1ZP' }, gstr2b: { taxable_value: 90000 }, variance: 10000, action: 'Tax value mismatch. Verify with physical invoice.' }
+            ]
+          });
+          toast.success('Reconciliation complete (RBI AA Sync)');
+          setLoading(false);
+        }, 500);
+        return () => clearTimeout(timer);
+      }
+    }
+  }, [clientId, isDemo]);
 
   const handleExport = () => {
     setExporting(true);

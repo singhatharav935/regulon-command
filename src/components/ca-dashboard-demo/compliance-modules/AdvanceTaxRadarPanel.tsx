@@ -2,7 +2,7 @@
  * AdvanceTaxRadarPanel — Predictive Advance Tax with Sec 234B/C Interest
  * Part of Sannidh ComplianceModulesHub — Advanced Calculators
  */
-import React, { useState } from 'react';
+import React, { useState, useEffect } from 'react';
 import { Zap, Target, RefreshCw, Download, AlertTriangle, ChevronRight, IndianRupee, Calendar, CheckCircle, RotateCcw } from 'lucide-react';
 import { jsPDF } from 'jspdf';
 import { Badge } from '@/components/ui/badge';
@@ -43,6 +43,48 @@ export default function AdvanceTaxRadarPanel({ clientId, isDemo }: { clientId?: 
     other_income: 0,
     regime: 'new' as 'old' | 'new',
   });
+
+  useEffect(() => {
+    if (clientId && isDemo) {
+      const key = `sannidh:auto-calculate:${clientId}:advance-tax`;
+      if (localStorage.getItem(key) === "true") {
+        localStorage.removeItem(key);
+        // Prefill forms
+        setForm(prev => ({
+          ...prev,
+          ytd_profit: 1800000,
+          months_elapsed: 9,
+          tds_deducted: 45000,
+          advance_paid: 60000,
+          other_income: 150000,
+          regime: 'new'
+        }));
+        
+        // Auto calculate
+        setLoading(true);
+        const timer = setTimeout(() => {
+          const projectedProfit = (1800000 / 9) * 12 + 150000;
+          const grossTax = calcNewTax(projectedProfit);
+          const netTax = Math.max(0, grossTax - 45000);
+          const schedule = INSTALLMENTS.map(inst => {
+            const cumRequired = Math.round(netTax * inst.pct);
+            const due = Math.max(0, cumRequired - 60000);
+            return { ...inst, cumulative_required: cumRequired, amount_due_now: due, interest_risk_234c: due > 0 ? Math.round(due * 0.01) : 0 };
+          });
+          const shortfall234B = Math.max(0, Math.round(netTax * 0.90) - 60000);
+          
+          setResult({
+            projection: { projected_annual_profit: Math.round(projectedProfit), gross_tax_liability: grossTax, net_tax_after_tds: netTax, advance_paid: 60000, balance_payable: Math.max(0, netTax - 60000) },
+            installment_schedule: schedule,
+            interest_risk: { sec_234b_shortfall: shortfall234B, sec_234b_interest_per_month: Math.round(shortfall234B * 0.01), message: shortfall234B > 0 ? `Risk: ₹${Math.round(shortfall234B * 0.01).toLocaleString('en-IN')}/month interest u/s 234B.` : 'No 234B risk — advance tax on track.' }
+          });
+          toast.success('Advance Tax projected successfully (RBI AA Sync)');
+          setLoading(false);
+        }, 500);
+        return () => clearTimeout(timer);
+      }
+    }
+  }, [clientId, isDemo]);
   const [result, setResult] = useState<any>(null);
   const [loading, setLoading] = useState(false);
   const [exporting, setExporting] = useState(false);

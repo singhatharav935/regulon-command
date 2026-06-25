@@ -298,6 +298,10 @@ const ClientPortfolioSection = ({
           localStorage.removeItem('sannidh:ca-swarm-messages');
           localStorage.removeItem('sannidh:ca-swarm-agents');
           localStorage.removeItem('sannidh:ca-swarm-system-status');
+          setTimeout(() => {
+            window.dispatchEvent(new CustomEvent('demo-client-added'));
+            window.dispatchEvent(new CustomEvent('ca:metrics-updated'));
+          }, 100);
           return updated;
         });
         setShowOnboardModal(false);

@@ -1,5 +1,4 @@
-// Force Vite HMR Cache Invalidation
-import { useState } from 'react';
+import { useState, useEffect } from 'react';
 import { motion } from 'framer-motion';
 import { AlertTriangle, Bell, Plus, RefreshCw, CheckCircle, Clock, XCircle } from 'lucide-react';
 import { Button } from '@/components/ui/button';
@@ -34,6 +33,14 @@ export default function NoticeTrackerPanel({ clientId, isDemo }: { clientId?: st
   const [loading, setLoading] = useState(false);
   const [showAddForm, setShowAddForm] = useState(false);
   const [newNotice, setNewNotice] = useState({ department: 'GST', notice_type: '', notice_number: '', issue_date: '', response_due_date: '', amount_involved: '', subject: '', severity: 'medium' });
+
+  useEffect(() => {
+    if (clientId) {
+      const key = `sannidh:auto-calculate:${clientId}:notices`;
+      localStorage.removeItem(key);
+      fetchNotices();
+    }
+  }, [clientId, isDemo]);
 
   const fetchNotices = async () => {
     if (!clientId) { toast.error('Select a client first'); return; }

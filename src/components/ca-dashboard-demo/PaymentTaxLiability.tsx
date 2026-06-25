@@ -1,9 +1,10 @@
 /**
  * PaymentTaxLiability — Full UI Component (Gap 3)
  * Payment / Tax-Liability Automation
- * All data from Supabase. No mock data.
+ * Uses Supabase when authenticated; falls back to demo localStorage store.
  */
 import { useState, useEffect, useMemo, useCallback } from 'react';
+import { useDemoPaymentStore } from '@/hooks/useDemoPaymentStore';
 import { useNavigate } from 'react-router-dom';
 import { motion, AnimatePresence } from 'framer-motion';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
@@ -114,9 +115,16 @@ const useSafeSwarmState = () => {
 
 // ─── Dashboard Tab ────────────────────────────────────────────────────────────
 
-const DashboardTab = ({ caUserId }: { caUserId: string }) => {
-  const { summary, loading, refetch } = usePaymentDashboard(caUserId);
-  const { upcoming, refetch: refetchLiabilities } = useTaxLiabilities(caUserId);
+const DashboardTab = ({ caUserId, isDemoMode }: { caUserId: string; isDemoMode?: boolean }) => {
+  const demo = useDemoPaymentStore();
+  const realDashboard = usePaymentDashboard(isDemoMode ? null : caUserId);
+  const realLiabilities = useTaxLiabilities(isDemoMode ? null : caUserId);
+
+  const summary = isDemoMode ? demo.summary : realDashboard.summary;
+  const loading = isDemoMode ? demo.loading : realDashboard.loading;
+  const refetch = isDemoMode ? demo.refetch : realDashboard.refetch;
+  const upcoming = isDemoMode ? demo.upcoming : realLiabilities.upcoming;
+  const refetchLiabilities = isDemoMode ? demo.refetch : realLiabilities.refetch;
 
   useEffect(() => {
     const handleReload = () => {
@@ -239,10 +247,24 @@ const DashboardTab = ({ caUserId }: { caUserId: string }) => {
 
 // ─── Tax Liabilities Tab ──────────────────────────────────────────────────────
 
-const LiabilitiesTab = ({ caUserId }: { caUserId: string }) => {
-  const { liabilities, loading, computing, addLiability, removeLiability, computeAndCreate, refetch } = useTaxLiabilities(caUserId);
-  const { entities } = useEntities(caUserId);
-  const { initiateOnline, recordManual, initiating, recording } = usePaymentTransactions(caUserId);
+const LiabilitiesTab = ({ caUserId, isDemoMode }: { caUserId: string; isDemoMode?: boolean }) => {
+  const demo = useDemoPaymentStore();
+  const real = useTaxLiabilities(isDemoMode ? null : caUserId);
+  const { entities } = useEntities(isDemoMode ? null : caUserId);
+  const { initiateOnline, recordManual, initiating, recording } = usePaymentTransactions(isDemoMode ? null : caUserId);
+
+  const liabilities = isDemoMode ? demo.liabilities : real.liabilities;
+  const loading = isDemoMode ? demo.loading : real.loading;
+  const computing = isDemoMode ? false : real.computing;
+  const refetch = isDemoMode ? demo.refetch : real.refetch;
+
+  const addLiability = isDemoMode
+    ? (l: any) => { demo.addLiability(l); return Promise.resolve(); }
+    : real.addLiability;
+  const removeLiability = isDemoMode
+    ? (id: string) => { demo.removeLiability(id); return Promise.resolve(); }
+    : real.removeLiability;
+  const computeAndCreate = isDemoMode ? async () => {} : real.computeAndCreate;
 
   const navigate = useNavigate();
 
@@ -405,6 +427,13 @@ const LiabilitiesTab = ({ caUserId }: { caUserId: string }) => {
     if (!showPayDialog) return;
     const amountPaise = rupeesToP(Number(payForm.amount) || Number(pToRupees(showPayDialog.balance_due_paise)));
     if (amountPaise <= 0) { toast.error('Enter valid amount'); return; }
+
+    // ── Demo mode: mark paid locally ──────────────────────────────────────
+    if (isDemoMode) {
+      demo.markPaid(showPayDialog.id, amountPaise, payForm.gateway);
+      setShowPayDialog(null);
+      return;
+    }
 
     if (payForm.gateway === 'razorpay') {
       const result = await initiateOnline(showPayDialog.id, amountPaise, showPayDialog.tax_label, showPayDialog.entity_id);
@@ -712,7 +741,7 @@ const LiabilitiesTab = ({ caUserId }: { caUserId: string }) => {
                             <Button
                               size="sm"
                               className="bg-green-600 hover:bg-green-700 text-xs h-7"
-                              disabled={!isRunning}
+                              disabled={isDemoMode ? false : !isRunning}
                               onClick={() => { setShowPayDialog(l); setPayForm(f => ({ ...f, amount: pToRupees(l.balance_due_paise) })); }}
                             >
                               <CreditCard className="w-3 h-3 mr-1" />Pay
@@ -1217,9 +1246,19 @@ const PaymentTaxLiability = () => {
   const [caUserId, setCaUserId] = useState<string | null>(null);
   const [activeTab, setActiveTab] = useState('dashboard');
 
+  // Detect demo mode — the /ca-dashboard route never has a real Supabase session
+  const isDemoMode = typeof window !== 'undefined' &&
+    (window.location.pathname === '/ca-dashboard' ||
+     window.location.pathname.startsWith('/ca-dashboard/'));
+
   useEffect(() => {
-    supabase.auth.getUser().then(({ data }) => setCaUserId(data.user?.id ?? null));
-  }, []);
+    if (isDemoMode) {
+      // Use a stable demo ID so hooks don't keep re-fetching
+      setCaUserId('demo-mode');
+    } else {
+      supabase.auth.getUser().then(({ data }) => setCaUserId(data.user?.id ?? null));
+    }
+  }, [isDemoMode]);
 
   const { isRunning, isAutoMode } = useSafeSwarmState();
 
@@ -1302,10 +1341,10 @@ const PaymentTaxLiability = () => {
           </TabsTrigger>
         </TabsList>
 
-        <TabsContent value="dashboard" className="mt-6"><DashboardTab caUserId={caUserId} /></TabsContent>
-        <TabsContent value="liabilities" className="mt-6"><LiabilitiesTab caUserId={caUserId} /></TabsContent>
-        <TabsContent value="transactions" className="mt-6"><TransactionsTab caUserId={caUserId} /></TabsContent>
-        <TabsContent value="reconciliation" className="mt-6"><ReconciliationTab caUserId={caUserId} /></TabsContent>
+        <TabsContent value="dashboard" className="mt-6"><DashboardTab caUserId={caUserId} isDemoMode={isDemoMode} /></TabsContent>
+        <TabsContent value="liabilities" className="mt-6"><LiabilitiesTab caUserId={caUserId} isDemoMode={isDemoMode} /></TabsContent>
+        <TabsContent value="transactions" className="mt-6"><TransactionsTab caUserId={isDemoMode ? null : caUserId} /></TabsContent>
+        <TabsContent value="reconciliation" className="mt-6"><ReconciliationTab caUserId={isDemoMode ? null : caUserId} /></TabsContent>
       </Tabs>
     </motion.div>
   );

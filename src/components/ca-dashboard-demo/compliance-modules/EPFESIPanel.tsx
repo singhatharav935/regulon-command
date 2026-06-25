@@ -1,4 +1,4 @@
-import { useState } from 'react';
+import { useState, useEffect } from 'react';
 import { motion } from 'framer-motion';
 import { Users, Upload, RefreshCw, Calculator, Bell } from 'lucide-react';
 import { Button } from '@/components/ui/button';
@@ -18,6 +18,43 @@ export default function EPFESIPanel({ clientId, isDemo }: { clientId?: string; i
   const [periodMonth, setPeriodMonth] = useState(new Date().getMonth() + 1);
   const [periodYear, setPeriodYear] = useState(new Date().getFullYear());
   const [employees, setEmployees] = useState<Employee[]>([{ name: '', pan: '', uan: '', esi_number: '', basic_salary: '', da: '', gross_wages: '' }]);
+
+  useEffect(() => {
+    if (clientId && isDemo) {
+      const key = `sannidh:auto-calculate:${clientId}:epf-esi`;
+      if (localStorage.getItem(key) === "true") {
+        localStorage.removeItem(key);
+        // Prefill employees
+        setEmployees([
+          { name: 'Aditi Sharma', pan: 'ABCDE1234F', uan: '100987654321', esi_number: '11122334455667788', basic_salary: '14500', da: '500', gross_wages: '15000' },
+          { name: 'Rahul Verma', pan: 'FGHIJ5678K', uan: '100987654322', esi_number: '11122334455667789', basic_salary: '25000', da: '1000', gross_wages: '26000' },
+          { name: 'Amit Patel', pan: 'KLMNO9012P', uan: '100987654323', esi_number: '11122334455667790', basic_salary: '18000', da: '800', gross_wages: '18800' }
+        ]);
+
+        // Auto calculate
+        setLoading(true);
+        const timer = setTimeout(() => {
+          setResult({
+            summary: {
+              total_employees: 3,
+              total_employee_contribution: 6900,
+              total_employer_contribution: 7475,
+              total_epf_liability: 14375,
+              alert: 'EPF Computation finalized (Demo Mode)'
+            },
+            employees: [
+              { employee_name: 'Aditi Sharma', employee_epf: 1740, total_employer_cost: 1885 },
+              { employee_name: 'Rahul Verma', employee_epf: 3000, total_employer_cost: 3250 },
+              { employee_name: 'Amit Patel', employee_epf: 2160, total_employer_cost: 2340 }
+            ]
+          });
+          toast.success('EPF calculated successfully (RBI AA Sync)');
+          setLoading(false);
+        }, 500);
+        return () => clearTimeout(timer);
+      }
+    }
+  }, [clientId, isDemo]);
 
   const addEmployee = () => setEmployees(prev => [...prev, { name: '', pan: '', uan: '', esi_number: '', basic_salary: '', da: '', gross_wages: '' }]);
   const updateEmployee = (idx: number, field: keyof Employee, value: string) => setEmployees(prev => prev.map((e, i) => i === idx ? { ...e, [field]: value } : e));

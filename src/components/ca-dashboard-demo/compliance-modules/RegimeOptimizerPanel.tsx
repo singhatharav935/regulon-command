@@ -2,7 +2,7 @@
  * RegimeOptimizerPanel — Tax Regime Optimizer (Old vs New FY 2024-25)
  * Part of Sannidh ComplianceModulesHub — Advanced Calculators
  */
-import React, { useState } from 'react';
+import React, { useState, useEffect } from 'react';
 import { Calculator, Zap, TrendingUp, Download, RefreshCw, AlertTriangle, IndianRupee, TrendingDown, RotateCcw } from 'lucide-react';
 import { jsPDF } from 'jspdf';
 import { Badge } from '@/components/ui/badge';
@@ -43,6 +43,58 @@ export default function RegimeOptimizerPanel({ clientId, isDemo }: { clientId?: 
     sec_80d: 0, sec_80ccd_1b: 0, home_loan_interest: 0,
     other_deductions: 0, professional_tax: 0,
   });
+
+  useEffect(() => {
+    if (clientId && isDemo) {
+      const key = `sannidh:auto-calculate:${clientId}:regime-optimizer`;
+      if (localStorage.getItem(key) === "true") {
+        localStorage.removeItem(key);
+        // Prefill forms
+        setForm({
+          gross_salary: 1200000,
+          hra_exemption: 80000,
+          sec_80c: 150000,
+          sec_80d: 25000,
+          sec_80ccd_1b: 50000,
+          home_loan_interest: 120000,
+          other_deductions: 20000,
+          professional_tax: 2400
+        });
+        
+        // Auto calculate
+        setLoading(true);
+        const timer = setTimeout(() => {
+          const totalDed = Math.min(150000, 150000) + Math.min(25000, 50000) + Math.min(50000, 50000) + Math.min(120000, 200000) + 20000 + 2400;
+          const taxableOld = Math.max(0, 1200000 - 80000 - 50000 - totalDed);
+          const taxableNew = Math.max(0, 1200000 - 75000);
+          
+          const oldSlabs = (ti: number) => {
+            let t = ti <= 250000 ? 0 : ti <= 500000 ? (ti-250000)*0.05 : ti <= 1000000 ? 12500+(ti-500000)*0.20 : 112500+(ti-1000000)*0.30;
+            if (ti <= 500000) t = 0;
+            return Math.round(t * 1.04);
+          };
+          const newSlabs = (ti: number) => {
+            let t = ti <= 300000 ? 0 : ti <= 700000 ? (ti-300000)*0.05 : ti <= 1000000 ? 20000+(ti-700000)*0.10 : ti <= 1200000 ? 50000+(ti-1000000)*0.15 : ti <= 1500000 ? 80000+(ti-1200000)*0.20 : 140000+(ti-1500000)*0.30;
+            if (ti <= 700000) t = 0;
+            return Math.round(t * 1.04);
+          };
+          
+          const taxOld = oldSlabs(taxableOld);
+          const taxNew = newSlabs(taxableNew);
+          const saving = taxOld - taxNew;
+          
+          setResult({
+            old_regime: { gross_salary: 1200000, hra_exemption: 80000, standard_deduction: 50000, total_deductions: totalDed, taxable_income: taxableOld, tax_liability: taxOld },
+            new_regime: { gross_salary: 1200000, standard_deduction: 75000, taxable_income: taxableNew, tax_liability: taxNew },
+            comparison: { saving: Math.abs(saving), saving_regime: saving >= 0 ? 'new' : 'old', recommended: saving >= 0 ? 'new' : 'old', recommendation_text: saving >= 0 ? `You save ${fmt(Math.abs(saving))} by choosing the New Regime.` : `You save ${fmt(Math.abs(saving))} by staying in the Old Regime.` },
+          });
+          toast.success('Tax regimes compared successfully (RBI AA Sync)');
+          setLoading(false);
+        }, 500);
+        return () => clearTimeout(timer);
+      }
+    }
+  }, [clientId, isDemo]);
   const [result, setResult] = useState<RegimeResult | null>(null);
   const [loading, setLoading] = useState(false);
   const [exporting, setExporting] = useState(false);

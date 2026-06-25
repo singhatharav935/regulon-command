@@ -1,4 +1,4 @@
-import { useState } from 'react';
+import { useState, useEffect } from 'react';
 import { motion } from 'framer-motion';
 import { Upload, Calculator, FileText, CheckCircle, AlertTriangle, Download, RefreshCw } from 'lucide-react';
 import { jsPDF } from 'jspdf';
@@ -18,6 +18,34 @@ export default function GSTR1Panel({ clientId, isDemo }: { clientId?: string; is
   const [loading, setLoading] = useState(false);
   const [result, setResult] = useState<any>(null);
   const [exporting, setExporting] = useState(false);
+
+  useEffect(() => {
+    if (clientId && isDemo) {
+      const key = `sannidh:auto-calculate:${clientId}:gstr1`;
+      if (localStorage.getItem(key) === "true") {
+        localStorage.removeItem(key);
+        setLoading(true);
+        const timer = setTimeout(() => {
+          const invoiceCount = 18;
+          const taxable = invoiceCount * 32000;
+          const tax = Math.round(taxable * 0.18);
+          setResult({
+            summary: {
+              alert: `GSTR-1 Draft generated with ${invoiceCount} invoices. Ready for Government portal sync.`,
+              due_date: '11th of Next Month',
+              total_invoices: invoiceCount,
+              total_taxable: taxable,
+              total_tax: tax,
+              invalid_invoices: 0
+            }
+          });
+          toast.success('GSTR-1 generated successfully (RBI AA Sync)');
+          setLoading(false);
+        }, 500);
+        return () => clearTimeout(timer);
+      }
+    }
+  }, [clientId, isDemo]);
 
   const handleGenerate = async () => {
     if (!clientId) { toast.error('Select a client first'); return; }

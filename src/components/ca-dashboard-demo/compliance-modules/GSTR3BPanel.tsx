@@ -18,10 +18,45 @@ export default function GSTR3BPanel({ clientId, isDemo }: { clientId?: string; i
   const [form, setForm] = useState({ period_month: new Date().getMonth() + 1, period_year: new Date().getFullYear(), outward_cgst: '', outward_sgst: '', outward_igst: '', itc_cgst: '', itc_sgst: '', itc_igst: '', rcm_liability: '' });
 
   useEffect(() => {
-    if (clientId) {
+    if (clientId && isDemo) {
+      const key = `sannidh:auto-calculate:${clientId}:gstr3b`;
+      if (localStorage.getItem(key) === "true") {
+        localStorage.removeItem(key);
+        // Prefill forms
+        setForm(prev => ({
+          ...prev,
+          outward_cgst: '80000',
+          outward_sgst: '80000',
+          outward_igst: '160000',
+          itc_cgst: '60000',
+          itc_sgst: '60000',
+          itc_igst: '120000',
+          rcm_liability: '0'
+        }));
+        
+        // Auto calculate
+        setLoading(true);
+        const timer = setTimeout(() => {
+          setResult({
+            summary: `GSTR-3B computation complete. Net tax payable: ₹80,000`,
+            due_date: '20th of Next Month',
+            payment_mode: 'Online/Challan',
+            computation: {
+              outward_tax: { total: 320000 },
+              itc_available: { total: 240000 },
+              net_tax_payable: { total: 80000 }
+            },
+            alerts: []
+          });
+          toast.success('GSTR-3B calculated successfully (RBI AA Sync)');
+          setLoading(false);
+        }, 500);
+        return () => clearTimeout(timer);
+      }
+    } else if (clientId) {
       fetchSwarmData();
     }
-  }, [clientId]);
+  }, [clientId, isDemo]);
 
   const fetchSwarmData = async () => {
     try {
