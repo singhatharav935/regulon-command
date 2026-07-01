@@ -33,6 +33,38 @@ import {
   AlertTriangle, FileText, CheckCircle2, Search, ArrowRight, Play, Server, Layers, Info
 } from 'lucide-react';
 
+// ─── Input Sanitization & Validation Helpers ────────────────────────────────
+const MAX_TASK_TITLE_LENGTH = 200;
+const MAX_SEARCH_QUERY_LENGTH = 100;
+const MAX_PAYLOAD_SIZE_BYTES = 4096;
+
+/** Strip HTML tags, script injections, and control characters from user input */
+const sanitizeInput = (raw: string, maxLength: number = 500): string => {
+  return raw
+    .replace(/<[^>]*>/g, '')           // Strip HTML tags
+    .replace(/[\x00-\x08\x0B\x0C\x0E-\x1F]/g, '') // Remove control chars (preserve newlines/tabs)
+    .replace(/javascript:/gi, '')       // Block JS protocol
+    .replace(/on\w+\s*=/gi, '')         // Strip inline event handlers
+    .trim()
+    .slice(0, maxLength);
+};
+
+/** Validate that a payload object isn't oversized or empty */
+const validatePayload = (payload: Record<string, unknown>): { valid: boolean; error?: string } => {
+  const json = JSON.stringify(payload);
+  if (json.length > MAX_PAYLOAD_SIZE_BYTES) {
+    return { valid: false, error: `Payload too large (${json.length} bytes, max ${MAX_PAYLOAD_SIZE_BYTES})` };
+  }
+  // Reject if all string values are empty
+  const hasContent = Object.values(payload).some(
+    v => typeof v === 'string' ? v.trim().length > 0 : v !== null && v !== undefined
+  );
+  if (!hasContent) {
+    return { valid: false, error: 'Payload is empty — at least one field must have content' };
+  }
+  return { valid: true };
+};
+
 export const OfflinePwaHub: React.FC = () => {
   // Connectivity States
   const [onlineStatus, setOnlineStatus] = useState(isOnline());
@@ -158,16 +190,38 @@ export const OfflinePwaHub: React.FC = () => {
   const handleSimulateOfflineMutation = (e: React.FormEvent) => {
     e.preventDefault();
 
+    // Sanitize user inputs before processing
+    const cleanTitle = sanitizeInput(taskTitle, MAX_TASK_TITLE_LENGTH);
+    const cleanClientName = sanitizeInput(clientName, 200);
+    const cleanPriority = ['high', 'medium', 'low'].includes(taskPriority) ? taskPriority : 'medium';
+
+    if (!cleanTitle) {
+      toast.error('Task title is required and must contain valid characters');
+      return;
+    }
+
+    if (cleanTitle.length < 3) {
+      toast.error('Task title must be at least 3 characters long');
+      return;
+    }
+
     // Map to actual compliance_tasks schema: title, company_id, regulator, priority, status, due_date
     const payload = {
-      title: `[Offline] ${taskTitle}`,
-      description: `Client: ${clientName} | ${taskTitle}`,
+      title: `[Offline] ${cleanTitle}`,
+      description: `Client: ${cleanClientName} | ${cleanTitle}`,
       company_id: null,      // No client lookup in this simulator
       regulator: 'GSTIN',    // maps to 'category' intent
       due_date: new Date(Date.now() + 7 * 24 * 60 * 60 * 1000).toISOString().split('T')[0],
       status: 'pending',
-      priority: taskPriority,
+      priority: cleanPriority,
     };
+
+    // Validate payload size and content
+    const validation = validatePayload(payload as Record<string, unknown>);
+    if (!validation.valid) {
+      toast.error(`Invalid payload: ${validation.error}`);
+      return;
+    }
 
     if (!onlineStatus) {
       // Offline mode: Queue mutation locally
@@ -180,7 +234,7 @@ export const OfflinePwaHub: React.FC = () => {
           if (error) {
             toast.error(`Insertion failed: ${error.message}`);
           } else {
-            toast.success(`Online insertion successful: Created task "${taskTitle}"`);
+            toast.success(`Online insertion successful: Created task "${cleanTitle}"`);
           }
         });
     }
@@ -234,7 +288,7 @@ export const OfflinePwaHub: React.FC = () => {
             {/* Toggle Switch */}
             <div className="p-4 rounded-2xl bg-background/50 border border-border/20 flex items-center justify-between gap-6 shrink-0 w-full md:w-auto">
               <div className="space-y-0.5">
-                <Label className="text-xs font-bold text-foreground" id="label-simulate-offline">Simulate Offline Mode</Label>
+                <Label htmlFor="simulate-offline-toggle" className="text-xs font-bold text-foreground" id="label-simulate-offline">Simulate Offline Mode</Label>
                 <p className="text-[10px] text-muted-foreground">Test PWA sync queue behavior</p>
               </div>
               <Switch
@@ -391,8 +445,8 @@ export const OfflinePwaHub: React.FC = () => {
             <CardContent>
               <form onSubmit={handleSimulateOfflineMutation} className="space-y-4">
                 <div className="space-y-2">
-                  <Label className="text-xs text-muted-foreground" id="label-offline-client">Select Client Entity</Label>
-                  <Select name="offline-client-entity" aria-label="Select client entity" value={clientName} onValueChange={setClientName}>
+                  <Label htmlFor="offline-client-entity" className="text-xs text-muted-foreground" id="label-offline-client">Select Client Entity</Label>
+                  <Select name="offline-client-entity" aria-label="Select client entity" aria-labelledby="label-offline-client" value={clientName} onValueChange={setClientName}>
                     <SelectTrigger aria-label="Select client entity" className="bg-background/40 border-border/40 text-xs h-10">
                       <SelectValue placeholder="Select client" />
                     </SelectTrigger>
@@ -412,15 +466,16 @@ export const OfflinePwaHub: React.FC = () => {
                     aria-label="Statutory task title"
                     placeholder="e.g. File revised GSTR-1 return"
                     value={taskTitle}
-                    onChange={(e) => setTaskTitle(e.target.value)}
+                    onChange={(e) => setTaskTitle(sanitizeInput(e.target.value, MAX_TASK_TITLE_LENGTH))}
                     className="bg-background/40 border-border/40 text-xs h-10"
                     required
+                    maxLength={MAX_TASK_TITLE_LENGTH}
                   />
                 </div>
 
                 <div className="space-y-2">
-                  <Label className="text-xs text-muted-foreground" id="label-offline-priority">SLA Priority</Label>
-                  <Select name="offline-task-priority" aria-label="Select SLA priority" value={taskPriority} onValueChange={setTaskPriority}>
+                  <Label htmlFor="offline-task-priority" className="text-xs text-muted-foreground" id="label-offline-priority">SLA Priority</Label>
+                  <Select name="offline-task-priority" aria-label="Select SLA priority" aria-labelledby="label-offline-priority" value={taskPriority} onValueChange={setTaskPriority}>
                     <SelectTrigger aria-label="Select SLA priority" className="bg-background/40 border-border/40 text-xs h-10">
                       <SelectValue />
                     </SelectTrigger>
@@ -467,8 +522,9 @@ export const OfflinePwaHub: React.FC = () => {
               aria-label="Search local offline cache"
               placeholder="Search local offline cache..."
               value={searchCacheQuery}
-              onChange={(e) => setSearchCacheQuery(e.target.value)}
+              onChange={(e) => setSearchCacheQuery(sanitizeInput(e.target.value, MAX_SEARCH_QUERY_LENGTH))}
               className="pl-9 bg-background/40 border-border/40 text-xs h-9"
+              maxLength={MAX_SEARCH_QUERY_LENGTH}
             />
           </div>
         </CardHeader>

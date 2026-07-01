@@ -15,6 +15,29 @@ import { Card, CardContent, CardHeader, CardTitle, CardDescription } from '@/com
 import { Badge } from '@/components/ui/badge';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
+
+// ─── Input Sanitization ─────────────────────────────────────────────────────
+const MAX_TITLE_LENGTH = 300;
+const MAX_TEXT_LENGTH = 5000;
+const MAX_PAYLOAD_SIZE_BYTES = 8192;
+
+const sanitizeInput = (raw: string, maxLength: number = 500): string => {
+  return raw
+    .replace(/<[^>]*>/g, '')
+    .replace(/[\x00-\x08\x0B\x0C\x0E-\x1F]/g, '')
+    .replace(/javascript:/gi, '')
+    .replace(/on\w+\s*=/gi, '')
+    .trim()
+    .slice(0, maxLength);
+};
+
+const validatePayload = (payload: Record<string, unknown>): { valid: boolean; error?: string } => {
+  const json = JSON.stringify(payload);
+  if (json.length > MAX_PAYLOAD_SIZE_BYTES) {
+    return { valid: false, error: `Payload too large (${json.length} bytes, max ${MAX_PAYLOAD_SIZE_BYTES})` };
+  }
+  return { valid: true };
+};
 import { Label } from '@/components/ui/label';
 import { Progress } from '@/components/ui/progress';
 import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
@@ -281,11 +304,11 @@ export default function StatutoryDeadlineCalendar() {
     }
 
     try {
-      await addEvent({
-        title: eventForm.title,
-        description: eventForm.description || null,
+      const payload = {
+        title: sanitizeInput(eventForm.title, MAX_TITLE_LENGTH),
+        description: eventForm.description ? sanitizeInput(eventForm.description, MAX_TEXT_LENGTH) : null,
         event_type: eventForm.event_type,
-        regulator: eventForm.regulator,
+        regulator: sanitizeInput(eventForm.regulator, 100),
         due_date: eventForm.due_date,
         due_time: eventForm.due_time || null,
         entity_id: eventForm.entity_id || null,
@@ -293,13 +316,21 @@ export default function StatutoryDeadlineCalendar() {
         sla_hours: eventForm.sla_hours ? Number(eventForm.sla_hours) : null,
         penalty_per_day_paise: eventForm.penalty_per_day ? Number(eventForm.penalty_per_day) * 100 : 0,
         max_penalty_paise: eventForm.max_penalty ? Number(eventForm.max_penalty) * 100 : 0,
-        penalty_section: eventForm.penalty_section || null,
+        penalty_section: eventForm.penalty_section ? sanitizeInput(eventForm.penalty_section, 100) : null,
         is_recurring: eventForm.is_recurring,
         recurrence_pattern: eventForm.is_recurring ? eventForm.recurrence_pattern : null,
         color_tag: eventForm.color_tag,
-        notes: eventForm.notes || null,
-        status: 'upcoming'
-      });
+        notes: eventForm.notes ? sanitizeInput(eventForm.notes, MAX_TEXT_LENGTH) : null,
+        status: 'upcoming' as const
+      };
+
+      const validation = validatePayload(payload as Record<string, unknown>);
+      if (!validation.valid) {
+        toast.error(validation.error || 'Invalid payload');
+        return;
+      }
+
+      await addEvent(payload);
       setShowAddEvent(false);
       refetchSummary();
     } catch {
@@ -315,19 +346,27 @@ export default function StatutoryDeadlineCalendar() {
     }
 
     try {
-      await addRule({
-        rule_name: ruleForm.rule_name,
-        description: ruleForm.description || null,
+      const rulePayload = {
+        rule_name: sanitizeInput(ruleForm.rule_name, MAX_TITLE_LENGTH),
+        description: ruleForm.description ? sanitizeInput(ruleForm.description, MAX_TEXT_LENGTH) : null,
         trigger_type: ruleForm.trigger_type,
         trigger_value: Number(ruleForm.trigger_value) || 0,
         channel: ruleForm.channel,
-        recipients: [{ name: ruleForm.recipient_name, contact: ruleForm.recipient_contact }],
+        recipients: [{ name: sanitizeInput(ruleForm.recipient_name, 200), contact: sanitizeInput(ruleForm.recipient_contact, 200) }],
         applies_to_types: ruleForm.applies_to_types,
         applies_to_priorities: ruleForm.applies_to_priorities,
         applies_to_regulators: ruleForm.applies_to_regulators,
         entity_id: ruleForm.entity_id || null,
         is_active: true
-      });
+      };
+
+      const validation = validatePayload(rulePayload as Record<string, unknown>);
+      if (!validation.valid) {
+        toast.error(validation.error || 'Invalid payload');
+        return;
+      }
+
+      await addRule(rulePayload);
       setShowAddRule(false);
     } catch {}
   };
@@ -340,11 +379,11 @@ export default function StatutoryDeadlineCalendar() {
     }
 
     try {
-      await addTemplate({
-        template_name: templateForm.template_name,
-        description: templateForm.description || null,
+      const tmplPayload = {
+        template_name: sanitizeInput(templateForm.template_name, MAX_TITLE_LENGTH),
+        description: templateForm.description ? sanitizeInput(templateForm.description, MAX_TEXT_LENGTH) : null,
         event_type: templateForm.event_type,
-        regulator: templateForm.regulator,
+        regulator: sanitizeInput(templateForm.regulator, 100),
         recurrence: templateForm.recurrence,
         day_of_month: templateForm.day_of_month ? Number(templateForm.day_of_month) : null,
         month_of_year: templateForm.month_of_year ? Number(templateForm.month_of_year) : null,
@@ -352,11 +391,19 @@ export default function StatutoryDeadlineCalendar() {
         default_sla_hours: templateForm.default_sla_hours ? Number(templateForm.default_sla_hours) : null,
         penalty_per_day_paise: templateForm.penalty_per_day ? Number(templateForm.penalty_per_day) * 100 : 0,
         max_penalty_paise: templateForm.max_penalty ? Number(templateForm.max_penalty) * 100 : 0,
-        penalty_section: templateForm.penalty_section || null,
+        penalty_section: templateForm.penalty_section ? sanitizeInput(templateForm.penalty_section, 100) : null,
         color_tag: templateForm.color_tag,
         auto_remind_days: templateForm.auto_remind_days.split(',').map(Number),
         is_active: true
-      });
+      };
+
+      const validation = validatePayload(tmplPayload as Record<string, unknown>);
+      if (!validation.valid) {
+        toast.error(validation.error || 'Invalid payload');
+        return;
+      }
+
+      await addTemplate(tmplPayload);
       setShowAddTemplate(false);
     } catch {}
   };

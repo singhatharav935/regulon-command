@@ -30,6 +30,30 @@ import {
   useCompanyEvaluations
 } from '@/hooks/useRegulatoryVersion';
 
+// ─── Input Sanitization ─────────────────────────────────────────────────────
+const MAX_SEARCH_LENGTH = 200;
+const MAX_TITLE_LENGTH = 300;
+const MAX_TEXT_LENGTH = 10000;
+const MAX_PAYLOAD_SIZE_BYTES = 16384;
+
+const sanitizeInput = (raw: string, maxLength: number = 500): string => {
+  return raw
+    .replace(/<[^>]*>/g, '')           // Strip HTML tags
+    .replace(/[\x00-\x08\x0B\x0C\x0E-\x1F]/g, '') // Remove control chars
+    .replace(/javascript:/gi, '')       // Block JS protocol
+    .replace(/on\w+\s*=/gi, '')         // Strip inline event handlers
+    .trim()
+    .slice(0, maxLength);
+};
+
+const validateFormPayload = (payload: Record<string, unknown>): { valid: boolean; error?: string } => {
+  const json = JSON.stringify(payload);
+  if (json.length > MAX_PAYLOAD_SIZE_BYTES) {
+    return { valid: false, error: `Payload too large (${json.length} bytes, max ${MAX_PAYLOAD_SIZE_BYTES})` };
+  }
+  return { valid: true };
+};
+
 // ─── Constants & Metadata ───────────────────────────────────────────────────
 
 const GOVERNMENT_PORTALS = [
@@ -439,16 +463,26 @@ const AmendTab = ({ item, onUpdateSuccess }: { item: any; onUpdateSuccess: () =>
 
     setSaving(true);
     try {
-      await editNews(item.id, {
-        title: form.title,
-        summary: form.summary,
-        full_text: form.full_text,
+      // Sanitize all text inputs before submission
+      const sanitizedData = {
+        title: sanitizeInput(form.title, MAX_TITLE_LENGTH),
+        summary: sanitizeInput(form.summary, 2000),
+        full_text: sanitizeInput(form.full_text, MAX_TEXT_LENGTH),
         effective_date: form.effective_date,
         published_date: form.published_date,
         impact_level: form.impact_level,
-        penalty_max: form.penalty_max,
-        penalty_late_fee: form.penalty_late_fee
-      } as any, form.change_summary);
+        penalty_max: sanitizeInput(form.penalty_max, 100),
+        penalty_late_fee: sanitizeInput(form.penalty_late_fee, 100)
+      };
+
+      const validation = validateFormPayload(sanitizedData as Record<string, unknown>);
+      if (!validation.valid) {
+        toast.error(validation.error || 'Invalid payload');
+        setSaving(false);
+        return;
+      }
+
+      await editNews(item.id, sanitizedData as any, sanitizeInput(form.change_summary, 500));
       
       onUpdateSuccess();
     } catch {}
@@ -496,6 +530,9 @@ const AmendTab = ({ item, onUpdateSuccess }: { item: any; onUpdateSuccess: () =>
         <div className="col-span-2">
           <Label className="text-[10px] text-muted-foreground uppercase font-bold">Change Summary Audit log *</Label>
           <Input
+            id="rule-edit-change-summary"
+            name="rule-edit-change-summary"
+            aria-label="Change summary audit log"
             required
             placeholder="Describe what changed in this version (e.g. rate reduced from 18% to 12% by Council Notification...)"
             value={form.change_summary}
@@ -569,23 +606,32 @@ export default function RegulatoryNewsRuleImpact({
     }
 
     try {
-      await addNews({
-        title: addForm.title,
-        summary: addForm.summary,
-        full_text: addForm.full_text || null,
-        authority: addForm.authority,
+      // Sanitize all form inputs before submission
+      const sanitizedPayload = {
+        title: sanitizeInput(addForm.title, MAX_TITLE_LENGTH),
+        summary: sanitizeInput(addForm.summary, 2000),
+        full_text: addForm.full_text ? sanitizeInput(addForm.full_text, MAX_TEXT_LENGTH) : null,
+        authority: sanitizeInput(addForm.authority, 200),
         authority_code: addForm.authority_code,
         category: addForm.category,
         effective_date: addForm.effective_date,
         published_date: addForm.published_date || addForm.effective_date,
         impact_level: addForm.impact_level as any,
-        penalty_max: addForm.penalty_max || null,
-        penalty_late_fee: addForm.penalty_late_fee || null,
-        change_summary: addForm.change_summary,
-        affected_sectors: addForm.affected_sectors.split(',').map(s => s.trim()),
-        affected_companies: addForm.affected_companies.split(',').map(c => c.trim()),
+        penalty_max: addForm.penalty_max ? sanitizeInput(addForm.penalty_max, 100) : null,
+        penalty_late_fee: addForm.penalty_late_fee ? sanitizeInput(addForm.penalty_late_fee, 100) : null,
+        change_summary: sanitizeInput(addForm.change_summary, 500),
+        affected_sectors: addForm.affected_sectors.split(',').map(s => sanitizeInput(s, 100)),
+        affected_companies: addForm.affected_companies.split(',').map(c => sanitizeInput(c, 100)),
         required_actions: ['Update invoicing systems', 'Transitional return check']
-      });
+      };
+
+      const validation = validateFormPayload(sanitizedPayload as Record<string, unknown>);
+      if (!validation.valid) {
+        toast.error(validation.error || 'Invalid payload');
+        return;
+      }
+
+      await addNews(sanitizedPayload);
       setShowAddNews(false);
       refetch();
     } catch {}
@@ -824,9 +870,12 @@ export default function RegulatoryNewsRuleImpact({
           <div className="relative">
             <Search className="w-4 h-4 absolute left-3 top-1/2 -translate-y-1/2 text-muted-foreground" />
             <Input
+              id="regulatory-news-search"
+              name="regulatory-news-search"
+              aria-label="Search circular title or text"
               placeholder="Search circular title / text..."
               value={searchQuery}
-              onChange={e => setSearchQuery(e.target.value)}
+              onChange={e => setSearchQuery(sanitizeInput(e.target.value, MAX_SEARCH_LENGTH))}
               className="pl-9 bg-card/40 border-border/50 text-xs"
             />
           </div>

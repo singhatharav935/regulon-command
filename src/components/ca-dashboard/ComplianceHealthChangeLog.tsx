@@ -31,6 +31,21 @@ import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { Badge } from '@/components/ui/badge';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
+
+// ─── Input Sanitization ─────────────────────────────────────────────────────
+const MAX_SEARCH_LENGTH = 200;
+
+/** Strip HTML tags, script injections, and control characters from user input */
+const sanitizeInput = (raw: string, maxLength: number = 500): string => {
+  return raw
+    .replace(/<[^>]*>/g, '')
+    .replace(/[\x00-\x08\x0B\x0C\x0E-\x1F]/g, '')
+    .replace(/javascript:/gi, '')
+    .replace(/on\w+\s*=/gi, '')
+    .trim()
+    .slice(0, maxLength);
+};
+
 import {
   Select,
   SelectContent,
@@ -414,7 +429,7 @@ export default function ComplianceHealthChangeLog({
                 aria-label="Search by company, reason, compliance"
                 placeholder="Search by company, reason, compliance..."
                 value={searchQuery}
-                onChange={(e) => setSearchQuery(e.target.value)}
+                onChange={(e) => setSearchQuery(sanitizeInput(e.target.value, MAX_SEARCH_LENGTH))}
                 className="pl-10 bg-background/50"
               />
             </div>
