@@ -12,7 +12,7 @@ import { cn } from "@/lib/utils";
 const Switch = React.forwardRef<
   React.ElementRef<typeof SwitchPrimitives.Root>,
   React.ComponentPropsWithoutRef<typeof SwitchPrimitives.Root>
->(({ className, id, name, "aria-label": ariaLabel, ...props }, ref) => {
+>(({ className, id, name, "aria-label": ariaLabel, "aria-labelledby": ariaLabelledBy, ...props }, ref) => {
   const containerRef = React.useRef<HTMLSpanElement>(null);
 
   // Use useLayoutEffect for synchronous DOM patching before paint
@@ -33,6 +33,9 @@ const Switch = React.forwardRef<
         if (!hiddenInput.getAttribute('aria-label')) {
           hiddenInput.setAttribute('aria-label', ariaLabel || name || 'switch');
         }
+        if (ariaLabelledBy && !hiddenInput.getAttribute('aria-labelledby')) {
+          hiddenInput.setAttribute('aria-labelledby', ariaLabelledBy);
+        }
       }
     };
 
@@ -44,7 +47,7 @@ const Switch = React.forwardRef<
     observer.observe(container, { childList: true, subtree: true });
 
     return () => observer.disconnect();
-  }, [name, ariaLabel]);
+  }, [name, ariaLabel, ariaLabelledBy]);
 
   return (
     <span ref={containerRef} style={{ display: 'contents' }}>
@@ -52,6 +55,7 @@ const Switch = React.forwardRef<
         id={id}
         name={name}
         aria-label={ariaLabel}
+        aria-labelledby={ariaLabelledBy}
         className={cn(
           "peer inline-flex h-6 w-11 shrink-0 cursor-pointer items-center rounded-full border-2 border-transparent transition-colors data-[state=checked]:bg-primary data-[state=unchecked]:bg-input focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2 focus-visible:ring-offset-background disabled:cursor-not-allowed disabled:opacity-50",
           className,

@@ -105,6 +105,7 @@ import { useRealtimeSync } from "@/hooks/useRealtimeSync";
 // CAAgentProvider is now global — provided at App.tsx level
 import { CACommandCenterHeader } from "@/components/agents/CACommandCenterHeader";
 import { CAActionInbox } from "@/components/agents/CAActionInbox";
+import { safeLog } from '@/lib/security-utils';
 import ProductionSetupBanner from "@/components/ca-dashboard/ProductionSetupBanner";
 
 // Daily Governance Brief Component
@@ -150,7 +151,7 @@ const DailyGovernanceBrief = () => {
       });
       setLastRefresh(new Date());
     } catch (err) {
-      console.error('[DailyGovernanceBrief] Failed to fetch daily brief:', err);
+      safeLog.error('[DailyGovernanceBrief] Failed to fetch daily brief');
     } finally {
       setLoading(false);
     }
@@ -810,7 +811,7 @@ const LiveAIDraftingEngine = () => {
             addAgentLog(`⚠️ PDF appears to be a scanned image. Please upload as JPEG/PNG for Vision OCR.`);
           }
         } catch (pdfErr) {
-          console.error("PDF parsing error", pdfErr);
+          safeLog.error('PDF parsing error', pdfErr);
           extractedText = "Error extracting text. Proceeding with filename analysis: " + uploadedFile.name;
         }
       } else {
@@ -876,7 +877,7 @@ const LiveAIDraftingEngine = () => {
       });
       
     } catch (error: any) {
-      console.error(error);
+      safeLog.error('ExternalCADashboard error', error);
       addAgentLog(`❌ ERROR: ${error.message}`);
       toast.error('Drafting Failed', { description: error.message });
     } finally {
@@ -1078,7 +1079,7 @@ const LiveAIDraftingEngine = () => {
           });
           
         if (uploadErr) {
-          console.error('Storage upload error:', uploadErr);
+          safeLog.error('Storage upload error', uploadErr);
           addAgentLog(`⚠️ WORM upload warning: ${uploadErr.message}. Continuing with signature flow...`);
         } else {
           addAgentLog('✅ PDF locked into WORM Vault successfully.');
@@ -1912,7 +1913,7 @@ const ExternalCADashboardReal = () => {
       const dbClients = await loadCAClients();
       setCompanies(dbClients);
     } catch (err) {
-      console.error("Error loading CA clients in dashboard:", err);
+      safeLog.error('Error loading CA clients in dashboard');
     }
   };
 
@@ -1923,7 +1924,7 @@ const ExternalCADashboardReal = () => {
       const requests = await getPendingConsentRequests();
       setPendingRequests(requests);
     } catch (err) {
-      console.error('Failed to fetch pending consent requests:', err);
+      safeLog.error('Failed to fetch pending consent requests');
     }
   };
 
@@ -1990,7 +1991,7 @@ const ExternalCADashboardReal = () => {
         toast.error(result.error || 'Failed to initiate onboarding');
       }
     } catch (error: any) {
-      console.error('Onboarding error:', error);
+      safeLog.error('Onboarding error', error);
       toast.error('Failed to onboard client: ' + error.message);
     } finally {
       setIsOnboarding(false);
@@ -2019,7 +2020,7 @@ const ExternalCADashboardReal = () => {
         setShowCompanyDetails(true);
       }
     } catch (err) {
-      console.error('[ExternalCADashboard] Error viewing company:', err);
+      safeLog.error('[ExternalCADashboard] Error viewing company');
       setSelectedCompany(company);
       setShowCompanyDetails(true);
     }
@@ -2037,7 +2038,7 @@ const ExternalCADashboardReal = () => {
         toast.error(result.error || 'Failed to refresh data');
       }
     } catch (err) {
-      console.error('[ExternalCADashboard] Error refreshing company:', err);
+      safeLog.error('[ExternalCADashboard] Error refreshing company');
       toast.error('Failed to refresh data');
     }
   };
@@ -2115,7 +2116,7 @@ const ExternalCADashboardReal = () => {
         toast.error(result.error || "Failed to add company");
       }
     } catch (error) {
-      console.error("Error adding company:", error);
+      safeLog.error('Error adding company', error);
       toast.error("Failed to add company. Please try again.");
     } finally {
       setIsAddingCompany(false);

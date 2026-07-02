@@ -131,25 +131,25 @@ const App = () => (
             <Route path="/auth/forgot-password" element={<ForgotPassword />} />
             <Route path="/auth/reset-password" element={<ResetPassword />} />
             <Route path="/onboarding" element={<UserOnboardingFlow />} />
-            <Route path="/settings/account" element={<AccountSettingsPage />} />
-            <Route path="/profile" element={<ProfileSettings />} />
-            <Route path="/settings/agent-control-center" element={<AgentControlCenter />} />
-            <Route path="/settings/company-agent-control-center" element={<CompanyAgentControlCenter />} />
+            <Route path="/settings/account" element={<ProtectedRoute allowRoles={["user","manager","admin"]} allowPersonas={["company_owner","external_ca","in_house_ca","in_house_lawyer","admin","ca_firm"]} requireVerified={false}><AccountSettingsPage /></ProtectedRoute>} />
+            <Route path="/profile" element={<ProtectedRoute allowRoles={["user","manager","admin"]} allowPersonas={["company_owner","external_ca","in_house_ca","in_house_lawyer","admin","ca_firm"]} requireVerified={false}><ProfileSettings /></ProtectedRoute>} />
+            <Route path="/settings/agent-control-center" element={<ProtectedRoute allowRoles={["user","manager","admin"]} allowPersonas={["external_ca","in_house_ca","ca_firm","admin"]} requireVerified={false}><AgentControlCenter /></ProtectedRoute>} />
+            <Route path="/settings/company-agent-control-center" element={<ProtectedRoute allowRoles={["user","manager","admin"]} allowPersonas={["company_owner","admin"]} requireVerified={false}><CompanyAgentControlCenter /></ProtectedRoute>} />
             <Route path="/terms" element={<TermsOfService />} />
             <Route path="/privacy" element={<PrivacyPolicy />} />
             <Route path="/disclaimers" element={<Disclaimers />} />
             <Route path="/persona-selector" element={<PersonaSelector />} />
-            <Route path="/dashboard" element={<Dashboard />} />
-            <Route path="/ca-dashboard" element={<CADashboard />} />
-            <Route path="/ca-dashboard/efiling-ack-pdf" element={<EFilingAckPdfViewer />} />
-            <Route path="/ca-dashboard/payment-challan-pdf" element={<PaymentChallanPdfViewer />} />
-            <Route path="/admin-dashboard" element={<AdminDashboard />} />
-            <Route path="/ca-firm-dashboard" element={<CAFirmDashboard />} />
-            <Route path="/real-external-ca-dashboard" element={<ExternalCADashboardReal />} />
-            <Route path="/real-company-dashboard" element={<CompanyDashboardReal />} />
-            <Route path="/real-inhouse-ca-dashboard" element={<InhouseCADashboardReal />} />
+            <Route path="/dashboard" element={<ProtectedRoute allowRoles={["user","manager","admin"]} allowPersonas={["company_owner","external_ca","in_house_ca","in_house_lawyer","admin","ca_firm"]} requireVerified={false}><Dashboard /></ProtectedRoute>} />
+            <Route path="/ca-dashboard" element={<ProtectedRoute allowRoles={["user","manager","admin"]} allowPersonas={["external_ca","in_house_ca","ca_firm"]} requireVerified={false}><CADashboard /></ProtectedRoute>} />
+            <Route path="/ca-dashboard/efiling-ack-pdf" element={<ProtectedRoute allowRoles={["user","manager","admin"]} allowPersonas={["external_ca","in_house_ca","ca_firm"]} requireVerified={false}><EFilingAckPdfViewer /></ProtectedRoute>} />
+            <Route path="/ca-dashboard/payment-challan-pdf" element={<ProtectedRoute allowRoles={["user","manager","admin"]} allowPersonas={["external_ca","in_house_ca","ca_firm"]} requireVerified={false}><PaymentChallanPdfViewer /></ProtectedRoute>} />
+            <Route path="/admin-dashboard" element={<ProtectedRoute allowRoles={["admin"]} allowPersonas={["admin"]} requireVerified={false}><AdminDashboard /></ProtectedRoute>} />
+            <Route path="/ca-firm-dashboard" element={<ProtectedRoute allowRoles={["user","manager","admin"]} allowPersonas={["ca_firm","external_ca","admin"]} requireVerified={false}><CAFirmDashboard /></ProtectedRoute>} />
+            <Route path="/real-external-ca-dashboard" element={<ProtectedRoute allowRoles={["user","manager","admin"]} allowPersonas={["external_ca","ca_firm","admin"]} requireVerified={false}><ExternalCADashboardReal /></ProtectedRoute>} />
+            <Route path="/real-company-dashboard" element={<ProtectedRoute allowRoles={["user","manager","admin"]} allowPersonas={["company_owner","admin"]} requireVerified={false}><CompanyDashboardReal /></ProtectedRoute>} />
+            <Route path="/real-inhouse-ca-dashboard" element={<ProtectedRoute allowRoles={["user","manager","admin"]} allowPersonas={["in_house_ca","admin"]} requireVerified={false}><InhouseCADashboardReal /></ProtectedRoute>} />
             {/* RealCADashboard removed - using demo dashboards */}
-            <Route path="/agent-work-review" element={<AgentWorkReview />} />
+            <Route path="/agent-work-review" element={<ProtectedRoute allowRoles={["user","manager","admin"]} allowPersonas={["company_owner","external_ca","in_house_ca","in_house_lawyer","admin","ca_firm"]} requireVerified={false}><AgentWorkReview /></ProtectedRoute>} />
 
             <Route path="/app" element={<RoleLandingRoute />} />
             {/* Removed App Dashboard - use demo dashboards */}

@@ -3,6 +3,7 @@
  * Renders a realistic, high-fidelity government challan receipt for successful payments.
  */
 import { useEffect, useState, useRef } from 'react';
+import { escapeHtml } from '@/lib/security-utils';
 import { useNavigate } from 'react-router-dom';
 import { motion } from 'framer-motion';
 import { Button } from '@/components/ui/button';
@@ -109,7 +110,7 @@ export default function PaymentChallanPdfViewer() {
       <!DOCTYPE html>
       <html>
         <head>
-          <title>${liability?.tax_label ?? 'Challan Receipt'}</title>
+          <title>${escapeHtml(liability?.tax_label ?? 'Challan Receipt')}</title>
           <style>
             body { font-family: 'Arial', sans-serif; color: #1a1a1a; padding: 40px; }
             .header { border-bottom: 3px solid #333; padding-bottom: 20px; margin-bottom: 30px; }

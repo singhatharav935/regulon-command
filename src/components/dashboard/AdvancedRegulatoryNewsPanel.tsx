@@ -28,6 +28,7 @@ import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
+import { safeLog } from '@/lib/security-utils';
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { 
   fetchRegulatoryNews, 
@@ -64,7 +65,7 @@ const AdvancedRegulatoryNewsPanel = () => {
       setNews(data);
       setLastRefresh(new Date());
     } catch (error) {
-      console.error("Error loading news:", error);
+      safeLog.error('Error loading news', error);
     } finally {
       setLoading(false);
       setRefreshing(false);
@@ -368,7 +369,7 @@ const AdvancedRegulatoryNewsPanel = () => {
                                 size="sm" 
                                 variant="ghost"
                                 className="h-6 w-6 p-0"
-                                onClick={() => window.open(item.source_url, '_blank')}
+                                onClick={() => window.open(item.source_url, '_blank', 'noopener,noreferrer')}
                               >
                                 <ExternalLink className="w-3 h-3" />
                               </Button>
@@ -515,7 +516,7 @@ const AdvancedRegulatoryNewsPanel = () => {
                       size="sm" 
                       variant="ghost"
                       className="h-8 w-8 p-0"
-                      onClick={() => window.open(item.source_url, '_blank')}
+                      onClick={() => window.open(item.source_url, '_blank', 'noopener,noreferrer')}
                     >
                       <ExternalLink className="w-4 h-4" />
                     </Button>

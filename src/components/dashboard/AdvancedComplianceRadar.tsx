@@ -36,6 +36,7 @@ import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
 import { Progress } from "@/components/ui/progress";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
+import { safeLog } from '@/lib/security-utils';
 import { 
   fetchRegulatoryAlerts, 
   fetchAlertsSummary, 
@@ -120,7 +121,7 @@ const AdvancedComplianceRadar = ({
       setAgentStatus(statusData);
       setHealth(healthData);
     } catch (error) {
-      console.error("Error loading regulatory data:", error);
+      safeLog.error('Error loading regulatory data', error);
     } finally {
       setLoading(false);
     }
@@ -136,7 +137,7 @@ const AdvancedComplianceRadar = ({
       }
       await loadData(); // Reload data after sync
     } catch (error) {
-      console.error("Error syncing data:", error);
+      safeLog.error('Error syncing data', error);
     } finally {
       setSyncing(false);
     }
@@ -510,7 +511,7 @@ const AdvancedComplianceRadar = ({
                             <Button 
                               size="sm" 
                               variant="ghost"
-                              onClick={() => window.open(alert.source_url!, '_blank')}
+                              onClick={() => window.open(alert.source_url!, '_blank', 'noopener,noreferrer')}
                             >
                               <ExternalLink className="w-4 h-4" />
                             </Button>

@@ -14,7 +14,7 @@ import { cn } from "@/lib/utils";
 const Select = React.forwardRef<
   HTMLDivElement,
   React.ComponentPropsWithoutRef<typeof SelectPrimitive.Root> & { 'aria-label'?: string }
->(({ children, name, 'aria-label': ariaLabel, ...props }, _ref) => {
+>(({ children, name, 'aria-label': ariaLabel, 'aria-labelledby': ariaLabelledBy, ...props }, _ref) => {
   const containerRef = React.useRef<HTMLDivElement>(null);
 
   // Use useLayoutEffect for synchronous DOM patching before paint
@@ -35,6 +35,9 @@ const Select = React.forwardRef<
         if (!hiddenSelect.getAttribute('aria-label')) {
           hiddenSelect.setAttribute('aria-label', ariaLabel || name || 'select');
         }
+        if (ariaLabelledBy && !hiddenSelect.getAttribute('aria-labelledby')) {
+          hiddenSelect.setAttribute('aria-labelledby', ariaLabelledBy);
+        }
       }
     };
 
@@ -46,7 +49,7 @@ const Select = React.forwardRef<
     observer.observe(container, { childList: true, subtree: true });
 
     return () => observer.disconnect();
-  }, [name, ariaLabel]);
+  }, [name, ariaLabel, ariaLabelledBy]);
 
   return (
     <div ref={containerRef} style={{ display: 'contents' }}>
@@ -55,7 +58,7 @@ const Select = React.forwardRef<
       </SelectPrimitive.Root>
     </div>
   );
-}) as React.FC<React.ComponentPropsWithoutRef<typeof SelectPrimitive.Root> & { 'aria-label'?: string }>;
+}) as React.FC<React.ComponentPropsWithoutRef<typeof SelectPrimitive.Root> & { 'aria-label'?: string; 'aria-labelledby'?: string }>;
 Select.displayName = "Select";
 
 const SelectGroup = SelectPrimitive.Group;

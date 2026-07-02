@@ -997,7 +997,7 @@ export default function RegulatoryNewsRuleImpact({
                         <Button
                           size="sm"
                           variant="outline"
-                          onClick={() => window.open(item.source_url || port?.url, '_blank')}
+                          onClick={() => window.open(item.source_url || port?.url, '_blank', 'noopener,noreferrer')}
                           className="h-8 text-xs border-border/50 bg-card/30 hover:bg-card/50"
                         >
                           <ExternalLink className="w-3.5 h-3.5 mr-1" /> Verify Source

@@ -41,6 +41,7 @@ import { supabase } from "@/integrations/supabase/client";
 import { useLocation, useNavigate } from "react-router-dom";
 import { workspaceBackendRequest, workspaceBackendStreamRequest } from "@/lib/workspace-backend";
 import ComplianceModulesHub from "./compliance-modules/ComplianceModulesHub";
+import { safeLog } from '@/lib/security-utils';
 import { hydrateDraftContext } from "@/lib/data-hydration-engine";
 const documentTypes = [
   // === ORIGINAL 8 REGULATORY NOTICE TYPES ===
@@ -4547,7 +4548,8 @@ const AIDraftingEngine = ({
       if (successMessage) toast.success(successMessage);
       return true;
     } catch (error) {
-      toast.error(error instanceof Error ? error.message : "Failed to save draft version.");
+      safeLog.error('Draft version save failed', error);
+      toast.error("Failed to save draft version. Please try again.");
       return false;
     } finally {
       setIsSavingDraftVersion(false);
@@ -4906,7 +4908,8 @@ const AIDraftingEngine = ({
         description: "The lawyer will be notified in their Legal Hub dashboard.",
       });
     } catch (err: any) {
-      toast.error("Failed to send for legal review: " + (err?.message || "Unknown error"));
+      safeLog.error('Legal review send failed', err);
+      toast.error("Failed to send for legal review. Please try again.");
     } finally {
       setIsSendingToLawyer(false);
     }
@@ -5700,7 +5703,8 @@ Return only the revised final draft text.`);
     } catch (error) {
       const errorMessage = error instanceof Error ? error.message : "Failed to apply AI fix";
       setGenerationError(errorMessage);
-      toast.error(errorMessage);
+      safeLog.error('GST draft generation failed', errorMessage);
+      toast.error("Failed to generate draft. Please try again.");
     } finally {
       setIsApplyingMcaFix(false);
     }
@@ -6856,7 +6860,8 @@ Calculated Modules: ${JSON.stringify(dataRoom.compiled_modules)}
       }
 
       setGenerationError(errorMessage);
-      toast.error(errorMessage || "Failed to generate draft");
+      safeLog.error('Draft generation failed', errorMessage);
+      toast.error("Failed to generate draft. Please try again.");
     } finally {
       setIsGenerating(false);
     }

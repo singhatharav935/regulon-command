@@ -3,6 +3,7 @@
  * Renders a beautiful, realistic acknowledgment PDF for acknowledged/approved filings.
  */
 import { useEffect, useState, useRef } from 'react';
+import { escapeHtml } from '@/lib/security-utils';
 import { useNavigate } from 'react-router-dom';
 import { motion } from 'framer-motion';
 import { Button } from '@/components/ui/button';
@@ -79,7 +80,7 @@ export default function EFilingAckPdfViewer() {
       <!DOCTYPE html>
       <html>
         <head>
-          <title>${job?.filing_title ?? 'Acknowledgment'}</title>
+          <title>${escapeHtml(job?.filing_title ?? 'Acknowledgment')}</title>
           <style>
             body { font-family: 'Arial', sans-serif; color: #1a1a1a; padding: 40px; }
             .header { border-bottom: 3px solid #333; padding-bottom: 20px; margin-bottom: 30px; }

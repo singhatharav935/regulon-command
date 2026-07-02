@@ -101,6 +101,7 @@ import {
   FolderCheck,
 } from "lucide-react";
 import { toast } from "sonner";
+import { safeLog } from '@/lib/security-utils';
 import useCAMetrics from "@/hooks/useCAMetrics";
 import { useCAIdentity } from "@/hooks/useCAIdentity";
 import { useRealtimeSync } from "@/hooks/useRealtimeSync";
@@ -1356,7 +1357,7 @@ Date: ${new Date().toISOString().split('T')[0]}
         description: 'OpenAI has drafted the legal response using live data room.'
       });
     } catch (error) {
-      console.error(error);
+      safeLog.error('CADashboard error', error);
       addAgentLog(`❌ ERROR: ${error.message}`);
       toast.error('Drafting Failed', { description: error.message });
     } finally {
@@ -2257,7 +2258,7 @@ Date: ${new Date().toISOString().split('T')[0]}
                               variant="outline"
                               className="text-cyan-400 border-cyan-500/50 hover:bg-cyan-500/20"
                               onClick={() => {
-                                window.open(generatedPDFUrl, '_blank');
+                                window.open(generatedPDFUrl, '_blank', 'noopener,noreferrer');
                                 const a = document.createElement('a');
                                 a.href = generatedPDFUrl;
                                 a.download = `SANNIDH-Legal-Response-${Date.now()}.pdf`;
@@ -2760,7 +2761,7 @@ const CADashboard = () => {
         toast.error(result.error || "Failed to add company");
       }
     } catch (error) {
-      console.error("Error adding company:", error);
+      safeLog.error('Error adding company', error);
       toast.error("Failed to add company. Please try again.");
     } finally {
       setIsAddingCompany(false);

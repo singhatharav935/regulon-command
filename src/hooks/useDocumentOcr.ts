@@ -150,7 +150,7 @@ export function useDocumentVault(caUserId: string) {
       try {
         const url = await getDocumentUrl(doc.storage_path, doc.storage_bucket);
         await logDocumentAccess(doc.id, caUserId, 'download');
-        window.open(url, '_blank');
+        window.open(url, '_blank', 'noopener,noreferrer');
       } catch (err: any) {
         toast.error('Download failed', { description: err.message });
       }

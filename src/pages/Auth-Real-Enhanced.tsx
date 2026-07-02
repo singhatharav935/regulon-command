@@ -26,6 +26,7 @@ import { Label } from "@/components/ui/label";
 import { Card } from "@/components/ui/card";
 import { Checkbox } from "@/components/ui/checkbox";
 import { useToast } from "@/hooks/use-toast";
+import { safeLog } from '@/lib/security-utils';
 import { enhancedAuth } from "@/lib/enhanced-auth";
 import { createLocalDemoUser } from "@/lib/local-demo-auth";
 import { SecurePasswordInput } from "@/components/auth/PasswordStrengthMeter";
@@ -220,7 +221,7 @@ const AuthReal = () => {
       const redirectTo = (location.state as any)?.from || getDashboardRoute(effectiveRole);
       navigate(redirectTo);
     } catch (error: any) {
-      console.error("Login error:", error);
+      safeLog.error('Login error', error);
       toast({
         title: "Login Failed",
         description: error.message || "Failed to log in. Please check your credentials.",
@@ -280,7 +281,7 @@ const AuthReal = () => {
         }, 500);
       }
     } catch (error: any) {
-      console.error("Registration error:", error);
+      safeLog.error('Registration error', error);
       toast({
         title: "Registration Failed",
         description: error.message || "Failed to create account",
@@ -389,7 +390,7 @@ const AuthReal = () => {
         window.location.href = dashboardRoute;
       }, 500);
     } catch (error: any) {
-      console.error("Registration error:", error);
+      safeLog.error('Registration error', error);
       toast({
         title: "Registration Failed",
         description: error.message || "Failed to create account. Please try again.",
@@ -412,7 +413,7 @@ const AuthReal = () => {
 
       setMode('login');
     } catch (error: any) {
-      console.error("Password reset error:", error);
+      safeLog.error('Password reset error', error);
       toast({
         title: "Reset Failed",
         description: error.message || "Failed to send reset email",
@@ -438,7 +439,7 @@ const AuthReal = () => {
       setMode('login');
       setPassword('');
     } catch (error: any) {
-      console.error("Password reset error:", error);
+      safeLog.error('Password reset error', error);
       toast({
         title: "Reset Failed",
         description: error.message || "Failed to reset password",
