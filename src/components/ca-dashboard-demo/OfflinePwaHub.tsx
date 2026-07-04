@@ -82,35 +82,21 @@ export const OfflinePwaHub: React.FC = () => {
   useEffect(() => {
     async function loadCachedRecords() {
       try {
-        // companies actual columns: id, name, gstin, pan (NOT company_name or gst_number)
         const { data: companiesData } = await supabase
           .from('companies' as any)
-          .select('id, name, gstin, pan');
-        setCachedCompanies((companiesData || []).map((c: any) => ({
-          id: c.id,
-          company_name: c.name,      // remap to display field
-          gst_number: c.gstin,       // remap to display field
-          risk: 'Medium',            // not stored in companies table
-        })));
+          .select('id, company_name, gst_number, risk');
+        setCachedCompanies(companiesData || []);
 
-        // compliance_tasks actual columns: id, title, description, company_id, regulator, priority, status, due_date
         const { data: tasksData } = await supabase
           .from('compliance_tasks' as any)
-          .select('id, title, description, due_date, status, priority')
+          .select('id, client_name, task_title, due_date, status, priority')
           .limit(10);
-        setCachedTasks((tasksData || []).map((t: any) => ({
-          id: t.id,
-          client_name: 'Client',     // no client_name column in schema
-          task_title: t.title,       // map title -> task_title for display
-          due_date: t.due_date,
-          status: t.status,
-          priority: t.priority,
-        })));
+        setCachedTasks(tasksData || []);
       } catch (err) {
         // Fallbacks if tables fail
         setCachedCompanies([
           { id: '1', company_name: 'Shree Balaji Logistics', gst_number: '07AAAAA1111A1Z1', risk: 'High' },
-          { id: '2', company_name: 'Venkateshwara Agro Ltd', gst_number: '33AAAAA2222B1Z2', risk: 'Medium' },
+          { id: '2', company_name: 'Venkateshwara Agro Ltd', gstin: '33AAAAA2222B1Z2', risk: 'Medium' },
         ]);
         setCachedTasks([
           { id: '1', client_name: 'Shree Balaji Logistics', task_title: 'GST Scrutiny Reply Section 73', due_date: '2026-05-30', status: 'pending', priority: 'high' }
@@ -142,15 +128,14 @@ export const OfflinePwaHub: React.FC = () => {
   const handleSimulateOfflineMutation = (e: React.FormEvent) => {
     e.preventDefault();
 
-    // Map to actual compliance_tasks schema: title, company_id, regulator, priority, status, due_date
     const payload = {
-      title: `[Offline] ${taskTitle}`,
-      description: `Client: ${clientName} | ${taskTitle}`,
-      company_id: null,      // No client lookup in this simulator
-      regulator: 'GSTIN',
+      client_name: clientName,
+      task_title: `[Offline] ${taskTitle}`,
       due_date: new Date(Date.now() + 7 * 24 * 60 * 60 * 1000).toISOString().split('T')[0],
       status: 'pending',
       priority: taskPriority,
+      category: 'GSTIN',
+      comments: 'Simulated task created while running in local Progressive Web App shell.',
     };
 
     if (!onlineStatus) {
@@ -172,12 +157,11 @@ export const OfflinePwaHub: React.FC = () => {
     setTaskTitle('');
   };
 
-  // Filter cached records (safely handle missing fields — tasks are remapped to task_title/client_name)
-  const filteredCachedTasks = cachedTasks.filter(task =>
-    (task.task_title || task.title || '').toLowerCase().includes(searchCacheQuery.toLowerCase()) ||
-    (task.client_name || '').toLowerCase().includes(searchCacheQuery.toLowerCase())
+  // Filter cached records
+  const filteredCachedTasks = cachedTasks.filter(task => 
+    task.client_name.toLowerCase().includes(searchCacheQuery.toLowerCase()) ||
+    task.task_title.toLowerCase().includes(searchCacheQuery.toLowerCase())
   );
-
 
   return (
     <div className="space-y-6">

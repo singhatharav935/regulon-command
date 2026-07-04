@@ -71,8 +71,7 @@ const getStorageItem = (key: string, defaultValue: any) => {
   }
   try {
     return JSON.parse(val);
-  } catch (err) {
-    console.warn('[Supabase] Failed to parse localStorage value for key:', key, err);
+  } catch {
     return defaultValue;
   }
 };

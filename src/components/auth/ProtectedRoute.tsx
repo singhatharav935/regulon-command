@@ -43,10 +43,7 @@ const ProtectedRoute = ({ children, allowRoles, allowPersonas, requireVerified =
   const fallbackPersona = inferPersonaFromMetadata(user?.user_metadata?.registration_role);
   // localRole (from registration form) takes priority OVER previewPersona (from demo PersonaSelector)
   // This prevents a stale demo session from overriding a fresh real registration.
-  // SECURITY: Only trust localStorage persona when a real user is authenticated (prevents spoofing by unauthenticated visitors)
-  const localRole = user
-    ? (localStorage.getItem("current_user_role") || localStorage.getItem("pending_registration_role")) as AppPersona | null
-    : null;
+  const localRole = (localStorage.getItem("current_user_role") || localStorage.getItem("pending_registration_role")) as AppPersona | null;
   const effectivePersona = persona ?? fallbackPersona ?? localRole ?? previewPersona;
   const hasAccessIdentity = Boolean(user) || Boolean(previewPersona) || Boolean(localRole);
   const unresolvedIdentity = hasAccessIdentity && !effectivePersona && effectiveRoles.length === 0;

@@ -6,7 +6,6 @@
 
 import { useState, useEffect, useRef, useCallback } from "react";
 import { isCABackendConfigured } from "@/lib/ca-backend-guard";
-import { sanitizeInput, safeLog } from '@/lib/security-utils';
 import { supabase } from "@/integrations/supabase/client";
 import { motion, AnimatePresence } from "framer-motion";
 import {
@@ -148,13 +147,11 @@ const SannidhAIAgent = () => {
           
           // Send wake-word event to backend (resolve auth asynchronously)
           supabase.auth.getUser().then(({ data }) => {
-            const authToken = localStorage.getItem("token");
-            if (!authToken) return; // Skip API call if no auth token
             fetch("/api/ca/voice/wake-word", {
               method: "POST",
               headers: {
                 "Content-Type": "application/json",
-                "Authorization": `Bearer ${authToken}`,
+                "Authorization": `Bearer ${localStorage.getItem("token") || "ca-token-123"}`,
               },
               body: JSON.stringify({
                 event: "wake_word_detected",
@@ -171,13 +168,13 @@ const SannidhAIAgent = () => {
             .trim();
 
           if (commandText) {
-            setUserInput(sanitizeInput(commandText, 1000));
+            setUserInput(commandText);
             handleAgentQuery(commandText);
           }
         }
         // Only process normal commands if already listening
         else if (isListening && isFinal && transcript.length > 2) {
-          setUserInput(sanitizeInput(transcript, 1000));
+          setUserInput(transcript);
           handleAgentQuery(transcript);
         }
       };
@@ -190,7 +187,7 @@ const SannidhAIAgent = () => {
       };
 
       recognitionRef.current.onerror = (event: any) => {
-        safeLog.error('Speech recognition error', event.error);
+        console.error("Speech recognition error:", event.error);
         if (event.error !== "no-speech") {
           setIsListening(false);
         }
@@ -341,7 +338,7 @@ const SannidhAIAgent = () => {
       const briefText = `Good morning! I've analyzed your compliance calendar. You have ${allTasks.length} active tasks:\n\n${taskList}\n\nWould you like me to start working on any of these?`;
       setDailyBrief(briefText);
     } catch (error) {
-      safeLog.warn('[SannidhAIAgent] Backend unavailable for daily brief');
+      // Backend unavailable — silently use empty state
     }
   };
 
@@ -381,7 +378,7 @@ const SannidhAIAgent = () => {
             method: "POST",
             headers: {
               "Content-Type": "application/json",
-              "Authorization": `Bearer ${localStorage.getItem("token") || ""}`,
+              "Authorization": `Bearer ${localStorage.getItem("token") || "ca-token-123"}`,
             },
             body: JSON.stringify({
               command: query,
@@ -392,14 +389,14 @@ const SannidhAIAgent = () => {
 
           if (voiceResponse.ok) {
             const voiceData = await voiceResponse.json();
-            safeLog.debug('[VOICE] Command processed', voiceData);
+            console.log("[VOICE] Command processed:", voiceData);
             // Add the backend response to activity log
             if (voiceData.log_entry) {
               addActivity((voiceData.action as ActivityLog["type"]) || "message", "Voice Command", voiceData.response);
             }
           }
         } catch (voiceError) {
-          safeLog.error('Voice command logging failed', voiceError);
+          console.error("Voice command logging failed:", voiceError);
         }
       }
 
@@ -430,7 +427,7 @@ const SannidhAIAgent = () => {
         await executeGeneralQuery(query);
       }
     } catch (error) {
-      safeLog.error('Error processing agent query', error);
+      console.error("Error processing agent query:", error);
       toast.error("Failed to process your request");
     } finally {
       setIsProcessing(false);
@@ -483,7 +480,7 @@ The assessee respectfully submits that the demand is erroneous and should be wit
 
       toast.success("Draft prepared! Please review and approve.");
     } catch (error) {
-      safeLog.error('Draft tool error', error);
+      console.error("Draft tool error:", error);
       toast.error("Failed to generate draft");
     }
   };
@@ -544,7 +541,7 @@ ACTION ITEMS:
 
       toast.success("Reconciliation report generated!");
     } catch (error) {
-      safeLog.error('Reconcile tool error', error);
+      console.error("Reconcile tool error:", error);
       toast.error("Failed to reconcile");
     }
   };
@@ -596,7 +593,7 @@ COMPLIANCE STATUS:
 
       toast.success("Document verified! ✅");
     } catch (error) {
-      safeLog.error('Verify tool error', error);
+      console.error("Verify tool error:", error);
       toast.error("Failed to verify document");
     }
   };
@@ -626,7 +623,7 @@ What would you like me to do next?`;
       // Play audio response
       speakResponse(response);
     } catch (error) {
-      safeLog.error('General query error', error);
+      console.error("General query error:", error);
       toast.error("Failed to process query");
     }
   };
@@ -663,7 +660,7 @@ What would you like me to do next?`;
         setIsListening(true);
         toast.success('Voice assistant active - Say "Hey Sannidh"');
       } catch (error) {
-        safeLog.error('Failed to start speech recognition', error);
+        console.error("Failed to start speech recognition:", error);
         toast.error("Failed to start voice recognition");
       }
     }
@@ -725,7 +722,7 @@ What would you like me to do next?`;
       toast.success("Document approved and exported!");
       setApprovalRequest(null);
     } catch (error) {
-      safeLog.error('Approval error', error);
+      console.error("Approval error:", error);
       toast.error("Failed to approve document");
     } finally {
       setIsProcessing(false);

@@ -1,5 +1,4 @@
 import { useState, useRef, useEffect } from "react";
-import { sanitizeInput, safeLog } from '@/lib/security-utils';
 import { motion, AnimatePresence } from "framer-motion";
 import { 
   MessageCircle, 
@@ -86,7 +85,7 @@ const ComplianceChatbot = ({
         setMessages(prev => [...prev, assistantMsg]);
         return;
       } catch (error) {
-        safeLog.warn('Real chatbot API failed, falling back to demo');
+        console.log("Real chatbot failed, falling back to demo");
       }
     }
 
@@ -168,7 +167,7 @@ const ComplianceChatbot = ({
     const messageToSend = customMessage || input.trim();
     if (!messageToSend || isLoading) return;
 
-    const userMsg: Message = { role: "user", content: sanitizeInput(messageToSend, 2000) };
+    const userMsg: Message = { role: "user", content: messageToSend };
     setMessages(prev => [...prev, userMsg]);
     setInput("");
     setIsLoading(true);
@@ -177,8 +176,8 @@ const ComplianceChatbot = ({
     try {
       await streamChat([...messages, userMsg]);
     } catch (e) {
-      safeLog.error('Chat error', e);
-      setError("An error occurred. Please try again.");
+      console.error("Chat error:", e);
+      setError(e instanceof Error ? e.message : "An error occurred");
     } finally {
       setIsLoading(false);
     }

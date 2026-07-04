@@ -214,9 +214,6 @@ const TaskFilingManagement = ({
             <div className="flex items-center gap-2 min-w-0">
               <Search className="w-4 h-4 text-muted-foreground flex-shrink-0" />
               <Input 
-                id="task-search"
-                name="task-search"
-                aria-label="Search tasks or companies"
                 placeholder="Search tasks or companies..."
                 value={searchQuery}
                 onChange={(e) => setSearchQuery(e.target.value)}
@@ -225,8 +222,8 @@ const TaskFilingManagement = ({
             </div>
 
             {/* Authority Filter */}
-            <Select name="task-filter-authority" aria-label="Filter by authority" value={filterAuthority} onValueChange={setFilterAuthority}>
-              <SelectTrigger aria-label="Filter by authority" className="h-9 bg-card">
+            <Select value={filterAuthority} onValueChange={setFilterAuthority}>
+              <SelectTrigger className="h-9 bg-card">
                 <SelectValue placeholder="Filter by Authority" />
               </SelectTrigger>
               <SelectContent>
@@ -243,8 +240,8 @@ const TaskFilingManagement = ({
             </Select>
 
             {/* Urgency Filter */}
-            <Select name="task-filter-urgency" aria-label="Filter by urgency" value={filterUrgency} onValueChange={setFilterUrgency}>
-              <SelectTrigger aria-label="Filter by urgency" className="h-9 bg-card">
+            <Select value={filterUrgency} onValueChange={setFilterUrgency}>
+              <SelectTrigger className="h-9 bg-card">
                 <SelectValue placeholder="Filter by Urgency" />
               </SelectTrigger>
               <SelectContent>
@@ -257,8 +254,8 @@ const TaskFilingManagement = ({
             </Select>
 
             {/* Sort By */}
-            <Select name="task-sort-by" aria-label="Sort tasks by" value={sortBy} onValueChange={setSortBy}>
-              <SelectTrigger aria-label="Sort tasks by" className="h-9 bg-card">
+            <Select value={sortBy} onValueChange={setSortBy}>
+              <SelectTrigger className="h-9 bg-card">
                 <SelectValue placeholder="Sort Tasks By" />
               </SelectTrigger>
               <SelectContent>

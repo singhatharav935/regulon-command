@@ -116,9 +116,6 @@ export default function MultiClientMasterHub({ isDemo }: MultiClientMasterHubPro
           <div className="relative w-64">
             <Search className="w-4 h-4 absolute left-3 top-2.5 text-muted-foreground" />
             <Input 
-              id="multi-client-search"
-              name="multi-client-search"
-              aria-label="Search PAN, GSTIN, Name"
               placeholder="Search PAN, GSTIN, Name..." 
               className="pl-9 h-9 bg-background/50"
               value={searchTerm}

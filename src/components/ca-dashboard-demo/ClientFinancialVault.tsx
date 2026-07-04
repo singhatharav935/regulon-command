@@ -3,7 +3,7 @@ import { motion, AnimatePresence } from 'framer-motion';
 import { 
   Building2, Database, BrainCircuit, RefreshCw, CheckCircle,
   FileText, ShieldAlert, BarChart3, Clock, AlertTriangle, ArrowRight, Activity,
-  Upload, Fingerprint, Landmark, Zap, Download, Send, Edit, Save, X
+  Upload, Fingerprint, Landmark, Zap, Download, Send, Edit, Save, X, Tags
 } from 'lucide-react';
 import { Button } from '@/components/ui/button';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
@@ -18,6 +18,8 @@ import remarkGfm from 'remark-gfm';
 import { buildOfflineDraft, readyNoticeTemplates } from './AIDraftingEngine';
 import { generateBalanceSheetPdf, generateProfitLossPdf, generateModulePdf, generateTrialBalancePdf, generateGeneralLedgerPdf, generateBankReconPdf, generateFixedAssetRegisterPdf } from './FinancialPdfTemplates';
 import { useCAAgentOrchestrator } from '../agents-demo/CAAgentOrchestrator';
+import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
+import PaymentClassificationDemo from './PaymentClassificationDemo';
 
 const getHash = (str: string) => {
   let hash = 0;
@@ -720,243 +722,267 @@ export default function ClientFinancialVault() {
                 <p className="text-xs text-muted-foreground max-w-xs mt-1">Trigger the AI Swarm to populate the financial books and module calculations.</p>
               </div>
             ) : (
-              <div className="space-y-4">
-                <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-                  {/* BS Summary */}
-                  <div className="p-5 bg-card/40 border border-border/40 rounded-2xl flex flex-col justify-between">
-                    <div>
-                      <div className="flex justify-between items-center mb-4">
-                        <h3 className="font-semibold flex items-center gap-2 text-white">
-                          <Database className="w-4 h-4 text-blue-400" /> Balance Sheet
-                        </h3>
-                        <div className="flex items-center gap-2">
-                          <Badge variant="outline" className="bg-blue-500/10 text-blue-400 border-blue-500/20">Auto-Generated</Badge>
-                          <Button 
-                            size="sm" 
-                            variant="ghost" 
-                            className="h-7 px-2 text-xs text-blue-400 hover:text-blue-300 hover:bg-blue-500/10"
-                            onClick={() => handleViewFinancialsPdf('balance_sheet')}
-                          >
-                            <FileText className="w-3.5 h-3.5 mr-1" /> PDF
-                          </Button>
-                        </div>
-                      </div>
-                      <div className="space-y-3">
-                        <div className="flex justify-between text-sm">
-                          <span className="text-muted-foreground">Total Assets:</span>
-                          <span className="font-mono text-white">₹{dataRoom.compiled_bs?.assets?.total?.toLocaleString() || '0'}</span>
-                        </div>
-                        <div className="flex justify-between text-sm">
-                          <span className="text-muted-foreground">Total Liabilities + Equity:</span>
-                          <span className="font-mono text-white">₹{dataRoom.compiled_bs?.liabilities_equity?.total?.toLocaleString() || '0'}</span>
-                        </div>
-                      </div>
-                    </div>
-                    <div className="pt-4 mt-4 border-t border-border/20">
-                      <p className="text-xs text-green-400 flex items-center gap-1"><CheckCircle className="w-3 h-3"/> Equation Balanced</p>
-                    </div>
-                  </div>
+              <Tabs defaultValue="dataroom" className="w-full">
+                <TabsList className="grid w-full grid-cols-2 h-11 bg-card/60 border border-border/40 p-1 rounded-xl mb-6">
+                  <TabsTrigger 
+                    value="dataroom" 
+                    className="data-[state=active]:bg-indigo-500/20 data-[state=active]:text-indigo-400 gap-2 h-9 rounded-lg"
+                  >
+                    <Database className="w-4 h-4" /> Financial Data Room
+                  </TabsTrigger>
+                  <TabsTrigger 
+                    value="payment-intel" 
+                    className="data-[state=active]:bg-violet-500/20 data-[state=active]:text-violet-400 gap-2 h-9 rounded-lg"
+                  >
+                    <Tags className="w-4 h-4" /> Payment Intel
+                  </TabsTrigger>
+                </TabsList>
 
-                  {/* P&L Summary */}
-                  <div className="p-5 bg-card/40 border border-border/40 rounded-2xl flex flex-col justify-between">
-                    <div>
-                      <div className="flex justify-between items-center mb-4">
-                        <h3 className="font-semibold flex items-center gap-2 text-white">
-                          <BarChart3 className="w-4 h-4 text-green-400" /> P&L Statement
-                        </h3>
-                        <div className="flex items-center gap-2">
-                          <Badge variant="outline" className="bg-green-500/10 text-green-400 border-green-500/20">Auto-Generated</Badge>
-                          <Button 
-                            size="sm" 
-                            variant="ghost" 
-                            className="h-7 px-2 text-xs text-green-400 hover:text-green-300 hover:bg-green-500/10"
-                            onClick={() => handleViewFinancialsPdf('profit_loss')}
-                          >
-                            <FileText className="w-3.5 h-3.5 mr-1" /> PDF
-                          </Button>
-                        </div>
-                      </div>
-                      <div className="space-y-3">
-                        <div className="flex justify-between text-sm">
-                          <span className="text-muted-foreground">Total Revenue:</span>
-                          <span className="font-mono text-white">₹{dataRoom.compiled_pl?.revenue?.toLocaleString() || '0'}</span>
-                        </div>
-                        <div className="flex justify-between text-sm">
-                          <span className="text-muted-foreground">Net Profit (PAT):</span>
-                          <span className="font-mono text-green-400">₹{dataRoom.compiled_pl?.profit_after_tax?.toLocaleString() || '0'}</span>
-                        </div>
-                      </div>
-                    </div>
-                    <div className="pt-4 mt-4 border-t border-border/20">
-                      <p className="text-xs text-indigo-400 flex items-center gap-1">Data verified from bank feeds</p>
-                    </div>
-                  </div>
-
-                  {/* Bank Reconciliation Summary */}
-                  <div className="p-5 bg-card/40 border border-border/40 rounded-2xl flex flex-col justify-between">
-                    <div>
-                      <div className="flex justify-between items-center mb-4">
-                        <h3 className="font-semibold flex items-center gap-2 text-white">
-                          <Activity className="w-4 h-4 text-amber-400" /> Bank Reconciliation
-                        </h3>
-                        <div className="flex items-center gap-2">
-                          <Badge variant="outline" className="bg-amber-500/10 text-amber-400 border-amber-500/20">Auto-Generated</Badge>
-                          <Button 
-                            size="sm" 
-                            variant="ghost" 
-                            className="h-7 px-2 text-xs text-amber-400 hover:text-amber-300 hover:bg-amber-500/10"
-                            onClick={() => handleViewFinancialsPdf('bank_recon')}
-                          >
-                            <FileText className="w-3.5 h-3.5 mr-1" /> PDF
-                          </Button>
-                        </div>
-                      </div>
-                      <div className="space-y-3">
-                        <div className="flex justify-between text-sm">
-                          <span className="text-muted-foreground">Balance per Books:</span>
-                          <span className="font-mono text-white">₹{Math.floor((dataRoom.compiled_bs?.assets?.total || 0) * 0.15)?.toLocaleString() || '0'}</span>
-                        </div>
-                        <div className="flex justify-between text-sm">
-                          <span className="text-muted-foreground">Balance per Bank:</span>
-                          <span className="font-mono text-white">
-                            ₹{(() => {
-                              const ledgerBal = Math.floor((dataRoom.compiled_bs?.assets?.total || 0) * 0.15);
-                              const add1 = Math.floor(ledgerBal * 0.08);
-                              const add2 = Math.floor(ledgerBal * 0.015);
-                              const less1 = Math.floor(ledgerBal * 0.05);
-                              const less2 = Math.floor(ledgerBal * 0.002);
-                              return (ledgerBal + add1 + add2 - less1 - less2).toLocaleString();
-                            })()}
-                          </span>
-                        </div>
-                      </div>
-                    </div>
-                    <div className="pt-4 mt-4 border-t border-border/20">
-                      <p className="text-xs text-amber-400 flex items-center gap-1"><CheckCircle className="w-3 h-3"/> Bank feeds reconciled</p>
-                    </div>
-                  </div>
-
-                  {/* Statutory Registers */}
-                  <div className="p-5 bg-card/40 border border-border/40 rounded-2xl flex flex-col justify-between">
-                    <div>
-                      <div className="flex justify-between items-center mb-4">
-                        <h3 className="font-semibold flex items-center gap-2 text-white">
-                          <Landmark className="w-4 h-4 text-cyan-400" /> Statutory Registers
-                        </h3>
-                        <Badge variant="outline" className="bg-cyan-500/10 text-cyan-400 border-cyan-500/20">Auto-Generated</Badge>
-                      </div>
-                      <div className="space-y-2.5">
-                        <div className="flex items-center justify-between text-sm">
-                          <span className="text-muted-foreground">Trial Balance (TB)</span>
-                          <Button 
-                            size="sm" 
-                            variant="ghost" 
-                            className="h-7 px-2 text-xs text-cyan-400 hover:text-cyan-300 hover:bg-cyan-500/10"
-                            onClick={() => handleViewFinancialsPdf('trial_balance')}
-                          >
-                            <FileText className="w-3.5 h-3.5 mr-1" /> View PDF
-                          </Button>
-                        </div>
-                        <div className="flex items-center justify-between text-sm">
-                          <span className="text-muted-foreground">General Ledger (GL)</span>
-                          <Button 
-                            size="sm" 
-                            variant="ghost" 
-                            className="h-7 px-2 text-xs text-cyan-400 hover:text-cyan-300 hover:bg-cyan-500/10"
-                            onClick={() => handleViewFinancialsPdf('general_ledger')}
-                          >
-                            <FileText className="w-3.5 h-3.5 mr-1" /> View PDF
-                          </Button>
-                        </div>
-                        <div className="flex items-center justify-between text-sm">
-                          <span className="text-muted-foreground">Fixed Asset Register</span>
-                          <Button 
-                            size="sm" 
-                            variant="ghost" 
-                            className="h-7 px-2 text-xs text-cyan-400 hover:text-cyan-300 hover:bg-cyan-500/10"
-                            onClick={() => handleViewFinancialsPdf('fixed_assets')}
-                          >
-                            <FileText className="w-3.5 h-3.5 mr-1" /> View PDF
-                          </Button>
-                        </div>
-                      </div>
-                    </div>
-                    <div className="pt-4 mt-4 border-t border-border/20">
-                      <p className="text-xs text-cyan-400 flex items-center gap-1"><CheckCircle className="w-3 h-3"/> Mapped & Compiled</p>
-                    </div>
-                  </div>
-                </div>
-
-                {/* Modules Saved List */}
-                <div className="p-5 bg-card/40 border border-border/40 rounded-2xl">
-                  <div className="flex justify-between items-center mb-4">
-                    <h3 className="font-semibold flex items-center gap-2">
-                      <FileText className="w-4 h-4 text-purple-400" /> 26 Module Data Room Vault
-                    </h3>
-                  </div>
-                  <p className="text-sm text-muted-foreground mb-4">The AI Drafting Engine has direct access to these pre-calculated snapshots for notice replies.</p>
-                  
-                  <div className="grid grid-cols-2 md:grid-cols-3 gap-3">
-                    {/* Dynamic display of the 26 modules saved in the vault */}
-                    {dataRoom.calculated_modules?.map((mod: any, i: number) => (
-                      <div key={i} className="flex items-center justify-between p-2 bg-background/50 rounded-lg border border-border/30 text-xs hover:border-indigo-500/30 hover:bg-indigo-500/5 transition-all group">
-                        <div className="flex items-center gap-2 text-muted-foreground truncate mr-2 flex-1 min-w-0">
-                          <CheckCircle className="w-3 h-3 text-emerald-400 shrink-0" />
-                          <span className="truncate text-left" title={mod.module_label}>{mod.module_label}</span>
-                        </div>
-                        <div className="flex items-center gap-1.5 shrink-0">
-                          {/* Display a key metric if available to show it's real */}
-                          {mod.calculation_data && Object.keys(mod.calculation_data)[0] && (
-                             <span className="font-mono text-emerald-400 text-[10px]">
-                               {typeof Object.values(mod.calculation_data)[0] === 'number' 
-                                 ? `₹${Number(Object.values(mod.calculation_data)[0]).toLocaleString()}` 
-                                 : String(Object.values(mod.calculation_data)[0])}
-                             </span>
-                          )}
-                          <button
-                            onClick={() => handleViewModulePdf(mod)}
-                            className="p-1 text-muted-foreground/60 hover:text-indigo-400 rounded hover:bg-indigo-500/10 transition-all shrink-0"
-                            title="View PDF Report"
-                          >
-                            <FileText className="w-3.5 h-3.5" />
-                          </button>
-                        </div>
-                      </div>
-                    ))}
-                  </div>
-                </div>
-
-                {/* AI Generated Documents Vault */}
-                <div className="p-5 bg-card/40 border border-border/40 rounded-2xl mt-4">
-                  <h3 className="font-semibold flex items-center gap-2 mb-4">
-                    <ShieldAlert className="w-4 h-4 text-orange-400" /> AI Generated Compliance Drafts
-                  </h3>
-                  {dataRoom.documents && dataRoom.documents.length > 0 ? (
-                    <div className="grid grid-cols-1 md:grid-cols-2 gap-3">
-                      {dataRoom.documents.map((doc: any, i: number) => (
-                        <div key={i} className="flex items-center gap-3 p-3 bg-background/50 rounded-lg border border-border/30">
-                          <FileText className="w-6 h-6 text-orange-400" />
-                          <div className="flex-1 min-w-0">
-                            <p className="text-sm font-medium truncate text-foreground">{doc.name}</p>
-                            <p className="text-xs text-muted-foreground">Generated automatically by AI Swarm</p>
+                <TabsContent value="dataroom" className="space-y-4 outline-none">
+                  <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+                    {/* BS Summary */}
+                    <div className="p-5 bg-card/40 border border-border/40 rounded-2xl flex flex-col justify-between">
+                      <div>
+                        <div className="flex justify-between items-center mb-4">
+                          <h3 className="font-semibold flex items-center gap-2 text-white">
+                            <Database className="w-4 h-4 text-blue-400" /> Balance Sheet
+                          </h3>
+                          <div className="flex items-center gap-2">
+                            <Badge variant="outline" className="bg-blue-500/10 text-blue-400 border-blue-500/20">Auto-Generated</Badge>
+                            <Button 
+                              size="sm" 
+                              variant="ghost" 
+                              className="h-7 px-2 text-xs text-blue-400 hover:text-blue-300 hover:bg-blue-500/10"
+                              onClick={() => handleViewFinancialsPdf('balance_sheet')}
+                            >
+                              <FileText className="w-3.5 h-3.5 mr-1" /> PDF
+                            </Button>
                           </div>
-                          <Button 
-                            size="sm" 
-                            variant="outline" 
-                            className="text-xs h-7 text-orange-400 border-orange-500/30 bg-orange-500/5 hover:bg-orange-500/20 hover:text-orange-300"
-                            onClick={() => setSelectedPdf(doc)}
-                          >
-                            View PDF
-                          </Button>
+                        </div>
+                        <div className="space-y-3">
+                          <div className="flex justify-between text-sm">
+                            <span className="text-muted-foreground">Total Assets:</span>
+                            <span className="font-mono text-white">₹{dataRoom.compiled_bs?.assets?.total?.toLocaleString() || '0'}</span>
+                          </div>
+                          <div className="flex justify-between text-sm">
+                            <span className="text-muted-foreground">Total Liabilities + Equity:</span>
+                            <span className="font-mono text-white">₹{dataRoom.compiled_bs?.liabilities_equity?.total?.toLocaleString() || '0'}</span>
+                          </div>
+                        </div>
+                      </div>
+                      <div className="pt-4 mt-4 border-t border-border/20">
+                        <p className="text-xs text-green-400 flex items-center gap-1"><CheckCircle className="w-3 h-3"/> Equation Balanced</p>
+                      </div>
+                    </div>
+
+                    {/* P&L Summary */}
+                    <div className="p-5 bg-card/40 border border-border/40 rounded-2xl flex flex-col justify-between">
+                      <div>
+                        <div className="flex justify-between items-center mb-4">
+                          <h3 className="font-semibold flex items-center gap-2 text-white">
+                            <BarChart3 className="w-4 h-4 text-green-400" /> P&L Statement
+                          </h3>
+                          <div className="flex items-center gap-2">
+                            <Badge variant="outline" className="bg-green-500/10 text-green-400 border-green-500/20">Auto-Generated</Badge>
+                            <Button 
+                              size="sm" 
+                              variant="ghost" 
+                              className="h-7 px-2 text-xs text-green-400 hover:text-green-300 hover:bg-green-500/10"
+                              onClick={() => handleViewFinancialsPdf('profit_loss')}
+                            >
+                              <FileText className="w-3.5 h-3.5 mr-1" /> PDF
+                            </Button>
+                          </div>
+                        </div>
+                        <div className="space-y-3">
+                          <div className="flex justify-between text-sm">
+                            <span className="text-muted-foreground">Total Revenue:</span>
+                            <span className="font-mono text-white">₹{dataRoom.compiled_pl?.revenue?.toLocaleString() || '0'}</span>
+                          </div>
+                          <div className="flex justify-between text-sm">
+                            <span className="text-muted-foreground">Net Profit (PAT):</span>
+                            <span className="font-mono text-green-400">₹{dataRoom.compiled_pl?.profit_after_tax?.toLocaleString() || '0'}</span>
+                          </div>
+                        </div>
+                      </div>
+                      <div className="pt-4 mt-4 border-t border-border/20">
+                        <p className="text-xs text-indigo-400 flex items-center gap-1">Data verified from bank feeds</p>
+                      </div>
+                    </div>
+
+                    {/* Bank Reconciliation Summary */}
+                    <div className="p-5 bg-card/40 border border-border/40 rounded-2xl flex flex-col justify-between">
+                      <div>
+                        <div className="flex justify-between items-center mb-4">
+                          <h3 className="font-semibold flex items-center gap-2 text-white">
+                            <Activity className="w-4 h-4 text-amber-400" /> Bank Reconciliation
+                          </h3>
+                          <div className="flex items-center gap-2">
+                            <Badge variant="outline" className="bg-amber-500/10 text-amber-400 border-amber-500/20">Auto-Generated</Badge>
+                            <Button 
+                              size="sm" 
+                              variant="ghost" 
+                              className="h-7 px-2 text-xs text-amber-400 hover:text-amber-300 hover:bg-amber-500/10"
+                              onClick={() => handleViewFinancialsPdf('bank_recon')}
+                            >
+                              <FileText className="w-3.5 h-3.5 mr-1" /> PDF
+                            </Button>
+                          </div>
+                        </div>
+                        <div className="space-y-3">
+                          <div className="flex justify-between text-sm">
+                            <span className="text-muted-foreground">Balance per Books:</span>
+                            <span className="font-mono text-white">₹{Math.floor((dataRoom.compiled_bs?.assets?.total || 0) * 0.15)?.toLocaleString() || '0'}</span>
+                          </div>
+                          <div className="flex justify-between text-sm">
+                            <span className="text-muted-foreground">Balance per Bank:</span>
+                            <span className="font-mono text-white">
+                              ₹{(() => {
+                                const ledgerBal = Math.floor((dataRoom.compiled_bs?.assets?.total || 0) * 0.15);
+                                const add1 = Math.floor(ledgerBal * 0.08);
+                                const add2 = Math.floor(ledgerBal * 0.015);
+                                const less1 = Math.floor(ledgerBal * 0.05);
+                                const less2 = Math.floor(ledgerBal * 0.002);
+                                return (ledgerBal + add1 + add2 - less1 - less2).toLocaleString();
+                              })()}
+                            </span>
+                          </div>
+                        </div>
+                      </div>
+                      <div className="pt-4 mt-4 border-t border-border/20">
+                        <p className="text-xs text-amber-400 flex items-center gap-1"><CheckCircle className="w-3 h-3"/> Bank feeds reconciled</p>
+                      </div>
+                    </div>
+
+                    {/* Statutory Registers */}
+                    <div className="p-5 bg-card/40 border border-border/40 rounded-2xl flex flex-col justify-between">
+                      <div>
+                        <div className="flex justify-between items-center mb-4">
+                          <h3 className="font-semibold flex items-center gap-2 text-white">
+                            <Landmark className="w-4 h-4 text-cyan-400" /> Statutory Registers
+                          </h3>
+                          <Badge variant="outline" className="bg-cyan-500/10 text-cyan-400 border-cyan-500/20">Auto-Generated</Badge>
+                        </div>
+                        <div className="space-y-2.5">
+                          <div className="flex items-center justify-between text-sm">
+                            <span className="text-muted-foreground">Trial Balance (TB)</span>
+                            <Button 
+                              size="sm" 
+                              variant="ghost" 
+                              className="h-7 px-2 text-xs text-cyan-400 hover:text-cyan-300 hover:bg-cyan-500/10"
+                              onClick={() => handleViewFinancialsPdf('trial_balance')}
+                            >
+                              <FileText className="w-3.5 h-3.5 mr-1" /> View PDF
+                            </Button>
+                          </div>
+                          <div className="flex items-center justify-between text-sm">
+                            <span className="text-muted-foreground">General Ledger (GL)</span>
+                            <Button 
+                              size="sm" 
+                              variant="ghost" 
+                              className="h-7 px-2 text-xs text-cyan-400 hover:text-cyan-300 hover:bg-cyan-500/10"
+                              onClick={() => handleViewFinancialsPdf('general_ledger')}
+                            >
+                              <FileText className="w-3.5 h-3.5 mr-1" /> View PDF
+                            </Button>
+                          </div>
+                          <div className="flex items-center justify-between text-sm">
+                            <span className="text-muted-foreground">Fixed Asset Register</span>
+                            <Button 
+                              size="sm" 
+                              variant="ghost" 
+                              className="h-7 px-2 text-xs text-cyan-400 hover:text-cyan-300 hover:bg-cyan-500/10"
+                              onClick={() => handleViewFinancialsPdf('fixed_assets')}
+                            >
+                              <FileText className="w-3.5 h-3.5 mr-1" /> View PDF
+                            </Button>
+                          </div>
+                        </div>
+                      </div>
+                      <div className="pt-4 mt-4 border-t border-border/20">
+                        <p className="text-xs text-cyan-400 flex items-center gap-1"><CheckCircle className="w-3 h-3"/> Mapped & Compiled</p>
+                      </div>
+                    </div>
+                  </div>
+
+                  {/* Modules Saved List */}
+                  <div className="p-5 bg-card/40 border border-border/40 rounded-2xl mt-4">
+                    <div className="flex justify-between items-center mb-4">
+                      <h3 className="font-semibold flex items-center gap-2">
+                        <FileText className="w-4 h-4 text-purple-400" /> 26 Module Data Room Vault
+                      </h3>
+                    </div>
+                    <p className="text-sm text-muted-foreground mb-4">The AI Drafting Engine has direct access to these pre-calculated snapshots for notice replies.</p>
+                    
+                    <div className="grid grid-cols-2 md:grid-cols-3 gap-3">
+                      {/* Dynamic display of the 26 modules saved in the vault */}
+                      {dataRoom.calculated_modules?.map((mod: any, i: number) => (
+                        <div key={i} className="flex items-center justify-between p-2 bg-background/50 rounded-lg border border-border/30 text-xs hover:border-indigo-500/30 hover:bg-indigo-500/5 transition-all group">
+                          <div className="flex items-center gap-2 text-muted-foreground truncate mr-2 flex-1 min-w-0">
+                            <CheckCircle className="w-3 h-3 text-emerald-400 shrink-0" />
+                            <span className="truncate text-left" title={mod.module_label}>{mod.module_label}</span>
+                          </div>
+                          <div className="flex items-center gap-1.5 shrink-0">
+                            {/* Display a key metric if available to show it's real */}
+                            {mod.calculation_data && Object.keys(mod.calculation_data)[0] && (
+                               <span className="font-mono text-emerald-400 text-[10px]">
+                                 {typeof Object.values(mod.calculation_data)[0] === 'number' 
+                                   ? `₹${Number(Object.values(mod.calculation_data)[0]).toLocaleString()}` 
+                                   : String(Object.values(mod.calculation_data)[0])}
+                               </span>
+                            )}
+                            <button
+                              onClick={() => handleViewModulePdf(mod)}
+                              className="p-1 text-muted-foreground/60 hover:text-indigo-400 rounded hover:bg-indigo-500/10 transition-all shrink-0"
+                              title="View PDF Report"
+                            >
+                              <FileText className="w-3.5 h-3.5" />
+                            </button>
+                          </div>
                         </div>
                       ))}
                     </div>
-                  ) : (
-                    <p className="text-xs text-muted-foreground text-center py-4">No drafts generated yet.</p>
-                  )}
-                </div>
+                  </div>
 
-              </div>
+                  {/* AI Generated Documents Vault */}
+                  <div className="p-5 bg-card/40 border border-border/40 rounded-2xl mt-4">
+                    <h3 className="font-semibold flex items-center gap-2 mb-4">
+                      <ShieldAlert className="w-4 h-4 text-orange-400" /> AI Generated Compliance Drafts
+                    </h3>
+                    {dataRoom.documents && dataRoom.documents.length > 0 ? (
+                      <div className="grid grid-cols-1 md:grid-cols-2 gap-3">
+                        {dataRoom.documents.map((doc: any, i: number) => (
+                          <div key={i} className="flex items-center gap-3 p-3 bg-background/50 rounded-lg border border-border/30">
+                            <FileText className="w-6 h-6 text-orange-400" />
+                            <div className="flex-1 min-w-0">
+                              <p className="text-sm font-medium truncate text-foreground">{doc.name}</p>
+                              <p className="text-xs text-muted-foreground">Generated automatically by AI Swarm</p>
+                            </div>
+                            <Button 
+                              size="sm" 
+                              variant="outline" 
+                              className="text-xs h-7 text-orange-400 border-orange-500/30 bg-orange-500/5 hover:bg-orange-500/20 hover:text-orange-300"
+                              onClick={() => setSelectedPdf(doc)}
+                            >
+                              View PDF
+                            </Button>
+                          </div>
+                        ))}
+                      </div>
+                    ) : (
+                      <p className="text-xs text-muted-foreground text-center py-4">No drafts generated yet.</p>
+                    )}
+                  </div>
+                </TabsContent>
+
+                <TabsContent value="payment-intel" className="outline-none">
+                  <PaymentClassificationDemo 
+                    clientId={selectedClient} 
+                    clientName={clients.find(c => c.id === selectedClient)?.name || "The Client"} 
+                    financialYear={financialYear} 
+                  />
+                </TabsContent>
+              </Tabs>
             )}
           </div>
           </div>

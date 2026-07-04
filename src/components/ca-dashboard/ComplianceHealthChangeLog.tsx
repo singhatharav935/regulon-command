@@ -31,21 +31,6 @@ import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { Badge } from '@/components/ui/badge';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
-
-// ─── Input Sanitization ─────────────────────────────────────────────────────
-const MAX_SEARCH_LENGTH = 200;
-
-/** Strip HTML tags, script injections, and control characters from user input */
-const sanitizeInput = (raw: string, maxLength: number = 500): string => {
-  return raw
-    .replace(/<[^>]*>/g, '')
-    .replace(/[\x00-\x08\x0B\x0C\x0E-\x1F]/g, '')
-    .replace(/javascript:/gi, '')
-    .replace(/on\w+\s*=/gi, '')
-    .trim()
-    .slice(0, maxLength);
-};
-
 import {
   Select,
   SelectContent,
@@ -424,18 +409,15 @@ export default function ComplianceHealthChangeLog({
             <div className="relative flex-1">
               <Search className="absolute left-3 top-1/2 transform -translate-y-1/2 w-4 h-4 text-muted-foreground" />
               <Input
-                id="compliance-changelog-search-input"
-                name="compliance-changelog-search"
-                aria-label="Search by company, reason, compliance"
                 placeholder="Search by company, reason, compliance..."
                 value={searchQuery}
-                onChange={(e) => setSearchQuery(sanitizeInput(e.target.value, MAX_SEARCH_LENGTH))}
+                onChange={(e) => setSearchQuery(e.target.value)}
                 className="pl-10 bg-background/50"
               />
             </div>
 
             {/* Filters */}
-            <Select name="compliance-change-type-filter" aria-label="Filter by change type" value={filters.changeType} onValueChange={(value) => setFilters({ ...filters, changeType: value })}>
+            <Select value={filters.changeType} onValueChange={(value) => setFilters({ ...filters, changeType: value })}>
               <SelectTrigger className="w-[150px]">
                 <SelectValue placeholder="Change Type" />
               </SelectTrigger>
@@ -447,7 +429,7 @@ export default function ComplianceHealthChangeLog({
               </SelectContent>
             </Select>
 
-            <Select name="compliance-action-by-filter" aria-label="Filter by action by" value={filters.actionBy} onValueChange={(value) => setFilters({ ...filters, actionBy: value })}>
+            <Select value={filters.actionBy} onValueChange={(value) => setFilters({ ...filters, actionBy: value })}>
               <SelectTrigger className="w-[140px]">
                 <SelectValue placeholder="Action By" />
               </SelectTrigger>
@@ -460,7 +442,7 @@ export default function ComplianceHealthChangeLog({
               </SelectContent>
             </Select>
 
-            <Select name="compliance-time-range-filter" aria-label="Filter by time range" value={filters.timeRange} onValueChange={(value) => setFilters({ ...filters, timeRange: value })}>
+            <Select value={filters.timeRange} onValueChange={(value) => setFilters({ ...filters, timeRange: value })}>
               <SelectTrigger className="w-[130px]">
                 <SelectValue placeholder="Time Range" />
               </SelectTrigger>

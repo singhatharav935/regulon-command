@@ -92,9 +92,17 @@ export interface RbacActivityLog {
  */
 export async function bootstrapRbac(caUserId: string): Promise<void> {
   if (!isValidUUID(caUserId)) return;
-  // NOTE: bootstrap_ca_rbac_system RPC does not exist in the DB schema.
-  // We skip the RPC call and run JS-based bootstrap directly to avoid 400/404 errors.
-  try { await fallbackBootstrap(caUserId); } catch { /* skip — non-critical */ }
+  try {
+    const { error } = await supabase.rpc('bootstrap_ca_rbac_system', { ca_id: caUserId });
+    if (error) {
+      if (isNonCriticalError(error)) return; // RLS recursion or missing table — skip silently
+      // Non-critical RPC errors — try fallback
+      await fallbackBootstrap(caUserId);
+    }
+  } catch (err: any) {
+    // Fallback also gracefully — don't propagate
+    try { await fallbackBootstrap(caUserId); } catch { /* skip */ }
+  }
 }
 
 /**

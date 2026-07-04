@@ -356,9 +356,6 @@ export const LocalizationHub: React.FC = () => {
                   <div className="relative">
                     <Search className="w-4 h-4 absolute left-3 top-3 text-muted-foreground" />
                     <Input
-                      id="localization-search"
-                      name="localization-search"
-                      aria-label="Search parsed notices"
                       placeholder="Search parsed notices..."
                       value={searchQuery}
                       onChange={(e) => setSearchQuery(e.target.value)}
@@ -433,8 +430,6 @@ export const LocalizationHub: React.FC = () => {
                       <Select
                         value={selectedNotice.status}
                         onValueChange={(val: NoticeStatus) => handleUpdateStatus(selectedNotice.id, val)}
-                        name="notice-status-update"
-                        aria-label="Update notice status"
                       >
                         <SelectTrigger className="w-36 h-9 bg-background/50 border-border/40 text-xs">
                           <SelectValue placeholder="Update status" />
@@ -650,7 +645,7 @@ export const LocalizationHub: React.FC = () => {
                           Loading clients...
                         </div>
                       ) : (
-                        <Select value={selectedClient} onValueChange={setSelectedClient} name="loc-client-select" aria-label="Select corporate client">
+                        <Select value={selectedClient} onValueChange={setSelectedClient}>
                           <SelectTrigger className="bg-background/40 border-border/40 text-xs h-10">
                             <SelectValue placeholder="Select client" />
                           </SelectTrigger>
@@ -668,8 +663,6 @@ export const LocalizationHub: React.FC = () => {
                       <Select
                         value={selectedLanguage}
                         onValueChange={(val: RegionalLanguage) => setSelectedLanguage(val)}
-                        name="loc-language-select"
-                        aria-label="Select original language"
                       >
                         <SelectTrigger className="bg-background/40 border-border/40 text-xs h-10">
                           <SelectValue placeholder="Select language" />
@@ -689,8 +682,6 @@ export const LocalizationHub: React.FC = () => {
                       <Select
                         value={selectedAuthority}
                         onValueChange={(val: IssuingAuthority) => setSelectedAuthority(val)}
-                        name="loc-authority-select"
-                        aria-label="Select issuing authority"
                       >
                         <SelectTrigger className="bg-background/40 border-border/40 text-xs h-10">
                           <SelectValue placeholder="Select Authority" />
@@ -706,9 +697,6 @@ export const LocalizationHub: React.FC = () => {
                     <div className="space-y-2">
                       <Label className="text-xs text-muted-foreground">Notice File Name (Mock Scan)</Label>
                       <Input
-                        id="loc-notice-filename"
-                        name="loc-notice-filename"
-                        aria-label="Notice file name"
                         placeholder="e.g. gst_notice_8932_hindi.pdf"
                         value={fileName}
                         onChange={(e) => setFileName(e.target.value)}
@@ -802,8 +790,6 @@ export const LocalizationHub: React.FC = () => {
                     checked={isRtlLayout}
                     onCheckedChange={(checked) => setLanguagePreference(language, checked)}
                     className="data-[state=checked]:bg-indigo-600"
-                    name="rtl-toggle"
-                    aria-label="Toggle RTL layout"
                   />
                 </div>
               </CardContent>
@@ -888,8 +874,6 @@ export const LocalizationHub: React.FC = () => {
                           <Select
                             defaultValue={i === 0 ? 'hi' : i === 1 ? 'ta' : i === 2 ? 'mr' : 'en'}
                             onValueChange={(val) => toast.success(`Alert language for ${c.company_name} updated to ${val.toUpperCase()}`)}
-                            name={`client-lang-pref-${c.id || i}`}
-                            aria-label={`Alert language for ${c.company_name}`}
                           >
                             <SelectTrigger className="w-36 h-8 bg-background/40 border-border/30 text-xs">
                               <SelectValue />

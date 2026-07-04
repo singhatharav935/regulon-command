@@ -127,7 +127,7 @@ export default function SecureFileSharingPanel() {
           <Button size="sm" variant="outline" onClick={fetchFiles} disabled={loading}>
             <RefreshCw className={`w-4 h-4 ${loading ? 'animate-spin' : ''}`} />
           </Button>
-          <input ref={fileInputRef} type="file" id="vault-file-upload" name="vault-file-upload" aria-label="Upload file for encryption" accept=".pdf,.doc,.docx" className="hidden" onChange={handleUpload} />
+          <input ref={fileInputRef} type="file" accept=".pdf,.doc,.docx" className="hidden" onChange={handleUpload} />
           <Button
             className="bg-emerald-600 hover:bg-emerald-700"
             onClick={() => fileInputRef.current?.click()}

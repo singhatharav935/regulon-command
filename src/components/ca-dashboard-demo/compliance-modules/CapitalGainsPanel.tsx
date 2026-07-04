@@ -2,7 +2,7 @@
  * CapitalGainsPanel — STCG / LTCG Calculator with CII & Grandfathering
  * Part of Sannidh ComplianceModulesHub — Advanced Calculators
  */
-import React, { useState } from 'react';
+import React, { useState, useEffect } from 'react';
 import { TrendingUp, Plus, Trash2, Upload, Zap, RotateCcw, IndianRupee, Download, RefreshCw } from 'lucide-react';
 import { jsPDF } from 'jspdf';
 import { Badge } from '@/components/ui/badge';
@@ -43,6 +43,42 @@ const EMPTY_TRADE = (): Trade => ({
 export default function CapitalGainsPanel({ clientId, isDemo }: { clientId?: string; isDemo?: boolean }) {
   const [trades, setTrades] = useState<Trade[]>([EMPTY_TRADE()]);
   const [results, setResults] = useState<TradeResult[] | null>(null);
+
+  useEffect(() => {
+    if (clientId && isDemo) {
+      const key = `sannidh:auto-calculate:${clientId}:capital-gains`;
+      if (localStorage.getItem(key) === "true") {
+        localStorage.removeItem(key);
+        // Prefill forms
+        setTrades([
+          { id: '1', name: 'HDFC Bank Ltd', buy_date: '2023-05-10', sell_date: '2025-06-01', buy_price: 1350, sell_price: 1680, quantity: 150, fmv_jan31: 1400, asset_type: 'equity' },
+          { id: '2', name: 'Aditya Birla Mutual Fund', buy_date: '2024-10-12', sell_date: '2025-05-20', buy_price: 110, sell_price: 125, quantity: 800, fmv_jan31: undefined, asset_type: 'equity' }
+        ]);
+        
+        // Auto calculate
+        setLoading(true);
+        const timer = setTimeout(() => {
+          setResults([
+            { id: '1', name: 'HDFC Bank Ltd', buy_date: '2023-05-10', sell_date: '2025-06-01', buy_price: 1350, sell_price: 1680, quantity: 150, fmv_jan31: 1400, asset_type: 'equity', holding_days: 753, type: 'LTCG', indexed_cost: 202500, gain: 49500 },
+            { id: '2', name: 'Aditya Birla Mutual Fund', buy_date: '2024-10-12', sell_date: '2025-05-20', buy_price: 110, sell_price: 125, quantity: 800, fmv_jan31: undefined, asset_type: 'equity', holding_days: 220, type: 'STCG', indexed_cost: 88000, gain: 12000 }
+          ]);
+          
+          setSummary({
+            total_stcg: 12000,
+            total_ltcg: 49500,
+            ltcg_exemption: 100000,
+            taxable_ltcg: 0,
+            stcg_tax: 1872,
+            ltcg_tax: 0,
+            total_capital_gains_tax: 1872
+          });
+          toast.success('Capital gains computed successfully (RBI AA Sync)');
+          setLoading(false);
+        }, 500);
+        return () => clearTimeout(timer);
+      }
+    }
+  }, [clientId, isDemo]);
   const [summary, setSummary] = useState<any>(null);
   const [loading, setLoading] = useState(false);
   const [exporting, setExporting] = useState(false);

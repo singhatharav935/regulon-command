@@ -63,14 +63,10 @@ export interface SecurityEvent {
   timestamp: string;
 }
 
-// Rate limiters for different operations — persisted in localStorage to survive page refresh
-// Login:          5 attempts per 15 minutes
-// Registration:   3 attempts per 15 minutes
-// Password Reset: 3 attempts per 15 minutes
-const FIFTEEN_MINUTES_MS = 15 * 60 * 1000; // 900,000ms
-const loginRateLimiter = new ClientRateLimiter(5, FIFTEEN_MINUTES_MS, 'sannidh_rl_login');
-const registrationRateLimiter = new ClientRateLimiter(3, FIFTEEN_MINUTES_MS, 'sannidh_rl_register');
-const passwordResetLimiter = new ClientRateLimiter(3, FIFTEEN_MINUTES_MS, 'sannidh_rl_password_reset');
+// Rate limiters for different operations
+const loginRateLimiter = new ClientRateLimiter(5, 60000); // 5 attempts per minute
+const registrationRateLimiter = new ClientRateLimiter(3, 300000); // 3 attempts per 5 minutes
+const passwordResetLimiter = new ClientRateLimiter(2, 600000); // 2 attempts per 10 minutes
 
 class EnhancedAuthService {
   private currentUser: AuthUser | null = null;
@@ -260,8 +256,7 @@ class EnhancedAuthService {
     rememberDevice = false
   ): Promise<AuthResponse> {
     if (!registrationRateLimiter.canProceed()) {
-      const wait = registrationRateLimiter.getRemainingWaitFormatted();
-      throw new Error(`Too many registration attempts. Please try again in ${wait || '15 minutes'}.`);
+      throw new Error('Too many registration attempts. Please try again later.');
     }
 
     // Validate password strength
@@ -340,8 +335,7 @@ class EnhancedAuthService {
     trustDevice = false
   ): Promise<AuthResponse> {
     if (!loginRateLimiter.canProceed()) {
-      const wait = loginRateLimiter.getRemainingWaitFormatted();
-      throw new Error(`Too many login attempts. You have been temporarily locked out. Please try again in ${wait || '15 minutes'}.`);
+      throw new Error('Too many login attempts. Please try again in a minute.');
     }
 
     const { data, error } = await supabase.auth.signInWithPassword({
@@ -470,8 +464,7 @@ class EnhancedAuthService {
    */
   async requestPasswordReset(email: string): Promise<{ message: string }> {
     if (!passwordResetLimiter.canProceed()) {
-      const wait = passwordResetLimiter.getRemainingWaitFormatted();
-      throw new Error(`Too many password reset requests. Please try again in ${wait || '15 minutes'}.`);
+      throw new Error('Too many password reset requests. Please try again later.');
     }
 
     const redirectUrl = `${window.location.origin}/auth/reset-password`;

@@ -17,7 +17,7 @@ export default defineConfig(({ mode }) => {
         ignored: ["**/node_modules/**", "**/node_modules.nosync/**", "**/.git/**", "**/dist/**", "**/supabase/**"],
       },
       hmr: {
-        overlay: true,
+        overlay: false,
       },
       proxy: {
         "/api": {

@@ -182,7 +182,7 @@ interface Document {
 // API SERVICE
 // ========================================
 
-const API_BASE = import.meta.env.VITE_API_URL || '/api/v1';
+const API_BASE = import.meta.env.VITE_API_URL || 'http://localhost:8001/api/v1';
 
 // Local fallback IDs are created when the backend is unreachable during signup.
 // API calls with these IDs will always fail (400), so we skip them entirely.

@@ -2,7 +2,7 @@ import { CAAgentProvider } from "@/components/agents-demo/CAAgentOrchestrator";
 import { useState, useEffect, useRef, useCallback, Suspense, lazy } from "react";
 import { isCABackendConfigured } from "@/lib/ca-backend-guard";
 import { getLiveRegulatoryNews, getStatutoryDeadlines } from "@/services/ca-supabase-service";
-import { GST_TEMPLATE, MCA_TEMPLATE, IT_TEMPLATE, SEBI_TEMPLATE, RBI_TEMPLATE, CUSTOMS_TEMPLATE, LEGAL_TEMPLATE } from "@/lib/draftTemplates";
+import { buildOfflineDraft, readyNoticeTemplates } from "@/components/ca-dashboard-demo/AIDraftingEngine";
 const MultiClientMasterHub = lazy(() => import("@/components/ca-dashboard-demo/MultiClientMasterHub"));
 const PracticeBillingPanel = lazy(() => import("@/components/ca-dashboard-demo/PracticeBillingPanel"));
 const SecureFileSharingPanel = lazy(() => import("@/components/ca-dashboard-demo/SecureFileSharingPanel"));
@@ -37,6 +37,7 @@ const NotificationAlertHub = lazy(() => import("@/components/ca-dashboard-demo/N
 const AuditTrailHub = lazy(() => import("@/components/ca-dashboard-demo/AuditTrailHub"));
 const LocalizationHub = lazy(() => import("@/components/ca-dashboard-demo/LocalizationHub"));
 const OfflinePwaHub = lazy(() => import("@/components/ca-dashboard-demo/OfflinePwaHub"));
+const CaseRoom = lazy(() => import("@/components/ca-dashboard-demo/CaseRoom"));
 import { isOnline } from "@/services/offline-sync-service";
 import { useLanguage, LANGUAGE_LABELS } from "@/contexts/LanguageContext";
 import { Globe2, Wifi, WifiOff } from "lucide-react";
@@ -49,6 +50,7 @@ import { Textarea } from "@/components/ui/textarea";
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table";
 import { Progress } from "@/components/ui/progress";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
+import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogDescription } from "@/components/ui/dialog";
 import {
   Bot,
   Building,
@@ -62,6 +64,8 @@ import {
   MessageSquare,
   BarChart3,
   Plus,
+  Fingerprint,
+  Landmark,
   Search,
   Download,
   DollarSign,
@@ -101,7 +105,6 @@ import {
   FolderCheck,
 } from "lucide-react";
 import { toast } from "sonner";
-import { safeLog } from '@/lib/security-utils';
 import useCAMetrics from "@/hooks/useCAMetrics";
 import { useCAIdentity } from "@/hooks/useCAIdentity";
 import { useRealtimeSync } from "@/hooks/useRealtimeSync";
@@ -1034,10 +1037,26 @@ const LiveAIDraftingEngine = () => {
   const [signatureStatus, setSignatureStatus] = useState<string | null>(null);
   const [filingARN, setFilingARN] = useState<string | null>(null);
   
+  // Interactive Workflow Modals State
+  const [showOtpModal, setShowOtpModal] = useState(false);
+  const [otpInput, setOtpInput] = useState('');
+  const [otpVerifying, setOtpVerifying] = useState(false);
+  const [showFilingConsole, setShowFilingConsole] = useState(false);
+  const [filingLogs, setFilingLogs] = useState<string[]>([]);
+  const [showFilingReceipt, setShowFilingReceipt] = useState(false);
+  
+  // Current Draft Notice Data
+  const [currentDraftClient, setCurrentDraftClient] = useState('');
+  const [currentDraftType, setCurrentDraftType] = useState('');
+  const [currentDraftRef, setCurrentDraftRef] = useState('');
+  const [currentDraftMismatch, setCurrentDraftMismatch] = useState('');
+  const [currentDraftPortal, setCurrentDraftPortal] = useState('');
+  
   // New Fetched Digital Notices State
   const [digitalNotices, setDigitalNotices] = useState<any[]>([]);
   const [selectedDigitalNotice, setSelectedDigitalNotice] = useState<any>(null);
   const [draftViewMode, setDraftViewMode] = useState<'text' | 'pdf'>('text');
+  const [draftFilterCompany, setDraftFilterCompany] = useState<string | null>(null);
   
   // Deployment
   const [deploymentCommand, setDeploymentCommand] = useState('');
@@ -1056,10 +1075,97 @@ const LiveAIDraftingEngine = () => {
     addAgentLog('📰 Fetched latest regulatory circulars from CBIC / MCA / RBI');
   };
 
+  // Fetch Digital Notices dynamically from localStorage
+  const fetchDigitalNotices = () => {
+    let demoClients: any[] = [];
+    try {
+      const saved = localStorage.getItem('demo_clients');
+      if (saved) demoClients = JSON.parse(saved);
+    } catch (e) {}
+
+    if (demoClients.length === 0) {
+      setDigitalNotices([]);
+      return;
+    }
+
+    const notices: any[] = [];
+    demoClients.forEach((client, clientIndex) => {
+      const clientName = client.name || client.client_name;
+
+      // Distribute notices realistically (some have 2, some 1, some 0 notices)
+      const distribution = clientIndex % 4;
+
+      if (distribution === 0 || distribution === 2) {
+        // GST Notice
+        notices.push({
+          id: `not-dig-gst-${client.id || clientIndex}`,
+          refNumber: `SCN/DRC01/2026/${100 + clientIndex}`,
+          client: clientName,
+          portal: 'GST Portal',
+          noticeType: 'GST Show Cause Notice (GST-DRC-01) - Supplier Filing Default',
+          issueDate: '2026-02-07',
+          dueDate: '2026-06-25',
+          mismatchAmount: `₹${((10 + clientIndex * 4.3) * 100000).toLocaleString('en-IN')}`,
+          status: 'action_required'
+        });
+      }
+
+      if (distribution === 1 || distribution === 2) {
+        // MCA Notice
+        notices.push({
+          id: `not-dig-mca-${client.id || clientIndex}`,
+          refNumber: `ROC/KA/ADJ/2026/${200 + clientIndex}`,
+          client: clientName,
+          portal: 'MCA Portal',
+          noticeType: 'Director DIN Suspension Notice (Sec 164) - Aadhaar Mismatch',
+          issueDate: '2026-01-15',
+          dueDate: '2026-06-30',
+          mismatchAmount: `₹${((5 + clientIndex * 2.1) * 100000).toLocaleString('en-IN')}`,
+          status: 'action_required'
+        });
+      }
+
+      if (distribution === 0) {
+        // Income Tax Notice
+        notices.push({
+          id: `not-dig-it-${client.id || clientIndex}`,
+          refNumber: `ITBA/AST/S/143(2)/2026-${27 + clientIndex}`,
+          client: clientName,
+          portal: 'Income Tax Portal',
+          noticeType: 'Income Tax Scrutiny Notice (Sec 143(2)) - Customer TDS Deposit Deficit (26AS)',
+          issueDate: '2026-06-05',
+          dueDate: '2026-07-10',
+          mismatchAmount: `₹${((15 + clientIndex * 7.7) * 100000).toLocaleString('en-IN')}`,
+          status: 'action_required'
+        });
+      }
+    });
+
+    setDigitalNotices(notices);
+  };
+
   // Fetch Client Deadlines — calculated dynamically from today's date
   const fetchClientDeadlines = async () => {
+    let demoClients: any[] = [];
+    try {
+      const saved = localStorage.getItem('demo_clients');
+      if (saved) demoClients = JSON.parse(saved);
+    } catch (e) {}
+
+    if (demoClients.length === 0) {
+      setClientDeadlines([]);
+      return;
+    }
+
     const deadlines = getStatutoryDeadlines();
-    setClientDeadlines(deadlines as any);
+    const deadlinesWithClients = deadlines.map((d, index) => {
+      const client = demoClients[index % demoClients.length];
+      return {
+        ...d,
+        client: client.name || client.client_name
+      };
+    });
+    setClientDeadlines(deadlinesWithClients as any);
     addAgentLog('📅 Statutory deadlines calculated for May–June 2026');
   };
 
@@ -1069,6 +1175,7 @@ const LiveAIDraftingEngine = () => {
       addAgentLog('🤖 SANNIDH AI Agent initialized and monitoring...');
       fetchRegulatoryNews();
       fetchClientDeadlines();
+      fetchDigitalNotices();
       
       // Set up periodic monitoring
       const monitoringInterval = setInterval(() => {
@@ -1076,6 +1183,7 @@ const LiveAIDraftingEngine = () => {
           addAgentLog('🔍 Scanning for compliance updates...');
           fetchRegulatoryNews();
           fetchClientDeadlines();
+          fetchDigitalNotices();
         }
       }, 60000); // Every minute
       
@@ -1083,8 +1191,102 @@ const LiveAIDraftingEngine = () => {
     }
   }, [isAgentActive, addAgentLog]);
 
+  // Synchronize initial draft notice context when notices load
+  useEffect(() => {
+    if (!currentDraftClient && digitalNotices.length > 0) {
+      const firstNotice = digitalNotices[0];
+      setCurrentDraftClient(firstNotice.client);
+      setCurrentDraftType(
+        firstNotice.portal === 'GST Portal' 
+          ? 'gst-show-cause' 
+          : firstNotice.portal === 'MCA Portal' 
+            ? 'mca-notice' 
+            : 'income-tax-response'
+      );
+      setCurrentDraftRef(firstNotice.refNumber);
+      setCurrentDraftMismatch(firstNotice.mismatchAmount);
+      setCurrentDraftPortal(firstNotice.portal);
+    }
+  }, [digitalNotices, currentDraftClient]);
+
+  // Sync state on demo-client-added event
+  useEffect(() => {
+    const handleUpdate = () => {
+      fetchClientDeadlines();
+      fetchDigitalNotices();
+    };
+    window.addEventListener('demo-client-added', handleUpdate);
+    return () => window.removeEventListener('demo-client-added', handleUpdate);
+  }, []);
+
   // Deploy AI Agent for Task
   const deployAgentForTask = async (taskType: AITask['type'], client: string, description: string) => {
+    // Determine mapping to statutory templates
+    let noticeKey = 'custom-draft';
+    let portal = 'GST Portal';
+    let refNum = `SCN-DRC-ZD070226019874A`;
+    let mismatch = `₹18,46,920`;
+
+    const descLower = description.toLowerCase();
+    const typeLower = taskType.toLowerCase();
+    
+    if (typeLower === 'reconciliation' || descLower.includes('gst') || descLower.includes('gstr')) {
+      noticeKey = 'gst-show-cause';
+      portal = 'GST Portal';
+      refNum = 'ZD070226019874A';
+      mismatch = '₹18,46,920';
+    } else if (descLower.includes('mca') || descLower.includes('roc') || descLower.includes('annual filing') || descLower.includes('aoc') || descLower.includes('mgt')) {
+      noticeKey = 'mca-notice';
+      portal = 'MCA Portal';
+      refNum = 'ROC/KA/ADJ/2026/112';
+      mismatch = '₹5,00,000';
+    } else if (descLower.includes('income') || descLower.includes('tax') || descLower.includes('scrutiny') || descLower.includes('143')) {
+      noticeKey = 'income-tax-response';
+      portal = 'Income Tax Portal';
+      refNum = 'ITBA/AST/S/143(2)/2026-27';
+      mismatch = '₹27,80,000';
+    } else if (descLower.includes('rbi') || descLower.includes('fema')) {
+      noticeKey = 'rbi-filing';
+      portal = 'RBI Portal';
+      refNum = 'RBI/FED/2026-27/245';
+      mismatch = '₹12,00,000';
+    } else if (descLower.includes('sebi')) {
+      noticeKey = 'sebi-compliance';
+      portal = 'SEBI Portal';
+      refNum = 'SEBI/HO/CFD/SCN/2026/311';
+      mismatch = '₹15,00,000';
+    }
+
+    // Try to find a matching notice in digitalNotices for this client
+    const matchingNotice = digitalNotices.find(n => 
+      n.client.toLowerCase() === client.toLowerCase() && 
+      (description.toLowerCase().includes('gst') ? n.portal.includes('GST') :
+       description.toLowerCase().includes('mca') || description.toLowerCase().includes('roc') ? n.portal.includes('MCA') :
+       description.toLowerCase().includes('income') || description.toLowerCase().includes('tax') ? n.portal.includes('Income') : true)
+    ) || digitalNotices.find(n => n.client.toLowerCase() === client.toLowerCase());
+
+    if (matchingNotice) {
+      refNum = matchingNotice.refNumber;
+      portal = matchingNotice.portal;
+      mismatch = matchingNotice.mismatchAmount;
+      noticeKey = matchingNotice.portal === 'GST Portal' ? 'gst-show-cause' :
+                  matchingNotice.portal === 'MCA Portal' ? 'mca-notice' : 'income-tax-response';
+      setSelectedDigitalNotice(matchingNotice);
+    }
+
+    setCurrentDraftClient(client);
+    setCurrentDraftType(noticeKey);
+    setCurrentDraftRef(refNum);
+    setCurrentDraftPortal(portal);
+    setCurrentDraftMismatch(mismatch);
+    setDraftApprovalStatus('pending');
+    setSignatureStatus(null);
+    setFilingARN(null);
+
+    // Redirect to visual draft tab and filter by selected company
+    setDraftFilterCompany(client);
+    setActiveTab('drafting');
+
     const newTask: AITask = {
       id: `task-${Date.now()}`,
       type: taskType,
@@ -1212,7 +1414,6 @@ const LiveAIDraftingEngine = () => {
       t.id === taskId ? { ...t, status: 'approved' } : t
     ));
 
-    // Log WORM audit entry for legal accountability
     if (task) {
       const { logWORMAuditEntry } = await import('@/services/ca-supabase-service');
       await logWORMAuditEntry({
@@ -1222,6 +1423,67 @@ const LiveAIDraftingEngine = () => {
         caAction: 'approved',
       });
       addAgentLog(`🔐 WORM Audit entry logged — SHA-256 hash stored in Supabase`);
+      
+      // Map and load the draft for the approved task!
+      let noticeKey = 'custom-draft';
+      let portal = 'GST Portal';
+      let refNum = `SCN-DRC-ZD070226019874A`;
+      let mismatch = `₹18,46,920`;
+
+      const titleLower = task.title.toLowerCase();
+      const descLower = task.description.toLowerCase();
+      
+      if (titleLower.includes('gst') || descLower.includes('gst') || titleLower.includes('reconcile')) {
+        noticeKey = 'gst-show-cause';
+        portal = 'GST Portal';
+        refNum = 'ZD070226019874A';
+        mismatch = '₹18,46,920';
+      } else if (titleLower.includes('mca') || descLower.includes('mca') || titleLower.includes('aoc') || titleLower.includes('mgt')) {
+        noticeKey = 'mca-notice';
+        portal = 'MCA Portal';
+        refNum = 'ROC/KA/ADJ/2026/112';
+        mismatch = '₹5,00,000';
+      } else if (titleLower.includes('income') || descLower.includes('income') || titleLower.includes('143')) {
+        noticeKey = 'income-tax-response';
+        portal = 'Income Tax Portal';
+        refNum = 'ITBA/AST/S/143(2)/2026-27';
+        mismatch = '₹27,80,000';
+      }
+
+      setCurrentDraftClient(task.client);
+      setCurrentDraftType(noticeKey);
+      setCurrentDraftRef(refNum);
+      setCurrentDraftPortal(portal);
+      setCurrentDraftMismatch(mismatch);
+      setDraftApprovalStatus('pending');
+      setSignatureStatus(null);
+      setFilingARN(null);
+
+      const templateText = (readyNoticeTemplates[noticeKey] || "")
+        .replace(/GlobalTrade India Logistics/g, task.client)
+        .replace(/Acme Technologies Pvt Ltd/g, task.client)
+        .replace(/TechVenture Solutions/g, task.client)
+        .replace(/₹18,46,920/g, mismatch)
+        .replace(/₹5,00,000/g, mismatch)
+        .replace(/₹27,80,000/g, mismatch)
+        .replace(/ZD070226019874A/g, refNum)
+        .replace(/ROC\/KA\/ADJ\/2026\/112/g, refNum)
+        .replace(/ITBA\/AST\/S\/143\(2\)\/2026-27/g, refNum);
+
+      const draftText = buildOfflineDraft({
+        documentType: noticeKey,
+        companyName: task.client,
+        authority: portal === "GST Portal" ? "GST Department" : portal === "MCA Portal" ? "ROC" : "Income Tax Department",
+        noticeText: templateText,
+        modeLabel: "conservative",
+        templatePack: "Detailed Para-Wise Reply",
+        promptPack: "Precedent Analysis + Objection Matrix",
+        sovereignEngine: "sannidh_sovereign"
+      });
+
+      setGeneratedDraft(draftText);
+      setDraftViewMode('pdf');
+      setActiveTab('drafting');
     }
 
     // Generate final PDF
@@ -1286,6 +1548,7 @@ const LiveAIDraftingEngine = () => {
     
     setIsProcessing(true);
     addAgentLog(`🔄 Uploading document: ${uploadedFile.name}`);
+    setActiveTab('drafting');
     
     try {
       await new Promise(resolve => setTimeout(resolve, 800));
@@ -1299,37 +1562,59 @@ const LiveAIDraftingEngine = () => {
       addAgentLog(`🏦 Registering GST Notice SCN-829412 in SANNIDH Database...`);
       addAgentLog(`🤖 SANNIDH AI Brain (OpenAI) cross-referencing ledger database & CBIC rules...`);
       
-      await new Promise(resolve => setTimeout(resolve, 1500));
-      let content = `
-BEFORE THE CENTRAL GOODS AND SERVICES TAX OFFICERS, DIVISION-I, NEW DELHI
+      await new Promise(resolve => setTimeout(resolve, 1000));
 
-IN THE MATTER OF:
-GlobalTrade India Logistics (Assessee)
-GSTIN: 27AABCG5678K2ZQ
+      let demoClients: any[] = [];
+      try {
+        const saved = localStorage.getItem('demo_clients');
+        if (saved) demoClients = JSON.parse(saved);
+      } catch (e) {}
 
-SUBJECT: REPLY TO SHOW CAUSE NOTICE REF NO: SCN-829412 DATED 25/05/2026
+      if (demoClients.length === 0) {
+        toast.error("Please onboard a client in Client Portfolio first.");
+        setIsProcessing(false);
+        return;
+      }
 
-MOST RESPECTFULLY SHOWETH:
+      const client = demoClients[0].name || demoClients[0].client_name;
+      const noticeKey = "gst-show-cause";
+      const portal = "GST Portal";
+      const refNum = `SCN-GST-OCR-${Date.now().toString().slice(-4)}`;
+      const mismatch = "₹12,45,670";
 
-1. PRELIMINARY OBJECTIONS
-The Assessee, GlobalTrade India Logistics, submits that the impugned Show Cause Notice proposing demand of Input Tax Credit (ITC) mismatch under GSTR-2B vs GSTR-3B is legally untenable and contrary to established circulars.
-
-2. FACTUAL MATRIX & RECONCILIATION
-The discrepancy amount of ₹2,40,000 alleged in the SCN has been thoroughly reconciled. The mismatch arose primarily due to delayed filing by suppliers and genuine clerical errors which do not indicate any intent to evade tax.
-
-3. LEGAL DEFENSES UNDER GST LAW
-It is a settled principle that the substantive right to claim ITC under Section 16 of the CGST Act cannot be denied merely on account of procedural lapses.
-
-PRAYER
-In view of the above submissions, it is prayed that the demand proposed in the impugned Show Cause Notice may kindly be dropped in the interest of justice.
-
-For and on behalf of GlobalTrade India Logistics
-Authorized Signatory
-Date: ${new Date().toISOString().split('T')[0]}
-`;
-
-      setGeneratedDraft(content);
+      setCurrentDraftClient(client);
+      setCurrentDraftType(noticeKey);
+      setCurrentDraftRef(refNum);
+      setCurrentDraftPortal(portal);
+      setCurrentDraftMismatch(mismatch);
       setDraftApprovalStatus('pending');
+      setSignatureStatus(null);
+      setFilingARN(null);
+
+      const templateText = (readyNoticeTemplates[noticeKey] || "")
+        .replace(/GlobalTrade India Logistics/g, client)
+        .replace(/Acme Technologies Pvt Ltd/g, client)
+        .replace(/TechVenture Solutions/g, client)
+        .replace(/₹18,46,920/g, mismatch)
+        .replace(/₹5,00,000/g, mismatch)
+        .replace(/₹27,80,000/g, mismatch)
+        .replace(/ZD070226019874A/g, refNum)
+        .replace(/ROC\/KA\/ADJ\/2026\/112/g, refNum)
+        .replace(/ITBA\/AST\/S\/143\(2\)\/2026-27/g, refNum);
+
+      const draftText = buildOfflineDraft({
+        documentType: noticeKey,
+        companyName: client,
+        authority: "GST Department",
+        noticeText: templateText,
+        modeLabel: "conservative",
+        templatePack: "Detailed Para-Wise Reply",
+        promptPack: "Precedent Analysis + Objection Matrix",
+        sovereignEngine: "sannidh_sovereign"
+      });
+
+      setGeneratedDraft(draftText);
+      setDraftViewMode('pdf');
       addAgentLog(`✅ Real Legal Draft generated successfully by OpenAI.`);
       
       // Update Task list to add this new notice_response task
@@ -1337,7 +1622,7 @@ Date: ${new Date().toISOString().split('T')[0]}
         id: `task-demo-uploaded-${Date.now()}`,
         type: "notice_response",
         title: "Draft Notice Response",
-        client: "GlobalTrade India Logistics",
+        client: client,
         status: "pending_approval",
         progress: 100,
         createdAt: new Date().toISOString(),
@@ -1356,8 +1641,8 @@ Date: ${new Date().toISOString().split('T')[0]}
       toast.success('Draft generated successfully!', {
         description: 'OpenAI has drafted the legal response using live data room.'
       });
-    } catch (error) {
-      safeLog.error('CADashboard error', error);
+    } catch (error: any) {
+      console.error(error);
       addAgentLog(`❌ ERROR: ${error.message}`);
       toast.error('Drafting Failed', { description: error.message });
     } finally {
@@ -1383,33 +1668,40 @@ Date: ${new Date().toISOString().split('T')[0]}
     
     await new Promise(resolve => setTimeout(resolve, 1500));
     
-    let draftText = `
-BEFORE THE CENTRAL GOODS AND SERVICES TAX OFFICERS, DIVISION-I, NEW DELHI
+    const noticeKey = notice.id?.includes('gst') || notice.refNumber?.includes('SCN') || notice.refNumber?.includes('ZD07') ? 'gst-show-cause' :
+                      notice.id?.includes('mca') || notice.refNumber?.includes('ROC') ? 'mca-notice' :
+                      notice.id?.includes('it') || notice.refNumber?.includes('ITBA') ? 'income-tax-response' : 'custom-draft';
 
-IN THE MATTER OF:
-${notice.client} (Assessee)
-GSTIN: 27AABCG5678K2ZQ
+    setCurrentDraftClient(notice.client);
+    setCurrentDraftType(noticeKey);
+    setCurrentDraftRef(notice.refNumber);
+    setCurrentDraftPortal(notice.portal);
+    setCurrentDraftMismatch(notice.mismatchAmount);
+    setDraftApprovalStatus('pending');
+    setSignatureStatus(null);
+    setFilingARN(null);
 
-SUBJECT: REPLY TO SHOW CAUSE NOTICE REF NO: ${notice.refNumber} DATED ${notice.issueDate}
+    const templateText = (readyNoticeTemplates[noticeKey] || "")
+      .replace(/GlobalTrade India Logistics/g, notice.client)
+      .replace(/Acme Technologies Pvt Ltd/g, notice.client)
+      .replace(/TechVenture Solutions/g, notice.client)
+      .replace(/₹18,46,920/g, notice.mismatchAmount)
+      .replace(/₹5,00,000/g, notice.mismatchAmount)
+      .replace(/₹27,80,000/g, notice.mismatchAmount)
+      .replace(/ZD070226019874A/g, notice.refNumber)
+      .replace(/ROC\/KA\/ADJ\/2026\/112/g, notice.refNumber)
+      .replace(/ITBA\/AST\/S\/143\(2\)\/2026-27/g, notice.refNumber);
 
-MOST RESPECTFULLY SHOWETH:
-
-1. PRELIMINARY OBJECTIONS
-The Assessee, ${notice.client}, submits that the impugned Show Cause Notice proposing demand of Input Tax Credit (ITC) mismatch under GSTR-2B vs GSTR-3B is legally untenable and contrary to established circulars.
-
-2. FACTUAL MATRIX & RECONCILIATION
-The discrepancy amount of ${notice.mismatchAmount} alleged in the SCN has been thoroughly reconciled. The mismatch arose primarily due to delayed filing by suppliers and genuine clerical errors which do not indicate any intent to evade tax.
-
-3. LEGAL DEFENSES UNDER GST LAW
-It is a settled principle that the substantive right to claim ITC under Section 16 of the CGST Act cannot be denied merely on account of procedural lapses.
-
-PRAYER
-In view of the above submissions, it is prayed that the demand proposed in the impugned Show Cause Notice may kindly be dropped in the interest of justice.
-
-For and on behalf of ${notice.client}
-Authorized Signatory
-Date: ${new Date().toISOString().split('T')[0]}
-`;
+    const draftText = buildOfflineDraft({
+      documentType: noticeKey,
+      companyName: notice.client,
+      authority: notice.portal === "GST Portal" ? "GST Department" : notice.portal === "MCA Portal" ? "ROC" : "Income Tax Department",
+      noticeText: templateText,
+      modeLabel: "conservative",
+      templatePack: "Detailed Para-Wise Reply",
+      promptPack: "Precedent Analysis + Objection Matrix",
+      sovereignEngine: "sannidh_sovereign"
+    });
 
     setGeneratedDraft(draftText);
     setDraftApprovalStatus('pending');
@@ -1614,14 +1906,14 @@ Date: ${new Date().toISOString().split('T')[0]}
     addAgentLog('✍️ Initiating Client E-Signature Workflow...');
     
     try {
-      await new Promise(resolve => setTimeout(resolve, 1000));
-      addAgentLog('📤 Uploading signed PDF to secure WORM Secure Vault...');
-      
       await new Promise(resolve => setTimeout(resolve, 800));
+      addAgentLog('📤 Uploading approved PDF to secure WORM Secure Vault...');
+      
+      await new Promise(resolve => setTimeout(resolve, 600));
       addAgentLog('✅ PDF locked into WORM Secure Vault successfully (SHA-256 hash verified).');
       
-      await new Promise(resolve => setTimeout(resolve, 800));
-      addAgentLog('📧 Sending secure E-Signature link to client...');
+      await new Promise(resolve => setTimeout(resolve, 600));
+      addAgentLog('📧 Sending secure Aadhaar e-Sign authentication link to client...');
       
       const signatureToken = `esign-${Date.now()}-${Math.random().toString(36).slice(2, 8)}`;
       setSignatureStatus(`Signature request sent. Token: ${signatureToken}`);
@@ -1631,31 +1923,53 @@ Date: ${new Date().toISOString().split('T')[0]}
         t.id.startsWith('task-demo') ? { ...t, status: 'approved', description: 'Awaiting client digital e-signature.' } : t
       ));
       
-      toast.success('E-Signature Request Sent!', {
-        description: 'Client received an email notification with the secure signature link.'
+      toast.success('E-Signature Link Dispatched!', {
+        description: 'Signatory has been notified. Opening secure Aadhaar verification terminal.'
       });
       
-      // Simulate client signing after 5 seconds
-      setTimeout(async () => {
-        addAgentLog('🔔 Notification: Client authorized & signed response successfully using AADHAR OTP.');
-        addAgentLog('🔐 Secure cryptographic digital signature attached to response document.');
-        setSignatureStatus(`Signed by GlobalTrade Director (Aadhar OTP verified)`);
-        setDraftApprovalStatus('signed');
-        
-        setAiTasks(prev => prev.map(t => 
-          t.id.startsWith('task-demo') ? { ...t, status: 'approved', description: 'Client e-signature received. Ready for e-filing.' } : t
-        ));
-        
-        toast.info('Client Signature Received!', {
-          description: 'Notice response is fully signed and ready for government portal e-filing.'
-        });
-      }, 5000);
+      // Open Aadhaar verification modal directly for the CA to simulate/verify
+      setTimeout(() => {
+        setShowOtpModal(true);
+      }, 800);
       
-    } catch (err) {
+    } catch (err: any) {
       addAgentLog(`❌ E-Signature Failed: ${err.message}`);
       toast.error('E-Signature Failed', { description: err.message });
     } finally {
       setIsSendingForSignature(false);
+    }
+  };
+
+  const verifySignatureOTP = async () => {
+    if (otpInput !== '123456') {
+      toast.error('Verification failed. Please enter the correct code: 123456.');
+      return;
+    }
+    setOtpVerifying(true);
+    addAgentLog('✍️ Authorizing digital signature via Aadhaar OTP gateway...');
+    
+    try {
+      await new Promise(resolve => setTimeout(resolve, 1500));
+      addAgentLog('🔔 Notification: Signatory approved and signed response successfully via Aadhaar OTP.');
+      addAgentLog('🔐 Cryptographic digital signature attached to legal response PDF.');
+      setSignatureStatus(`Signed by ${currentDraftClient || 'Client'} Director (Aadhar OTP verified)`);
+      setDraftApprovalStatus('signed');
+      
+      setAiTasks(prev => prev.map(t => 
+        t.id.startsWith('task-demo') ? { ...t, status: 'approved', description: 'Client e-signature received. Ready for e-filing.' } : t
+      ));
+      
+      toast.success('Aadhaar Signature Authenticated!', {
+        description: 'Notice response is fully signed and ready for government portal filing.'
+      });
+      
+      setShowOtpModal(false);
+      setOtpInput('');
+    } catch (err: any) {
+      addAgentLog(`❌ OTP Verification Failed: ${err.message}`);
+      toast.error('Verification Failed', { description: err.message });
+    } finally {
+      setOtpVerifying(false);
     }
   };
 
@@ -1665,40 +1979,112 @@ Date: ${new Date().toISOString().split('T')[0]}
       return;
     }
     setIsFilingToGovt(true);
+    setShowFilingConsole(true);
+    setFilingLogs([]);
     addAgentLog('🏛️ Connecting to Government Portal API...');
+
+    const logs = [
+      'Establishing secure TLS 1.3 handshake with government server gateway...',
+      'Gateway authorized. Credentials verified via Digital Signature Certificate (DSC)...',
+      'Uploading XML payload and encrypted notice response package...',
+      'Validating schema and computing SHA-256 payload checksum...',
+      'Checksum validation success. Dispatching to statutory filing queue...',
+      'Recording transaction entry onto immutable WORM audit log...',
+      'Filing transaction confirmed by government gatekeeper API.'
+    ];
+
+    let currentLogIndex = 0;
     
-    try {
-      await new Promise(resolve => setTimeout(resolve, 800));
-      addAgentLog('🔑 Retrieving GSP API Auth Token from Secure credentials vault...');
-      
-      await new Promise(resolve => setTimeout(resolve, 1000));
-      addAgentLog('📡 Connecting to GSTN server gate... Authenticated with GSTIN 27AABCG5678K2ZQ.');
-      
-      await new Promise(resolve => setTimeout(resolve, 1000));
-      addAgentLog('📤 Submitting signed legal response package (PDF + XML Metadata)...');
-      
-      await new Promise(resolve => setTimeout(resolve, 1200));
-      const arnNumber = `GST-ARN-2026-${Math.floor(100000 + Math.random() * 900000)}`;
-      setFilingARN(arnNumber);
-      setDraftApprovalStatus('filed');
-      
-      // Update task state to completed
-      setAiTasks(prev => prev.map(t => 
-        t.id.startsWith('task-demo') ? { ...t, status: 'completed', description: `Filed successfully under ARN: ${arnNumber}` } : t
-      ));
-      
-      addAgentLog(`✅ FILED SUCCESSFULLY! Government ARN: ${arnNumber}`);
-      addAgentLog(`📊 Filing transaction saved securely to Audit Trail for compliance records.`);
-      
-      toast.success('Filed to Government Portal!', {
-        description: `Acknowledgment Number: ${arnNumber}`
-      });
-    } catch (err) {
-      addAgentLog(`❌ Government Filing Failed: ${err.message}`);
-      toast.error('Filing Failed', { description: err.message });
-    } finally {
-      setIsFilingToGovt(false);
-    }
+    const appendNextLog = () => {
+      if (currentLogIndex < logs.length) {
+        const timestamp = new Date().toLocaleTimeString();
+        setFilingLogs(prev => [...prev, `[${timestamp}] ${logs[currentLogIndex]}`]);
+        addAgentLog(logs[currentLogIndex]);
+        currentLogIndex++;
+        setTimeout(appendNextLog, 1000);
+      } else {
+        const arnNumber = `GST-ARN-2026-${Math.floor(100000 + Math.random() * 900000)}`;
+        setFilingARN(arnNumber);
+        setDraftApprovalStatus('filed');
+        
+        // Update task state to completed
+        setAiTasks(prev => prev.map(t => 
+          t.id.startsWith('task-demo') ? { ...t, status: 'completed', description: `Filed successfully under ARN: ${arnNumber}` } : t
+        ));
+
+        // Find the client in local storage
+        let demoClients: any[] = [];
+        try {
+          const saved = localStorage.getItem('demo_clients');
+          if (saved) demoClients = JSON.parse(saved);
+        } catch (e) {}
+
+        const matchedClient = demoClients.find(c => (c.name || c.client_name) === currentDraftClient);
+        
+        if (matchedClient) {
+          let completed = [];
+          try {
+            const saved = localStorage.getItem(`completed_tasks_${matchedClient.id}`);
+            if (saved) completed = JSON.parse(saved);
+          } catch (e) {}
+          
+          const taskEntry = {
+            title: `Reply to Notice ${currentDraftRef}`,
+            draftType: currentDraftType,
+            pdfName: `Draft_${currentDraftType}_${currentDraftClient.replace(/\s+/g, '_')}.pdf`,
+            completedAt: new Date().toISOString(),
+            arn: arnNumber,
+            portal: currentDraftPortal,
+            referenceNumber: currentDraftRef,
+            mismatchAmount: currentDraftMismatch
+          };
+
+          // Check if already in list
+          if (!completed.find((c: any) => c.title === taskEntry.title && c.pdfName === taskEntry.pdfName)) {
+            completed.push(taskEntry);
+            localStorage.setItem(`completed_tasks_${matchedClient.id}`, JSON.stringify(completed));
+          }
+          
+          // Also set swarm completed
+          localStorage.setItem(`swarm_completed_${matchedClient.id}`, 'true');
+        }
+
+        // Save to global completed work history
+        try {
+          const historySaved = localStorage.getItem('demo:sannidh:completed-work-history');
+          const history = historySaved ? JSON.parse(historySaved) : [];
+          history.unshift({
+            id: `hist-${Date.now()}-${Math.random().toString(36).substring(2, 9)}`,
+            title: `Reply to Notice ${currentDraftRef}`,
+            client: currentDraftClient,
+            draftType: currentDraftType,
+            completedAt: new Date().toISOString(),
+            documentName: `Draft_${currentDraftType}_${currentDraftClient.replace(/\s+/g, '_')}.pdf`,
+            arn: arnNumber,
+          });
+          if (history.length > 50) history.length = 50;
+          localStorage.setItem('demo:sannidh:completed-work-history', JSON.stringify(history));
+          window.dispatchEvent(new CustomEvent('demo:sannidh:history-updated'));
+        } catch (e) {}
+
+        addAgentLog(`✅ FILED SUCCESSFULLY! Government ARN: ${arnNumber}`);
+        addAgentLog(`📊 Filing transaction saved securely to Audit Trail for compliance records.`);
+        
+        setIsFilingToGovt(false);
+        setShowFilingConsole(false);
+        setShowFilingReceipt(true);
+        
+        toast.success('Filed to Government Portal!', {
+          description: `Acknowledgment Number: ${arnNumber}`
+        });
+
+        // Notify client vault and other tabs
+        window.dispatchEvent(new CustomEvent('swarm-completed-event'));
+        window.dispatchEvent(new CustomEvent('swarm-status-changed'));
+      }
+    };
+
+    setTimeout(appendNextLog, 500);
   };
 
   // Quick Deploy Commands
@@ -2020,61 +2406,100 @@ Date: ${new Date().toISOString().split('T')[0]}
                 <div className="space-y-6">
                   {/* Digital Notice Inbox */}
                   <div className="space-y-3">
-                    <div className="flex items-center justify-between">
+                    <div className="flex items-center justify-between flex-wrap gap-2">
                       <h3 className="text-lg font-semibold text-cyan-300 flex items-center">
                         <Database className="w-5 h-5 mr-2 text-cyan-400" />
                         Live Portal Notices Inbox (Auto-Detected)
                       </h3>
-                      <Badge className="bg-cyan-500/20 text-cyan-400 border-cyan-500/30">3 New Notices</Badge>
+                      <div className="flex items-center gap-2">
+                        {draftFilterCompany && (
+                          <Badge 
+                            variant="secondary" 
+                            className="bg-purple-500/20 text-purple-300 border border-purple-500/30 cursor-pointer hover:bg-purple-500/35"
+                            onClick={() => setDraftFilterCompany(null)}
+                          >
+                            Filter: {draftFilterCompany} ✕
+                          </Badge>
+                        )}
+                        <Badge className="bg-cyan-500/20 text-cyan-400 border-cyan-500/30">
+                          {digitalNotices.filter(notice => !draftFilterCompany || notice.client.toLowerCase() === draftFilterCompany.toLowerCase()).length} New Notices
+                        </Badge>
+                      </div>
                     </div>
-                    <p className="text-xs text-muted-foreground">
-                      Sannidh AI monitors GSTN, MCA-21, and CBDT servers under CA consent. The following notices require immediate response drafts.
-                    </p>
-                    <div className="space-y-3">
-                      {digitalNotices.map((notice) => (
-                        <div
-                          key={notice.id}
-                          className={`p-4 rounded-xl border transition-all duration-300 bg-card/40 hover:bg-card/60 cursor-pointer ${
-                            selectedDigitalNotice?.id === notice.id
-                              ? 'border-cyan-500 shadow-[0_0_15px_rgba(6,182,212,0.15)] bg-cyan-950/10'
-                              : 'border-border/50'
-                          }`}
-                          onClick={() => setSelectedDigitalNotice(notice)}
-                        >
-                          <div className="flex items-start justify-between flex-wrap gap-2 mb-2">
-                            <div>
-                              <div className="flex items-center gap-2 flex-wrap">
-                                <span className="font-mono text-xs font-semibold text-cyan-300">{notice.refNumber}</span>
-                                <Badge variant="outline" className="text-[10px] uppercase border-cyan-500/30 text-cyan-400 bg-cyan-500/5">
-                                  {notice.portal}
-                                </Badge>
-                              </div>
-                              <p className="text-sm font-medium text-white mt-1">{notice.noticeType}</p>
-                              <p className="text-xs text-muted-foreground">Client: {notice.client}</p>
-                            </div>
-                            <div className="text-right">
-                              <span className="text-[10px] text-muted-foreground block">Mismatch Amt</span>
-                              <span className="text-xs font-bold text-red-400">{notice.mismatchAmount}</span>
-                            </div>
-                          </div>
-                          <div className="flex items-center justify-between mt-3 pt-2 border-t border-border/20 text-xs">
-                            <span className="text-muted-foreground">Due Date: {new Date(notice.dueDate).toLocaleDateString('en-IN', { day: '2-digit', month: 'short' })}</span>
-                            <Button
-                              size="sm"
-                              className="h-7 px-3 text-xs bg-cyan-600 hover:bg-cyan-500 text-white font-medium gap-1"
-                              onClick={(e) => {
-                                e.stopPropagation();
-                                setSelectedDigitalNotice(notice);
-                                processDigitalNotice(notice);
-                              }}
-                              disabled={isProcessing}
-                            >
-                              <Sparkles className="w-3 h-3" />
-                              Auto-Draft Response
-                            </Button>
-                          </div>
+                    
+                    <div className="flex justify-between items-center gap-2 mt-2">
+                      <p className="text-xs text-muted-foreground">
+                        Sannidh AI monitors GSTN, MCA-21, and CBDT servers under CA consent.
+                      </p>
+                      <Select 
+                        value={draftFilterCompany || "all"} 
+                        onValueChange={(val) => setDraftFilterCompany(val === "all" ? null : val)}
+                      >
+                        <SelectTrigger className="w-[180px] bg-card/60 border-cyan-500/20 text-xs h-8">
+                          <SelectValue placeholder="Filter by Client" />
+                        </SelectTrigger>
+                        <SelectContent className="bg-card border-cyan-500/20 text-xs">
+                          <SelectItem value="all">Show All Clients</SelectItem>
+                          {Array.from(new Set(digitalNotices.map(n => n.client))).map(clientName => (
+                            <SelectItem key={clientName} value={clientName}>{clientName}</SelectItem>
+                          ))}
+                        </SelectContent>
+                      </Select>
+                    </div>
+
+                    <div className="space-y-3 mt-4">
+                      {digitalNotices.filter(notice => !draftFilterCompany || notice.client.toLowerCase() === draftFilterCompany.toLowerCase()).length === 0 ? (
+                        <div className="bg-card/25 border border-dashed border-border/30 rounded-xl p-8 text-center text-muted-foreground text-xs">
+                          No digital notices detected for {draftFilterCompany || 'onboarded clients'}.
                         </div>
-                      ))}
+                      ) : (
+                        digitalNotices
+                          .filter(notice => !draftFilterCompany || notice.client.toLowerCase() === draftFilterCompany.toLowerCase())
+                          .map((notice) => (
+                            <div
+                              key={notice.id}
+                              className={`p-4 rounded-xl border transition-all duration-300 bg-card/40 hover:bg-card/60 cursor-pointer ${
+                                selectedDigitalNotice?.id === notice.id
+                                  ? 'border-cyan-500 shadow-[0_0_15px_rgba(6,182,212,0.15)] bg-cyan-950/10'
+                                  : 'border-border/50'
+                              }`}
+                              onClick={() => setSelectedDigitalNotice(notice)}
+                            >
+                              <div className="flex items-start justify-between flex-wrap gap-2 mb-2">
+                                <div>
+                                  <div className="flex items-center gap-2 flex-wrap">
+                                    <span className="font-mono text-xs font-semibold text-cyan-300">{notice.refNumber}</span>
+                                    <Badge variant="outline" className="text-[10px] uppercase border-cyan-500/30 text-cyan-400 bg-cyan-500/5">
+                                      {notice.portal}
+                                    </Badge>
+                                  </div>
+                                  <p className="text-sm font-medium text-white mt-1">{notice.noticeType}</p>
+                                  <p className="text-xs text-muted-foreground">Client: {notice.client}</p>
+                                </div>
+                                <div className="text-right">
+                                  <span className="text-[10px] text-muted-foreground block">Mismatch Amt</span>
+                                  <span className="text-xs font-bold text-red-400">{notice.mismatchAmount}</span>
+                                </div>
+                              </div>
+                              <div className="flex items-center justify-between mt-3 pt-2 border-t border-border/20 text-xs">
+                                <span className="text-muted-foreground">Due Date: {new Date(notice.dueDate).toLocaleDateString('en-IN', { day: '2-digit', month: 'short' })}</span>
+                                <Button
+                                  size="sm"
+                                  className="h-7 px-3 text-xs bg-cyan-600 hover:bg-cyan-500 text-white font-medium gap-1"
+                                  onClick={(e) => {
+                                    e.stopPropagation();
+                                    setSelectedDigitalNotice(notice);
+                                    processDigitalNotice(notice);
+                                  }}
+                                  disabled={isProcessing}
+                                >
+                                  <Sparkles className="w-3 h-3" />
+                                  Auto-Draft Response
+                                </Button>
+                              </div>
+                            </div>
+                          ))
+                      )}
                     </div>
                   </div>
 
@@ -2180,8 +2605,8 @@ Date: ${new Date().toISOString().split('T')[0]}
                             <p className="text-[10px] font-bold text-slate-900">Client Signatory</p>
                             {['signed', 'filed'].includes(draftApprovalStatus) ? (
                               <div className="my-2 p-1.5 rounded bg-blue-500/10 border border-blue-500/30 text-blue-700 max-w-[200px] text-left">
-                                <p className="font-serif italic text-xs font-bold text-blue-850">GlobalTrade Director</p>
-                                <p className="text-[7px] font-sans text-blue-600">Cryptographic Signature Attached<br />ID Verified via AADHAR OTP Authentication</p>
+                                <p className="font-serif italic text-xs font-bold text-blue-850">{currentDraftClient || 'Client'} Director</p>
+                                <p className="text-[7px] font-sans text-blue-600">Cryptographic Signature Attached<br />ID Verified via Aadhaar OTP Authentication</p>
                               </div>
                             ) : (
                               <div className="my-6 h-4 border-b border-dashed border-slate-400 w-32" />
@@ -2258,7 +2683,7 @@ Date: ${new Date().toISOString().split('T')[0]}
                               variant="outline"
                               className="text-cyan-400 border-cyan-500/50 hover:bg-cyan-500/20"
                               onClick={() => {
-                                window.open(generatedPDFUrl, '_blank', 'noopener,noreferrer');
+                                window.open(generatedPDFUrl, '_blank');
                                 const a = document.createElement('a');
                                 a.href = generatedPDFUrl;
                                 a.download = `SANNIDH-Legal-Response-${Date.now()}.pdf`;
@@ -2507,12 +2932,268 @@ Date: ${new Date().toISOString().split('T')[0]}
           </motion.div>
         )}
       </AnimatePresence>
+
+      {/* Aadhaar OTP e-Sign Modal */}
+      <AnimatePresence>
+        {showOtpModal && (
+          <motion.div
+            initial={{ opacity: 0 }}
+            animate={{ opacity: 1 }}
+            exit={{ opacity: 0 }}
+            className="fixed inset-0 bg-black/85 z-50 flex items-center justify-center p-4 backdrop-blur-sm"
+            onClick={() => {
+              if (!otpVerifying) {
+                setShowOtpModal(false);
+                setOtpInput('');
+              }
+            }}
+          >
+            <motion.div
+              initial={{ scale: 0.9, opacity: 0 }}
+              animate={{ scale: 1, opacity: 1 }}
+              exit={{ scale: 0.9, opacity: 0 }}
+              className="bg-card border border-cyan-500/30 rounded-2xl max-w-md w-full overflow-hidden shadow-[0_0_50px_rgba(6,182,212,0.15)]"
+              onClick={(e) => e.stopPropagation()}
+            >
+              {/* Header */}
+              <div className="bg-gradient-to-r from-cyan-955 to-blue-955 p-5 border-b border-cyan-500/20 text-center relative">
+                <div className="mx-auto w-12 h-12 rounded-full bg-cyan-500/10 border border-cyan-500/30 flex items-center justify-center mb-3">
+                  <Fingerprint className="w-6 h-6 text-cyan-400 animate-pulse" />
+                </div>
+                <h3 className="text-lg font-bold text-white tracking-wide">Aadhaar e-Sign Authentication</h3>
+                <p className="text-[11px] text-cyan-300/80 mt-1">Secured by National e-Governance Services Limited (NeSL)</p>
+                
+                {!otpVerifying && (
+                  <button 
+                    onClick={() => { setShowOtpModal(false); setOtpInput(''); }}
+                    className="absolute top-4 right-4 text-muted-foreground hover:text-white"
+                  >
+                    <X className="w-4 h-4" />
+                  </button>
+                )}
+              </div>
+
+              {/* Body */}
+              <div className="p-6 space-y-5">
+                <div className="text-center space-y-2">
+                  <p className="text-xs text-muted-foreground">
+                    A secure 6-digit OTP has been sent to the registered mobile number of the authorized signatory for <strong className="text-white">{currentDraftClient}</strong>.
+                  </p>
+                  <div className="p-2 bg-yellow-500/10 border border-yellow-500/30 rounded-lg text-[10px] text-yellow-300 inline-block font-medium">
+                    💡 DEMO MODE: Enter code <strong className="font-mono text-white text-xs">123456</strong> to verify successfully.
+                  </div>
+                </div>
+
+                <div className="space-y-2">
+                  <label className="text-xs font-semibold text-cyan-400 block text-center">Enter 6-Digit OTP</label>
+                  <input
+                    type="password"
+                    maxLength={6}
+                    value={otpInput}
+                    onChange={(e) => setOtpInput(e.target.value.replace(/\D/g, ''))}
+                    placeholder="• • • • • •"
+                    disabled={otpVerifying}
+                    className="w-full text-center bg-black/40 border border-cyan-500/30 rounded-lg py-3 text-xl font-mono tracking-[0.75em] text-white focus:border-cyan-400 outline-none transition-colors"
+                  />
+                </div>
+
+                <div className="flex gap-3 pt-2">
+                  <Button
+                    variant="outline"
+                    className="flex-1"
+                    disabled={otpVerifying}
+                    onClick={() => { setShowOtpModal(false); setOtpInput(''); }}
+                  >
+                    Cancel
+                  </Button>
+                  <Button
+                    className="flex-1 bg-cyan-600 hover:bg-cyan-500 text-white font-medium shadow-[0_0_15px_rgba(6,182,212,0.4)]"
+                    disabled={otpVerifying || otpInput.length !== 6}
+                    onClick={verifySignatureOTP}
+                  >
+                    {otpVerifying ? (
+                      <><Loader className="w-4 h-4 mr-2 animate-spin" /> Verifying...</>
+                    ) : (
+                      'Verify & Sign'
+                    )}
+                  </Button>
+                </div>
+              </div>
+            </motion.div>
+          </motion.div>
+        )}
+      </AnimatePresence>
+
+      {/* Government E-Filing Console Modal */}
+      <AnimatePresence>
+        {showFilingConsole && (
+          <div className="fixed inset-0 bg-black/90 z-50 flex items-center justify-center p-4 backdrop-blur-md">
+            <div className="bg-zinc-955 border border-zinc-800 rounded-xl max-w-xl w-full overflow-hidden shadow-[0_0_80px_rgba(0,0,0,0.8)] font-mono">
+              {/* Terminal Title Bar */}
+              <div className="bg-zinc-900 px-4 py-2.5 border-b border-zinc-800 flex items-center justify-between">
+                <div className="flex items-center gap-2">
+                  <div className="flex gap-1.5">
+                    <span className="w-3 h-3 rounded-full bg-red-500/80 inline-block" />
+                    <span className="w-3 h-3 rounded-full bg-yellow-500/80 inline-block" />
+                    <span className="w-3 h-3 rounded-full bg-green-500/80 inline-block" />
+                  </div>
+                  <span className="text-xs text-zinc-400 font-bold ml-2">Govt Portal Filing Console - Gateway Connection</span>
+                </div>
+                <div className="flex items-center gap-2">
+                  <span className="w-2 h-2 rounded-full bg-green-400 animate-ping" />
+                  <span className="text-[10px] text-green-400 font-sans font-bold">TRANSMITTING</span>
+                </div>
+              </div>
+
+              {/* Console Logs */}
+              <div className="p-5 h-[320px] overflow-y-auto text-xs text-zinc-300 space-y-2 select-text text-left">
+                {filingLogs.map((log, idx) => (
+                  <div key={idx} className="leading-relaxed">
+                    <span className="text-zinc-500 font-bold font-sans">[$]</span> {log}
+                  </div>
+                ))}
+                
+                {isFilingToGovt && filingLogs.length < 7 && (
+                  <div className="flex items-center gap-2 text-cyan-400 pt-2 animate-pulse">
+                    <Loader className="w-3.5 h-3.5 animate-spin" />
+                    <span>Executing portal handshake...</span>
+                  </div>
+                )}
+              </div>
+
+              {/* Footer status bar */}
+              <div className="bg-zinc-900/50 px-4 py-2 border-t border-zinc-800/80 flex items-center justify-between text-[10px] text-zinc-500">
+                <span>SECURE SSL v3 CONNECTION</span>
+                <span>PACKETS: {filingLogs.length}/7 SENT</span>
+              </div>
+            </div>
+          </div>
+        )}
+      </AnimatePresence>
+
+      {/* Official Government Filing Receipt Modal */}
+      <AnimatePresence>
+        {showFilingReceipt && (
+          <motion.div
+            initial={{ opacity: 0 }}
+            animate={{ opacity: 1 }}
+            exit={{ opacity: 0 }}
+            className="fixed inset-0 bg-black/85 z-50 flex items-center justify-center p-4 backdrop-blur-sm"
+            onClick={() => setShowFilingReceipt(false)}
+          >
+            <motion.div
+              initial={{ scale: 0.9, opacity: 0 }}
+              animate={{ scale: 1, opacity: 1 }}
+              exit={{ scale: 0.9, opacity: 0 }}
+              className="bg-slate-50 text-slate-800 rounded-2xl max-w-lg w-full overflow-hidden shadow-2xl border border-slate-300 font-sans"
+              onClick={(e) => e.stopPropagation()}
+            >
+              {/* Official Header */}
+              <div className="bg-gradient-to-r from-emerald-950 to-teal-950 p-6 border-b-2 border-emerald-500 text-center relative text-white">
+                <div className="mx-auto w-12 h-12 rounded-full bg-emerald-500/10 border border-emerald-500/30 flex items-center justify-center mb-3">
+                  <CheckCircle className="w-7 h-7 text-emerald-400" />
+                </div>
+                <h3 className="text-base font-bold tracking-wide uppercase">Government of India</h3>
+                <p className="text-xs text-emerald-300 font-serif italic mt-0.5">Official Filing Acknowledgment Receipt</p>
+                
+                <button 
+                  onClick={() => setShowFilingReceipt(false)}
+                  className="absolute top-4 right-4 text-emerald-300/60 hover:text-white"
+                >
+                  <X className="w-5 h-5" />
+                </button>
+              </div>
+
+              {/* Receipt Body */}
+              <div className="p-6 space-y-5 text-left text-xs font-sans">
+                <div className="bg-white p-4 rounded-xl border border-slate-200 space-y-3 shadow-inner">
+                  <div className="flex justify-between items-center border-b border-slate-100 pb-2">
+                    <span className="text-slate-500 font-bold uppercase tracking-wider text-[9px]">Filing Status</span>
+                    <Badge className="bg-emerald-605 text-emerald-400 hover:bg-emerald-700 font-bold px-2 py-0.5 border-0">SUCCESSFULLY FILED</Badge>
+                  </div>
+                  
+                  <div className="grid grid-cols-2 gap-3 text-slate-700">
+                    <div>
+                      <span className="text-[10px] text-slate-400 block font-semibold uppercase">Acknowledgment No (ARN)</span>
+                      <span className="font-mono font-bold text-slate-900 text-sm">{filingARN}</span>
+                    </div>
+                    <div>
+                      <span className="text-[10px] text-slate-400 block font-semibold uppercase">Filing Date & Time</span>
+                      <span className="font-medium text-slate-900">{new Date().toLocaleString('en-IN')}</span>
+                    </div>
+                    <div>
+                      <span className="text-[10px] text-slate-400 block font-semibold uppercase">Client Name</span>
+                      <span className="font-bold text-slate-900">{currentDraftClient}</span>
+                    </div>
+                    <div>
+                      <span className="text-[10px] text-slate-400 block font-semibold uppercase">Government Portal</span>
+                      <span className="font-bold text-slate-900">{currentDraftPortal}</span>
+                    </div>
+                    <div>
+                      <span className="text-[10px] text-slate-400 block font-semibold uppercase">Notice Type</span>
+                      <span className="font-medium text-slate-900">{currentDraftType === 'gst-show-cause' ? 'DRC-01 Notice Reply' : currentDraftType === 'mca-notice' ? 'ROC AOC-4 Return' : 'Section 143(2) Reply'}</span>
+                    </div>
+                    <div>
+                      <span className="text-[10px] text-slate-400 block font-semibold uppercase">Notice Reference</span>
+                      <span className="font-mono text-slate-900">{currentDraftRef}</span>
+                    </div>
+                  </div>
+
+                  <div className="pt-2 border-t border-slate-100 flex justify-between text-slate-700">
+                    <span className="text-slate-500 font-semibold">Disputed Amount / Mismatch:</span>
+                    <span className="font-bold text-red-600">{currentDraftMismatch}</span>
+                  </div>
+                </div>
+
+                {/* Digital Verification Info */}
+                <div className="bg-emerald-50 border border-emerald-250 rounded-lg p-3 flex items-start gap-2.5">
+                  <Shield className="w-5 h-5 text-emerald-600 flex-shrink-0 mt-0.5" />
+                  <div className="space-y-0.5">
+                    <p className="text-[9px] font-bold text-emerald-950 uppercase">Cryptographically Authenticated</p>
+                    <p className="text-[9px] text-emerald-700 leading-tight">
+                      This return receipt has been signed and validated using Aadhaar e-Sign credentials. The digital signature hash has been locked onto the immutable Sannidh WORM compliance log.
+                    </p>
+                  </div>
+                </div>
+
+                {/* Download Button */}
+                <div className="flex gap-3">
+                  <Button
+                    variant="outline"
+                    className="flex-1 border-slate-300 hover:bg-slate-100 text-slate-700 font-medium"
+                    onClick={() => setShowFilingReceipt(false)}
+                  >
+                    Close
+                  </Button>
+                  <Button
+                    className="flex-1 bg-emerald-600 hover:bg-emerald-700 text-white font-medium shadow-[0_0_15px_rgba(16,185,129,0.3)]"
+                    onClick={() => {
+                      toast.success('Downloading acknowledgment receipt PDF...');
+                      import('jspdf').then(m => {
+                        const doc = new m.jsPDF({ orientation: 'portrait', unit: 'mm', format: 'a4' });
+                        doc.text(`Official Filing Receipt`, 20, 20);
+                        doc.text(`ARN: ${filingARN}`, 20, 30);
+                        doc.text(`Client: ${currentDraftClient}`, 20, 40);
+                        doc.text(`Date: ${new Date().toLocaleString('en-IN')}`, 20, 50);
+                        doc.text(`Notice Ref: ${currentDraftRef}`, 20, 60);
+                        doc.save(`Receipt-${filingARN}.pdf`);
+                      });
+                    }}
+                  >
+                    Download Receipt
+                  </Button>
+                </div>
+              </div>
+            </motion.div>
+          </motion.div>
+        )}
+      </AnimatePresence>
     </motion.div>
   );
 };
 
 type CADashboardZone = 
-  | "command" | "multi-entity" | "e-filing" | "payment" | "clients" | "operations" 
+  | "command" | "multi-entity" | "e-filing" | "case-room" | "payment" | "clients" | "operations" 
   | "ai-swarm" | "calculations" | "enterprise-api" | "erp-integration" | "doc-ocr" 
   | "team-rbac" | "notifications" | "branding" | "audit-trail" | "language-hub" | "offline-hub";
 
@@ -2581,7 +3262,7 @@ const CADashboard = () => {
   const [chatDrawerOpen, setChatDrawerOpen] = useState(false);
 
   // Compliance Service API URL
-  const COMPLIANCE_API = (import.meta.env.VITE_CA_API_BASE_URL as string) || (import.meta.env.VITE_API_URL as string) || '/api/v1';
+  const COMPLIANCE_API = 'http://localhost:8001/api/v1';
 
   // Fetch CA's clients from compliance service (Bypassed for Demo CA Dashboard to display mock data room simulation)
   const fetchClients = async () => {
@@ -2705,38 +3386,66 @@ const CADashboard = () => {
     return 'Critical';
   };
 
-  // Update stats when metrics change
+  const recalculateDemoStats = useCallback(() => {
+    let demoClients: any[] = [];
+    try {
+      const saved = localStorage.getItem('demo_clients');
+      if (saved) demoClients = JSON.parse(saved);
+    } catch (e) {}
+
+    let assignments: any[] = [];
+    try {
+      const savedTasks = localStorage.getItem('demo:prioritized-assignments');
+      if (savedTasks) assignments = JSON.parse(savedTasks);
+    } catch (e) {}
+
+    const pendingTasks = assignments.filter((a: any) => a.status !== 'completed').length;
+    
+    setStats((prevStats) =>
+      prevStats.map((stat) => {
+        switch (stat.id) {
+          case "companies":
+            return { ...stat, value: String(demoClients.length) };
+          case "tasks":
+            return { ...stat, value: String(pendingTasks) };
+          case "due":
+            return { ...stat, value: String(demoClients.length * 3) };
+          case "alerts":
+            return { ...stat, value: String(Math.min(3, pendingTasks)) };
+          case "revenue":
+            const revVal = demoClients.length * 15000;
+            return {
+              ...stat,
+              value: `₹${(revVal / 100000).toFixed(2)}L`,
+            };
+          case "plan":
+            return {
+              ...stat,
+              value: `${demoClients.length}/10`,
+            };
+          default:
+            return stat;
+        }
+      })
+    );
+  }, []);
+
+  // Update stats when metrics or demo clients change
   useEffect(() => {
-    if (metrics) {
-      setStats((prevStats) =>
-        prevStats.map((stat) => {
-          switch (stat.id) {
-            case "companies":
-              return { ...stat, value: String(metrics.assigned_companies ?? 0) };
-            case "tasks":
-              return { ...stat, value: String(metrics.active_tasks ?? 0) };
-            case "due":
-              return { ...stat, value: String(metrics.pending_filings_week ?? 0) };
-            case "alerts":
-              return { ...stat, value: String(metrics.high_risk_alerts ?? 0) };
-            case "revenue":
-              const rawRev = metrics.monthly_revenue ?? 0;
-              return {
-                ...stat,
-                value: `₹${(rawRev / 100000).toFixed(1)}L`,
-              };
-            case "plan":
-              return {
-                ...stat,
-                value: `${metrics.assigned_companies ?? 0}/10`,
-              };
-            default:
-              return stat;
-          }
-        })
-      );
-    }
-  }, [metrics]);
+    recalculateDemoStats();
+    
+    window.addEventListener('demo-client-added', recalculateDemoStats);
+    window.addEventListener('ca:metrics-updated', recalculateDemoStats);
+    window.addEventListener('swarm-completed-event', recalculateDemoStats);
+    window.addEventListener('demo:sannidh:history-updated', recalculateDemoStats);
+
+    return () => {
+      window.removeEventListener('demo-client-added', recalculateDemoStats);
+      window.removeEventListener('ca:metrics-updated', recalculateDemoStats);
+      window.removeEventListener('swarm-completed-event', recalculateDemoStats);
+      window.removeEventListener('demo:sannidh:history-updated', recalculateDemoStats);
+    };
+  }, [recalculateDemoStats]);
 
   const addCompany = async () => {
     if (!newCompanyPan.trim()) {
@@ -2761,7 +3470,7 @@ const CADashboard = () => {
         toast.error(result.error || "Failed to add company");
       }
     } catch (error) {
-      safeLog.error('Error adding company', error);
+      console.error("Error adding company:", error);
       toast.error("Failed to add company. Please try again.");
     } finally {
       setIsAddingCompany(false);
@@ -2831,6 +3540,9 @@ const CADashboard = () => {
                     <TabsTrigger value="e-filing" className="px-4 py-2.5 rounded-lg data-[state=active]:bg-blue-500/20 data-[state=active]:text-blue-400 font-medium text-xs flex items-center gap-1">
                       <FileCheck2 className="w-3.5 h-3.5" />E-Filing
                     </TabsTrigger>
+                    <TabsTrigger value="case-room" className="px-4 py-2.5 rounded-lg data-[state=active]:bg-purple-500/20 data-[state=active]:text-purple-400 font-medium text-xs flex items-center gap-1">
+                      <Scale className="w-3.5 h-3.5" />Case Room
+                    </TabsTrigger>
                     <TabsTrigger value="payment" className="px-4 py-2.5 rounded-lg data-[state=active]:bg-green-500/20 data-[state=active]:text-green-400 font-medium text-xs flex items-center gap-1">
                       <IndianRupee className="w-3.5 h-3.5" />Payments
                     </TabsTrigger>
@@ -2877,6 +3589,11 @@ const CADashboard = () => {
               {/* ZONE 0B: E-FILING INTEGRATION */}
               <TabsContent value="e-filing" className="m-0 focus-visible:outline-none focus-visible:ring-0">
                 {activeZone === "e-filing" && <EFilingIntegration />}
+              </TabsContent>
+
+              {/* ZONE 0B-2: CASE ROOM LITIGATION */}
+              <TabsContent value="case-room" className="m-0 focus-visible:outline-none focus-visible:ring-0">
+                {activeZone === "case-room" && <CaseRoom />}
               </TabsContent>
 
               {/* ZONE 0C: PAYMENT & TAX-LIABILITY AUTOMATION */}

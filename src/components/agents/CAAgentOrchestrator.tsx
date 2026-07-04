@@ -324,9 +324,7 @@ const initialDemoMessages = (): CAAgentMessage[] => {
       if (parsed[1]) secondClientName = parsed[1].name || parsed[1].client_name;
       else secondClientName = firstClientName;
     }
-  } catch (e) {
-    console.warn('[CAAgentOrchestrator] Failed to parse demo_clients for initial messages:', e);
-  }
+  } catch (e) {}
 
   return [
     {
@@ -585,9 +583,7 @@ export const CAAgentProvider: React.FC<{ children: React.ReactNode }> = ({ child
             const parsed = JSON.parse(saved);
             if (parsed[0]) clientName = parsed[0].name || parsed[0].client_name;
           }
-        } catch(e) {
-          console.warn('[CAAgentOrchestrator] Failed to parse demo_clients in consensus cycle:', e);
-        }
+        } catch(e) {}
       } else {
         if (realClientNames.length > 0) {
           clientName = realClientNames[Math.floor(Math.random() * realClientNames.length)];

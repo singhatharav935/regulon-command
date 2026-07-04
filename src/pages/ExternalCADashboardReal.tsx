@@ -105,7 +105,6 @@ import { useRealtimeSync } from "@/hooks/useRealtimeSync";
 // CAAgentProvider is now global — provided at App.tsx level
 import { CACommandCenterHeader } from "@/components/agents/CACommandCenterHeader";
 import { CAActionInbox } from "@/components/agents/CAActionInbox";
-import { safeLog } from '@/lib/security-utils';
 import ProductionSetupBanner from "@/components/ca-dashboard/ProductionSetupBanner";
 
 // Daily Governance Brief Component
@@ -150,8 +149,8 @@ const DailyGovernanceBrief = () => {
         liveUpdates: [{ message: 'Dashboard synced with Supabase.', timestamp: new Date().toISOString() }],
       });
       setLastRefresh(new Date());
-    } catch (err) {
-      safeLog.error('[DailyGovernanceBrief] Failed to fetch daily brief');
+    } catch {
+      // Silent fail
     } finally {
       setLoading(false);
     }
@@ -811,7 +810,7 @@ const LiveAIDraftingEngine = () => {
             addAgentLog(`⚠️ PDF appears to be a scanned image. Please upload as JPEG/PNG for Vision OCR.`);
           }
         } catch (pdfErr) {
-          safeLog.error('PDF parsing error', pdfErr);
+          console.error("PDF parsing error", pdfErr);
           extractedText = "Error extracting text. Proceeding with filename analysis: " + uploadedFile.name;
         }
       } else {
@@ -877,7 +876,7 @@ const LiveAIDraftingEngine = () => {
       });
       
     } catch (error: any) {
-      safeLog.error('ExternalCADashboard error', error);
+      console.error(error);
       addAgentLog(`❌ ERROR: ${error.message}`);
       toast.error('Drafting Failed', { description: error.message });
     } finally {
@@ -1079,7 +1078,7 @@ const LiveAIDraftingEngine = () => {
           });
           
         if (uploadErr) {
-          safeLog.error('Storage upload error', uploadErr);
+          console.error('Storage upload error:', uploadErr);
           addAgentLog(`⚠️ WORM upload warning: ${uploadErr.message}. Continuing with signature flow...`);
         } else {
           addAgentLog('✅ PDF locked into WORM Vault successfully.');
@@ -1456,9 +1455,6 @@ const LiveAIDraftingEngine = () => {
                   <h4 className="font-medium mb-3">Custom Deployment Command</h4>
                   <div className="flex gap-2">
                     <Input
-                      id="ai-deployment-command"
-                      name="ai-deployment-command"
-                      aria-label="Custom AI deployment command"
                       placeholder="e.g., Generate audit report for TechVenture..."
                       value={deploymentCommand}
                       onChange={(e) => setDeploymentCommand(e.target.value)}
@@ -1495,8 +1491,6 @@ const LiveAIDraftingEngine = () => {
                       onChange={handleFileUpload}
                       className="hidden"
                       id="document-upload"
-                      name="document-upload"
-                      aria-label="Upload document for AI analysis"
                     />
                     <label htmlFor="document-upload" className="cursor-pointer">
                       <p className="text-muted-foreground mb-2">
@@ -1542,9 +1536,6 @@ const LiveAIDraftingEngine = () => {
                 <div className="space-y-4">
                   <h3 className="text-lg font-semibold text-cyan-300">AI-Generated Draft</h3>
                   <Textarea
-                    id="ai-generated-draft"
-                    name="ai-generated-draft"
-                    aria-label="AI-generated legal draft"
                     placeholder="AI will generate legal draft here based on uploaded document..."
                     value={generatedDraft}
                     readOnly
@@ -1913,7 +1904,7 @@ const ExternalCADashboardReal = () => {
       const dbClients = await loadCAClients();
       setCompanies(dbClients);
     } catch (err) {
-      safeLog.error('Error loading CA clients in dashboard');
+      console.error("Error loading CA clients in dashboard:", err);
     }
   };
 
@@ -1924,7 +1915,7 @@ const ExternalCADashboardReal = () => {
       const requests = await getPendingConsentRequests();
       setPendingRequests(requests);
     } catch (err) {
-      safeLog.error('Failed to fetch pending consent requests');
+      console.error('Failed to fetch pending consent requests:', err);
     }
   };
 
@@ -1991,7 +1982,7 @@ const ExternalCADashboardReal = () => {
         toast.error(result.error || 'Failed to initiate onboarding');
       }
     } catch (error: any) {
-      safeLog.error('Onboarding error', error);
+      console.error('Onboarding error:', error);
       toast.error('Failed to onboard client: ' + error.message);
     } finally {
       setIsOnboarding(false);
@@ -2019,8 +2010,7 @@ const ExternalCADashboardReal = () => {
         setSelectedCompany(company);
         setShowCompanyDetails(true);
       }
-    } catch (err) {
-      safeLog.error('[ExternalCADashboard] Error viewing company');
+    } catch {
       setSelectedCompany(company);
       setShowCompanyDetails(true);
     }
@@ -2037,8 +2027,7 @@ const ExternalCADashboardReal = () => {
       } else {
         toast.error(result.error || 'Failed to refresh data');
       }
-    } catch (err) {
-      safeLog.error('[ExternalCADashboard] Error refreshing company');
+    } catch {
       toast.error('Failed to refresh data');
     }
   };
@@ -2116,7 +2105,7 @@ const ExternalCADashboardReal = () => {
         toast.error(result.error || "Failed to add company");
       }
     } catch (error) {
-      safeLog.error('Error adding company', error);
+      console.error("Error adding company:", error);
       toast.error("Failed to add company. Please try again.");
     } finally {
       setIsAddingCompany(false);
@@ -2154,12 +2143,10 @@ const ExternalCADashboardReal = () => {
                 <Globe2 className="w-3.5 h-3.5" /> Language: <strong className="text-white">{LANGUAGE_LABELS[language].label.split(' ')[0]}</strong>
               </Badge>
               <Select
-                name="dashboard-language-select"
-                aria-label="Select dashboard language"
                 value={language}
                 onValueChange={(val: any) => setLanguagePreference(val, isRtlLayout)}
               >
-                <SelectTrigger aria-label="Select dashboard language" className="w-40 bg-background/50 border-border/40 text-xs h-9">
+                <SelectTrigger className="w-40 bg-background/50 border-border/40 text-xs h-9">
                   <SelectValue placeholder="Select Language" />
                 </SelectTrigger>
                 <SelectContent className="bg-card border-border/40 text-xs">

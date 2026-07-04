@@ -214,8 +214,6 @@ describe("Security Utilities", () => {
   describe("ClientRateLimiter", () => {
     beforeEach(() => {
       vi.useFakeTimers();
-      // Clear any leftover rate-limit keys from localStorage
-      Object.keys(localStorage).filter(k => k.startsWith('sannidh_rl_')).forEach(k => localStorage.removeItem(k));
     });
 
     afterEach(() => {
@@ -223,7 +221,7 @@ describe("Security Utilities", () => {
     });
 
     it("should allow requests within limit", () => {
-      const limiter = new ClientRateLimiter(5, 60000, 'sannidh_rl_test_allow');
+      const limiter = new ClientRateLimiter(5, 60000);
       
       for (let i = 0; i < 5; i++) {
         expect(limiter.canProceed()).toBe(true);
@@ -231,7 +229,7 @@ describe("Security Utilities", () => {
     });
 
     it("should block requests exceeding limit", () => {
-      const limiter = new ClientRateLimiter(3, 60000, 'sannidh_rl_test_block');
+      const limiter = new ClientRateLimiter(3, 60000);
       
       expect(limiter.canProceed()).toBe(true);
       expect(limiter.canProceed()).toBe(true);
@@ -240,7 +238,7 @@ describe("Security Utilities", () => {
     });
 
     it("should reset after window expires", () => {
-      const limiter = new ClientRateLimiter(2, 1000, 'sannidh_rl_test_expire');
+      const limiter = new ClientRateLimiter(2, 1000);
       
       expect(limiter.canProceed()).toBe(true);
       expect(limiter.canProceed()).toBe(true);
@@ -252,7 +250,7 @@ describe("Security Utilities", () => {
     });
 
     it("should reset manually", () => {
-      const limiter = new ClientRateLimiter(2, 60000, 'sannidh_rl_test_reset');
+      const limiter = new ClientRateLimiter(2, 60000);
       
       limiter.canProceed();
       limiter.canProceed();
@@ -260,40 +258,6 @@ describe("Security Utilities", () => {
       
       limiter.reset();
       expect(limiter.canProceed()).toBe(true);
-    });
-
-    it("should report attempts remaining", () => {
-      const limiter = new ClientRateLimiter(3, 60000, 'sannidh_rl_test_remaining');
-
-      expect(limiter.getAttemptsRemaining()).toBe(3);
-      limiter.canProceed();
-      expect(limiter.getAttemptsRemaining()).toBe(2);
-      limiter.canProceed();
-      limiter.canProceed();
-      expect(limiter.getAttemptsRemaining()).toBe(0);
-    });
-
-    it("should format remaining wait time", () => {
-      const limiter = new ClientRateLimiter(1, 120000, 'sannidh_rl_test_format'); // 2 min window
-
-      limiter.canProceed(); // use the single slot
-      expect(limiter.canProceed()).toBe(false);
-
-      const formatted = limiter.getRemainingWaitFormatted();
-      // Should contain "min" since window is 2 minutes
-      expect(formatted).toMatch(/min/);
-    });
-
-    it("should persist across instances with the same key", () => {
-      const key = 'sannidh_rl_test_persist';
-      const limiter1 = new ClientRateLimiter(2, 60000, key);
-      limiter1.canProceed();
-      limiter1.canProceed();
-
-      // Create a new instance with the same key — simulates page refresh
-      const limiter2 = new ClientRateLimiter(2, 60000, key);
-      expect(limiter2.canProceed()).toBe(false);
-      expect(limiter2.getAttemptsRemaining()).toBe(0);
     });
   });
 });

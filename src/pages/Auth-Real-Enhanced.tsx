@@ -26,7 +26,6 @@ import { Label } from "@/components/ui/label";
 import { Card } from "@/components/ui/card";
 import { Checkbox } from "@/components/ui/checkbox";
 import { useToast } from "@/hooks/use-toast";
-import { safeLog } from '@/lib/security-utils';
 import { enhancedAuth } from "@/lib/enhanced-auth";
 import { createLocalDemoUser } from "@/lib/local-demo-auth";
 import { SecurePasswordInput } from "@/components/auth/PasswordStrengthMeter";
@@ -221,7 +220,7 @@ const AuthReal = () => {
       const redirectTo = (location.state as any)?.from || getDashboardRoute(effectiveRole);
       navigate(redirectTo);
     } catch (error: any) {
-      safeLog.error('Login error', error);
+      console.error("Login error:", error);
       toast({
         title: "Login Failed",
         description: error.message || "Failed to log in. Please check your credentials.",
@@ -281,7 +280,7 @@ const AuthReal = () => {
         }, 500);
       }
     } catch (error: any) {
-      safeLog.error('Registration error', error);
+      console.error("Registration error:", error);
       toast({
         title: "Registration Failed",
         description: error.message || "Failed to create account",
@@ -333,7 +332,7 @@ const AuthReal = () => {
       // For company_owner role, try registering with backend API
       if (formData.registrationRole === 'company_owner') {
         try {
-          const API_BASE = import.meta.env.VITE_API_URL || '/api/v1';
+          const API_BASE = import.meta.env.VITE_API_URL || 'http://localhost:8001/api/v1';
           const companyResponse = await fetch(`${API_BASE}/company/register`, {
             method: 'POST',
             headers: { 'Content-Type': 'application/json' },
@@ -390,7 +389,7 @@ const AuthReal = () => {
         window.location.href = dashboardRoute;
       }, 500);
     } catch (error: any) {
-      safeLog.error('Registration error', error);
+      console.error("Registration error:", error);
       toast({
         title: "Registration Failed",
         description: error.message || "Failed to create account. Please try again.",
@@ -413,7 +412,7 @@ const AuthReal = () => {
 
       setMode('login');
     } catch (error: any) {
-      safeLog.error('Password reset error', error);
+      console.error("Password reset error:", error);
       toast({
         title: "Reset Failed",
         description: error.message || "Failed to send reset email",
@@ -439,7 +438,7 @@ const AuthReal = () => {
       setMode('login');
       setPassword('');
     } catch (error: any) {
-      safeLog.error('Password reset error', error);
+      console.error("Password reset error:", error);
       toast({
         title: "Reset Failed",
         description: error.message || "Failed to reset password",

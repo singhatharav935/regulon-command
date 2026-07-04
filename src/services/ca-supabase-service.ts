@@ -5,7 +5,6 @@
  */
 
 import { supabase } from "@/integrations/supabase/client";
-import { escapeHtml, safeLog } from "@/lib/security-utils";
 
 const isDemoMode = () => {
   if (typeof window === 'undefined') return false;
@@ -446,16 +445,23 @@ export async function getCAMetricsFromDB(): Promise<CAMetrics> {
       .select('company_id', { count: 'exact', head: true })
       .eq('user_id', user.id);
 
-    // 2. High Risk Alerts — client_govt_notices table does not exist in DB schema
-    // Skip query to avoid 400 error; default to 0
-    const highRiskCount = 0;
+    // 2. High Risk Alerts (Notices that are high status or urgent)
+    const { count: highRiskCount } = await supabase
+      .from('client_govt_notices')
+      .select('id', { count: 'exact', head: true })
+      .eq('ca_user_id', user.id)
+      .eq('status', 'detected');
 
-    // 3. Overdue dependencies — ca_dependencies table does not exist in DB schema
-    // Skip query to avoid 400 error; default to 0
-    const overdueCount = 0;
+    // 3. Overdue dependencies
+    const nowStr = new Date().toISOString();
+    const { count: overdueCount } = await supabase
+      .from('ca_dependencies')
+      .select('id', { count: 'exact', head: true })
+      .eq('ca_user_id', user.id)
+      .eq('status', 'pending')
+      .lt('due_date', nowStr);
 
     // 4. Active Tasks (Unbilled tasks that need billing/completion)
-    // ca_task_history: is_billed is the correct column per schema
     const { count: activeTasksCount } = await supabase
       .from('ca_task_history')
       .select('id', { count: 'exact', head: true })
@@ -472,8 +478,15 @@ export async function getCAMetricsFromDB(): Promise<CAMetrics> {
       .gte('payment_received_date', startOfMonth);
     const monthlyRev = (invoices || []).reduce((sum, inv) => sum + Number(inv.total_amount || 0), 0);
 
-    // 6. Pending Filings — client_govt_notices does not exist in DB schema, default to 0
-    const pendingFilings = 0;
+    // 6. Pending Filings in next 7 days
+    const nextWeekStr = new Date(Date.now() + 7 * 86400000).toISOString();
+    const { count: pendingFilings } = await supabase
+      .from('client_govt_notices')
+      .select('id', { count: 'exact', head: true })
+      .eq('ca_user_id', user.id)
+      .eq('status', 'detected')
+      .gte('due_date', nowStr)
+      .lte('due_date', nextWeekStr);
 
     return {
       assigned_companies: assignedCount || 0,
@@ -485,7 +498,7 @@ export async function getCAMetricsFromDB(): Promise<CAMetrics> {
       last_updated: new Date().toISOString(),
     };
   } catch (err) {
-    safeLog.error("Failed to fetch CA metrics from DB", err);
+    console.error("Failed to fetch CA metrics from DB", err);
     return defaultMetrics();
   }
 }
@@ -620,11 +633,37 @@ export async function getClientGovtNotices(): Promise<any[]> {
     const { data: { user } } = await supabase.auth.getUser();
     if (!user) return [];
 
-    // client_govt_notices does NOT exist in the DB schema (not in types.ts)
-    // Return empty array to avoid 400 Bad Request errors.
-    return [];
+    const { data, error } = await supabase
+      .from('client_govt_notices')
+      .select('*, companies(name)')
+      .eq('ca_user_id', user.id)
+      .order('due_date', { ascending: true });
+
+    if (error || !data) return [];
+    
+    return data.map((n: any) => {
+      const now = new Date();
+      const dueDate = new Date(n.due_date);
+      const diffMs = dueDate.getTime() - now.getTime();
+      const daysRemaining = Math.ceil(diffMs / (1000 * 60 * 60 * 24));
+      
+      return {
+        id: n.id,
+        company: n.companies?.name || 'Unknown Company',
+        company_id: n.company_id.substring(0, 8),
+        task: `${n.notice_type} - ${n.notice_number}`,
+        authority: n.department,
+        filing_type: 'Notice Response',
+        dueDate: dueDate.toLocaleDateString('en-IN', { day: '2-digit', month: 'short', year: 'numeric' }),
+        days_remaining: daysRemaining,
+        penalty: 'Notice Assessment',
+        dependency: n.status === 'detected' ? 'Pending AI Analysis' : n.status,
+        urgency: daysRemaining <= 3 ? 'critical' : daysRemaining <= 7 ? 'high' : daysRemaining <= 15 ? 'medium' : 'low',
+        status: daysRemaining < 0 ? 'overdue' : 'pending',
+      };
+    });
   } catch (err) {
-    safeLog.error("Failed to fetch notices", err);
+    console.error("Failed to fetch notices", err);
     return [];
   }
 }
@@ -658,11 +697,34 @@ export async function getCADependencies(): Promise<any[]> {
     const { data: { user } } = await supabase.auth.getUser();
     if (!user) return [];
 
-    // ca_dependencies does NOT exist in the DB schema (not in types.ts)
-    // Return empty array to avoid 400 Bad Request errors.
-    return [];
+    const { data, error } = await supabase
+      .from('ca_dependencies')
+      .select('*, companies(name)')
+      .eq('ca_user_id', user.id)
+      .order('due_date', { ascending: true });
+
+    if (error || !data) return [];
+    
+    return data.map((d: any) => {
+      const now = new Date();
+      const dueDate = new Date(d.due_date);
+      const diffMs = dueDate.getTime() - now.getTime();
+      const daysRemaining = Math.ceil(diffMs / (1000 * 60 * 60 * 24));
+
+      return {
+        id: d.id,
+        company: d.companies?.name || 'Unknown Company',
+        company_id: d.company_id,
+        document: d.document_name,
+        type: 'Required Document',
+        dueDate: dueDate.toLocaleDateString('en-IN', { day: '2-digit', month: 'short', year: 'numeric' }),
+        days_remaining: daysRemaining,
+        status: d.status, // 'pending', 'uploaded', 'verified'
+        urgency: d.urgency, // 'critical', 'high', 'medium', 'low'
+      };
+    });
   } catch (err) {
-    safeLog.error("Failed to fetch dependencies", err);
+    console.error("Failed to fetch dependencies", err);
     return [];
   }
 }
@@ -700,10 +762,9 @@ export async function getCommunicationLogs(): Promise<any[]> {
     const { data: { user } } = await supabase.auth.getUser();
     if (!user) return [];
 
-    // communication_logs has no FK to companies — select without the join to avoid 400
     const { data, error } = await supabase
       .from('communication_logs')
-      .select('*')
+      .select('*, companies(name)')
       .eq('ca_user_id', user.id)
       .order('created_at', { ascending: false });
 
@@ -714,19 +775,19 @@ export async function getCommunicationLogs(): Promise<any[]> {
       type: log.type === 'whatsapp' ? 'message' : log.type === 'email' ? 'email' : 'system',
       direction: log.direction === 'inbound' ? 'incoming' : log.direction === 'outbound' ? 'outgoing' : 'system',
       company_id: log.company_id,
-      company_name: 'Unknown Company', // No FK to companies — name not available without extra query
+      company_name: log.companies?.name || 'Unknown Company',
       subject: log.subject || 'Compliance Notification',
       content: log.content,
-      sender: log.direction === 'inbound' ? 'Client' : 'Sannidh AI',
-      recipient: log.recipient || (log.direction === 'outbound' ? 'Client' : 'CA (You)'),
+      sender: log.direction === 'inbound' ? log.companies?.name : 'Sannidh AI',
+      recipient: log.recipient || (log.direction === 'outbound' ? log.companies?.name : 'CA (You)'),
       status: log.status === 'pending' ? 'unread' : 'read',
-      priority: 'medium',
-      category: 'general',
+      priority: 'medium', // Default mapped
+      category: 'general', // Default mapped
       timestamp: log.created_at,
       ai_summary: log.ai_agent_id ? `Auto-generated by Agent ${log.ai_agent_id}` : undefined,
     }));
   } catch (err) {
-    safeLog.error("Failed to fetch logs", err);
+    console.error("Failed to fetch logs", err);
     return [];
   }
 }
@@ -756,10 +817,9 @@ export async function getUnbilledTasks(): Promise<any[]> {
     const { data: { user } } = await supabase.auth.getUser();
     if (!user) return [];
 
-    // ca_task_history has no FK to companies — select without the join to avoid 400
     const { data, error } = await supabase
       .from('ca_task_history')
-      .select('*')
+      .select('*, companies(name)')
       .eq('ca_user_id', user.id)
       .eq('is_billed', false)
       .order('completed_at', { ascending: false });
@@ -768,13 +828,13 @@ export async function getUnbilledTasks(): Promise<any[]> {
     
     return data.map((t: any) => ({
       id: t.id,
-      client: 'Client', // No FK to companies — company name not joinable without extra query
+      client: t.companies?.name || 'Unknown Client',
       task_name: t.task_name,
       date_completed: new Date(t.completed_at).toLocaleDateString('en-IN', { day: '2-digit', month: 'short', year: 'numeric' }),
       suggested_fee: parseFloat(t.suggested_fee),
     }));
   } catch (err) {
-    safeLog.error("Failed to fetch unbilled tasks", err);
+    console.error("Failed to fetch unbilled tasks", err);
     return [];
   }
 }
@@ -828,7 +888,7 @@ export async function getBillingStats(): Promise<any> {
       collected_change_pct: 0, // Requires historical comparison, defaulting to 0
     };
   } catch (err) {
-    safeLog.error("Failed to fetch billing stats", err);
+    console.error("Failed to fetch billing stats", err);
     return null;
   }
 }
@@ -950,10 +1010,10 @@ export async function logWORMAuditEntry(entry: {
       is_draft: false,
     });
 
-    safeLog.info(`[SANNIDH WORM] Audit entry logged: ${wormEntry.worm_seal}`);
+    console.info(`[SANNIDH WORM] Audit entry logged: ${wormEntry.worm_seal}`);
   } catch (err) {
     // WORM logging must never crash the main flow
-    safeLog.error('[SANNIDH WORM] Failed to log audit entry', err);
+    console.error('[SANNIDH WORM] Failed to log audit entry:', err);
   }
 }
 
@@ -1008,7 +1068,7 @@ export async function exportCompliancePDF(options: {
 <body>
   <div class="header">
     <h1>SANNIDH AI — Compliance Intelligence Brief</h1>
-    <p>${escapeHtml(firmName)} &nbsp;|&nbsp; Prepared for: ${escapeHtml(caName)} &nbsp;|&nbsp; ${escapeHtml(dateStr)}</p>
+    <p>${firmName} &nbsp;|&nbsp; Prepared for: ${caName} &nbsp;|&nbsp; ${dateStr}</p>
     <span class="badge">CONFIDENTIAL — CA USE ONLY</span>
   </div>
 
@@ -1019,11 +1079,11 @@ export async function exportCompliancePDF(options: {
       ? '<tr><td colspan="5" style="text-align:center;color:#888;">No clients added yet.</td></tr>'
       : clients.map(c => `
         <tr>
-          <td>${escapeHtml(c.name)}</td>
-          <td>${escapeHtml(c.industry)}</td>
-          <td class="${c.health >= 80 ? 'ok' : c.health >= 60 ? 'medium' : 'urgent'}">${escapeHtml(c.health)}%</td>
-          <td class="${c.risk === 'High' ? 'urgent' : c.risk === 'Medium' ? 'medium' : 'ok'}">${escapeHtml(c.risk)}</td>
-          <td>${escapeHtml(c.deadline)}</td>
+          <td>${c.name}</td>
+          <td>${c.industry}</td>
+          <td class="${c.health >= 80 ? 'ok' : c.health >= 60 ? 'medium' : 'urgent'}">${c.health}%</td>
+          <td class="${c.risk === 'High' ? 'urgent' : c.risk === 'Medium' ? 'medium' : 'ok'}">${c.risk}</td>
+          <td>${c.deadline}</td>
         </tr>`).join('')}
   </table>
 
@@ -1032,11 +1092,11 @@ export async function exportCompliancePDF(options: {
     <tr><th>Filing / Obligation</th><th>Type</th><th>Due Date</th><th>Days Remaining</th><th>Regulator</th></tr>
     ${deadlines.map(d => `
       <tr>
-        <td>${escapeHtml(d.title)}</td>
-        <td>${escapeHtml(d.type)}</td>
-        <td>${escapeHtml(d.deadline)}</td>
+        <td>${d.title}</td>
+        <td>${d.type}</td>
+        <td>${d.deadline}</td>
         <td class="${d.daysRemaining <= 7 ? 'urgent' : d.daysRemaining <= 15 ? 'medium' : 'ok'}">${d.daysRemaining < 0 ? 'OVERDUE' : d.daysRemaining + ' days'}</td>
-        <td>${escapeHtml(d.regulator)}</td>
+        <td>${d.regulator}</td>
       </tr>`).join('')}
   </table>
 
@@ -1044,9 +1104,9 @@ export async function exportCompliancePDF(options: {
   <div>
     ${news.map(n => `
       <div class="news-item">
-        <strong>${escapeHtml(n.title)}</strong>
-        <p>${escapeHtml(n.source)} &mdash; ${escapeHtml(n.date)} | Impact: ${escapeHtml(n.impact.toUpperCase())}</p>
-        <p>${escapeHtml(n.summary)}</p>
+        <strong>${n.title}</strong>
+        <p>${n.source} &mdash; ${n.date} | Impact: ${n.impact.toUpperCase()}</p>
+        <p>${n.summary}</p>
       </div>`).join('')}
   </div>
 
@@ -1058,7 +1118,7 @@ export async function exportCompliancePDF(options: {
 </html>`;
 
   // Open a print window — works in all browsers, no dependencies
-  const printWindow = window.open('', '_blank', 'noopener,noreferrer');
+  const printWindow = window.open('', '_blank');
   if (!printWindow) return;
   printWindow.document.write(html);
   printWindow.document.close();

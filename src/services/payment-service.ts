@@ -32,15 +32,12 @@ export interface TaxLiability {
   id: string;
   ca_user_id: string;
   entity_id?: string;
-  // DB column: head_name (not tax_label)
-  head_name: string;
-  tax_label: string;       // alias for head_name in the UI
-  tax_type: string;
-  // DB column: assessment_year (not period_start/period_end)
-  assessment_year?: string;
-  period_start: string;    // mapped from assessment_year in UI
-  period_end: string;      // mapped from assessment_year in UI
-  due_date?: string;
+  company_id?: string;
+  tax_type: TaxType;
+  tax_label: string;
+  period_start: string;
+  period_end: string;
+  due_date: string;
   gross_liability_paise: number;
   itc_available_paise: number;
   net_liability_paise: number;
@@ -48,14 +45,21 @@ export interface TaxLiability {
   penalty_paise: number;
   late_fee_paise: number;
   total_due_paise: number;
-  // DB uses 'status' text column, not is_paid boolean
-  status: string;
-  is_paid: boolean;        // derived from status === 'paid'
-  amount?: number;         // DB column: amount (numeric)
-  notes?: string;
+  amount_paid_paise: number;
+  balance_due_paise: number;
+  computation_data: Record<string, unknown>;
+  ai_computation: boolean;
+  ai_notes?: string;
+  is_paid: boolean;
+  is_nil_return: boolean;
+  challan_type?: ChallanType;
+  bsr_code?: string;
+  challan_serial_no?: string;
+  challan_date?: string;
+  challan_amount_paise?: number;
   created_at: string;
   updated_at: string;
-  // joined from entities table
+  // joined
   entity_name?: string;
   entity_type?: string;
   gstin?: string;
@@ -147,50 +151,105 @@ export async function fetchLiabilities(
   caUserId: string,
   filters?: { isPaid?: boolean; entityId?: string; taxType?: TaxType }
 ): Promise<TaxLiability[]> {
-  // NOTE: tax_liability_heads does NOT exist in the DB schema (not in types.ts).
-  // All queries to this table return 400 Bad Request. Return empty array to prevent errors.
-  return [];
+  if (!isValidUUID(caUserId)) return [];
+  let q = (supabase as any)
+    .from('tax_liability_heads')
+    .select('*, entities(entity_name, entity_type, gstin, pan)')
+    .eq('ca_user_id', caUserId);
+
+  // tax_liability_heads table uses 'status' column, not 'is_paid'
+  if (filters?.isPaid === true) q = q.eq('status', 'paid');
+  else if (filters?.isPaid === false) q = q.neq('status', 'paid');
+  if (filters?.entityId) q = q.eq('entity_id', filters.entityId);
+  if (filters?.taxType) q = q.eq('tax_type', filters.taxType);
+
+  const { data, error } = await q.order('due_date', { ascending: true });
+  if (error) return handleServiceError(error, []);
+
+  return (data ?? []).map((row: any) => ({
+    ...row,
+    entity_name: row.entities?.entity_name,
+    entity_type: row.entities?.entity_type,
+    gstin: row.entities?.gstin,
+    pan: row.entities?.pan,
+  }));
 }
 
 export async function fetchUpcomingPayments(caUserId: string): Promise<TaxLiability[]> {
-  // NOTE: tax_liability_heads does not exist in DB schema. Return empty array.
-  return [];
+  if (!isValidUUID(caUserId)) return [];
+  // upcoming_payments view may not exist — try with fallback
+  try {
+    const { data, error } = await (supabase as any)
+      .from('upcoming_payments')
+      .select('*')
+      .eq('ca_user_id', caUserId);
+
+    if (!error && data) return data;
+  } catch { /* view doesn't exist */ }
+
+  // Fallback: query base table for unpaid liabilities
+  return fetchLiabilities(caUserId, { isPaid: false });
 }
 
 export async function createLiability(
-  liability: Omit<TaxLiability, 'id' | 'is_paid' | 'amount_paid_paise' | 'balance_due_paise' | 'created_at' | 'updated_at' | 'entity_name' | 'entity_type' | 'gstin' | 'pan'>
+  liability: Omit<TaxLiability, 'id' | 'balance_due_paise' | 'created_at' | 'updated_at' | 'entity_name' | 'entity_type' | 'gstin' | 'pan'>
 ): Promise<TaxLiability> {
-  // NOTE: tax_liability_heads does not exist in DB schema.
-  // Return a client-side constructed object without persisting to DB.
-  const id = crypto.randomUUID();
-  const now = new Date().toISOString();
-  const net = Math.max(0, (liability.gross_liability_paise || 0) - (liability.itc_available_paise || 0));
-  const total = net + (liability.interest_paise || 0) + (liability.penalty_paise || 0) + (liability.late_fee_paise || 0);
-  return {
-    ...liability,
-    id,
-    head_name: liability.tax_label || liability.head_name || liability.tax_type,
-    is_paid: false,
-    amount_paid_paise: 0,
-    balance_due_paise: total,
-    net_liability_paise: net,
-    total_due_paise: total,
-    created_at: now,
-    updated_at: now,
-  } as TaxLiability;
+  // Auto-compute derived fields
+  const net = Math.max(0, liability.gross_liability_paise - liability.itc_available_paise);
+  const total = net + liability.interest_paise + liability.penalty_paise + liability.late_fee_paise;
+
+  const { data, error } = await (supabase as any)
+    .from('tax_liability_heads')
+    .insert([{ ...liability, net_liability_paise: net, total_due_paise: total }])
+    .select()
+    .single();
+
+  if (error) return handleServiceError(error, []);
+  return data;
 }
 
 export async function updateLiability(
   id: string,
   updates: Partial<TaxLiability>
 ): Promise<TaxLiability> {
-  // NOTE: tax_liability_heads does not exist in DB schema.
-  // Return updates merged with a placeholder — no DB call made.
-  return { id, ...updates } as TaxLiability;
+  // Recompute derived fields if amounts change
+  if (
+    updates.gross_liability_paise !== undefined ||
+    updates.itc_available_paise !== undefined ||
+    updates.interest_paise !== undefined ||
+    updates.penalty_paise !== undefined ||
+    updates.late_fee_paise !== undefined
+  ) {
+    const { data: existing } = await (supabase as any)
+      .from('tax_liability_heads')
+      .select('gross_liability_paise,itc_available_paise,interest_paise,penalty_paise,late_fee_paise')
+      .eq('id', id)
+      .single();
+
+    const merged = { ...existing, ...updates };
+    const net = Math.max(0, merged.gross_liability_paise - merged.itc_available_paise);
+    const total = net + merged.interest_paise + merged.penalty_paise + merged.late_fee_paise;
+    updates.net_liability_paise = net;
+    updates.total_due_paise = total;
+  }
+
+  const { data, error } = await (supabase as any)
+    .from('tax_liability_heads')
+    .update(updates)
+    .eq('id', id)
+    .select()
+    .single();
+
+  if (error) return handleServiceError(error, []);
+  return data;
 }
 
 export async function deleteLiability(id: string): Promise<void> {
-  // NOTE: tax_liability_heads does not exist in DB schema. No-op.
+  const { error } = await (supabase as any)
+    .from('tax_liability_heads')
+    .delete()
+    .eq('id', id);
+  if (error) return handleServiceError(error, []);
 }
 
 /**

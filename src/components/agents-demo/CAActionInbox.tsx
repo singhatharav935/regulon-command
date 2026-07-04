@@ -269,9 +269,7 @@ export const CAActionInbox = () => {
             const matchedClient = clients.find((c: any) => (c.name || c.client_name) === clientName);
             if (matchedClient) clientId = matchedClient.id;
           }
-        } catch (e) {
-          console.warn('[CAActionInbox-Demo] Silent catch triggered:', e);
-        }
+        } catch (e) {}
 
         const formattedTitle = action.title.replace(/[^a-zA-Z0-9]/g, '_');
         const clientSanitized = clientName.replace(/\s+/g, '_');
@@ -289,9 +287,7 @@ export const CAActionInbox = () => {
         try {
           const saved = localStorage.getItem(`completed_tasks_${clientId}`);
           if (saved) completed = JSON.parse(saved);
-        } catch (e) {
-          console.warn('[CAActionInbox-Demo] Silent catch triggered:', e);
-        }
+        } catch (e) {}
 
         if (!completed.find((c: any) => c.title === action.title)) {
           completed.push(taskEntry);
@@ -303,9 +299,7 @@ export const CAActionInbox = () => {
         try {
           const saved = localStorage.getItem('demo:sannidh:completed-work-history');
           if (saved) history = JSON.parse(saved);
-        } catch (e) {
-          console.warn('[CAActionInbox-Demo] Silent catch triggered:', e);
-        }
+        } catch (e) {}
 
         const newHistoryEntry = {
           id: `resolved-${Date.now()}-${Math.random().toString(36).substring(2, 9)}`,
@@ -380,9 +374,7 @@ export const CAActionInbox = () => {
         if (saved) {
           setCompletedHistory(JSON.parse(saved));
         }
-      } catch (e) {
-          console.warn('[CAActionInbox-Demo] Silent catch triggered:', e);
-        }
+      } catch (e) {}
     };
     window.addEventListener('demo:sannidh:history-updated', handleUpdate);
     return () => window.removeEventListener('demo:sannidh:history-updated', handleUpdate);
@@ -393,9 +385,7 @@ export const CAActionInbox = () => {
     try {
       const saved = localStorage.getItem('demo_clients');
       if (saved) demoClients = JSON.parse(saved);
-    } catch (e) {
-          console.warn('[CAActionInbox-Demo] Silent catch triggered:', e);
-        }
+    } catch (e) {}
 
     const matchedClient = demoClients.find(c => (c.name || c.client_name) === item.client);
     const clientId = matchedClient ? matchedClient.id : 'demo-auto-123';
@@ -445,9 +435,7 @@ export const CAActionInbox = () => {
             }
           }
         }
-      } catch (e) {
-          console.warn('[CAActionInbox-Demo] Silent catch triggered:', e);
-        }
+      } catch (e) {}
 
       if (!clientName) {
         const match = content.match(/for\s+([^.]+)/i);

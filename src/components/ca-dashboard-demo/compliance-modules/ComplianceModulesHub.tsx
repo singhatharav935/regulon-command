@@ -280,6 +280,12 @@ export default function ComplianceModulesHub({ demoClients, isDemo }: { demoClie
   const [clients, setClients] = useState<{ id: string, name: string }[]>([]);
   const [loading, setLoading] = useState(true);
 
+  // RBI AA & AI Swarm simulation states
+  const [runningAnimationFor, setRunningAnimationFor] = useState<string | null>(null);
+  const [animationProgress, setAnimationProgress] = useState(0);
+  const [animationLogs, setAnimationLogs] = useState<string[]>([]);
+  const [completedSteps, setCompletedSteps] = useState<number>(0);
+
   React.useEffect(() => {
     // Explicit prop takes ABSOLUTE priority over URL detection
     const isDemoMode = isDemo !== undefined
@@ -326,6 +332,176 @@ export default function ComplianceModulesHub({ demoClients, isDemo }: { demoClie
 
     loadClients();
   }, [demoClients, isDemo]);
+
+  // Handle module selection and trigger animation in demo mode
+  const handleSelectModule = (modId: string) => {
+    setActiveModule(modId);
+    
+    const isDemoMode = isDemo !== undefined
+      ? isDemo
+      : (typeof window !== 'undefined' && (
+          window.location.pathname === '/ca-dashboard' || 
+          window.location.pathname === '/ca-dashboard/' || 
+          window.location.pathname.startsWith('/ca-dashboard/')
+        ));
+
+    if (selectedClient && isDemoMode) {
+      setRunningAnimationFor(modId);
+      setAnimationProgress(0);
+      setAnimationLogs([]);
+      setCompletedSteps(0);
+    }
+  };
+
+  // Run progress animation and compile custom logs
+  React.useEffect(() => {
+    if (!runningAnimationFor || !selectedClient) return;
+
+    const activeInfo = MODULES.find(m => m.id === runningAnimationFor);
+    const clientName = clients.find(c => c.id === selectedClient)?.name || "Active Client";
+    const label = activeInfo?.label || "Module";
+
+    const customLogs: Record<string, string[]> = {
+      gstr1: [
+        `Establishing secure session with RBI Account Aggregator (AA) for ${clientName}...`,
+        "AA Consent verification check: AUTHORIZED (Valid until 2028)",
+        "Syncing bank stream GST collection accounts...",
+        "Fetching sales ledger records & invoice database...",
+        "Syncing 14 sales invoices with GSTIN records...",
+        "Validating buyer GSTIN checksums...",
+        "Computing CGST (9%), SGST (9%), and IGST (18%) portions...",
+        "Formulating B2B, B2C, and HSN summary sections...",
+        "Sannidh AI Audit swarm: Verification checks PASSED.",
+        "GSTR-1 Draft ready for portal integration."
+      ],
+      gstr2b: [
+        `Connecting to RBI Account Aggregator (AA) platform for ${clientName}...`,
+        "Establishing authentication handshakes with GSTN gateway...",
+        "Fetching GSTR-2B JSON statement from GST Portal...",
+        "Downloading buyer GSTR-1 filings for current period...",
+        "Comparing GSTR-2B portal record with Purchase Register...",
+        "Running reconciliation checks (invoice by invoice)...",
+        "Mismatch flagged: INV-001 has difference of ₹10,000...",
+        "Missing record flagged: INV-EXTRA not filed by supplier...",
+        "Drafting notification reminders for vendor compliance..."
+      ],
+      gstr3b: [
+        `Connecting to RBI Account Aggregator (AA) stream for ${clientName}...`,
+        "Retrieving GSTR-1 outward liability data...",
+        "Retrieving GSTR-2B eligible ITC credits...",
+        "Verifying Rule 86B utilization limits (max 99% ITC)...",
+        "Matching CGST/SGST/IGST accounts...",
+        "Calculating net tax liability payable in cash...",
+        "Validating RCM liabilities from purchase ledgers...",
+        "GSTR-3B tax computation finalized."
+      ],
+      itr: [
+        `Initiating secure handshake with RBI Account Aggregator (AA) for ${clientName}...`,
+        "Retrieving Form 26AS, AIS (Annual Information Statement)...",
+        "Downloading tax deducted at source (TDS) receipts...",
+        "Syncing business P&L account & balance sheet audit trail...",
+        "Checking disallowable expenditures under Sec 37...",
+        "Computing depreciation under IT Act Dual Schedule...",
+        "Applying slab rates & health/education cess (4%)...",
+        "ITR computation draft generated."
+      ],
+      'epf-esi': [
+        `Connecting to payroll register database via AA for ${clientName}...`,
+        "Extracting monthly employee wage statements...",
+        "Filtering employees with basic wage <= ₹15,000 (EPF threshold)...",
+        "Filtering employees with gross wage <= ₹21,000 (ESI threshold)...",
+        "Calculating EPF contributions (12% employee + 12% employer)...",
+        "Calculating ESI contributions (0.75% employee + 3.25% employer)...",
+        "Validating UANs and ESI numbers...",
+        "EPF & ESI payroll computation complete."
+      ],
+      financials: [
+        `Retrieving trial balance and general ledger from synced ERP for ${clientName}...`,
+        "Running ledger verification checks...",
+        "Validating accounting equation: Assets = Liabilities + Equity...",
+        "Compiling Schedule III Balance Sheet format...",
+        "Preparing Profit & Loss Statement with margin ratios...",
+        "Constructing Cash Flow Statement (Indirect Method)...",
+        "All statements validated and balanced successfully."
+      ],
+      notices: [
+        `Scanning GST, Income Tax, and MCA portals via API key for ${clientName}...`,
+        "Detecting notice alerts and cause notices...",
+        "Parsing PDF notices using Sannidh OCR parser...",
+        "Extracting reference IDs, amounts, and due dates...",
+        "Mapping notices to compliance calendars...",
+        "Creating task timeline reminders."
+      ],
+      'advance-tax': [
+        `Retrieving YTD profit and loss statements for ${clientName}...`,
+        "Extrapolating projected annual revenue based on run rate...",
+        "Calculating estimated gross tax liability...",
+        "Deducting TDS credits and advance tax installments already paid...",
+        "Checking interest liability under Section 234B & 234C...",
+        "Compiling quarterly installment schedule."
+      ],
+      'regime-optimizer': [
+        `Fetching employee salary structures and tax declarations for ${clientName}...`,
+        "Decoding rent receipts, HRA claims, and 80C/80D proofs...",
+        "Simulating old tax regime slabs with deductions...",
+        "Simulating new tax regime slabs with standard deduction...",
+        "Calculating side-by-side comparison and net tax savings...",
+        "Optimizing tax filing regime recommendation."
+      ],
+      'capital-gains': [
+        `Establishing connection to broker portfolio feeds via AA for ${clientName}...`,
+        "Importing equity, mutual fund, and debt trade sheets...",
+        "Calculating holding periods (STCG vs LTCG criteria)...",
+        "Applying CII indexation for debt/gold assets...",
+        "Applying Sec 112A Grandfathering FMV for pre-2018 equity...",
+        "Calculating net gains and taxable capital gains."
+      ]
+    };
+
+    const logs = customLogs[runningAnimationFor] || [
+      `Establishing secure session with RBI Account Aggregator (AA) for ${clientName}...`,
+      `Retrieving ledger records and bank statements for ${label}...`,
+      "Initializing Sannidh AI swarm compliance agents...",
+      `Analyzing regulatory guidelines for ${label}...`,
+      "Compiling variables and verifying calculations...",
+      "Drafting official filing and audit logs...",
+      "Verification complete. Workspace initialized."
+    ];
+
+    let currentLogIndex = 0;
+    const intervalTime = 3000 / logs.length;
+
+    const timer = setInterval(() => {
+      if (currentLogIndex < logs.length) {
+        setAnimationLogs(prev => [...prev, logs[currentLogIndex]]);
+        currentLogIndex++;
+        
+        const progress = Math.min(100, Math.round((currentLogIndex / logs.length) * 100));
+        setAnimationProgress(progress);
+        
+        if (progress >= 90) setCompletedSteps(4);
+        else if (progress >= 65) setCompletedSteps(3);
+        else if (progress >= 35) setCompletedSteps(2);
+        else setCompletedSteps(1);
+      } else {
+        clearInterval(timer);
+        setTimeout(() => {
+          // Tell the child panel that it can auto-calculate and display immediately
+          localStorage.setItem(`sannidh:auto-calculate:${selectedClient}:${runningAnimationFor}`, "true");
+          setRunningAnimationFor(null);
+        }, 500);
+      }
+    }, intervalTime);
+
+    return () => clearInterval(timer);
+  }, [runningAnimationFor, selectedClient, clients]);
+
+  const handleSkip = () => {
+    if (runningAnimationFor) {
+      localStorage.setItem(`sannidh:auto-calculate:${selectedClient}:${runningAnimationFor}`, "true");
+      setRunningAnimationFor(null);
+    }
+  };
 
   const ActiveComponent = activeModule ? MODULES.find(m => m.id === activeModule)?.component : null;
   const activeInfo = activeModule ? MODULES.find(m => m.id === activeModule) : null;
@@ -377,7 +553,7 @@ export default function ComplianceModulesHub({ demoClients, isDemo }: { demoClie
                 initial={{ opacity: 0, y: 10 }}
                 animate={{ opacity: 1, y: 0 }}
                 transition={{ delay: i * 0.035 }}
-                onClick={() => setActiveModule(mod.id)}
+                onClick={() => handleSelectModule(mod.id)}
                 className="text-left p-4 rounded-xl border border-border/30 bg-card/30 hover:bg-card/60 hover:border-border/60 transition-all group"
               >
                 <div className="flex items-start gap-3">
@@ -439,6 +615,100 @@ export default function ComplianceModulesHub({ demoClients, isDemo }: { demoClie
                 <h4 className="text-base font-semibold text-muted-foreground text-opacity-80">Select a Client First</h4>
                 <p className="text-xs text-muted-foreground max-w-xs mt-1 mx-auto">Please select an active client from the dropdown above to initialize the {activeInfo?.label} workspace.</p>
               </div>
+            ) : runningAnimationFor ? (
+              /* Simulated Account Aggregator & AI Swarm animation overlay */
+              <motion.div
+                initial={{ opacity: 0, scale: 0.98 }}
+                animate={{ opacity: 1, scale: 1 }}
+                className="p-6 border border-cyan-500/30 rounded-2xl bg-slate-950/80 backdrop-blur-md space-y-6 relative overflow-hidden"
+              >
+                {/* Glowing border effects */}
+                <div className="absolute top-0 left-0 w-full h-[2px] bg-gradient-to-r from-transparent via-cyan-500 to-transparent animate-pulse" />
+                
+                <div className="flex flex-col md:flex-row gap-6 items-center">
+                  {/* Radar Scanner Animation */}
+                  <div className="relative w-32 h-32 flex-shrink-0 flex items-center justify-center">
+                    <div className="absolute inset-0 rounded-full border border-cyan-500/20 animate-ping" />
+                    <div className="absolute inset-2 rounded-full border border-cyan-500/30 animate-pulse" />
+                    <div className="absolute inset-4 rounded-full border-2 border-dashed border-cyan-400/40 animate-[spin_8s_linear_infinite]" />
+                    <div className="absolute inset-8 rounded-full bg-cyan-950/50 border border-cyan-500/50 flex items-center justify-center">
+                      <ScanLine className="w-8 h-8 text-cyan-400 animate-pulse" />
+                    </div>
+                  </div>
+
+                  <div className="flex-1 space-y-2 text-center md:text-left">
+                    <div className="flex items-center gap-2 justify-center md:justify-start">
+                      <Badge className="bg-cyan-500/20 text-cyan-400 border border-cyan-500/30 text-[10px] animate-pulse">RBI AA INTEGRATION</Badge>
+                      <Badge className="bg-purple-500/20 text-purple-400 border border-purple-500/30 text-[10px]">AI SWARM RUNNING</Badge>
+                    </div>
+                    <h4 className="text-lg font-bold text-white">Sannidh Compliance Auto-Pilot</h4>
+                    <p className="text-xs text-muted-foreground">
+                      Running secure handshake with Account Aggregator and executing regulatory validation engines for <span className="text-cyan-400 font-semibold">{clients.find(c => c.id === selectedClient)?.name}</span>.
+                    </p>
+                  </div>
+
+                  <Button variant="ghost" size="sm" onClick={handleSkip} className="absolute top-4 right-4 text-xs text-slate-500 hover:text-slate-300">
+                    Skip →
+                  </Button>
+                </div>
+
+                {/* Progress bar */}
+                <div className="space-y-1.5">
+                  <div className="flex justify-between text-xs font-semibold">
+                    <span className="text-cyan-400">Compliance Workspace Compiling...</span>
+                    <span className="text-cyan-400">{animationProgress}%</span>
+                  </div>
+                  <div className="w-full h-2 bg-slate-900 rounded-full overflow-hidden border border-border/20">
+                    <div
+                      className="h-full bg-gradient-to-r from-cyan-500 to-purple-500 rounded-full transition-all duration-300"
+                      style={{ width: `${animationProgress}%` }}
+                    />
+                  </div>
+                </div>
+
+                {/* Grid checklist + console */}
+                <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
+                  {/* Checklist */}
+                  <div className="md:col-span-1 space-y-2 p-3 bg-slate-900/40 rounded-xl border border-border/20">
+                    <p className="text-xs font-bold text-slate-400 uppercase tracking-wide mb-2">Execution Pipeline</p>
+                    {[
+                      { label: "RBI AA Consent Verification", step: 1 },
+                      { label: "Ledger & Bank Feed Fetch", step: 2 },
+                      { label: "AI Swarm Calculation Engine", step: 3 },
+                      { label: "Workspace Render Init", step: 4 }
+                    ].map(st => (
+                      <div key={st.step} className="flex items-center gap-2 text-xs">
+                        {completedSteps >= st.step ? (
+                          <Badge className="p-0.5 bg-green-500/20 text-green-400 rounded-full border border-green-500/30 shrink-0 animate-scale-in">
+                            <svg className="w-3 h-3" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2.5" d="M5 13l4 4L19 7" /></svg>
+                          </Badge>
+                        ) : completedSteps + 1 === st.step ? (
+                          <div className="w-4 h-4 border-2 border-cyan-400 border-t-transparent rounded-full animate-spin shrink-0" />
+                        ) : (
+                          <div className="w-4 h-4 rounded-full border border-slate-700 shrink-0" />
+                        )}
+                        <span className={completedSteps >= st.step ? "text-slate-300 font-medium" : "text-slate-500"}>{st.label}</span>
+                      </div>
+                    ))}
+                  </div>
+
+                  {/* Terminal console logs */}
+                  <div className="md:col-span-2 bg-slate-950 border border-border/30 rounded-xl p-3 h-36 overflow-y-auto font-mono text-[10px] space-y-1 scrollbar-thin scrollbar-thumb-cyan-500/20">
+                    {animationLogs.map((log, i) => (
+                      <div key={i} className="flex items-start gap-1">
+                        <span className="text-cyan-500/70 shrink-0">sannidh:~$</span>
+                        <span className={i === animationLogs.length - 1 ? "text-cyan-400" : "text-slate-300"}>{log}</span>
+                      </div>
+                    ))}
+                    {animationProgress < 100 && (
+                      <div className="flex items-center gap-1 text-cyan-400/50">
+                        <span className="text-cyan-500/70 shrink-0">sannidh:~$</span>
+                        <span className="animate-pulse">_</span>
+                      </div>
+                    )}
+                  </div>
+                </div>
+              </motion.div>
             ) : (
               <Suspense fallback={<PanelFallback />}>
                 {ActiveComponent && (

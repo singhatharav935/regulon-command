@@ -121,8 +121,8 @@ const CinematicEntry = ({ onComplete }: CinematicEntryProps) => {
       if (glRef.current) {
         try {
           glRef.current.dispose();
-        } catch (err) {
-          console.debug('[CinematicEntry] WebGL context already destroyed during cleanup:', err);
+        } catch {
+          // Context may already be destroyed — safe to ignore
         }
         glRef.current = null;
       }
