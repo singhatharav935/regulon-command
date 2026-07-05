@@ -5,6 +5,7 @@
  */
 
 import { supabase } from "@/integrations/supabase/client";
+import { tableExists } from '@/lib/table-registry';
 
 const isDemoMode = () => {
   if (typeof window === 'undefined') return false;
@@ -446,27 +447,39 @@ export async function getCAMetricsFromDB(): Promise<CAMetrics> {
       .eq('user_id', user.id);
 
     // 2. High Risk Alerts (Notices that are high status or urgent)
-    const { count: highRiskCount } = await supabase
-      .from('client_govt_notices')
-      .select('id', { count: 'exact', head: true })
-      .eq('ca_user_id', user.id)
-      .eq('status', 'detected');
+    let highRiskCount = 0;
+    if (tableExists('client_govt_notices')) {
+      const { count } = await supabase
+        .from('client_govt_notices')
+        .select('id', { count: 'exact', head: true })
+        .eq('ca_user_id', user.id)
+        .eq('status', 'detected');
+      highRiskCount = count || 0;
+    }
 
     // 3. Overdue dependencies
     const nowStr = new Date().toISOString();
-    const { count: overdueCount } = await supabase
-      .from('ca_dependencies')
-      .select('id', { count: 'exact', head: true })
-      .eq('ca_user_id', user.id)
-      .eq('status', 'pending')
-      .lt('due_date', nowStr);
+    let overdueCount = 0;
+    if (tableExists('ca_dependencies')) {
+      const { count } = await supabase
+        .from('ca_dependencies')
+        .select('id', { count: 'exact', head: true })
+        .eq('ca_user_id', user.id)
+        .eq('status', 'pending')
+        .lt('due_date', nowStr);
+      overdueCount = count || 0;
+    }
 
     // 4. Active Tasks (Unbilled tasks that need billing/completion)
-    const { count: activeTasksCount } = await supabase
-      .from('ca_task_history')
-      .select('id', { count: 'exact', head: true })
-      .eq('ca_user_id', user.id)
-      .eq('is_billed', false);
+    let activeTasksCount = 0;
+    if (tableExists('ca_task_history')) {
+      const { count } = await supabase
+        .from('ca_task_history')
+        .select('id', { count: 'exact', head: true })
+        .eq('ca_user_id', user.id)
+        .eq('is_billed', false);
+      activeTasksCount = count || 0;
+    }
 
     // 5. Monthly Revenue (Total paid invoices for current month)
     const startOfMonth = new Date(new Date().getFullYear(), new Date().getMonth(), 1).toISOString();
@@ -480,13 +493,17 @@ export async function getCAMetricsFromDB(): Promise<CAMetrics> {
 
     // 6. Pending Filings in next 7 days
     const nextWeekStr = new Date(Date.now() + 7 * 86400000).toISOString();
-    const { count: pendingFilings } = await supabase
-      .from('client_govt_notices')
-      .select('id', { count: 'exact', head: true })
-      .eq('ca_user_id', user.id)
-      .eq('status', 'detected')
-      .gte('due_date', nowStr)
-      .lte('due_date', nextWeekStr);
+    let pendingFilings = 0;
+    if (tableExists('client_govt_notices')) {
+      const { count } = await supabase
+        .from('client_govt_notices')
+        .select('id', { count: 'exact', head: true })
+        .eq('ca_user_id', user.id)
+        .eq('status', 'detected')
+        .gte('due_date', nowStr)
+        .lte('due_date', nextWeekStr);
+      pendingFilings = count || 0;
+    }
 
     return {
       assigned_companies: assignedCount || 0,
@@ -632,6 +649,7 @@ export async function getClientGovtNotices(): Promise<any[]> {
   try {
     const { data: { user } } = await supabase.auth.getUser();
     if (!user) return [];
+    if (!tableExists('client_govt_notices')) return [];
 
     const { data, error } = await supabase
       .from('client_govt_notices')
@@ -696,6 +714,7 @@ export async function getCADependencies(): Promise<any[]> {
   try {
     const { data: { user } } = await supabase.auth.getUser();
     if (!user) return [];
+    if (!tableExists('ca_dependencies')) return [];
 
     const { data, error } = await supabase
       .from('ca_dependencies')
@@ -761,6 +780,7 @@ export async function getCommunicationLogs(): Promise<any[]> {
   try {
     const { data: { user } } = await supabase.auth.getUser();
     if (!user) return [];
+    if (!tableExists('communication_logs')) return [];
 
     const { data, error } = await supabase
       .from('communication_logs')
@@ -816,6 +836,7 @@ export async function getUnbilledTasks(): Promise<any[]> {
   try {
     const { data: { user } } = await supabase.auth.getUser();
     if (!user) return [];
+    if (!tableExists('ca_task_history')) return [];
 
     const { data, error } = await supabase
       .from('ca_task_history')

@@ -19,6 +19,7 @@ import { Label } from '@/components/ui/label';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
 import { toast } from 'sonner';
 import { supabase } from '@/integrations/supabase/client';
+import { tableExists } from '@/lib/table-registry';
 import {
   isOnline,
   setSimulatedOffline,
@@ -99,17 +100,23 @@ export const OfflinePwaHub: React.FC = () => {
         }
 
         // compliance_tasks table may not exist yet
-        try {
-          const { data: tasksData, error: taskErr } = await supabase
-            .from('compliance_tasks' as any)
-            .select('id, client_name, task_title, due_date, status, priority')
-            .limit(10);
-          if (!taskErr && tasksData) {
-            setCachedTasks(tasksData);
-          } else {
-            throw new Error('tasks query failed');
+        if (tableExists('compliance_tasks')) {
+          try {
+            const { data: tasksData, error: taskErr } = await supabase
+              .from('compliance_tasks' as any)
+              .select('id, client_name, task_title, due_date, status, priority')
+              .limit(10);
+            if (!taskErr && tasksData) {
+              setCachedTasks(tasksData);
+            } else {
+              throw new Error('tasks query failed');
+            }
+          } catch {
+            setCachedTasks([
+              { id: '1', client_name: 'Shree Balaji Logistics', task_title: 'GST Scrutiny Reply Section 73', due_date: '2026-05-30', status: 'pending', priority: 'high' }
+            ]);
           }
-        } catch {
+        } else {
           setCachedTasks([
             { id: '1', client_name: 'Shree Balaji Logistics', task_title: 'GST Scrutiny Reply Section 73', due_date: '2026-05-30', status: 'pending', priority: 'high' }
           ]);
@@ -165,15 +172,21 @@ export const OfflinePwaHub: React.FC = () => {
       queueOfflineMutation('INSERT', 'compliance_tasks', payload);
     } else {
       // Online mode: Create immediately in Supabase
-      supabase.from('compliance_tasks' as any)
-        .insert([payload])
-        .then(({ error }) => {
-          if (error) {
-            toast.error(`Insertion failed: ${error.message}`);
-          } else {
-            toast.success(`Online insertion successful: Created task "${taskTitle}"`);
-          }
-        });
+      if (tableExists('compliance_tasks')) {
+        supabase.from('compliance_tasks' as any)
+          .insert([payload])
+          .then(({ error }) => {
+            if (error) {
+              toast.error(`Insertion failed: ${error.message}`);
+            } else {
+              toast.success(`Online insertion successful: Created task "${taskTitle}"`);
+            }
+          });
+      } else {
+        // Table not deployed — queue as offline mutation instead
+        queueOfflineMutation('INSERT', 'compliance_tasks', payload);
+        toast.info('Task queued locally (table not yet deployed)');
+      }
     }
 
     setTaskTitle('');

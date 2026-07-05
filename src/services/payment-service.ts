@@ -5,6 +5,7 @@
  */
 import { supabase } from '@/integrations/supabase/client';
 import { isValidUUID } from '@/lib/uuid-guard';
+import { tableExists } from '@/lib/table-registry';
 import { handleServiceError } from '@/lib/safe-query';
 
 // ─── Types ────────────────────────────────────────────────────────────────────
@@ -152,6 +153,7 @@ export async function fetchLiabilities(
   filters?: { isPaid?: boolean; entityId?: string; taxType?: TaxType }
 ): Promise<TaxLiability[]> {
   if (!isValidUUID(caUserId)) return [];
+  if (!tableExists('tax_liability_heads')) return [];
   let q = (supabase as any)
     .from('tax_liability_heads')
     .select('*, entities(entity_name, entity_type, gstin, pan)')
@@ -194,6 +196,7 @@ export async function fetchUpcomingPayments(caUserId: string): Promise<TaxLiabil
 export async function createLiability(
   liability: Omit<TaxLiability, 'id' | 'balance_due_paise' | 'created_at' | 'updated_at' | 'entity_name' | 'entity_type' | 'gstin' | 'pan'>
 ): Promise<TaxLiability> {
+  if (!tableExists('tax_liability_heads')) return {} as TaxLiability;
   // Auto-compute derived fields
   const net = Math.max(0, liability.gross_liability_paise - liability.itc_available_paise);
   const total = net + liability.interest_paise + liability.penalty_paise + liability.late_fee_paise;
@@ -212,6 +215,7 @@ export async function updateLiability(
   id: string,
   updates: Partial<TaxLiability>
 ): Promise<TaxLiability> {
+  if (!tableExists('tax_liability_heads')) return {} as TaxLiability;
   // Recompute derived fields if amounts change
   if (
     updates.gross_liability_paise !== undefined ||
@@ -245,6 +249,7 @@ export async function updateLiability(
 }
 
 export async function deleteLiability(id: string): Promise<void> {
+  if (!tableExists('tax_liability_heads')) return;
   const { error } = await (supabase as any)
     .from('tax_liability_heads')
     .delete()

@@ -6,6 +6,7 @@
 import { supabase } from '@/integrations/supabase/client';
 import { isValidUUID } from '@/lib/uuid-guard';
 import { handleServiceError } from '@/lib/safe-query';
+import { tableExists, rpcExists } from '@/lib/table-registry';
 
 // ─── Types ───────────────────────────────────────────────────────────────────
 
@@ -449,9 +450,11 @@ export async function deleteReport(id: string): Promise<void> {
 export async function fetchRetentionPolicies(caUserId: string): Promise<DataRetentionPolicy[]> {
   // Bootstrap default policies if none exist
   if (!isValidUUID(caUserId)) return [];
-  try {
-    await supabase.rpc('bootstrap_retention_policies', { ca_id: caUserId });
-  } catch { /* graceful — proceed even if RPC not deployed */ }
+  if (rpcExists('bootstrap_retention_policies')) {
+    try {
+      await supabase.rpc('bootstrap_retention_policies', { ca_id: caUserId });
+    } catch { /* graceful — proceed even if RPC not deployed */ }
+  }
 
   const { data, error } = await (supabase as any)
     .from('data_retention_policies')

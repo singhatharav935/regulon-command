@@ -1,5 +1,6 @@
 import { useState, useEffect, useRef, useCallback, Suspense, lazy } from "react";
 import { isCABackendConfigured } from "@/lib/ca-backend-guard";
+import { tableExists } from "@/lib/table-registry";
 import { getLiveRegulatoryNews, getStatutoryDeadlines } from "@/services/ca-supabase-service";
 const MultiClientMasterHub = lazy(() => import("@/components/ca-dashboard/MultiClientMasterHub"));
 const PracticeBillingPanel = lazy(() => import("@/components/ca-dashboard/PracticeBillingPanel"));
@@ -837,17 +838,19 @@ const LiveAIDraftingEngine = () => {
 
       if (!companyId) throw new Error("No active clients found to map this notice to.");
 
-      const { data: notice, error: insertErr } = await supabase.from('client_govt_notices').insert({
-        company_id: companyId,
-        ca_user_id: caUser?.user?.id,
-        department: 'GST', // We could use LLM to auto-detect this, but keeping it GST for now
-        notice_type: 'Auto-Detected Notice',
-        notice_number: `SCN-${Date.now()}`,
-        issue_date: new Date().toISOString().split('T')[0],
-        financial_year: '2025-26',
-        raw_text_content: extractedText,
-        status: 'detected'
-      }).select().single();
+      const { data: notice, error: insertErr } = tableExists('client_govt_notices')
+        ? await supabase.from('client_govt_notices').insert({
+            company_id: companyId,
+            ca_user_id: caUser?.user?.id,
+            department: 'GST', // We could use LLM to auto-detect this, but keeping it GST for now
+            notice_type: 'Auto-Detected Notice',
+            notice_number: `SCN-${Date.now()}`,
+            issue_date: new Date().toISOString().split('T')[0],
+            financial_year: '2025-26',
+            raw_text_content: extractedText,
+            status: 'detected'
+          }).select().single()
+        : { data: { id: `local-notice-${Date.now()}` } as any, error: null };
 
       if (insertErr) throw insertErr;
 
@@ -1092,15 +1095,17 @@ const LiveAIDraftingEngine = () => {
       const signatureToken = `esign-${Date.now()}-${Math.random().toString(36).slice(2, 8)}`;
       
       // Record the signature request in the database
-      await supabase.from('client_govt_notices')
-        .update({ 
-          status: 'awaiting_client_signature',
-          ai_summary: `E-Signature requested. Token: ${signatureToken}. Sent at: ${new Date().toISOString()}`
-        })
-        .eq('ca_user_id', caUser?.user?.id)
-        .eq('status', 'review_pending')
-        .order('created_at', { ascending: false })
-        .limit(1);
+      if (tableExists('client_govt_notices')) {
+        await supabase.from('client_govt_notices')
+          .update({ 
+            status: 'awaiting_client_signature',
+            ai_summary: `E-Signature requested. Token: ${signatureToken}. Sent at: ${new Date().toISOString()}`
+          })
+          .eq('ca_user_id', caUser?.user?.id)
+          .eq('status', 'review_pending')
+          .order('created_at', { ascending: false })
+          .limit(1);
+      }
 
       setSignatureStatus(`Signature request sent. Token: ${signatureToken}`);
       setDraftApprovalStatus('signed');
@@ -1155,12 +1160,14 @@ const LiveAIDraftingEngine = () => {
         });
         
         // Queue for manual filing
-        await supabase.from('client_govt_notices')
-          .update({ status: 'queued_for_manual_filing' })
-          .eq('ca_user_id', caUser?.user?.id)
-          .eq('status', 'awaiting_client_signature')
-          .order('created_at', { ascending: false })
-          .limit(1);
+        if (tableExists('client_govt_notices')) {
+          await supabase.from('client_govt_notices')
+            .update({ status: 'queued_for_manual_filing' })
+            .eq('ca_user_id', caUser?.user?.id)
+            .eq('status', 'awaiting_client_signature')
+            .order('created_at', { ascending: false })
+            .limit(1);
+        }
         
         setDraftApprovalStatus('filed');
         setFilingARN(`MANUAL-QUEUE-${Date.now().toString().slice(-6)}`);
@@ -1186,15 +1193,17 @@ const LiveAIDraftingEngine = () => {
       const arnNumber = filingResult?.arn || `ARN-${Date.now().toString().slice(-8)}-${Math.random().toString(36).slice(2, 6).toUpperCase()}`;
       
       // Step 3: Update database with filing status
-      await supabase.from('client_govt_notices')
-        .update({ 
-          status: 'filed_to_government',
-          ai_summary: `Filed to Government Portal. ARN: ${arnNumber}. Filed at: ${new Date().toISOString()}. Filed by: ${caUser?.user?.email}`
-        })
-        .eq('ca_user_id', caUser?.user?.id)
-        .eq('status', 'awaiting_client_signature')
-        .order('created_at', { ascending: false })
-        .limit(1);
+      if (tableExists('client_govt_notices')) {
+        await supabase.from('client_govt_notices')
+          .update({ 
+            status: 'filed_to_government',
+            ai_summary: `Filed to Government Portal. ARN: ${arnNumber}. Filed at: ${new Date().toISOString()}. Filed by: ${caUser?.user?.email}`
+          })
+          .eq('ca_user_id', caUser?.user?.id)
+          .eq('status', 'awaiting_client_signature')
+          .order('created_at', { ascending: false })
+          .limit(1);
+      }
       
       setFilingARN(arnNumber);
       setDraftApprovalStatus('filed');

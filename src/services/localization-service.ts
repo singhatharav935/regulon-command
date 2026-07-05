@@ -5,6 +5,7 @@
 import { supabase } from '@/integrations/supabase/client';
 import { isValidUUID } from '@/lib/uuid-guard';
 import { handleServiceError } from '@/lib/safe-query';
+import { tableExists } from '@/lib/table-registry';
 
 export type IssuingAuthority =
   | 'GSTIN' | 'Income Tax' | 'MCA' | 'DGFT' | 'EPFO' | 'ESIC' | 'SEBI' | 'RBI' | 'Customs';
@@ -464,7 +465,7 @@ export async function translateAndParseNotice(
   // 5. Create a regulatory task automatically for the first action item in compliance table if possible
   try {
     const { data: userData } = await supabase.auth.getUser();
-    if (userData?.user?.id) {
+    if (userData?.user?.id && tableExists('compliance_tasks')) {
       const firstAction = savedNotice.extracted_action_items[0];
       await (supabase as any)
         .from('compliance_tasks' as any)

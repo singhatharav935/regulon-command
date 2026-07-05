@@ -6,6 +6,7 @@
 import { supabase } from '@/integrations/supabase/client';
 import { isValidUUID } from '@/lib/uuid-guard';
 import { handleServiceError } from '@/lib/safe-query';
+import { tableExists } from '@/lib/table-registry';
 
 // ─── Helpers ──────────────────────────────────────────────────────────────────
 
@@ -696,12 +697,14 @@ export async function generateConsolidatedReport(
     entityIds = entities.map((e) => e.id);
   }
 
-  const { data: tasks } = await (supabase as any)
-    .from('compliance_tasks')
-    .select('*')
-    .in('company_id', entityIds)
-    .gte('created_at', periodStart)
-    .lte('created_at', periodEnd);
+  const { data: tasks } = tableExists('compliance_tasks')
+    ? await (supabase as any)
+      .from('compliance_tasks')
+      .select('*')
+      .in('company_id', entityIds)
+      .gte('created_at', periodStart)
+      .lte('created_at', periodEnd)
+    : { data: [] };
 
   const { data: deadlines } = await (supabase as any)
     .from('deadlines')

@@ -17,7 +17,7 @@ const EXISTING_TABLES = new Set([
   'companies',
   'company_members',
   'regulatory_exposure',
-  'compliance_tasks',
+  // 'compliance_tasks', — not deployed; queries cause 400
   'documents',
   'deadlines',
   'ai_conversations',
@@ -38,10 +38,10 @@ const EXISTING_TABLES = new Set([
   // CA client management
   'ca_clients',
   'consent_requests',
-  'client_govt_notices',
-  'ca_dependencies',
-  'communication_logs',
-  'ca_task_history',
+  // 'client_govt_notices', — not deployed; queries cause 400
+  // 'ca_dependencies',    — not deployed; queries cause 400
+  // 'communication_logs', — not deployed; queries cause 400
+  // 'ca_task_history',    — not deployed; queries cause 400
   'ca_firm_invoices',
 
   // Client financials
@@ -96,7 +96,7 @@ const EXISTING_TABLES = new Set([
   'efiling_status_log',
 
   // Payment & tax
-  'tax_liability_heads',
+  // 'tax_liability_heads', — not deployed; queries cause 400
   'tax_computation_rules',
   'payment_transactions',
   'payment_reconciliation',
@@ -142,4 +142,21 @@ const EXISTING_TABLES = new Set([
  */
 export function tableExists(tableName: string): boolean {
   return EXISTING_TABLES.has(tableName);
+}
+
+/**
+ * Known RPC functions deployed in the database.
+ * Queries to non-existent RPCs produce uncatchable 400 console errors.
+ */
+const EXISTING_RPCS = new Set<string>([
+  // Add RPC function names here as they are deployed to Supabase.
+  // 'bootstrap_retention_policies', — not deployed
+]);
+
+/**
+ * Check if an RPC function exists in the database.
+ * Returns false for RPCs that would cause 400 errors.
+ */
+export function rpcExists(rpcName: string): boolean {
+  return EXISTING_RPCS.has(rpcName);
 }

@@ -1,4 +1,5 @@
 import { useState, useEffect, useCallback } from 'react';
+import { tableExists } from '@/lib/table-registry';
 import { isCABackendConfigured } from '@/lib/ca-backend-guard';
 import { CASectionAgentBadge } from '../agents/CASectionAgentBadge';
 import { motion, AnimatePresence } from 'framer-motion';
@@ -159,22 +160,24 @@ export default function ComplianceHealthChangeLog({
       // Fetch recent government notices — table may not exist
       const clientIds = clients.map((c: any) => c.id);
       let noticeMap: Record<string, any[]> = {};
-      try {
-        const { data: notices, error: noticeErr } = await supabase
-          .from('client_govt_notices')
-          .select('company_id, notice_type, department, created_at, status')
-          .in('company_id', clientIds)
-          .order('created_at', { ascending: false })
-          .limit(50);
+      if (tableExists('client_govt_notices')) {
+        try {
+          const { data: notices, error: noticeErr } = await supabase
+            .from('client_govt_notices')
+            .select('company_id, notice_type, department, created_at, status')
+            .in('company_id', clientIds)
+            .order('created_at', { ascending: false })
+            .limit(50);
 
-        if (!noticeErr && notices) {
-          (notices || []).forEach((n: any) => {
-            if (!noticeMap[n.company_id]) noticeMap[n.company_id] = [];
-            noticeMap[n.company_id].push(n);
-          });
+          if (!noticeErr && notices) {
+            (notices || []).forEach((n: any) => {
+              if (!noticeMap[n.company_id]) noticeMap[n.company_id] = [];
+              noticeMap[n.company_id].push(n);
+            });
+          }
+        } catch {
+          // client_govt_notices table doesn't exist — proceed without notices
         }
-      } catch {
-        // client_govt_notices table doesn't exist — proceed without notices
       }
 
       const logs: ComplianceChangeLog[] = clients.map((client: any) => {
