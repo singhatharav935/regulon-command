@@ -20,7 +20,7 @@ self.addEventListener('install', (event) => {
       console.log('[Service Worker] Pre-caching static assets...');
       return cache.addAll(STATIC_ASSETS);
     }).then(() => {
-      return (self as any).skipWaiting();
+      return self.skipWaiting();
     })
   );
 });
@@ -79,7 +79,7 @@ self.addEventListener('fetch', (event) => {
           }
           // If HTML is requested but not cached, fallback to index
           if (req.headers.get('accept')?.includes('text/html')) {
-            return caches.match('/index.html') as Promise<Response>;
+            return caches.match('/index.html');
           }
           return new Response('Network error occurred. You are currently offline.', {
             status: 503,
@@ -94,6 +94,6 @@ self.addEventListener('fetch', (event) => {
 // 4. Background Sync & Messages listener
 self.addEventListener('message', (event) => {
   if (event.data && event.data.type === 'SKIP_WAITING') {
-    (self as any).skipWaiting();
+    self.skipWaiting();
   }
 });
