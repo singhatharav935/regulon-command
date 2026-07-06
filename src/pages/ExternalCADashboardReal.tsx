@@ -40,6 +40,7 @@ const GovScraperHub = lazy(() => import("@/components/ca-dashboard/GovScraperHub
 import { isOnline } from "@/services/offline-sync-service";
 import { useLanguage, LANGUAGE_LABELS } from "@/contexts/LanguageContext";
 import { Globe2, Wifi, WifiOff } from "lucide-react";
+import { type ClientSector, getSectorConfig, isZoneAllowed } from "@/lib/client-sector";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { Badge } from "@/components/ui/badge";
@@ -1832,6 +1833,38 @@ const LiveAIDraftingEngine = () => {
   );
 };
 
+// ─── SectorGate ────────────────────────────────────────────────────────────────
+// Wraps any zone or panel. If the active client's sector doesn't allow this
+// zone, shows a soft "not applicable" placeholder instead of the full panel.
+// If no client is selected (sector = null), renders children normally.
+const SectorGate = ({
+  sector,
+  zoneId,
+  children,
+}: {
+  sector: ClientSector | null;
+  zoneId: string;
+  children: React.ReactNode;
+}) => {
+  if (!sector || isZoneAllowed(sector, zoneId)) return <>{children}</>;
+  const cfg = getSectorConfig(sector);
+  return (
+    <div className="flex flex-col items-center justify-center py-20 px-6 text-center rounded-2xl border border-border/30 bg-card/10">
+      <div className="text-5xl mb-4">{cfg.emoji}</div>
+      <h3 className="text-lg font-semibold text-muted-foreground mb-2">
+        Not applicable for {cfg.label} clients
+      </h3>
+      <p className="text-sm text-muted-foreground/60 max-w-md">
+        This module is not required for <span className={`font-semibold ${cfg.color}`}>{cfg.label}</span> sector compliance.
+        Switch to a different client or change the sector to access this zone.
+      </p>
+      <div className={`mt-4 px-3 py-1.5 rounded-full border text-xs font-medium ${cfg.badgeCls}`}>
+        {cfg.emoji} Active: {cfg.label}
+      </div>
+    </div>
+  );
+};
+
 type CADashboardZone = 
   | "command" | "multi-entity" | "e-filing" | "payment" | "clients" | "operations" 
   | "ai-swarm" | "calculations" | "enterprise-api" | "erp-integration" | "doc-ocr" 
@@ -1860,6 +1893,19 @@ const ExternalCADashboardReal = () => {
   // Realtime sync: re-fetch when ANY device changes data in Supabase
   useRealtimeSync(refetch);
   const [activeZone, setActiveZone] = useState<CADashboardZone>("command");
+  // ── Sector context: set when CA clicks a client row in ClientPortfolioSection ──
+  const [selectedClientSector, setSelectedClientSector] = useState<ClientSector | null>(null);
+  const [selectedClientName, setSelectedClientName] = useState<string | null>(null);
+
+  useEffect(() => {
+    const handleSectorSelected = (e: Event) => {
+      const { clientName, sector } = (e as CustomEvent).detail;
+      setSelectedClientSector(sector || null);
+      setSelectedClientName(clientName || null);
+    };
+    window.addEventListener('ca:client-sector-selected', handleSectorSelected);
+    return () => window.removeEventListener('ca:client-sector-selected', handleSectorSelected);
+  }, []);
   // PRODUCTION: CA_API points to Supabase Edge Functions (real backend)
   const CA_API = (import.meta.env.VITE_SUPABASE_URL as string);
 
@@ -2171,10 +2217,31 @@ const ExternalCADashboardReal = () => {
             </div>
           </div>
 
-          {/* Production Setup Banner — shows which API keys are still needed */}
+          {/* Production Setup Banner */}
           <ProductionSetupBanner />
           {/* CA Command Center Header */}
           <CACommandCenterHeader />
+
+          {/* ── Sector Context Banner — shown when a client is selected ── */}
+          {selectedClientSector && selectedClientSector !== 'general' && (() => {
+            const cfg = getSectorConfig(selectedClientSector);
+            return (
+              <div className={`flex items-center justify-between px-4 py-2.5 rounded-xl border text-sm mt-4 ${cfg.bgColor} ${cfg.borderColor}`}>
+                <div className="flex items-center gap-2">
+                  <span className="text-lg">{cfg.emoji}</span>
+                  <span className="font-semibold text-foreground">{selectedClientName}</span>
+                  <span className={`text-xs px-2 py-0.5 rounded-full border font-medium ${cfg.badgeCls}`}>{cfg.label}</span>
+                  <span className="text-xs text-muted-foreground hidden sm:inline">— showing {cfg.label}-relevant features only</span>
+                </div>
+                <button
+                  onClick={() => { setSelectedClientSector(null); setSelectedClientName(null); }}
+                  className="text-xs text-muted-foreground hover:text-foreground underline transition-colors"
+                >
+                  Clear filter
+                </button>
+              </div>
+            );
+          })()}
           {/* Main Dashboard Layout with Horizontal Tabs */}
           <div className="mt-8">
             <Tabs value={activeZone} onValueChange={(val: any) => setActiveZone(val)} className="w-full">
@@ -2230,17 +2297,23 @@ const ExternalCADashboardReal = () => {
               <Suspense fallback={<div className="p-12 flex justify-center items-center"><Loader className="w-8 h-8 animate-spin text-cyan-500" /></div>}>
               {/* ZONE 0: MULTI-ENTITY & CONSOLIDATED REPORTING */}
               <TabsContent value="multi-entity" className="m-0 focus-visible:outline-none focus-visible:ring-0">
-                <MultiEntityConsolidatedReporting />
+                <SectorGate sector={selectedClientSector} zoneId="multi-entity">
+                  <MultiEntityConsolidatedReporting />
+                </SectorGate>
               </TabsContent>
 
               {/* ZONE 0B: E-FILING INTEGRATION */}
               <TabsContent value="e-filing" className="m-0 focus-visible:outline-none focus-visible:ring-0">
-                <EFilingIntegration />
+                <SectorGate sector={selectedClientSector} zoneId="e-filing">
+                  <EFilingIntegration />
+                </SectorGate>
               </TabsContent>
 
               {/* ZONE 0C: PAYMENT & TAX-LIABILITY AUTOMATION */}
               <TabsContent value="payment" className="m-0 focus-visible:outline-none focus-visible:ring-0">
-                <PaymentTaxLiability />
+                <SectorGate sector={selectedClientSector} zoneId="payment">
+                  <PaymentTaxLiability />
+                </SectorGate>
               </TabsContent>
 
               {/* ZONE 1: COMMAND CENTER (OVERVIEW) */}
@@ -2395,12 +2468,16 @@ const ExternalCADashboardReal = () => {
 
               {/* ZONE 6: ENTERPRISE API & WEBHOOKS */}
               <TabsContent value="enterprise-api" className="m-0 focus-visible:outline-none focus-visible:ring-0 space-y-8">
-                <EnterpriseApiWebhooks />
+                <SectorGate sector={selectedClientSector} zoneId="enterprise-api">
+                  <EnterpriseApiWebhooks />
+                </SectorGate>
               </TabsContent>
 
               {/* ZONE 7: ERP / ACCOUNTING INTEGRATION */}
               <TabsContent value="erp-integration" className="m-0 focus-visible:outline-none focus-visible:ring-0 space-y-8">
-                <ErpIntegrationHub />
+                <SectorGate sector={selectedClientSector} zoneId="erp-integration">
+                  <ErpIntegrationHub />
+                </SectorGate>
               </TabsContent>
 
               {/* ZONE 8: DOCUMENT MANAGEMENT & OCR */}

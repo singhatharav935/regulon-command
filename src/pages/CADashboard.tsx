@@ -41,6 +41,7 @@ const CaseRoom = lazy(() => import("@/components/ca-dashboard-demo/CaseRoom"));
 import { isOnline } from "@/services/offline-sync-service";
 import { useLanguage, LANGUAGE_LABELS } from "@/contexts/LanguageContext";
 import { Globe2, Wifi, WifiOff } from "lucide-react";
+import { type ClientSector, getSectorConfig, isZoneAllowed } from "@/lib/client-sector";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { Badge } from "@/components/ui/badge";
@@ -3192,6 +3193,38 @@ const LiveAIDraftingEngine = () => {
   );
 };
 
+// ─── DemoSectorGate ─────────────────────────────────────────────────────────
+// Demo-only wrapper. Identical logic to the real SectorGate but uses the
+// demo-specific event name and never imports anything from real dashboard.
+// If no client is selected (sector = null), renders children normally.
+const DemoSectorGate = ({
+  sector,
+  zoneId,
+  children,
+}: {
+  sector: ClientSector | null;
+  zoneId: string;
+  children: React.ReactNode;
+}) => {
+  if (!sector || isZoneAllowed(sector, zoneId)) return <>{children}</>;
+  const cfg = getSectorConfig(sector);
+  return (
+    <div className="flex flex-col items-center justify-center py-20 px-6 text-center rounded-2xl border border-border/30 bg-card/10">
+      <div className="text-5xl mb-4">{cfg.emoji}</div>
+      <h3 className="text-lg font-semibold text-muted-foreground mb-2">
+        Not applicable for {cfg.label} clients
+      </h3>
+      <p className="text-sm text-muted-foreground/60 max-w-md">
+        This module is not required for <span className={`font-semibold ${cfg.color}`}>{cfg.label}</span> sector compliance.
+        Switch to a different client or change the sector to access this zone.
+      </p>
+      <div className={`mt-4 px-3 py-1.5 rounded-full border text-xs font-medium ${cfg.badgeCls}`}>
+        {cfg.emoji} Active: {cfg.label}
+      </div>
+    </div>
+  );
+};
+
 type CADashboardZone = 
   | "command" | "multi-entity" | "e-filing" | "case-room" | "payment" | "clients" | "operations" 
   | "ai-swarm" | "calculations" | "enterprise-api" | "erp-integration" | "doc-ocr" 
@@ -3227,6 +3260,20 @@ const CADashboard = () => {
   // Realtime sync: re-fetch when ANY device changes data in Supabase
   useRealtimeSync(refetch);
   const [activeZone, setActiveZone] = useState<CADashboardZone>("command");
+  // ── Demo sector context: set when CA clicks a client row ──────────────────
+  const [selectedClientSector, setSelectedClientSector] = useState<ClientSector | null>(null);
+  const [selectedClientName, setSelectedClientName] = useState<string | null>(null);
+
+  useEffect(() => {
+    const handleDemoSectorSelected = (e: Event) => {
+      const { clientName, sector } = (e as CustomEvent).detail;
+      setSelectedClientSector(sector || null);
+      setSelectedClientName(clientName || null);
+    };
+    // Listen on the DEMO-specific event — never mixed with real dashboard
+    window.addEventListener('ca:demo-client-sector-selected', handleDemoSectorSelected);
+    return () => window.removeEventListener('ca:demo-client-sector-selected', handleDemoSectorSelected);
+  }, []);
   const CA_API = (import.meta.env.VITE_CA_API_BASE_URL as string);
   // Role-based access control bypassed for demo dashboard
 
@@ -3528,6 +3575,28 @@ const CADashboard = () => {
 
           {/* CA Command Center Header */}
           <CACommandCenterHeader />
+
+          {/* ── Demo Sector Context Banner — shown when a demo client is selected ── */}
+          {selectedClientSector && selectedClientSector !== 'general' && (() => {
+            const cfg = getSectorConfig(selectedClientSector);
+            return (
+              <div className={`flex items-center justify-between px-4 py-2.5 rounded-xl border text-sm mt-4 ${cfg.bgColor} ${cfg.borderColor}`}>
+                <div className="flex items-center gap-2">
+                  <span className="text-lg">{cfg.emoji}</span>
+                  <span className="font-semibold text-foreground">{selectedClientName}</span>
+                  <span className={`text-xs px-2 py-0.5 rounded-full border font-medium ${cfg.badgeCls}`}>{cfg.label}</span>
+                  <span className="text-xs text-muted-foreground hidden sm:inline">— showing {cfg.label}-relevant features only (demo)</span>
+                </div>
+                <button
+                  onClick={() => { setSelectedClientSector(null); setSelectedClientName(null); }}
+                  className="text-xs text-muted-foreground hover:text-foreground underline transition-colors"
+                >
+                  Clear filter
+                </button>
+              </div>
+            );
+          })()}
+
           {/* Main Dashboard Layout with Horizontal Tabs */}
           <div className="mt-8">
             <Tabs value={activeZone} onValueChange={(val: any) => setActiveZone(val)} className="w-full">
@@ -3583,22 +3652,30 @@ const CADashboard = () => {
               <Suspense fallback={<div className="p-12 flex justify-center items-center"><Loader className="w-8 h-8 animate-spin text-cyan-500" /></div>}>
               {/* ZONE 0: MULTI-ENTITY & CONSOLIDATED REPORTING */}
               <TabsContent value="multi-entity" className="m-0 focus-visible:outline-none focus-visible:ring-0">
-                {activeZone === "multi-entity" && <MultiEntityConsolidatedReporting />}
+                <DemoSectorGate sector={selectedClientSector} zoneId="multi-entity">
+                  {activeZone === "multi-entity" && <MultiEntityConsolidatedReporting />}
+                </DemoSectorGate>
               </TabsContent>
 
               {/* ZONE 0B: E-FILING INTEGRATION */}
               <TabsContent value="e-filing" className="m-0 focus-visible:outline-none focus-visible:ring-0">
-                {activeZone === "e-filing" && <EFilingIntegration />}
+                <DemoSectorGate sector={selectedClientSector} zoneId="e-filing">
+                  {activeZone === "e-filing" && <EFilingIntegration />}
+                </DemoSectorGate>
               </TabsContent>
 
               {/* ZONE 0B-2: CASE ROOM LITIGATION */}
               <TabsContent value="case-room" className="m-0 focus-visible:outline-none focus-visible:ring-0">
-                {activeZone === "case-room" && <CaseRoom />}
+                <DemoSectorGate sector={selectedClientSector} zoneId="case-room">
+                  {activeZone === "case-room" && <CaseRoom />}
+                </DemoSectorGate>
               </TabsContent>
 
               {/* ZONE 0C: PAYMENT & TAX-LIABILITY AUTOMATION */}
               <TabsContent value="payment" className="m-0 focus-visible:outline-none focus-visible:ring-0">
-                {activeZone === "payment" && <PaymentTaxLiability />}
+                <DemoSectorGate sector={selectedClientSector} zoneId="payment">
+                  {activeZone === "payment" && <PaymentTaxLiability />}
+                </DemoSectorGate>
               </TabsContent>
 
               {/* ZONE 1: COMMAND CENTER (OVERVIEW) */}
@@ -3766,17 +3843,23 @@ const CADashboard = () => {
 
               {/* ZONE 6: ENTERPRISE API & WEBHOOKS */}
               <TabsContent value="enterprise-api" className="m-0 focus-visible:outline-none focus-visible:ring-0 space-y-8">
-                {activeZone === "enterprise-api" && <EnterpriseApiWebhooks />}
+                <DemoSectorGate sector={selectedClientSector} zoneId="enterprise-api">
+                  {activeZone === "enterprise-api" && <EnterpriseApiWebhooks />}
+                </DemoSectorGate>
               </TabsContent>
 
               {/* ZONE 7: ERP / ACCOUNTING INTEGRATION */}
               <TabsContent value="erp-integration" className="m-0 focus-visible:outline-none focus-visible:ring-0 space-y-8">
-                {activeZone === "erp-integration" && <ErpIntegrationHub />}
+                <DemoSectorGate sector={selectedClientSector} zoneId="erp-integration">
+                  {activeZone === "erp-integration" && <ErpIntegrationHub />}
+                </DemoSectorGate>
               </TabsContent>
 
               {/* ZONE 8: DOCUMENT MANAGEMENT & OCR */}
               <TabsContent value="doc-ocr" className="m-0 focus-visible:outline-none focus-visible:ring-0 space-y-8">
-                {activeZone === "doc-ocr" && <DocumentOcrHub />}
+                <DemoSectorGate sector={selectedClientSector} zoneId="doc-ocr">
+                  {activeZone === "doc-ocr" && <DocumentOcrHub />}
+                </DemoSectorGate>
               </TabsContent>
 
               {/* ZONE 9: RBAC & TEAM MANAGEMENT */}

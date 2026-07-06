@@ -3,11 +3,12 @@ import { motion, AnimatePresence } from "framer-motion";
 import { useEffect, useState, useCallback, useRef } from "react";
 import {
   Building2, Clock, Plus, X, ChevronRight, Shield, Send, Loader,
-  CheckCircle, XCircle, AlertCircle, RefreshCw, Mail, MessageSquare, Zap,
+  CheckCircle, XCircle, AlertCircle, RefreshCw, Mail, MessageSquare, Zap, Tag,
 } from "lucide-react";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
+import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { toast } from "sonner";
 import {
   Table, TableBody, TableCell, TableHead, TableHeader, TableRow,
@@ -19,6 +20,8 @@ import {
 } from "@/services/ca-supabase-service";
 import { validateGSTIN, isGSTINFormatValid } from "@/lib/gstin-validator";
 import { useCAAgentOrchestrator } from "@/components/agents/CAAgentOrchestrator";
+import { ClientSectorBadge } from "@/components/ca-dashboard/ClientSectorBadge";
+import { type ClientSector, SELECTABLE_SECTORS, getSectorConfig } from "@/lib/client-sector";
 
 const riskColors: Record<string, string> = {
   Low:    "bg-green-500/20 text-green-400 border-green-500/30",
@@ -60,6 +63,7 @@ const ClientPortfolioSection = ({
   const [swarmDoneIds, setSwarmDoneIds] = useState<Set<string>>(new Set());
   const [onboardForm, setOnboardForm] = useState<CAClientForm>({
     gstin: '', pan: '', cin: '', client_name: '', client_email: '', client_phone: '',
+    sector: 'general',
   });
 
   // ── Government verification state ───────────────────────────────────────
@@ -545,7 +549,7 @@ const ClientPortfolioSection = ({
             <TableHeader>
               <TableRow className="bg-muted/30 hover:bg-muted/30">
                 <TableHead className="text-muted-foreground font-semibold">Company</TableHead>
-                <TableHead className="text-muted-foreground font-semibold">Industry</TableHead>
+                <TableHead className="text-muted-foreground font-semibold">Sector</TableHead>
                 <TableHead className="text-muted-foreground font-semibold">Health</TableHead>
                 <TableHead className="text-muted-foreground font-semibold">Risk</TableHead>
                 <TableHead className="text-muted-foreground font-semibold">Gaps</TableHead>
@@ -558,14 +562,36 @@ const ClientPortfolioSection = ({
             </TableHeader>
             <TableBody>
               {clients.map((client) => (
-                <TableRow key={client.id} className="hover:bg-muted/20 transition-colors cursor-pointer">
+                <TableRow
+                  key={client.id}
+                  className="hover:bg-muted/20 transition-colors cursor-pointer"
+                  onClick={() => {
+                    // Fire event so the main dashboard can gate features to this client's sector
+                    window.dispatchEvent(new CustomEvent('ca:client-sector-selected', {
+                      detail: { clientId: client.id, clientName: client.name, sector: client.sector || 'general' }
+                    }));
+                  }}
+                >
                   <TableCell className="font-medium text-foreground">
                     <div className="flex items-center gap-2">
                       <Building2 className="w-4 h-4 text-primary" />
                       {client.name}
                     </div>
                   </TableCell>
-                  <TableCell className="text-muted-foreground">{client.industry} · {client.jurisdiction || 'India'}</TableCell>
+                  <TableCell>
+                    <ClientSectorBadge
+                      clientId={client.id}
+                      currentSector={client.sector || 'general'}
+                      onSectorChange={(newSector) => {
+                        setClients(prev => prev.map(c =>
+                          c.id === client.id ? { ...c, sector: newSector } : c
+                        ));
+                        window.dispatchEvent(new CustomEvent('ca:client-sector-selected', {
+                          detail: { clientId: client.id, clientName: client.name, sector: newSector }
+                        }));
+                      }}
+                    />
+                  </TableCell>
                   <TableCell>
                     <div className="flex items-center gap-2">
                       <div className="w-12 h-2 bg-muted rounded-full overflow-hidden">
@@ -869,6 +895,36 @@ const ClientPortfolioSection = ({
                         <p className="text-xs text-amber-400/80">* At least one of Email or WhatsApp is required so the consent request can be delivered to your client.</p>
                       )}
                     </div>
+                  </div>
+
+                  {/* Sector Selection */}
+                  <div className="p-4 rounded-lg bg-orange-500/5 border border-orange-500/20">
+                    <h4 className="text-sm font-semibold text-orange-400 mb-3 flex items-center gap-2">
+                      <Tag className="w-3.5 h-3.5" /> Client Sector
+                    </h4>
+                    <Select
+                      value={onboardForm.sector || 'general'}
+                      onValueChange={(val) => setOnboardForm(prev => ({ ...prev, sector: val as ClientSector }))}
+                    >
+                      <SelectTrigger className="bg-card border-border/50">
+                        <SelectValue placeholder="Select sector..." />
+                      </SelectTrigger>
+                      <SelectContent className="bg-card border-border/60">
+                        {SELECTABLE_SECTORS.map((s) => {
+                          const sc = getSectorConfig(s);
+                          return (
+                            <SelectItem key={s} value={s} className="text-sm">
+                              <span className="mr-2">{sc.emoji}</span>
+                              <span className={sc.color}>{sc.label}</span>
+                              <span className="text-muted-foreground text-xs ml-2">— {sc.description.split('—')[1]?.trim() || sc.description}</span>
+                            </SelectItem>
+                          );
+                        })}
+                      </SelectContent>
+                    </Select>
+                    <p className="text-xs text-muted-foreground mt-2">
+                      Sector controls which compliance features are shown for this client.
+                    </p>
                   </div>
 
                   {/* Info */}

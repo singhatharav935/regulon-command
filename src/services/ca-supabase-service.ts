@@ -6,6 +6,7 @@
 
 import { supabase } from "@/integrations/supabase/client";
 import { tableExists } from '@/lib/table-registry';
+import { type ClientSector, industryToSector } from '@/lib/client-sector';
 
 const isDemoMode = () => {
   if (typeof window === 'undefined') return false;
@@ -283,12 +284,16 @@ export interface CAClientForm {
   client_name: string;
   client_email?: string;
   client_phone?: string;
+  /** Sector tag for client-level feature segmentation */
+  sector?: ClientSector;
 }
 
 export interface CAClient {
   id: string;
   name: string;
   industry: string;
+  /** Derived from industry column — used for sector-based feature gating */
+  sector: ClientSector;
   health: number;
   risk: 'Low' | 'Medium' | 'High';
   gaps: number;
@@ -330,13 +335,14 @@ export async function addCAClient(form: CAClientForm): Promise<{ success: boolea
 
     // Store GSTIN/PAN in localStorage as metadata (no dedicated column yet)
     const meta = JSON.parse(localStorage.getItem('ca_client_meta') || '{}');
-    meta[company.id] = { gstin: form.gstin, pan: form.pan, cin: form.cin, phone: form.client_phone, email: form.client_email };
+    meta[company.id] = { gstin: form.gstin, pan: form.pan, cin: form.cin, phone: form.client_phone, email: form.client_email, sector: form.sector || 'general' };
     localStorage.setItem('ca_client_meta', JSON.stringify(meta));
 
     const client: CAClient = {
       id: company.id,
       name: company.name,
       industry: company.industry || 'General',
+      sector: form.sector || industryToSector(company.industry),
       health: company.compliance_health || 75,
       risk: 'Medium',
       gaps: 2,
@@ -384,10 +390,13 @@ export async function loadCAClients(): Promise<CAClient[]> {
       const company = m.companies;
       const clientMeta = meta[company.id] || {};
       const health = company.compliance_health || 75;
+      // Derive sector: prefer stored meta sector, then derive from industry string
+      const sector = clientMeta.sector || industryToSector(company.industry);
       return {
         id: company.id,
         name: company.name,
         industry: company.industry || 'General',
+        sector,
         health,
         risk: health >= 80 ? 'Low' : health >= 60 ? 'Medium' : 'High',
         gaps: Math.floor((100 - health) / 20),
