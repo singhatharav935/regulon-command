@@ -36,6 +36,7 @@ const NotificationAlertHub = lazy(() => import("@/components/ca-dashboard/Notifi
 const AuditTrailHub = lazy(() => import("@/components/ca-dashboard/AuditTrailHub"));
 const LocalizationHub = lazy(() => import("@/components/ca-dashboard/LocalizationHub"));
 const OfflinePwaHub = lazy(() => import("@/components/ca-dashboard/OfflinePwaHub"));
+const GovScraperHub = lazy(() => import("@/components/ca-dashboard/GovScraperHub"));
 import { isOnline } from "@/services/offline-sync-service";
 import { useLanguage, LANGUAGE_LABELS } from "@/contexts/LanguageContext";
 import { Globe2, Wifi, WifiOff } from "lucide-react";
@@ -1834,7 +1835,7 @@ const LiveAIDraftingEngine = () => {
 type CADashboardZone = 
   | "command" | "multi-entity" | "e-filing" | "payment" | "clients" | "operations" 
   | "ai-swarm" | "calculations" | "enterprise-api" | "erp-integration" | "doc-ocr" 
-  | "team-rbac" | "notifications" | "branding" | "audit-trail" | "language-hub" | "offline-hub";
+  | "team-rbac" | "notifications" | "branding" | "audit-trail" | "language-hub" | "offline-hub" | "gov-scraper";
 
 const ExternalCADashboardReal = () => {
   const navigate = useNavigate();
@@ -2217,6 +2218,9 @@ const ExternalCADashboardReal = () => {
                      <TabsTrigger value="offline-hub" className="px-4 py-2.5 rounded-lg data-[state=active]:bg-emerald-500/20 data-[state=active]:text-emerald-400 font-medium text-xs flex items-center gap-1">
                        <Wifi className="w-3.5 h-3.5" />Offline & PWA
                      </TabsTrigger>
+                     <TabsTrigger value="gov-scraper" className="px-4 py-2.5 rounded-lg data-[state=active]:bg-orange-500/20 data-[state=active]:text-orange-400 font-medium text-xs flex items-center gap-1">
+                       <Cpu className="w-3.5 h-3.5" />Gov Scraper
+                     </TabsTrigger>
                  </TabsList>
                  <Button onClick={() => setIsDrawerOpen(true)} className="ml-4 flex-shrink-0 bg-gradient-to-r from-purple-600 to-cyan-600 hover:from-purple-500 hover:to-cyan-500 text-white border-0 shadow-[0_0_20px_rgba(139,92,246,0.3)]">
                     <Cpu className="w-4 h-4 mr-2" /> Open Engine
@@ -2427,6 +2431,11 @@ const ExternalCADashboardReal = () => {
               {/* ZONE 15: OFFLINE MODE & PROGRESSIVE WEB APP (PWA) */}
               <TabsContent value="offline-hub" className="m-0 focus-visible:outline-none focus-visible:ring-0 space-y-8">
                 <OfflinePwaHub />
+              </TabsContent>
+
+              {/* ZONE 16: GOV SCRAPER HUB */}
+              <TabsContent value="gov-scraper" className="m-0 focus-visible:outline-none focus-visible:ring-0 space-y-8">
+                <GovScraperHub />
               </TabsContent>
               </Suspense>
             </Tabs>

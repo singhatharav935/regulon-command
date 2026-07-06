@@ -250,6 +250,21 @@ async function fireAutonomousBankFetchAndSwarm(db: ReturnType<typeof getServiceC
       progress: 0
     });
 
+    // Fire and forget the AI Financial Swarm trigger via HTTP Edge Function call
+    fetch(`${supabaseUrl}/functions/v1/ai-financial-swarm`, {
+      method: "POST",
+      headers: {
+        "Authorization": `Bearer ${serviceKey}`,
+        "Content-Type": "application/json"
+      },
+      body: JSON.stringify({
+        action: "trigger_swarm",
+        company_id: companyId,
+        ca_user_id: caUserId,
+        financial_year: fy
+      })
+    }).catch(e => console.error("[AUTONOMOUS ENGINE ERROR] Failed to trigger ai-financial-swarm:", e));
+
   } catch (err) {
     console.error("[AUTONOMOUS ENGINE ERROR] Failed pipeline:", err);
   }
