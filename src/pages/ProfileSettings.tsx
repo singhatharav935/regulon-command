@@ -246,7 +246,7 @@ const ProfileSettings = () => {
 
   const handleLogout = async () => {
     clearProfile(); // Wipe stale avatar/name before navigating
-    await supabase.auth.signOut();
+    await supabase.auth.signOut({ scope: 'local' });
     localStorage.removeItem("current_user_role");
     localStorage.removeItem("pending_registration_role");
     navigate("/");

@@ -158,7 +158,7 @@ export async function updatePassword(newPassword: string): Promise<EmailResult> 
  */
 export async function signOut(): Promise<EmailResult> {
   try {
-    const { error } = await supabase.auth.signOut();
+    const { error } = await supabase.auth.signOut({ scope: 'local' });
 
     if (error) {
       return {

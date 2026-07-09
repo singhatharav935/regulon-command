@@ -444,7 +444,7 @@ class EnhancedAuthService {
    */
   async logout(): Promise<void> {
     try {
-      await supabase.auth.signOut();
+      await supabase.auth.signOut({ scope: 'local' });
     } catch (error) {
       console.warn('Logout error:', error);
     } finally {
