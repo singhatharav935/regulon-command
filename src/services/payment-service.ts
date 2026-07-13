@@ -179,16 +179,8 @@ export async function fetchLiabilities(
 
 export async function fetchUpcomingPayments(caUserId: string): Promise<TaxLiability[]> {
   if (!isValidUUID(caUserId)) return [];
-  // upcoming_payments view may not exist — try with fallback
-  try {
-    const { data, error } = await (supabase as any)
-      .from('upcoming_payments')
-      .select('*')
-      .eq('ca_user_id', caUserId);
-
-    if (!error && data) return data;
-  } catch { /* view doesn't exist */ }
-
+  // upcoming_payments view is not deployed — skip the view query entirely
+  // to avoid uncatchable 400 console errors from PostgREST.
   // Fallback: query base table for unpaid liabilities
   return fetchLiabilities(caUserId, { isPaid: false });
 }
