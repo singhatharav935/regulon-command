@@ -26,6 +26,8 @@ export interface SectorConfig {
   borderColor: string;   // Tailwind border color
   badgeCls: string;      // Full badge class string
   emoji: string;
+  /** Raw hex accent colour — used for CSS variable injection in dashboard theming */
+  accentHex: string;
   /** Dashboard zone IDs this sector can access. null = all zones allowed */
   allowedZones: string[] | null;
   /** Compliance module IDs this sector can access. null = all allowed */
@@ -43,11 +45,12 @@ export const SECTOR_CONFIGS: Record<ClientSector, SectorConfig> = {
     borderColor: 'border-emerald-500/40',
     badgeCls: 'bg-emerald-500/15 text-emerald-400 border-emerald-500/40',
     emoji: '🏭',
+    accentHex: '#10b981',
     allowedZones: [
       'command', 'clients', 'e-filing', 'payment', 'operations',
       'calculations', 'ai-swarm', 'doc-ocr', 'audit-trail',
       'team-rbac', 'notifications', 'branding', 'language-hub',
-      'offline-hub', 'gov-scraper', 'multi-entity',
+      'offline-hub', 'gov-scraper', 'multi-entity', 'case-room',
     ],
     allowedModules: [
       'gstr1', 'gstr2b', 'gstr3b', 'itr', 'epf_esi',
@@ -68,6 +71,7 @@ export const SECTOR_CONFIGS: Record<ClientSector, SectorConfig> = {
     borderColor: 'border-blue-500/40',
     badgeCls: 'bg-blue-500/15 text-blue-400 border-blue-500/40',
     emoji: '🏢',
+    accentHex: '#3b82f6',
     allowedZones: null, // all zones
     allowedModules: [
       'gstr1', 'gstr2b', 'gstr3b', 'itr', 'epf_esi',
@@ -91,6 +95,7 @@ export const SECTOR_CONFIGS: Record<ClientSector, SectorConfig> = {
     borderColor: 'border-violet-500/40',
     badgeCls: 'bg-violet-500/15 text-violet-400 border-violet-500/40',
     emoji: '🏦',
+    accentHex: '#8b5cf6',
     allowedZones: [
       'command', 'clients', 'e-filing', 'payment', 'operations',
       'enterprise-api', 'erp-integration', 'doc-ocr', 'audit-trail',
@@ -116,10 +121,12 @@ export const SECTOR_CONFIGS: Record<ClientSector, SectorConfig> = {
     borderColor: 'border-amber-500/40',
     badgeCls: 'bg-amber-500/15 text-amber-400 border-amber-500/40',
     emoji: '👤',
+    accentHex: '#f59e0b',
     allowedZones: [
       'command', 'clients', 'e-filing', 'payment', 'operations',
       'calculations', 'ai-swarm', 'doc-ocr', 'audit-trail',
       'notifications', 'branding', 'language-hub', 'offline-hub',
+      'gov-scraper',
     ],
     allowedModules: [
       'itr', 'regime_optimizer', 'advance_tax', 'capital_gains',
@@ -137,11 +144,13 @@ export const SECTOR_CONFIGS: Record<ClientSector, SectorConfig> = {
     borderColor: 'border-orange-500/40',
     badgeCls: 'bg-orange-500/15 text-orange-400 border-orange-500/40',
     emoji: '🚀',
+    accentHex: '#f97316',
     allowedZones: [
       'command', 'clients', 'e-filing', 'payment', 'operations',
       'calculations', 'ai-swarm', 'doc-ocr', 'audit-trail',
       'team-rbac', 'notifications', 'branding', 'language-hub',
       'offline-hub', 'gov-scraper', 'enterprise-api', 'erp-integration',
+      'multi-entity', 'case-room',
     ],
     allowedModules: [
       'gstr1', 'gstr2b', 'gstr3b', 'itr', 'epf_esi',
@@ -162,10 +171,12 @@ export const SECTOR_CONFIGS: Record<ClientSector, SectorConfig> = {
     borderColor: 'border-pink-500/40',
     badgeCls: 'bg-pink-500/15 text-pink-400 border-pink-500/40',
     emoji: '🤝',
+    accentHex: '#ec4899',
     allowedZones: [
       'command', 'clients', 'e-filing', 'payment', 'operations',
       'calculations', 'ai-swarm', 'doc-ocr', 'audit-trail',
       'notifications', 'branding', 'language-hub', 'offline-hub',
+      'gov-scraper',
     ],
     allowedModules: [
       'itr', 'financials', 'notice_tracker', 'audit_file',
@@ -184,6 +195,7 @@ export const SECTOR_CONFIGS: Record<ClientSector, SectorConfig> = {
     borderColor: 'border-slate-500/40',
     badgeCls: 'bg-slate-500/15 text-slate-400 border-slate-500/40',
     emoji: '📋',
+    accentHex: '#64748b',
     allowedZones: null, // no restriction
     allowedModules: null, // no restriction
   },

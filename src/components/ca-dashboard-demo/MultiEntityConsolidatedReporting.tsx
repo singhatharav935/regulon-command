@@ -1292,7 +1292,7 @@ const MultiEntityConsolidatedReporting = () => {
 
   useEffect(() => {
     supabase.auth.getUser().then(({ data }) => {
-      setCaUserId(data.user?.id ?? null);
+      setCaUserId(data.user?.id ?? 'demo-ca-user-id');
     });
   }, []);
 

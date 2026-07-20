@@ -1,8 +1,7 @@
 // ============================================================
 // PaymentClassificationDemo.tsx
 // DEMO CA Dashboard — Payment Classification Engine UI
-// Uses MOCK / SEED data only (demo clients added via Add Client)
-// Features: Reason for Tagging | Materiality Lock | Audit Trail
+// Uses MOCK / SEED data only (no real Supabase data)
 // ============================================================
 import React, { useState, useEffect, useMemo } from 'react';
 import { motion, AnimatePresence } from 'framer-motion';
@@ -15,8 +14,7 @@ import {
   TrendingUp, TrendingDown, AlertCircle, CheckCircle, Filter,
   Search, Sparkles, IndianRupee, BarChart3, Eye, Shield, HelpCircle,
   Users, Home, CreditCard, Receipt, Zap, Utensils, Car,
-  Briefcase, Building2, ArrowLeftRight, Landmark, Package, Heart,
-  Lock, Unlock, Hash, AlertTriangle, Info, CheckSquare, Fingerprint, Settings
+  Briefcase, Building2, ArrowLeftRight, Landmark, Package, Heart
 } from 'lucide-react';
 import { Button } from '@/components/ui/button';
 import { Badge } from '@/components/ui/badge';
@@ -28,14 +26,9 @@ import {
   getMonthlyTrends,
   saveCategoryOverride,
   clearAllOverrides,
-  computeLedgerHash,
-  saveAuditLock,
-  loadAuditLock,
-  clearAuditLock,
   CATEGORY_COLORS,
   type DemoTransaction,
   type PaymentCategory,
-  type AuditLock,
 } from './payment-classification-engine-demo';
 
 // ── Category icon map ─────────────────────────────────────────
@@ -106,52 +99,6 @@ const BarTooltip = ({ active, payload, label }: any) => {
   return null;
 };
 
-// ── Reason-for-Tagging expandable tooltip ─────────────────────
-const ReasonBadge: React.FC<{ reason: string }> = ({ reason }) => {
-  const [open, setOpen] = useState(false);
-  const shortReason = reason.split('·')[0].trim();
-  return (
-    <div className="relative">
-      <button
-        onClick={() => setOpen(o => !o)}
-        className="flex items-center gap-1 text-[10px] text-amber-400/80 hover:text-amber-300 transition-colors group"
-        title="Why was this tagged?"
-      >
-        <Info className="w-3 h-3 flex-shrink-0" />
-        <span className="hidden md:inline truncate max-w-[160px]">{shortReason}</span>
-      </button>
-      <AnimatePresence>
-        {open && (
-          <motion.div
-            initial={{ opacity: 0, y: 4, scale: 0.95 }}
-            animate={{ opacity: 1, y: 0, scale: 1 }}
-            exit={{ opacity: 0, y: 4, scale: 0.95 }}
-            className="absolute z-50 bottom-full mb-2 left-0 w-80 p-3 bg-zinc-900 border border-amber-500/30 rounded-xl shadow-2xl text-left"
-          >
-            <div className="flex items-start gap-2">
-              <Info className="w-3.5 h-3.5 text-amber-400 flex-shrink-0 mt-0.5" />
-              <div>
-                <p className="text-[11px] font-semibold text-amber-300 mb-1">Why this category?</p>
-                <p className="text-[10px] text-zinc-300 leading-relaxed">{reason}</p>
-              </div>
-            </div>
-          </motion.div>
-        )}
-      </AnimatePresence>
-    </div>
-  );
-};
-
-// ── Materiality warning badge ─────────────────────────────────
-const MaterialityBadge: React.FC<{ amount: number; threshold: number }> = ({ amount, threshold }) => {
-  if (amount <= threshold) return null;
-  return (
-    <Badge className="bg-orange-500/20 text-orange-300 border-orange-500/40 text-[10px] px-1.5 py-0.5">
-      <Lock className="w-2.5 h-2.5 mr-1" /> Sign-Off Required
-    </Badge>
-  );
-};
-
 interface Props {
   clientId: string;
   clientName: string;
@@ -160,27 +107,14 @@ interface Props {
 
 export default function PaymentClassificationDemo({ clientId, clientName, financialYear }: Props) {
   const [transactions, setTransactions] = useState<DemoTransaction[]>([]);
-  const [activeTab, setActiveTab] = useState<'overview' | 'transactions' | 'audit'>('overview');
+  const [activeTab, setActiveTab] = useState<'overview' | 'transactions'>('overview');
   const [searchQuery, setSearchQuery] = useState('');
   const [filterCategory, setFilterCategory] = useState<string>('all');
   const [filterType, setFilterType] = useState<'all' | 'debit' | 'credit'>('all');
   const [editingId, setEditingId] = useState<string | null>(null);
   const [overrideCategory, setOverrideCategory] = useState<PaymentCategory>('Uncategorized');
+  const [expandedMonths, setExpandedMonths] = useState<Set<string>>(new Set());
   const [isLoading, setIsLoading] = useState(true);
-
-  // ── Feature 2: Materiality Threshold ──────────────────────
-  const [materialityThreshold, setMaterialityThreshold] = useState<number>(() => {
-    if (typeof window === 'undefined') return 20000;
-    return parseInt(localStorage.getItem(`materiality_${clientId}`) || '20000', 10);
-  });
-  const [editingThreshold, setEditingThreshold] = useState(false);
-  const [thresholdInput, setThresholdInput] = useState(materialityThreshold.toString());
-
-  // ── Feature 3: Audit Trail ─────────────────────────────────
-  const [auditLock, setAuditLock] = useState<AuditLock | null>(null);
-  const [currentHash, setCurrentHash] = useState<string>('');
-  const [isHashing, setIsHashing] = useState(false);
-  const [hashTampered, setHashTampered] = useState(false);
 
   useEffect(() => {
     setIsLoading(true);
@@ -188,21 +122,8 @@ export default function PaymentClassificationDemo({ clientId, clientName, financ
       const txns = generateMockTransactions(clientId, clientName, financialYear);
       setTransactions(txns);
       setIsLoading(false);
-      // Load existing audit lock
-      const lock = loadAuditLock(clientId, financialYear);
-      setAuditLock(lock);
     }, 600);
   }, [clientId, clientName, financialYear]);
-
-  // Recompute current hash whenever transactions change and a lock exists
-  useEffect(() => {
-    if (auditLock && transactions.length > 0) {
-      computeLedgerHash(transactions).then(h => {
-        setCurrentHash(h);
-        setHashTampered(h !== auditLock.hash);
-      });
-    }
-  }, [transactions, auditLock]);
 
   const summary = useMemo(() => summarizeByCategory(transactions), [transactions]);
   const monthlyTrends = useMemo(() => getMonthlyTrends(transactions), [transactions]);
@@ -213,11 +134,6 @@ export default function PaymentClassificationDemo({ clientId, clientName, financ
     transactions.filter(t => t.type === 'credit').reduce((s, t) => s + t.amount, 0), [transactions]);
   const autoClassified = useMemo(() =>
     transactions.filter(t => !t.caOverride && t.confidence >= 80).length, [transactions]);
-
-  // Materiality: count transactions needing sign-off
-  const needsSignOff = useMemo(() =>
-    transactions.filter(t => t.type === 'debit' && t.amount > materialityThreshold && !t.caOverride).length,
-    [transactions, materialityThreshold]);
 
   const filteredTransactions = useMemo(() => {
     return transactions.filter(tx => {
@@ -249,13 +165,12 @@ export default function PaymentClassificationDemo({ clientId, clientName, financ
   };
 
   const handleExport = () => {
-    const rows = ['Date,Description,Amount,Type,Category,Confidence,Reason,CA Override'];
+    const rows = ['Date,Description,Amount,Type,Category,Confidence,CA Override'];
     transactions.forEach(tx => {
       rows.push([
         tx.date, `"${tx.description}"`, tx.amount,
         tx.type, tx.caOverride ?? tx.category,
         tx.caOverride ? 'Manual' : `${tx.confidence}%`,
-        `"${tx.classificationReason}"`,
         tx.caOverride ? tx.caOverride : ''
       ].join(','));
     });
@@ -267,61 +182,6 @@ export default function PaymentClassificationDemo({ clientId, clientName, financ
     a.click();
     URL.revokeObjectURL(url);
     toast.success('Classification report exported as CSV');
-  };
-
-  // ── Feature 2: Save materiality threshold ─────────────────
-  const handleSaveThreshold = () => {
-    const val = parseInt(thresholdInput, 10);
-    if (isNaN(val) || val < 0) {
-      toast.error('Enter a valid positive amount');
-      return;
-    }
-    setMaterialityThreshold(val);
-    localStorage.setItem(`materiality_${clientId}`, val.toString());
-    setEditingThreshold(false);
-    toast.success(`Materiality threshold set to ${formatINR(val)}`, {
-      description: 'Transactions above this amount require CA sign-off.',
-    });
-  };
-
-  // ── Feature 3: Finalize ledger (compute + store hash) ─────
-  const handleFinalizeLedger = async () => {
-    if (needsSignOff > 0) {
-      toast.error(`${needsSignOff} transaction(s) above ₹${materialityThreshold.toLocaleString('en-IN')} need CA sign-off first`, {
-        description: 'Approve or re-categorise high-value transactions before finalising.',
-      });
-      return;
-    }
-    setIsHashing(true);
-    try {
-      const hash = await computeLedgerHash(transactions);
-      const lock: AuditLock = {
-        hash,
-        finalizedAt: new Date().toISOString(),
-        transactionCount: transactions.length,
-        caUser: 'Demo CA User',
-      };
-      saveAuditLock(clientId, financialYear, lock);
-      setAuditLock(lock);
-      setCurrentHash(hash);
-      setHashTampered(false);
-      setActiveTab('audit');
-      toast.success('Ledger finalised — Audit Trail locked', {
-        description: `SHA-256 hash recorded. ${transactions.length} transactions sealed.`,
-      });
-    } catch {
-      toast.error('Failed to compute hash');
-    } finally {
-      setIsHashing(false);
-    }
-  };
-
-  const handleUnlockAudit = () => {
-    clearAuditLock(clientId, financialYear);
-    setAuditLock(null);
-    setCurrentHash('');
-    setHashTampered(false);
-    toast('Audit lock removed', { description: 'Ledger is now editable again.' });
   };
 
   if (isLoading) {
@@ -344,55 +204,6 @@ export default function PaymentClassificationDemo({ clientId, clientName, financ
       animate={{ opacity: 1, y: 0 }}
       className="space-y-6"
     >
-      {/* ── Audit Tamper Warning Banner ── */}
-      <AnimatePresence>
-        {hashTampered && (
-          <motion.div
-            initial={{ opacity: 0, y: -8 }}
-            animate={{ opacity: 1, y: 0 }}
-            exit={{ opacity: 0, y: -8 }}
-            className="flex items-start gap-3 p-4 bg-red-500/10 border border-red-500/40 rounded-2xl"
-          >
-            <AlertTriangle className="w-5 h-5 text-red-400 flex-shrink-0 mt-0.5" />
-            <div>
-              <p className="text-sm font-semibold text-red-400">⚠️ Audit Trail Compromised</p>
-              <p className="text-xs text-red-300/80 mt-0.5">
-                Post-verification modifications detected. The current ledger hash does not match
-                the sealed hash. Please review changes or unlock and re-finalise.
-              </p>
-            </div>
-          </motion.div>
-        )}
-      </AnimatePresence>
-
-      {/* ── Feature 2: Materiality Sign-Off Warning ── */}
-      <AnimatePresence>
-        {needsSignOff > 0 && (
-          <motion.div
-            initial={{ opacity: 0, y: -8 }}
-            animate={{ opacity: 1, y: 0 }}
-            exit={{ opacity: 0, y: -8 }}
-            className="flex items-start gap-3 p-4 bg-orange-500/10 border border-orange-500/30 rounded-2xl"
-          >
-            <Lock className="w-5 h-5 text-orange-400 flex-shrink-0 mt-0.5" />
-            <div className="flex-1">
-              <p className="text-sm font-semibold text-orange-300">
-                {needsSignOff} transaction{needsSignOff > 1 ? 's' : ''} above {formatINR(materialityThreshold)} — CA Sign-Off Required
-              </p>
-              <p className="text-xs text-orange-300/70 mt-0.5">
-                Per your materiality threshold, high-value debits must be manually reviewed before ledger can be finalised.
-              </p>
-            </div>
-            <button
-              onClick={() => setActiveTab('transactions')}
-              className="text-xs text-orange-400 underline flex-shrink-0"
-            >
-              Review
-            </button>
-          </motion.div>
-        )}
-      </AnimatePresence>
-
       {/* ── Header ── */}
       <div className="flex flex-col md:flex-row gap-4 items-start md:items-center justify-between p-5 bg-gradient-to-r from-violet-500/10 via-transparent to-cyan-500/10 border border-violet-500/20 rounded-2xl">
         <div className="flex items-center gap-3">
@@ -405,39 +216,19 @@ export default function PaymentClassificationDemo({ clientId, clientName, financ
               <Badge className="bg-violet-500/20 text-violet-300 border-violet-500/30 text-xs">
                 <Sparkles className="w-3 h-3 mr-1" /> AI-Powered
               </Badge>
-              {auditLock && !hashTampered && (
-                <Badge className="bg-green-500/20 text-green-300 border-green-500/30 text-xs">
-                  <Lock className="w-3 h-3 mr-1" /> Ledger Sealed
-                </Badge>
-              )}
             </h2>
             <p className="text-sm text-muted-foreground">
               Auto-categorised bank transactions for {clientName} · FY {financialYear}
             </p>
           </div>
         </div>
-        <div className="flex flex-wrap items-center gap-2">
+        <div className="flex items-center gap-2">
           <Button size="sm" variant="outline" onClick={handleResetOverrides} className="gap-2 text-xs">
             <RefreshCw className="w-3.5 h-3.5" /> Reset Overrides
           </Button>
           <Button size="sm" onClick={handleExport} className="gap-2 bg-violet-600 hover:bg-violet-700 text-xs">
             <Download className="w-3.5 h-3.5" /> Export CSV
           </Button>
-          {auditLock ? (
-            <Button size="sm" variant="outline" onClick={handleUnlockAudit} className="gap-2 text-xs border-green-500/30 text-green-400 hover:bg-green-500/10">
-              <Unlock className="w-3.5 h-3.5" /> Unlock Ledger
-            </Button>
-          ) : (
-            <Button
-              size="sm"
-              onClick={handleFinalizeLedger}
-              disabled={isHashing}
-              className="gap-2 bg-emerald-600 hover:bg-emerald-700 text-xs"
-            >
-              {isHashing ? <Sparkles className="w-3.5 h-3.5 animate-spin" /> : <Hash className="w-3.5 h-3.5" />}
-              Finalise Ledger
-            </Button>
-          )}
         </div>
       </div>
 
@@ -461,7 +252,7 @@ export default function PaymentClassificationDemo({ clientId, clientName, financ
 
       {/* ── Tabs ── */}
       <div className="flex gap-2 border-b border-border/40 pb-0">
-        {(['overview', 'transactions', 'audit'] as const).map(tab => (
+        {(['overview', 'transactions'] as const).map(tab => (
           <button
             key={tab}
             onClick={() => setActiveTab(tab)}
@@ -471,13 +262,12 @@ export default function PaymentClassificationDemo({ clientId, clientName, financ
                 : 'text-muted-foreground hover:text-foreground'
             }`}
           >
-            {tab === 'overview' ? '📊 Overview' : tab === 'transactions' ? '📋 Transactions' : '🔒 Audit Trail'}
+            {tab === 'overview' ? '📊 Overview' : '📋 Transactions'}
           </button>
         ))}
       </div>
 
       <AnimatePresence mode="wait">
-        {/* ── OVERVIEW TAB ── */}
         {activeTab === 'overview' && (
           <motion.div
             key="overview"
@@ -486,46 +276,6 @@ export default function PaymentClassificationDemo({ clientId, clientName, financ
             exit={{ opacity: 0 }}
             className="space-y-6"
           >
-            {/* ── Feature 2: Materiality Threshold Config ── */}
-            <div className="flex flex-col sm:flex-row sm:items-center gap-3 p-4 bg-orange-500/5 border border-orange-500/20 rounded-2xl">
-              <div className="flex items-center gap-2 flex-1">
-                <Settings className="w-4 h-4 text-orange-400 flex-shrink-0" />
-                <div>
-                  <p className="text-sm font-medium text-orange-300">Materiality Threshold</p>
-                  <p className="text-[11px] text-muted-foreground">
-                    Transactions above this limit auto-require CA sign-off, regardless of AI confidence.
-                  </p>
-                </div>
-              </div>
-              {editingThreshold ? (
-                <div className="flex items-center gap-2">
-                  <span className="text-sm text-muted-foreground">₹</span>
-                  <input
-                    type="number"
-                    value={thresholdInput}
-                    onChange={e => setThresholdInput(e.target.value)}
-                    className="w-28 px-2 py-1 bg-card/60 border border-orange-500/40 rounded-lg text-sm text-foreground focus:border-orange-400 outline-none"
-                    autoFocus
-                  />
-                  <Button size="sm" className="h-7 px-2 bg-orange-600 hover:bg-orange-700" onClick={handleSaveThreshold}>
-                    <Check className="w-3.5 h-3.5" />
-                  </Button>
-                  <Button size="sm" variant="ghost" className="h-7 px-2" onClick={() => { setEditingThreshold(false); setThresholdInput(materialityThreshold.toString()); }}>
-                    <X className="w-3.5 h-3.5" />
-                  </Button>
-                </div>
-              ) : (
-                <div className="flex items-center gap-3">
-                  <div className="px-3 py-1.5 bg-orange-500/10 border border-orange-500/30 rounded-lg">
-                    <span className="text-sm font-mono font-semibold text-orange-300">{formatINR(materialityThreshold)}</span>
-                  </div>
-                  <Button size="sm" variant="outline" className="h-7 text-xs gap-1 border-orange-500/30 text-orange-400" onClick={() => { setEditingThreshold(true); setThresholdInput(materialityThreshold.toString()); }}>
-                    <Edit3 className="w-3 h-3" /> Edit
-                  </Button>
-                </div>
-              )}
-            </div>
-
             {/* ── Charts Row ── */}
             <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
               {/* Pie Chart */}
@@ -614,7 +364,6 @@ export default function PaymentClassificationDemo({ clientId, clientName, financ
           </motion.div>
         )}
 
-        {/* ── TRANSACTIONS TAB ── */}
         {activeTab === 'transactions' && (
           <motion.div
             key="transactions"
@@ -664,33 +413,24 @@ export default function PaymentClassificationDemo({ clientId, clientName, financ
                 const effectiveCat = tx.caOverride ?? tx.category;
                 const catColor = CATEGORY_COLORS[effectiveCat];
                 const isEditing = editingId === tx.id;
-                const isMaterial = tx.type === 'debit' && tx.amount > materialityThreshold;
 
                 return (
                   <motion.div
                     key={tx.id}
                     layout
-                    className={`p-4 bg-card/40 border rounded-xl transition-all ${
-                      isMaterial && !tx.caOverride
-                        ? 'border-orange-500/40 hover:border-orange-500/60'
-                        : 'border-border/40 hover:border-violet-500/30'
-                    }`}
+                    className="p-4 bg-card/40 border border-border/40 rounded-xl hover:border-violet-500/30 transition-all"
                   >
-                    <div className="flex flex-col md:flex-row md:items-start gap-3">
+                    <div className="flex flex-col md:flex-row md:items-center gap-3">
                       {/* Date + Bank */}
                       <div className="flex-shrink-0 w-24">
                         <p className="text-xs font-mono text-muted-foreground">{tx.date}</p>
                         <p className="text-[10px] text-muted-foreground/60 mt-0.5">{tx.bank}</p>
                       </div>
 
-                      {/* Description + Reason */}
+                      {/* Description */}
                       <div className="flex-1 min-w-0">
                         <p className="text-sm text-foreground truncate">{tx.description}</p>
                         <p className="text-[10px] text-muted-foreground/70 truncate">{tx.narration}</p>
-                        {/* Feature 1: Reason for Tagging */}
-                        <div className="mt-1">
-                          <ReasonBadge reason={tx.classificationReason} />
-                        </div>
                       </div>
 
                       {/* Amount */}
@@ -699,8 +439,6 @@ export default function PaymentClassificationDemo({ clientId, clientName, financ
                           {tx.type === 'debit' ? '−' : '+'}{formatINR(tx.amount)}
                         </p>
                         <p className="text-[10px] text-muted-foreground capitalize">{tx.type}</p>
-                        {/* Feature 2: Materiality badge */}
-                        <MaterialityBadge amount={tx.amount} threshold={materialityThreshold} />
                       </div>
 
                       {/* Category + Edit */}
@@ -742,18 +480,16 @@ export default function PaymentClassificationDemo({ clientId, clientName, financ
                               <span>{effectiveCat}</span>
                             </div>
                             <ConfidenceBadge score={tx.confidence} isOverridden={!!tx.caOverride} />
-                            {!auditLock && (
-                              <Button
-                                size="sm" variant="ghost"
-                                className="h-7 w-7 p-0 text-muted-foreground hover:text-violet-400"
-                                onClick={() => {
-                                  setEditingId(tx.id);
-                                  setOverrideCategory(effectiveCat);
-                                }}
-                              >
-                                <Edit3 className="w-3.5 h-3.5" />
-                              </Button>
-                            )}
+                            <Button
+                              size="sm" variant="ghost"
+                              className="h-7 w-7 p-0 text-muted-foreground hover:text-violet-400"
+                              onClick={() => {
+                                setEditingId(tx.id);
+                                setOverrideCategory(effectiveCat);
+                              }}
+                            >
+                              <Edit3 className="w-3.5 h-3.5" />
+                            </Button>
                           </>
                         )}
                       </div>
@@ -770,122 +506,6 @@ export default function PaymentClassificationDemo({ clientId, clientName, financ
             </div>
           </motion.div>
         )}
-
-        {/* ── AUDIT TRAIL TAB ── */}
-        {activeTab === 'audit' && (
-          <motion.div
-            key="audit"
-            initial={{ opacity: 0 }}
-            animate={{ opacity: 1 }}
-            exit={{ opacity: 0 }}
-            className="space-y-5"
-          >
-            {auditLock ? (
-              <>
-                {/* Hash status card */}
-                <div className={`p-5 border rounded-2xl ${hashTampered ? 'bg-red-500/10 border-red-500/40' : 'bg-green-500/10 border-green-500/30'}`}>
-                  <div className="flex items-start gap-3">
-                    {hashTampered
-                      ? <AlertTriangle className="w-6 h-6 text-red-400 flex-shrink-0" />
-                      : <CheckSquare className="w-6 h-6 text-green-400 flex-shrink-0" />
-                    }
-                    <div>
-                      <p className={`font-semibold text-base ${hashTampered ? 'text-red-400' : 'text-green-400'}`}>
-                        {hashTampered ? '⚠️ Audit Trail Compromised' : '✅ Audit Trail Intact'}
-                      </p>
-                      <p className="text-xs text-muted-foreground mt-1">
-                        {hashTampered
-                          ? 'The current ledger does not match the sealed hash. Post-verification modifications detected.'
-                          : 'The current ledger matches the sealed SHA-256 hash. No modifications detected since finalisation.'
-                        }
-                      </p>
-                    </div>
-                  </div>
-                </div>
-
-                {/* Lock details */}
-                <div className="p-5 bg-card/40 border border-border/40 rounded-2xl space-y-4">
-                  <h3 className="font-semibold text-sm flex items-center gap-2">
-                    <Fingerprint className="w-4 h-4 text-violet-400" /> Sealed Ledger Details
-                  </h3>
-                  <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
-                    <div>
-                      <p className="text-[11px] text-muted-foreground uppercase tracking-wider mb-1">Finalised At</p>
-                      <p className="text-sm font-medium">{new Date(auditLock.finalizedAt).toLocaleString('en-IN')}</p>
-                    </div>
-                    <div>
-                      <p className="text-[11px] text-muted-foreground uppercase tracking-wider mb-1">Transaction Count</p>
-                      <p className="text-sm font-medium">{auditLock.transactionCount} transactions sealed</p>
-                    </div>
-                    <div>
-                      <p className="text-[11px] text-muted-foreground uppercase tracking-wider mb-1">Financial Year</p>
-                      <p className="text-sm font-medium">FY {financialYear}</p>
-                    </div>
-                    <div>
-                      <p className="text-[11px] text-muted-foreground uppercase tracking-wider mb-1">CA User</p>
-                      <p className="text-sm font-medium">{auditLock.caUser || 'Demo CA User'}</p>
-                    </div>
-                  </div>
-
-                  {/* Sealed hash */}
-                  <div>
-                    <p className="text-[11px] text-muted-foreground uppercase tracking-wider mb-2">Sealed SHA-256 Hash</p>
-                    <div className="p-3 bg-zinc-900 border border-border/30 rounded-xl font-mono text-[11px] text-green-400 break-all leading-relaxed">
-                      {auditLock.hash}
-                    </div>
-                  </div>
-
-                  {/* Current hash */}
-                  <div>
-                    <p className="text-[11px] text-muted-foreground uppercase tracking-wider mb-2">Current Ledger Hash</p>
-                    <div className={`p-3 border rounded-xl font-mono text-[11px] break-all leading-relaxed ${
-                      hashTampered
-                        ? 'bg-red-950/30 border-red-500/30 text-red-400'
-                        : 'bg-zinc-900 border-border/30 text-green-400'
-                    }`}>
-                      {currentHash || 'Computing...'}
-                    </div>
-                    {hashTampered && (
-                      <p className="text-[10px] text-red-400 mt-1.5">
-                        ↑ Hash mismatch. Ledger was modified after finalisation.
-                      </p>
-                    )}
-                  </div>
-                </div>
-
-                <Button variant="outline" onClick={handleUnlockAudit} className="gap-2 text-sm border-border/40">
-                  <Unlock className="w-4 h-4" /> Unlock Ledger to Edit
-                </Button>
-              </>
-            ) : (
-              <div className="flex flex-col items-center justify-center py-16 text-center space-y-5 border-2 border-dashed border-border/30 rounded-2xl bg-card/10">
-                <div className="w-16 h-16 rounded-full bg-emerald-500/10 border border-emerald-500/20 flex items-center justify-center">
-                  <Hash className="w-8 h-8 text-emerald-400" />
-                </div>
-                <div>
-                  <h3 className="text-lg font-semibold text-emerald-400">Ledger Not Yet Finalised</h3>
-                  <p className="text-sm text-muted-foreground max-w-md mt-2">
-                    Once you have reviewed and approved all transactions, click <strong>Finalise Ledger</strong> to seal
-                    a SHA-256 cryptographic hash. Any modification after sealing will be detected and flagged.
-                  </p>
-                </div>
-                <Button
-                  onClick={handleFinalizeLedger}
-                  disabled={isHashing || needsSignOff > 0}
-                  className="gap-2 bg-emerald-600 hover:bg-emerald-700"
-                >
-                  {isHashing ? <Sparkles className="w-4 h-4 animate-spin" /> : <Hash className="w-4 h-4" />}
-                  {needsSignOff > 0 ? `${needsSignOff} Sign-Off(s) Pending` : 'Finalise Ledger'}
-                </Button>
-                {needsSignOff > 0 && (
-                  <p className="text-xs text-orange-400">
-                    Approve {needsSignOff} high-value transaction{needsSignOff > 1 ? 's' : ''} first (above {formatINR(materialityThreshold)})
-                  </p>
-                )}
-              </div>
-            )}
-          </motion.div>
-        )}
       </AnimatePresence>
 
       {/* ── Footer note ── */}
@@ -893,7 +513,7 @@ export default function PaymentClassificationDemo({ clientId, clientName, financ
         <AlertCircle className="w-3 h-3 flex-shrink-0" />
         <span>
           Demo mode: Transactions are AI-generated seed data for <strong className="text-violet-400">{clientName}</strong>.
-          Classifications are rule-based. CA overrides and audit locks saved to browser session.
+          Classifications are rule-based. CA overrides are saved to browser session.
         </span>
       </div>
     </motion.div>

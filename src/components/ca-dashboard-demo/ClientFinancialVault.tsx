@@ -20,6 +20,9 @@ import { generateBalanceSheetPdf, generateProfitLossPdf, generateModulePdf, gene
 import { useCAAgentOrchestrator } from '../agents-demo/CAAgentOrchestrator';
 import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
 import PaymentClassificationDemo from './PaymentClassificationDemo';
+import { DIRECT_TAX, INDIRECT_TAX, CORPORATE_LAW, LABOR_LAWS, FEMA_RBI } from '@/lib/compliance-modules-metadata';
+
+const TOTAL_LIBRARY_FORMS = DIRECT_TAX.length + INDIRECT_TAX.length + CORPORATE_LAW.length + LABOR_LAWS.length + FEMA_RBI.length;
 
 const getHash = (str: string) => {
   let hash = 0;
@@ -47,6 +50,36 @@ export default function ClientFinancialVault() {
   const [zoom, setZoom] = useState(100);
   const [isEditing, setIsEditing] = useState(false);
   const [editContent, setEditContent] = useState('');
+  const [deptVaultOpen, setDeptVaultOpen] = useState<string | null>(null);
+
+  const DEPT_META = [
+    { id: 'direct-tax',  label: 'Direct Tax',       shortLabel: 'Direct Tax',  color: 'text-purple-400', bg: 'bg-purple-500/10', border: 'border-purple-500/30', hoverBorder: 'hover:border-purple-500/60', icon: '📄', keywords: ['itr','form3','form2','deferred','form24','form26','form27','challan','form15','form16','regime','capital','advance','form35','form36','notices','form67','form10'] },
+    { id: 'indirect-tax',label: 'Indirect Tax (GST)', shortLabel: 'GST',       color: 'text-green-400',  bg: 'bg-green-500/10',  border: 'border-green-500/30',  hoverBorder: 'hover:border-green-500/60',  icon: '₹', keywords: ['gstr','gst-','cmp','drc','pmt','rfd','reg','lut','apl','import-export'] },
+    { id: 'corporate',   label: 'Corporate Law',    shortLabel: 'Corp Law',    color: 'text-amber-400',  bg: 'bg-amber-500/10',  border: 'border-amber-500/30',  hoverBorder: 'hover:border-amber-500/60',  icon: '🏢', keywords: ['aoc','mgt','dpt','chg','pas','sh7','dir','mbp','msme','inc','adt','financials','debtors','bank-rec','prof-cqc','invoice'] },
+    { id: 'labor',       label: 'Labor Laws',       shortLabel: 'Labor',       color: 'text-cyan-400',   bg: 'bg-cyan-500/10',   border: 'border-cyan-500/30',   hoverBorder: 'hover:border-cyan-500/60',   icon: '👥', keywords: ['epf','pf','esic','salary-tds','gratuity','pt-return','board-meetings'] },
+    { id: 'fema-rbi',    label: 'FEMA & RBI',       shortLabel: 'FEMA/RBI',    color: 'text-emerald-400',bg: 'bg-emerald-500/10',border: 'border-emerald-500/30',hoverBorder: 'hover:border-emerald-500/60',icon: '🌐', keywords: ['fc-','fla','odi','fema','accounting-sync'] },
+  ];
+
+  // Map every metadata form → a calculated module entry with a realistic computed value
+  const ALL_FORMS = [...DIRECT_TAX, ...INDIRECT_TAX, ...CORPORATE_LAW, ...LABOR_LAWS, ...FEMA_RBI];
+
+  const DEPT_FORM_IDS: Record<string, string[]> = {
+    'direct-tax':  DIRECT_TAX.map(f => f.id),
+    'indirect-tax':INDIRECT_TAX.map(f => f.id),
+    'corporate':   CORPORATE_LAW.map(f => f.id),
+    'labor':       LABOR_LAWS.map(f => f.id),
+    'fema-rbi':    FEMA_RBI.map(f => f.id),
+  };
+
+  const getModulesForDept = (deptId: string) => {
+    const ids = DEPT_FORM_IDS[deptId] || [];
+    if (!dataRoom?.calculated_modules) return [];
+    return dataRoom.calculated_modules.filter((mod: any) => ids.includes(mod.module_id));
+  };
+
+  const getDeptCount = (deptId: string) => {
+    return (DEPT_FORM_IDS[deptId] || []).length;
+  };
 
   const handleViewFinancialsPdf = (type: 'balance_sheet' | 'profit_loss' | 'trial_balance' | 'general_ledger' | 'bank_recon' | 'fixed_assets') => {
     if (!selectedClient || !dataRoom) return;
@@ -279,38 +312,38 @@ export default function ClientFinancialVault() {
 
       const mockDataRoom = {
         readiness_score: 95 + (seed % 6),
-        total_modules_completed: 26,
-        executive_summary: `All 26 statutory modules have been calculated and verified against live bank feeds for ${clientName}. Notice replies and compliance drafts are finalized and stored in the vault.`,
+        total_modules_completed: ALL_FORMS.length,
+        executive_summary: `All ${ALL_FORMS.length} statutory modules across Direct Tax, GST, Corporate Law, Labour, and FEMA/RBI have been auto-calculated and verified for ${clientName}. Every compliance document is pre-built and ready for any government notice or audit.`,
         compiled_bs: { assets: { total: assets }, liabilities_equity: { total: assets } },
         compiled_pl: { revenue: rev, profit_after_tax: pat },
-        calculated_modules: [
-          { module_label: 'GST Reconciliation (GSTR-2B vs Books)', calculation_data: { 'Matched': `${90 + (seed % 11)}%` } },
-          { module_label: 'Income Tax Calculation (Opt)', calculation_data: { 'Tax Payable': Math.floor(pat * 0.25) } },
-          { module_label: 'MCA Form 20-B Extract', calculation_data: { 'Status': 'Ready' } },
-          { module_label: 'Payroll TDS (Form 24Q)', calculation_data: { 'Employees': 10 + (seed % 150) } },
-          { module_label: 'EPF & ESI Auto-Calc', calculation_data: { 'Liability': 50000 + (seed % 100000) } },
-          { module_label: 'Debtors Aging', calculation_data: { '90+ Days': seed % 5 } },
-          { module_label: 'Capital Gains Auto-Index', calculation_data: { 'LTCG': 20000 + (seed % 50000) } },
-          { module_label: 'Board Resolution Repository', calculation_data: { 'Generated': 3 + (seed % 10) } },
-          { module_label: 'AGM Minutes Tracking', calculation_data: { 'Status': 'Filed' } },
-          { module_label: 'DIN/TAN Renewal', calculation_data: { 'Valid Till': 2025 + (seed % 5) } },
-          { module_label: 'Advance Tax Predictor', calculation_data: { 'Q2 Installment': 'Paid' } },
-          { module_label: 'Deferred Tax Schedule', calculation_data: { 'DTA': 10000 + (seed % 20000) } },
-          { module_label: 'GST E-Way Bill Reconciliation', calculation_data: { 'Matched': '99.2%' } },
-          { module_label: 'Customs Bill of Entry Matching', calculation_data: { 'Pending': 0 } },
-          { module_label: 'Section 43B(h) MSME Due Audit', calculation_data: { 'Audited': '100%' } },
-          { module_label: 'Tax Audit Report Form 3CD', calculation_data: { 'Clauses': 'Completed' } },
-          { module_label: 'Transfer Pricing Form 3CEB', calculation_data: { 'Status': 'Verified' } },
-          { module_label: 'Equalisation Levy Calculator', calculation_data: { 'Due': 0 } },
-          { module_label: 'TCS Form 27EQ Tracking', calculation_data: { 'Challans': 'Matched' } },
-          { module_label: 'Professional Tax compliance', calculation_data: { 'Status': 'Complied' } },
-          { module_label: 'LLP Form 8 Statement of Accounts', calculation_data: { 'Draft': 'Ready' } },
-          { module_label: 'LLP Form 11 Annual Return', calculation_data: { 'Filing': 'Prepared' } },
-          { module_label: 'Section 185/186 Loan Audit', calculation_data: { 'Gaps': 0 } },
-          { module_label: 'CARO 2020 Compliance Checklist', calculation_data: { 'Audited': 'Verified' } },
-          { module_label: 'ICFR Audit Working Papers', calculation_data: { 'Status': 'Signed' } },
-          { module_label: 'WORM secure trail logs', calculation_data: { 'Hash': 'SHA-256' } }
-        ],
+        calculated_modules: ALL_FORMS.map((form, i) => {
+          const s = seed + i;
+          let calc_data: Record<string, any> = {};
+          if (form.badge === 'Annual Return' || form.badge === 'Regular Return') {
+            calc_data = { Status: 'Ready to File' };
+          } else if (form.badge?.includes('TDS')) {
+            calc_data = { tds_payable: 10000 + (s % 200000) };
+          } else if (form.badge?.includes('Tax')) {
+            calc_data = { tax_payable: 50000 + (s % 500000) };
+          } else if (form.badge === 'ITC Matching' || form.badge === 'Audit Statement') {
+            calc_data = { matched_pct: `${90 + (s % 10)}%` };
+          } else if (form.badge === 'Provident Fund' || form.badge === 'ESI') {
+            calc_data = { liability: 20000 + (s % 150000) };
+          } else if (form.badge === 'GST Refund') {
+            calc_data = { refund_due: 30000 + (s % 300000) };
+          } else if (form.badge === 'Annual ROC') {
+            calc_data = { filing_status: 'Computed' };
+          } else if (form.badge === 'FDI Inbound' || form.badge === 'Annual RBI') {
+            calc_data = { fdi_amount: 500000 + (s % 5000000) };
+          } else {
+            calc_data = { status: 'Verified' };
+          }
+          return {
+            module_id: form.id,
+            module_label: form.label,
+            calculation_data: calc_data,
+          };
+        }),
         documents: [
           ...completedDocuments,
           { 
@@ -905,44 +938,100 @@ export default function ClientFinancialVault() {
                     </div>
                   </div>
 
-                  {/* Modules Saved List */}
-                  <div className="p-5 bg-card/40 border border-border/40 rounded-2xl mt-4">
-                    <div className="flex justify-between items-center mb-4">
-                      <h3 className="font-semibold flex items-center gap-2">
-                        <FileText className="w-4 h-4 text-purple-400" /> 26 Module Data Room Vault
+                  {/* ── Department Vault Cards ─────────────────────────── */}
+                  <div className="mt-4">
+                    <div className="flex items-center justify-between mb-3">
+                      <h3 className="font-semibold flex items-center gap-2 text-sm">
+                        <FileText className="w-4 h-4 text-purple-400" />
+                        Compliance Data Room
                       </h3>
+                      <span className="text-xs text-muted-foreground">
+                        {TOTAL_LIBRARY_FORMS}+ forms in library · click dept to explore
+                      </span>
                     </div>
-                    <p className="text-sm text-muted-foreground mb-4">The AI Drafting Engine has direct access to these pre-calculated snapshots for notice replies.</p>
-                    
-                    <div className="grid grid-cols-2 md:grid-cols-3 gap-3">
-                      {/* Dynamic display of the 26 modules saved in the vault */}
-                      {dataRoom.calculated_modules?.map((mod: any, i: number) => (
-                        <div key={i} className="flex items-center justify-between p-2 bg-background/50 rounded-lg border border-border/30 text-xs hover:border-indigo-500/30 hover:bg-indigo-500/5 transition-all group">
-                          <div className="flex items-center gap-2 text-muted-foreground truncate mr-2 flex-1 min-w-0">
-                            <CheckCircle className="w-3 h-3 text-emerald-400 shrink-0" />
-                            <span className="truncate text-left" title={mod.module_label}>{mod.module_label}</span>
-                          </div>
-                          <div className="flex items-center gap-1.5 shrink-0">
-                            {/* Display a key metric if available to show it's real */}
-                            {mod.calculation_data && Object.keys(mod.calculation_data)[0] && (
-                               <span className="font-mono text-emerald-400 text-[10px]">
-                                 {typeof Object.values(mod.calculation_data)[0] === 'number' 
-                                   ? `₹${Number(Object.values(mod.calculation_data)[0]).toLocaleString()}` 
-                                   : String(Object.values(mod.calculation_data)[0])}
-                               </span>
-                            )}
-                            <button
-                              onClick={() => handleViewModulePdf(mod)}
-                              className="p-1 text-muted-foreground/60 hover:text-indigo-400 rounded hover:bg-indigo-500/10 transition-all shrink-0"
-                              title="View PDF Report"
-                            >
-                              <FileText className="w-3.5 h-3.5" />
-                            </button>
-                          </div>
-                        </div>
-                      ))}
+
+                    <div className="grid grid-cols-2 md:grid-cols-5 gap-3">
+                      {DEPT_META.map(dept => {
+                        const count = getDeptCount(dept.id);
+                        return (
+                          <button
+                            key={dept.id}
+                            onClick={() => setDeptVaultOpen(dept.id)}
+                            className={`group relative flex flex-col items-center justify-center gap-2 p-4 rounded-2xl border ${dept.bg} ${dept.border} ${dept.hoverBorder} hover:scale-[1.03] transition-all duration-200 cursor-pointer text-center`}
+                          >
+                            <span className="text-2xl">{dept.icon}</span>
+                            <div>
+                              <p className={`font-bold text-lg leading-none ${dept.color}`}>{count}</p>
+                              <p className="text-[10px] text-muted-foreground mt-0.5 leading-tight">{dept.shortLabel}</p>
+                            </div>
+                            <span className={`text-[9px] font-medium px-1.5 py-0.5 rounded-full ${dept.bg} ${dept.color} border ${dept.border}`}>
+                              Open →
+                            </span>
+                          </button>
+                        );
+                      })}
                     </div>
                   </div>
+
+                  {/* ── Department Drill-Down Modal ─────────────────────── */}
+                  <Dialog open={!!deptVaultOpen} onOpenChange={(o) => !o && setDeptVaultOpen(null)}>
+                    <DialogContent className="max-w-3xl w-[95vw] bg-zinc-950 border-border/50 text-foreground h-[80vh] flex flex-col p-0 overflow-hidden">
+                      <DialogHeader className="shrink-0 border-b border-border/30 p-5">
+                        <DialogTitle className="flex items-center gap-2">
+                          {deptVaultOpen && (() => { const d = DEPT_META.find(x => x.id === deptVaultOpen); return d ? <><span className="text-xl">{d.icon}</span><span className={d.color}>{d.label}</span></> : null; })()}
+                          <span className="text-muted-foreground font-normal text-sm ml-1">— Compiled Forms</span>
+                        </DialogTitle>
+                        <DialogDescription>
+                          {clients.find(c => c.id === selectedClient)?.name || 'Client'} · FY {financialYear} · Demo Auto-Pilot Snapshot
+                        </DialogDescription>
+                      </DialogHeader>
+
+                      <ScrollArea className="flex-1 p-5">
+                        {deptVaultOpen && (() => {
+                          const mods = getModulesForDept(deptVaultOpen);
+                          const dept = DEPT_META.find(d => d.id === deptVaultOpen)!;
+                          const demoRows = [
+                            { module_label: 'ITR-3/4 Auto-Generator', module_id: 'itr34', calculation_data: { net_taxable: 2400000 } },
+                            { module_label: 'Form 24Q – Salary TDS', module_id: 'form24q', calculation_data: { tds_payable: 84000 } },
+                            { module_label: 'Advance Tax Radar', module_id: 'advance-tax-radar', calculation_data: { advance_due: 120000 } },
+                          ];
+                          const rows = mods.length > 0 ? mods : demoRows;
+                          return (
+                            <div className="space-y-2">
+                              {rows.map((mod: any, i: number) => (
+                                <div key={i} className={`flex items-center justify-between p-3 rounded-xl border ${dept.bg} ${dept.border} hover:brightness-110 transition-all`}>
+                                  <div className="flex items-center gap-3 flex-1 min-w-0">
+                                    <CheckCircle className="w-4 h-4 text-emerald-400 shrink-0" />
+                                    <div className="min-w-0">
+                                      <p className="text-sm font-medium truncate">{mod.module_label}</p>
+                                      {mod.calculation_data && Object.keys(mod.calculation_data)[0] && (
+                                        <p className="text-xs text-emerald-400 font-mono mt-0.5">
+                                          {Object.keys(mod.calculation_data)[0].replace(/_/g, ' ')}: {
+                                            typeof Object.values(mod.calculation_data)[0] === 'number'
+                                              ? `₹${Number(Object.values(mod.calculation_data)[0]).toLocaleString()}`
+                                              : String(Object.values(mod.calculation_data)[0])
+                                          }
+                                        </p>
+                                      )}
+                                    </div>
+                                  </div>
+                                  <button
+                                    onClick={() => { setDeptVaultOpen(null); handleViewModulePdf(mod); }}
+                                    className={`shrink-0 flex items-center gap-1.5 text-xs px-3 py-1.5 rounded-lg border ${dept.border} ${dept.color} ${dept.bg} hover:brightness-125 transition-all`}
+                                  >
+                                    <FileText className="w-3.5 h-3.5" /> View PDF
+                                  </button>
+                                </div>
+                              ))}
+                              {mods.length === 0 && (
+                                <p className="text-xs text-muted-foreground text-center pt-4">Run Auto-Pilot to populate this department with calculated PDFs.</p>
+                              )}
+                            </div>
+                          );
+                        })()}
+                      </ScrollArea>
+                    </DialogContent>
+                  </Dialog>
 
                   {/* AI Generated Documents Vault */}
                   <div className="p-5 bg-card/40 border border-border/40 rounded-2xl mt-4">

@@ -12,7 +12,15 @@ import { useEffect } from 'react';
 
 // Backend API removed — calculations are performed client-side
 
-export default function GSTR3BPanel({ clientId, isDemo }: { clientId?: string; isDemo?: boolean }) {
+export default function GSTR3BPanel({
+  clientId,
+  isDemo,
+  onSaved,
+}: {
+  clientId?: string;
+  isDemo?: boolean;
+  onSaved?: () => void;
+}) {
   const [loading, setLoading] = useState(false);
   const [result, setResult] = useState<any>(null);
   const [form, setForm] = useState({ period_month: new Date().getMonth() + 1, period_year: new Date().getFullYear(), outward_cgst: '', outward_sgst: '', outward_igst: '', itc_cgst: '', itc_sgst: '', itc_igst: '', rcm_liability: '' });
@@ -101,7 +109,7 @@ export default function GSTR3BPanel({ clientId, isDemo }: { clientId?: string; i
     }
     setExporting(true);
     toast.info('Generating GSTR-3B Computation Report...', { duration: 1000 });
-    setTimeout(() => {
+    setTimeout(async () => {
       try {
         const doc = new jsPDF();
         
@@ -156,6 +164,17 @@ export default function GSTR3BPanel({ clientId, isDemo }: { clientId?: string; i
         doc.text('Sannidh - Compliance Auto-Pilot Signature Verified', 130, 280);
 
         doc.save(`GSTR3B_Computation_${clientId || 'DEMO'}.pdf`);
+
+        // REAL MODE: save to client data room
+        if (!isDemo && clientId) {
+          try {
+            const { saveFormToDataRoom, buildFormPDF } = await import('@/lib/form-pdf-utils');
+            const fy = `${new Date().getFullYear()}-${String(new Date().getFullYear() + 1).slice(-2)}`;
+            const blob = buildFormPDF({ formId: 'gstr3b', formCode: 'GSTR-3B', formLabel: 'GSTR-3B (Net Tax Payable)', clientId, financialYear: fy, data: result ?? {} });
+            const res = await saveFormToDataRoom({ formId: 'gstr3b', formCode: 'GSTR-3B', formLabel: 'GSTR-3B (Net Tax Payable)', clientId, financialYear: fy, data: result ?? {} }, blob);
+            if (res.success) { toast.success('PDF saved to client data room ✓'); onSaved?.(); }
+          } catch (e) { console.warn('Data room save failed:', e); }
+        }
 
         toast.success('GSTR-3B Official Report Downloaded.');
       } catch (err) {

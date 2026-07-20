@@ -31,8 +31,7 @@ export interface DemoTransaction {
   bank: string;
   referenceNo: string;
   category: PaymentCategory;
-  confidence: number; // 0-100
-  classificationReason: string; // WHY this category was assigned (for Reason-for-Tagging feature)
+  confidence: number; // 0–100
   caOverride?: PaymentCategory;
 }
 
@@ -62,27 +61,7 @@ export const CATEGORY_COLORS: Record<PaymentCategory, string> = {
   'Uncategorized':           '#6b7280',
 };
 
-// ── Statutory section associated with each category ──────────
-// Used to populate the "Reason for Tagging" tooltip on each transaction
-export const CATEGORY_TAX_SECTION: Record<PaymentCategory, string> = {
-  'Salary / Payroll':        'Sec 192 TDS on Salary · EPF 12% employer · ESI 4% employer',
-  'Rent / Lease':            'Sec 194-I TDS on Rent (10%) · GST RCM 18% if commercial',
-  'Loan / EMI':              'Interest deductible u/s 36(1)(iii) · Verify OD/CC limit',
-  'GST Payments':            'GST Act 2017 · GSTR-3B / PMT-06 output liability',
-  'Utilities':               'Business expense u/s 37(1) · Input GST eligible if B2B',
-  'Food & Dining':           'Perquisite u/s 17 · Disallowed u/s 37 if personal nature',
-  'Travel':                  'Sec 10(14) Travel Allowance · LTCA/STCA applicable',
-  'Business Expenses':       'Sec 37(1) General Business Expenditure · Input GST check',
-  'Capital Expenditure':     'Sec 32 Depreciation Schedule · Must capitalise, not expense',
-  'Inter-Company Transfer':  'Sec 40A(2)(b) Related Party · Transfer Pricing documentation',
-  'Tax Payments':            'Advance Tax u/s 208 · TDS Challan 280/281 · Self-Assessment',
-  'Vendor / Supplier':       'Sec 194C TDS 2% / Sec 194J TDS 10% if professional fee',
-  'Insurance':               'Sec 80C / 80D deduction check · Premium >₹20K verify TDS',
-  'Investment / SIP':        'Sec 80C / 80CCC eligible · Capital Gains on redemption',
-  'Uncategorized':           'No rule matched — manual CA review required before filing',
-};
-
-// ── Category icons (lucide name strings) ─────────────────────
+// ── Category icons (lucide name strings for mapping in UI) ───
 export const CATEGORY_ICONS: Record<PaymentCategory, string> = {
   'Salary / Payroll':        'Users',
   'Rent / Lease':            'Home',
@@ -96,12 +75,12 @@ export const CATEGORY_ICONS: Record<PaymentCategory, string> = {
   'Inter-Company Transfer':  'ArrowLeftRight',
   'Tax Payments':            'Landmark',
   'Vendor / Supplier':       'Package',
-  'Insurance':               'Heart',
+  'Insurance':               'Shield',
   'Investment / SIP':        'TrendingUp',
   'Uncategorized':           'HelpCircle',
 };
 
-// ── Keyword -> category rules ─────────────────────────────────
+// ── Keyword → category rules ─────────────────────────────────
 interface ClassificationRule {
   keywords: string[];
   category: PaymentCategory;
@@ -125,17 +104,17 @@ const CLASSIFICATION_RULES: ClassificationRule[] = [
     confidence: 96,
   },
   {
-    keywords: ['gstn', 'gst_pmt', 'gst challan', 'gst payment', 'igst', 'cgst', 'sgst', 'gstin challan', 'pmt-06'],
+    keywords: ['gstn', 'gst_pmt', 'gst challan', 'gst payment', 'igst', 'cgst', 'sgst', 'gstin challan'],
     category: 'GST Payments',
     confidence: 98,
   },
   {
-    keywords: ['bses', 'msedcl', 'bescom', 'tata power', 'electricity', 'jio', 'bsnl', 'airtel', 'vodafone', 'vi bill', 'water board', 'utility', 'municipal'],
+    keywords: ['bses', 'msedcl', 'bescom', 'tata power', 'electricity', 'jio', 'bsnl', 'airtel', 'vodafone', 'vi bill', 'water board', 'utility', 'bescom challan', 'municipal'],
     category: 'Utilities',
     confidence: 90,
   },
   {
-    keywords: ['zomato', 'swiggy', 'restaurant', 'hotel', 'cafe', 'food', 'dining', 'biryani', 'pizza', 'dominos', 'mcdonald', 'kfc', 'canteen'],
+    keywords: ['zomato', 'swiggy', 'restaurant', 'hotel', 'cafe', 'food', 'dining', 'biryani', 'pizza', 'dominos', 'mcdonald', 'kfc'],
     category: 'Food & Dining',
     confidence: 88,
   },
@@ -145,7 +124,7 @@ const CLASSIFICATION_RULES: ClassificationRule[] = [
     confidence: 87,
   },
   {
-    keywords: ['amazon', 'flipkart', 'meesho', 'office supplies', 'stationery', 'software', 'subscription', 'vendor payment', 'business purchase'],
+    keywords: ['amazon', 'flipkart', 'meesho', 'office supplies', 'stationery', 'software', 'subscription', 'canteen', 'vendor payment', 'business purchase'],
     category: 'Business Expenses',
     confidence: 82,
   },
@@ -181,81 +160,76 @@ const CLASSIFICATION_RULES: ClassificationRule[] = [
   },
 ];
 
-// ── Classify a single transaction ─────────────────────────────
-export function classifyTransaction(
-  description: string,
-  amount: number
-): { category: PaymentCategory; confidence: number; classificationReason: string } {
+// ── Classify a single description ────────────────────────────
+export function classifyTransaction(description: string, amount: number): { category: PaymentCategory; confidence: number } {
   const lower = description.toLowerCase();
 
   for (const rule of CLASSIFICATION_RULES) {
     for (const keyword of rule.keywords) {
       if (lower.includes(keyword)) {
-        return {
-          category: rule.category,
-          confidence: rule.confidence,
-          classificationReason: `Keyword matched: "${keyword}" → ${rule.category} · ${CATEGORY_TAX_SECTION[rule.category]}`,
-        };
+        return { category: rule.category, confidence: rule.confidence };
       }
     }
   }
 
-  // Amount-based heuristics
+  // Amount-based heuristics for uncategorized
   if (amount > 500000) {
-    return {
-      category: 'Capital Expenditure',
-      confidence: 55,
-      classificationReason: `Amount ₹${amount.toLocaleString('en-IN')} > ₹5,00,000 heuristic — possible Capital Expenditure · ${CATEGORY_TAX_SECTION['Capital Expenditure']}`,
-    };
+    return { category: 'Capital Expenditure', confidence: 55 };
   }
   if (amount > 100000 && lower.includes('neft')) {
-    return {
-      category: 'Vendor / Supplier',
-      confidence: 50,
-      classificationReason: `NEFT + Amount ₹${amount.toLocaleString('en-IN')} > ₹1,00,000 heuristic — possible Vendor / Supplier · ${CATEGORY_TAX_SECTION['Vendor / Supplier']}`,
-    };
+    return { category: 'Vendor / Supplier', confidence: 50 };
   }
 
-  return {
-    category: 'Uncategorized',
-    confidence: 40,
-    classificationReason: 'No keyword or heuristic matched — requires manual CA review before ledger finalisation',
-  };
+  return { category: 'Uncategorized', confidence: 40 };
 }
 
 // ── Mock transaction templates ────────────────────────────────
 const MOCK_TRANSACTION_TEMPLATES = [
+  // Salary
   { desc: 'NEFT Salary Transfer - Employee Payroll Batch', narration: 'PAYROLL/FEB2026/BATCH01', type: 'debit' as const, amountRange: [150000, 800000], bank: 'HDFC Bank' },
   { desc: 'Staff Wages Payment via HRMS', narration: 'HRMS/WAGES/MAR2026', type: 'debit' as const, amountRange: [80000, 400000], bank: 'ICICI Bank' },
-  { desc: 'Office Rent Payment - Landlord Sharma Properties', narration: 'RENT/OFFICE/MAR2026', type: 'debit' as const, amountRange: [45000, 250000], bank: 'SBI' },
+  // Rent
+  { desc: 'Office Rent Payment - Landlord M/s Sharma Properties', narration: 'RENT/OFFICE/MAR2026', type: 'debit' as const, amountRange: [45000, 250000], bank: 'SBI' },
   { desc: 'Lease Rental for Warehouse Unit B', narration: 'LEASE/WH-B/Q1FY26', type: 'debit' as const, amountRange: [30000, 120000], bank: 'Axis Bank' },
+  // EMI
   { desc: 'HDFC_EMI Loan Repayment A/c 4521', narration: 'HDFC_EMI/LOAN4521/MAR', type: 'debit' as const, amountRange: [25000, 180000], bank: 'HDFC Bank' },
-  { desc: 'SBI_LOAN Vehicle Loan EMI Auto1234', narration: 'SBI_LOAN/AUTO1234', type: 'debit' as const, amountRange: [18000, 60000], bank: 'SBI' },
+  { desc: 'SBI_LOAN Vehicle Loan EMI - AUTO1234', narration: 'SBI_LOAN/AUTO1234', type: 'debit' as const, amountRange: [18000, 60000], bank: 'SBI' },
+  // GST
   { desc: 'GSTN Challan Payment - IGST Output Tax Q3', narration: 'GSTN/IGST/Q3FY26/DRC03', type: 'debit' as const, amountRange: [50000, 500000], bank: 'HDFC Bank' },
   { desc: 'GST PMT-06 Monthly Payment CGST+SGST', narration: 'GST_PMT/PMT06/MAR2026', type: 'debit' as const, amountRange: [30000, 300000], bank: 'ICICI Bank' },
-  { desc: 'MSEDCL Electricity Bill Payment Feb 2026', narration: 'MSEDCL/BILL/FEB2026', type: 'debit' as const, amountRange: [8000, 45000], bank: 'Axis Bank' },
-  { desc: 'Jio Fiber Business Plan Monthly Subscription', narration: 'JIO/FIBER/MAR2026', type: 'debit' as const, amountRange: [2000, 8000], bank: 'SBI' },
-  { desc: 'BSES Rajdhani Power Ltd Commercial Connection', narration: 'BSES/COMM/Q1/2026', type: 'debit' as const, amountRange: [12000, 60000], bank: 'HDFC Bank' },
-  { desc: 'Zomato Business Canteen Meal Order', narration: 'ZOMATO/ORD/2845671', type: 'debit' as const, amountRange: [500, 5000], bank: 'ICICI Bank' },
-  { desc: 'Swiggy Corporate Account Team Lunch', narration: 'SWIGGY/CORP/MAR15', type: 'debit' as const, amountRange: [800, 4000], bank: 'Axis Bank' },
-  { desc: 'IRCTC Rail Booking Business Class Delhi Mumbai', narration: 'IRCTC/PNR/4456778', type: 'debit' as const, amountRange: [2000, 15000], bank: 'SBI' },
-  { desc: 'Uber Corporate Account Client Meeting Travel', narration: 'UBER/CORP/MAR22', type: 'debit' as const, amountRange: [500, 3000], bank: 'HDFC Bank' },
-  { desc: 'IndiGo Airlines Business Trip Mumbai Bengaluru', narration: 'INDIGO/6E4521/MAR26', type: 'debit' as const, amountRange: [5000, 25000], bank: 'ICICI Bank' },
-  { desc: 'Amazon Business Office Supplies Purchase', narration: 'AMAZON/BUS/ORD9987', type: 'debit' as const, amountRange: [3000, 35000], bank: 'Axis Bank' },
-  { desc: 'Software Subscription Adobe Acrobat Annual', narration: 'ADOBE/ANNUAL/2026', type: 'debit' as const, amountRange: [15000, 40000], bank: 'HDFC Bank' },
-  { desc: 'Capital Purchase Heavy Machinery Unit M12', narration: 'CAPEX/MACH/M12/FY26', type: 'debit' as const, amountRange: [500000, 5000000], bank: 'SBI' },
-  { desc: 'Office Renovation Work Phase 2 Contractor', narration: 'RENOVATION/PH2/MAR', type: 'debit' as const, amountRange: [200000, 1500000], bank: 'ICICI Bank' },
-  { desc: 'Advance Tax Q4 Payment NSDL Challan 280', narration: 'ADVTAX/280/Q4FY26', type: 'debit' as const, amountRange: [100000, 1000000], bank: 'HDFC Bank' },
-  { desc: 'TDS Challan 281 Salary TDS Deposit Mar 2026', narration: 'TDS/281/SALARY/MAR26', type: 'debit' as const, amountRange: [50000, 400000], bank: 'SBI' },
-  { desc: 'Supplier Payment Gupta Raw Materials NEFT Vendor', narration: 'VENDOR/GUPTA/INV4521', type: 'debit' as const, amountRange: [80000, 600000], bank: 'Axis Bank' },
-  { desc: 'Purchase Payment Steel Alloys Ltd Invoice 2281', narration: 'PURCH/STEEL/2281', type: 'debit' as const, amountRange: [150000, 900000], bank: 'ICICI Bank' },
-  { desc: 'LIC Group Insurance Premium Policy LIC8821', narration: 'LIC/GRPINS/MAR2026', type: 'debit' as const, amountRange: [20000, 150000], bank: 'HDFC Bank' },
+  // Utilities
+  { desc: 'MSEDCL Electricity Bill Payment - Feb 2026', narration: 'MSEDCL/BILL/FEB2026', type: 'debit' as const, amountRange: [8000, 45000], bank: 'Axis Bank' },
+  { desc: 'Jio Fiber Business Plan - Monthly Subscription', narration: 'JIO/FIBER/MAR2026', type: 'debit' as const, amountRange: [2000, 8000], bank: 'SBI' },
+  { desc: 'BSES Rajdhani Power Ltd - Commercial Connection', narration: 'BSES/COMM/Q1/2026', type: 'debit' as const, amountRange: [12000, 60000], bank: 'HDFC Bank' },
+  // Food
+  { desc: 'Zomato Business - Canteen Meal Order', narration: 'ZOMATO/ORD/2845671', type: 'debit' as const, amountRange: [500, 5000], bank: 'ICICI Bank' },
+  { desc: 'Swiggy Corporate Account - Team Lunch', narration: 'SWIGGY/CORP/MAR15', type: 'debit' as const, amountRange: [800, 4000], bank: 'Axis Bank' },
+  // Travel
+  { desc: 'IRCTC Rail Booking - Business Class Delhi-Mumbai', narration: 'IRCTC/PNR/4456778', type: 'debit' as const, amountRange: [2000, 15000], bank: 'SBI' },
+  { desc: 'Uber Corporate Account - Client Meeting Travel', narration: 'UBER/CORP/MAR22', type: 'debit' as const, amountRange: [500, 3000], bank: 'HDFC Bank' },
+  { desc: 'IndiGo Airlines - Business Trip Mumbai-Bengaluru', narration: 'INDIGO/6E4521/MAR26', type: 'debit' as const, amountRange: [5000, 25000], bank: 'ICICI Bank' },
+  // Business Expenses
+  { desc: 'Amazon Business - Office Supplies Purchase', narration: 'AMAZON/BUS/ORD9987', type: 'debit' as const, amountRange: [3000, 35000], bank: 'Axis Bank' },
+  { desc: 'Software Subscription - Adobe Acrobat Annual', narration: 'ADOBE/ANNUAL/2026', type: 'debit' as const, amountRange: [15000, 40000], bank: 'HDFC Bank' },
+  // Capital Expenditure
+  { desc: 'Capital Purchase - Heavy Machinery Unit M12', narration: 'CAPEX/MACH/M12/FY26', type: 'debit' as const, amountRange: [500000, 5000000], bank: 'SBI' },
+  { desc: 'Office Renovation Work - Phase 2 Contractor', narration: 'RENOVATION/PH2/MAR', type: 'debit' as const, amountRange: [200000, 1500000], bank: 'ICICI Bank' },
+  // Tax Payments
+  { desc: 'Advance Tax Q4 Payment - NSDL Challan 280', narration: 'ADVTAX/280/Q4FY26', type: 'debit' as const, amountRange: [100000, 1000000], bank: 'HDFC Bank' },
+  { desc: 'TDS Challan 281 - Salary TDS Deposit Mar 2026', narration: 'TDS/281/SALARY/MAR26', type: 'debit' as const, amountRange: [50000, 400000], bank: 'SBI' },
+  // Vendor
+  { desc: 'Supplier Payment - M/s Gupta Raw Materials NEFT', narration: 'VENDOR/GUPTA/INV4521', type: 'debit' as const, amountRange: [80000, 600000], bank: 'Axis Bank' },
+  { desc: 'Purchase Payment - Steel Alloys Ltd Invoice #2281', narration: 'PURCH/STEEL/2281', type: 'debit' as const, amountRange: [150000, 900000], bank: 'ICICI Bank' },
+  // Insurance
+  { desc: 'LIC Group Insurance Premium - Policy #LIC8821', narration: 'LIC/GRPINS/MAR2026', type: 'debit' as const, amountRange: [20000, 150000], bank: 'HDFC Bank' },
   { desc: 'Star Health Corporate Mediclaim Renewal FY26', narration: 'STARHEALTH/CORP/FY26', type: 'debit' as const, amountRange: [80000, 350000], bank: 'SBI' },
-  { desc: 'MF SIP Axis Bluechip Fund Direct Growth', narration: 'MF_SIP/AXIS/BLUE/MAR', type: 'debit' as const, amountRange: [10000, 100000], bank: 'ICICI Bank' },
-  { desc: 'Payment Received Customer Invoice INV2891', narration: 'CUST/PAY/INV2891', type: 'credit' as const, amountRange: [200000, 2000000], bank: 'HDFC Bank' },
-  { desc: 'Export Proceeds USD Settlement Axis FX', narration: 'EXPORT/USD/FX/MAR26', type: 'credit' as const, amountRange: [500000, 5000000], bank: 'Axis Bank' },
-  { desc: 'GST Refund RFD-01 Approved IGST FY25-26', narration: 'GSTREFUND/RFD01/IGST', type: 'credit' as const, amountRange: [50000, 500000], bank: 'SBI' },
-  { desc: 'Inter-Company Fund Receipt Subsidiary TechCo', narration: 'INTERCO/TECHCO/FEB26', type: 'credit' as const, amountRange: [100000, 1000000], bank: 'ICICI Bank' },
+  // Investment
+  { desc: 'MF SIP - Axis Bluechip Fund Direct Growth', narration: 'MF_SIP/AXIS/BLUE/MAR', type: 'debit' as const, amountRange: [10000, 100000], bank: 'ICICI Bank' },
+  // Incoming credits
+  { desc: 'Payment Received - Customer Invoice #INV2891', narration: 'CUST/PAY/INV2891', type: 'credit' as const, amountRange: [200000, 2000000], bank: 'HDFC Bank' },
+  { desc: 'Export Proceeds - USD Settlement Axis FX', narration: 'EXPORT/USD/FX/MAR26', type: 'credit' as const, amountRange: [500000, 5000000], bank: 'Axis Bank' },
+  { desc: 'GST Refund - RFD-01 Approved IGST FY25-26', narration: 'GSTREFUND/RFD01/IGST', type: 'credit' as const, amountRange: [50000, 500000], bank: 'SBI' },
+  { desc: 'Inter-Company Fund Receipt - Subsidiary TechCo', narration: 'INTERCO/TECHCO/FEB26', type: 'credit' as const, amountRange: [100000, 1000000], bank: 'ICICI Bank' },
 ];
 
 // ── Seeded random number generator ───────────────────────────
@@ -281,7 +255,7 @@ export function generateMockTransactions(clientId: string, clientName: string, f
   const seed = getHash(clientId + financialYear);
   const rng = seededRandom(seed);
 
-  const count = 28 + Math.floor(rng() * 14); // 28-42 transactions
+  const count = 28 + Math.floor(rng() * 14); // 28–42 transactions
   const transactions: DemoTransaction[] = [];
 
   const fyStartYear = parseInt(financialYear.split('-')[0]);
@@ -305,16 +279,22 @@ export function generateMockTransactions(clientId: string, clientName: string, f
     const [minAmt, maxAmt] = template.amountRange;
     const amount = Math.round((minAmt + rng() * (maxAmt - minAmt)) / 100) * 100;
 
-    let customizedDesc = template.desc
+    // Dynamically customize descriptions and narrations based on clientName
+    let customizedDesc = template.desc;
+    let customizedNarration = template.narration;
+    
+    customizedDesc = customizedDesc
       .replace('Employee Payroll Batch', `${firstWord} Payroll Batch`)
       .replace('Staff Wages', `${firstWord} Staff Wages`)
       .replace('Sharma Properties', `${firstWord} Realtors`)
       .replace('Warehouse Unit B', `${firstWord} Warehouse B`)
       .replace('Gupta Raw Materials', `${firstWord} Supplies`)
       .replace('Steel Alloys Ltd', `${firstWord} Steel Co`)
-      .replace('Subsidiary TechCo', `${firstWord} Subsidiary`);
-
-    let customizedNarration = template.narration
+      .replace('Customer Invoice', `${firstWord} Customer`)
+      .replace('Subsidiary TechCo', `${firstWord} Subsidiary`)
+      .replace('Group Insurance', `${firstWord} Group Insurance`);
+      
+    customizedNarration = customizedNarration
       .replace('PAYROLL', `${firstWord.toUpperCase()}/PAY`)
       .replace('CUST', `${firstWord.toUpperCase()}/CUST`)
       .replace('VENDOR', `${firstWord.toUpperCase()}/VNDR`)
@@ -322,7 +302,7 @@ export function generateMockTransactions(clientId: string, clientName: string, f
 
     const classified = classifyTransaction(customizedDesc, amount);
 
-    // Load CA override from localStorage if exists
+    // Load CA override from localStorage if exists (checking both ID-based and legacy index-based)
     const overrideKey = `payment_override_${clientId}_txn-${clientId}-${i}`;
     const savedOverride = typeof window !== 'undefined'
       ? (localStorage.getItem(overrideKey) || localStorage.getItem(`payment_override_${clientId}_${i}`)) as PaymentCategory | null
@@ -339,7 +319,6 @@ export function generateMockTransactions(clientId: string, clientName: string, f
       referenceNo: `REF${seed % 9000 + 1000}${i}`,
       category: classified.category,
       confidence: classified.confidence,
-      classificationReason: classified.classificationReason,
       caOverride: savedOverride ?? undefined,
     });
   }
@@ -384,7 +363,7 @@ export function getMonthlyTrends(transactions: DemoTransaction[]): MonthlyTrend[
   const map = new Map<string, { debit: number; credit: number; catMap: Map<string, number> }>();
 
   for (const tx of transactions) {
-    const month = tx.date.substring(0, 7);
+    const month = tx.date.substring(0, 7); // YYYY-MM
     const existing = map.get(month) ?? { debit: 0, credit: 0, catMap: new Map() };
     if (tx.type === 'debit') {
       existing.debit += tx.amount;
@@ -404,7 +383,12 @@ export function getMonthlyTrends(transactions: DemoTransaction[]): MonthlyTrend[
       v.catMap.forEach((amt, cat) => {
         if (amt > topAmt) { topAmt = amt; topCat = cat; }
       });
-      return { month, debit: v.debit, credit: v.credit, topCategory: topCat };
+      return {
+        month,
+        debit: v.debit,
+        credit: v.credit,
+        topCategory: topCat,
+      };
     });
 }
 
@@ -421,49 +405,4 @@ export function clearAllOverrides(clientId: string, count: number): void {
     localStorage.removeItem(`payment_override_${clientId}_txn-${clientId}-${i}`);
     localStorage.removeItem(`payment_override_${clientId}_${i}`);
   }
-}
-
-// ── SHA-256 ledger hash (Audit Trail feature) ─────────────────
-// Computes a deterministic hash of the entire categorised ledger state.
-// If any category, amount, or description changes after "Finalize", the hash breaks.
-export async function computeLedgerHash(transactions: DemoTransaction[]): Promise<string> {
-  const payload = transactions.map(tx => ({
-    id: tx.id,
-    date: tx.date,
-    description: tx.description,
-    amount: tx.amount,
-    type: tx.type,
-    category: tx.caOverride ?? tx.category,
-  }));
-  const json = JSON.stringify(payload);
-  const encoder = new TextEncoder();
-  const data = encoder.encode(json);
-  const hashBuffer = await crypto.subtle.digest('SHA-256', data);
-  const hashArray = Array.from(new Uint8Array(hashBuffer));
-  return hashArray.map(b => b.toString(16).padStart(2, '0')).join('');
-}
-
-// ── Audit lock helpers ────────────────────────────────────────
-export interface AuditLock {
-  hash: string;
-  finalizedAt: string; // ISO timestamp
-  transactionCount: number;
-  caUser?: string; // email of the CA who finalised
-}
-
-export function saveAuditLock(clientId: string, financialYear: string, lock: AuditLock): void {
-  if (typeof window === 'undefined') return;
-  localStorage.setItem(`audit_lock_${clientId}_${financialYear}`, JSON.stringify(lock));
-}
-
-export function loadAuditLock(clientId: string, financialYear: string): AuditLock | null {
-  if (typeof window === 'undefined') return null;
-  const raw = localStorage.getItem(`audit_lock_${clientId}_${financialYear}`);
-  if (!raw) return null;
-  try { return JSON.parse(raw) as AuditLock; } catch { return null; }
-}
-
-export function clearAuditLock(clientId: string, financialYear: string): void {
-  if (typeof window === 'undefined') return;
-  localStorage.removeItem(`audit_lock_${clientId}_${financialYear}`);
 }

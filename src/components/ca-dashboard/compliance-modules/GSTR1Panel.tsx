@@ -9,9 +9,18 @@ import { Badge } from '@/components/ui/badge';
 import { Progress } from '@/components/ui/progress';
 import { toast } from 'sonner';
 
-// Backend API removed — generation is performed client-side
+// Real dashboard panel — saves PDFs to client data room via Supabase Storage.
+// Demo dashboard uses: src/components/ca-dashboard-demo/compliance-modules/GSTR1Panel.tsx
 
-export default function GSTR1Panel({ clientId, isDemo }: { clientId?: string; isDemo?: boolean }) {
+export default function GSTR1Panel({
+  clientId,
+  isDemo,
+  onSaved,
+}: {
+  clientId?: string;
+  isDemo?: boolean;
+  onSaved?: () => void;
+}) {
   const [file, setFile] = useState<File | null>(null);
   const [periodMonth, setPeriodMonth] = useState(new Date().getMonth() + 1);
   const [periodYear, setPeriodYear] = useState(new Date().getFullYear());
@@ -50,7 +59,7 @@ export default function GSTR1Panel({ clientId, isDemo }: { clientId?: string; is
     setExporting(true);
     toast.info('Initializing Official GSTR-1 Template...', { duration: 1000 });
     
-    setTimeout(() => {
+    setTimeout(async () => {
       try {
         // Professional PDF Generation using jsPDF
         const doc = new jsPDF({
@@ -100,6 +109,32 @@ export default function GSTR1Panel({ clientId, isDemo }: { clientId?: string; is
         doc.text('Disclaimer: This is an AI-generated draft for demo purposes. Verify with official records before filing.', 20, 280);
 
         doc.save(`GSTR1_Draft_${clientId || 'DEMO'}_${periodMonth}.pdf`);
+
+        // REAL MODE: save PDF blob to client data room
+        if (!isDemo && clientId) {
+          try {
+            const { saveFormToDataRoom, buildFormPDF } = await import('@/lib/form-pdf-utils');
+            const blob = buildFormPDF({
+              formId: 'gstr1',
+              formCode: 'GSTR-1',
+              formLabel: 'GSTR-1 (Outward Sales Return)',
+              clientId,
+              financialYear: `${periodYear}-${String(periodYear + 1).slice(-2)}`,
+              data: result?.summary ?? {},
+            });
+            const saveResult = await saveFormToDataRoom(
+              { formId: 'gstr1', formCode: 'GSTR-1', formLabel: 'GSTR-1 (Outward Sales Return)', clientId,
+                financialYear: `${periodYear}-${String(periodYear + 1).slice(-2)}`, data: result?.summary ?? {} },
+              blob
+            );
+            if (saveResult.success) {
+              toast.success('PDF saved to client data room ✓');
+              onSaved?.();
+            }
+          } catch (saveErr) {
+            console.warn('Data room save failed:', saveErr);
+          }
+        }
 
         toast.success('GSTR-1 Official Draft Downloaded.');
       } catch (err) {

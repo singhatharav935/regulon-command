@@ -44,10 +44,13 @@ const CONSENT_STATUS_CONFIG = {
 
 interface ClientPortfolioSectionProps {
   governmentApiEnabled?: boolean;
+  /** When set, only clients of this sector are shown in the table */
+  sectorFilter?: ClientSector;
 }
 
 const ClientPortfolioSection = ({
   governmentApiEnabled = false,
+  sectorFilter,
 }: ClientPortfolioSectionProps) => {
   const { isRunning } = useCAAgentOrchestrator();
   const [clients, setClients] = useState<CAClient[]>([]);
@@ -121,6 +124,11 @@ const ClientPortfolioSection = ({
     setConsentRequests(consentData);
     setIsLoading(false);
   }, []);
+
+  // ── Sector filtering: derive the visible client list from sectorFilter prop ──
+  const displayedClients = sectorFilter && sectorFilter !== 'general'
+    ? clients.filter(c => (c.sector ?? 'general') === sectorFilter)
+    : clients;
 
   useEffect(() => {
     fetchData();
@@ -541,11 +549,20 @@ const ClientPortfolioSection = ({
         <div className="flex items-center justify-center py-12">
           <div className="w-8 h-8 border-4 border-primary border-t-transparent rounded-full animate-spin" />
         </div>
-      ) : clients.length === 0 ? (
+      ) : displayedClients.length === 0 ? (
         <div className="flex flex-col items-center py-16 text-center border border-border/30 rounded-xl">
           <Building2 className="w-10 h-10 text-muted-foreground mb-3" />
-          <p className="text-muted-foreground">No clients yet</p>
-          <p className="text-xs text-muted-foreground/60 mt-1">Click "Add Client" to onboard your first client</p>
+          {sectorFilter && sectorFilter !== 'general' ? (
+            <>
+              <p className="text-muted-foreground">No {getSectorConfig(sectorFilter).label} clients found</p>
+              <p className="text-xs text-muted-foreground/60 mt-1">No clients in this sector have been onboarded yet</p>
+            </>
+          ) : (
+            <>
+              <p className="text-muted-foreground">No clients yet</p>
+              <p className="text-xs text-muted-foreground/60 mt-1">Click "Add Client" to onboard your first client</p>
+            </>
+          )}
         </div>
       ) : (
         <div className="rounded-xl border border-border/50 overflow-hidden">
@@ -565,7 +582,7 @@ const ClientPortfolioSection = ({
               </TableRow>
             </TableHeader>
             <TableBody>
-              {clients.map((client) => (
+              {displayedClients.map((client) => (
                 <TableRow
                   key={client.id}
                   className="hover:bg-muted/20 transition-colors cursor-pointer"

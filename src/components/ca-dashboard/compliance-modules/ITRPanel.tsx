@@ -12,7 +12,15 @@ import { toast } from 'sonner';
 const CA_API = (import.meta.env.VITE_CA_API_BASE_URL as string);
 const API_BASE = `${CA_API}/api/v1/compliance`;
 
-export default function ITRPanel({ clientId, isDemo }: { clientId?: string; isDemo?: boolean }) {
+export default function ITRPanel({
+  clientId,
+  isDemo,
+  onSaved,
+}: {
+  clientId?: string;
+  isDemo?: boolean;
+  onSaved?: () => void;
+}) {
   const [itrType, setItrType] = useState<'itr3' | 'itr4'>('itr3');
   const [loading, setLoading] = useState(false);
   const [result, setResult] = useState<any>(null);
@@ -117,7 +125,7 @@ export default function ITRPanel({ clientId, isDemo }: { clientId?: string; isDe
     }
     setExporting(true);
     toast.info(`Preparing ITR-${itrType.slice(-1)} Official Assessment Draft...`, { duration: 1000 });
-    setTimeout(() => {
+    setTimeout(async () => {
       try {
         const doc = new jsPDF();
         
@@ -181,6 +189,17 @@ export default function ITRPanel({ clientId, isDemo }: { clientId?: string; isDe
         doc.text('Sannidh AI Compliance Verification System', 130, 280);
 
         doc.save(`ITR_${itrType.toUpperCase()}_Draft_${clientId || 'DEMO'}.pdf`);
+
+        // REAL MODE: save to client data room
+        if (!isDemo && clientId) {
+          try {
+            const { saveFormToDataRoom, buildFormPDF } = await import('@/lib/form-pdf-utils');
+            const fy = `${new Date().getFullYear()}-${String(new Date().getFullYear() + 1).slice(-2)}`;
+            const blob = buildFormPDF({ formId: 'itr34', formCode: `ITR-${itrType}`, formLabel: `ITR-${itrType} (Income Tax Return)`, clientId, financialYear: fy, data: result ?? {} });
+            const res = await saveFormToDataRoom({ formId: 'itr34', formCode: `ITR-${itrType}`, formLabel: `ITR-${itrType} (Income Tax Return)`, clientId, financialYear: fy, data: result ?? {} }, blob);
+            if (res.success) { toast.success('PDF saved to client data room ✓'); onSaved?.(); }
+          } catch (e) { console.warn('Data room save failed:', e); }
+        }
 
         toast.success('ITR Draft Downloaded successfully.');
       } catch (err) {

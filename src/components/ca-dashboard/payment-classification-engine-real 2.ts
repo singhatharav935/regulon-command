@@ -34,7 +34,6 @@ export interface RealTransaction {
   // Classification result
   category: PaymentCategory;
   confidence: number;
-  classificationReason: string; // WHY this category was assigned (Reason-for-Tagging feature)
   caOverride?: PaymentCategory;
   overrideBy?: string;  // CA user email
   overrideAt?: string;  // ISO timestamp
@@ -66,26 +65,6 @@ export const CATEGORY_COLORS: Record<PaymentCategory, string> = {
   'Insurance':               '#0ea5e9',
   'Investment / SIP':        '#84cc16',
   'Uncategorized':           '#6b7280',
-};
-
-// ── Statutory section associated with each category ──────────
-// Used to populate the "Reason for Tagging" tooltip
-export const CATEGORY_TAX_SECTION: Record<PaymentCategory, string> = {
-  'Salary / Payroll':        'Sec 192 TDS on Salary · EPF 12% employer · ESI 4% employer',
-  'Rent / Lease':            'Sec 194-I TDS on Rent (10%) · GST RCM 18% if commercial',
-  'Loan / EMI':              'Interest deductible u/s 36(1)(iii) · Verify OD/CC limit',
-  'GST Payments':            'GST Act 2017 · GSTR-3B / PMT-06 output liability',
-  'Utilities':               'Business expense u/s 37(1) · Input GST eligible if B2B',
-  'Food & Dining':           'Perquisite u/s 17 · Disallowed u/s 37 if personal nature',
-  'Travel':                  'Sec 10(14) Travel Allowance · LTCA/STCA applicable',
-  'Business Expenses':       'Sec 37(1) General Business Expenditure · Input GST check',
-  'Capital Expenditure':     'Sec 32 Depreciation Schedule · Must capitalise, not expense',
-  'Inter-Company Transfer':  'Sec 40A(2)(b) Related Party · Transfer Pricing documentation',
-  'Tax Payments':            'Advance Tax u/s 208 · TDS Challan 280/281 · Self-Assessment',
-  'Vendor / Supplier':       'Sec 194C TDS 2% / Sec 194J TDS 10% if professional fee',
-  'Insurance':               'Sec 80C / 80D deduction check · Premium >₹20K verify TDS',
-  'Investment / SIP':        'Sec 80C / 80CCC eligible · Capital Gains on redemption',
-  'Uncategorized':           'No rule matched — manual CA review required before filing',
 };
 
 // ── Classification rules ──────────────────────────────────────
@@ -173,42 +152,26 @@ export function classifyTransaction(
   description: string,
   narration: string,
   amount: number
-): { category: PaymentCategory; confidence: number; classificationReason: string } {
+): { category: PaymentCategory; confidence: number } {
   const combined = `${description} ${narration}`.toLowerCase();
 
   for (const rule of CLASSIFICATION_RULES) {
     for (const keyword of rule.keywords) {
       if (combined.includes(keyword)) {
-        return {
-          category: rule.category,
-          confidence: rule.confidence,
-          classificationReason: `Keyword matched: "${keyword}" → ${rule.category} · ${CATEGORY_TAX_SECTION[rule.category]}`,
-        };
+        return { category: rule.category, confidence: rule.confidence };
       }
     }
   }
 
   // Amount-based heuristics
   if (amount > 500000) {
-    return {
-      category: 'Capital Expenditure',
-      confidence: 55,
-      classificationReason: `Amount ₹${amount.toLocaleString('en-IN')} > ₹5,00,000 heuristic — possible Capital Expenditure · ${CATEGORY_TAX_SECTION['Capital Expenditure']}`,
-    };
+    return { category: 'Capital Expenditure', confidence: 55 };
   }
   if (amount > 100000 && combined.includes('neft')) {
-    return {
-      category: 'Vendor / Supplier',
-      confidence: 50,
-      classificationReason: `NEFT + Amount ₹${amount.toLocaleString('en-IN')} > ₹1,00,000 heuristic — possible Vendor / Supplier · ${CATEGORY_TAX_SECTION['Vendor / Supplier']}`,
-    };
+    return { category: 'Vendor / Supplier', confidence: 50 };
   }
 
-  return {
-    category: 'Uncategorized',
-    confidence: 40,
-    classificationReason: 'No keyword or heuristic matched — requires manual CA review before ledger finalisation',
-  };
+  return { category: 'Uncategorized', confidence: 40 };
 }
 
 // ── Parse AA transaction format to RealTransaction ────────────
@@ -233,12 +196,12 @@ export function parseAATransaction(rawTx: any): RealTransaction {
     accountNumber: rawTx.accountNumber || rawTx.maskedAccNumber || '',
     category: classified.category,
     confidence: classified.confidence,
-    classificationReason: classified.classificationReason,
   };
 }
 
 // ── Parse uploaded bank statement CSV rows ───────────────────
 export function parseStatementRow(row: Record<string, string>, bank?: string): RealTransaction | null {
+  // Try to extract standard fields from various CSV formats
   const date =
     row['Date'] || row['VALUE DATE'] || row['Txn Date'] || row['Transaction Date'] || '';
   const desc =
@@ -270,7 +233,6 @@ export function parseStatementRow(row: Record<string, string>, bank?: string): R
     referenceNo: ref,
     category: classified.category,
     confidence: classified.confidence,
-    classificationReason: classified.classificationReason,
   };
 }
 
@@ -358,24 +320,4 @@ export function getMonthlyTrends(transactions: RealTransaction[]): MonthlyTrend[
       });
       return { month, debit: v.debit, credit: v.credit, topCategory: topCat };
     });
-}
-
-// ── SHA-256 ledger hash (Audit Trail feature) ─────────────────
-// Computes a deterministic hash of the entire categorised ledger state.
-// If any category, amount, or description changes after "Finalize", the hash breaks.
-export async function computeLedgerHash(transactions: RealTransaction[]): Promise<string> {
-  const payload = transactions.map(tx => ({
-    id: tx.id,
-    date: tx.date,
-    description: tx.description,
-    amount: tx.amount,
-    type: tx.type,
-    category: tx.caOverride ?? tx.category,
-  }));
-  const json = JSON.stringify(payload);
-  const encoder = new TextEncoder();
-  const data = encoder.encode(json);
-  const hashBuffer = await crypto.subtle.digest('SHA-256', data);
-  const hashArray = Array.from(new Uint8Array(hashBuffer));
-  return hashArray.map(b => b.toString(16).padStart(2, '0')).join('');
 }

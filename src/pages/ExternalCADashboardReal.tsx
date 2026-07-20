@@ -41,6 +41,7 @@ import { isOnline } from "@/services/offline-sync-service";
 import { useLanguage, LANGUAGE_LABELS } from "@/contexts/LanguageContext";
 import { Globe2, Wifi, WifiOff } from "lucide-react";
 import { type ClientSector, getSectorConfig, isZoneAllowed } from "@/lib/client-sector";
+import { RealSectorSelectorBar } from "@/components/ca-dashboard/SectorSelectorBar";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { Badge } from "@/components/ui/badge";
@@ -1896,6 +1897,16 @@ const ExternalCADashboardReal = () => {
   // ── Sector context: set when CA clicks a client row in ClientPortfolioSection ──
   const [selectedClientSector, setSelectedClientSector] = useState<ClientSector | null>(null);
   const [selectedClientName, setSelectedClientName] = useState<string | null>(null);
+  // ── Global sector mode: set by the sector selector bar at the top ─────────
+  const [globalSector, setGlobalSector] = useState<ClientSector | null>(null);
+
+  // When global sector changes, redirect active zone if it's no longer allowed
+  useEffect(() => {
+    if (!globalSector || globalSector === 'general') return;
+    if (!isZoneAllowed(globalSector, activeZone)) {
+      setActiveZone('command');
+    }
+  }, [globalSector]);
 
   useEffect(() => {
     const handleSectorSelected = (e: Event) => {
@@ -2222,13 +2233,24 @@ const ExternalCADashboardReal = () => {
           {/* CA Command Center Header */}
           <CACommandCenterHeader />
 
-          {/* ── Sector Context Banner — shown when a client is selected ── */}
+          {/* ── Global Sector Mode Selector Bar ──────────────────────────────── */}
+          <RealSectorSelectorBar
+            globalSector={globalSector}
+            onSectorChange={(s) => {
+              setGlobalSector(s);
+              if (!s || s === 'general') {
+                setSelectedClientSector(null);
+                setSelectedClientName(null);
+              }
+            }}
+          />
+
+          {/* ── Per-client sector context banner (shown when a client row is clicked) */}
           {selectedClientSector && selectedClientSector !== 'general' && (() => {
             const cfg = getSectorConfig(selectedClientSector);
             return (
-              <div className={`flex items-center justify-between px-4 py-2.5 rounded-xl border text-sm mt-4 ${cfg.bgColor} ${cfg.borderColor}`}>
+              <div className={`flex items-center justify-between px-4 py-2.5 rounded-xl border text-sm mt-3 ${cfg.bgColor} ${cfg.borderColor}`}>
                 <div className="flex items-center gap-2">
-                  <span className="text-lg">{cfg.emoji}</span>
                   <span className="font-semibold text-foreground">{selectedClientName}</span>
                   <span className={`text-xs px-2 py-0.5 rounded-full border font-medium ${cfg.badgeCls}`}>{cfg.label}</span>
                   <span className="text-xs text-muted-foreground hidden sm:inline">— showing {cfg.label}-relevant features only</span>
@@ -2243,51 +2265,89 @@ const ExternalCADashboardReal = () => {
             );
           })()}
           {/* Main Dashboard Layout with Horizontal Tabs */}
-          <div className="mt-8">
+          <div
+            className="mt-6"
+            style={globalSector && globalSector !== 'general'
+              ? { '--sector-accent': getSectorConfig(globalSector).accentHex } as React.CSSProperties
+              : undefined
+            }
+          >
             <Tabs value={activeZone} onValueChange={(val: any) => setActiveZone(val)} className="w-full">
               <div className="flex items-center justify-between mb-8 overflow-x-auto pb-2 scrollbar-none">
                  <TabsList className="h-14 bg-card/40 border border-border/50 p-1 flex-shrink-0">
                     <TabsTrigger value="command" className="px-4 py-2.5 rounded-lg data-[state=active]:bg-cyan-500/20 data-[state=active]:text-cyan-400 font-medium text-xs">Overview</TabsTrigger>
+                    {isZoneAllowed(globalSector, 'multi-entity') && (
                     <TabsTrigger value="multi-entity" className="px-4 py-2.5 rounded-lg data-[state=active]:bg-cyan-500/20 data-[state=active]:text-cyan-400 font-medium text-xs flex items-center gap-1">
                       <Network className="w-3.5 h-3.5" />Multi-Entity
                     </TabsTrigger>
+                    )}
+                    {isZoneAllowed(globalSector, 'e-filing') && (
                     <TabsTrigger value="e-filing" className="px-4 py-2.5 rounded-lg data-[state=active]:bg-blue-500/20 data-[state=active]:text-blue-400 font-medium text-xs flex items-center gap-1">
                       <FileCheck2 className="w-3.5 h-3.5" />E-Filing
                     </TabsTrigger>
+                    )}
+                    {isZoneAllowed(globalSector, 'payment') && (
                     <TabsTrigger value="payment" className="px-4 py-2.5 rounded-lg data-[state=active]:bg-green-500/20 data-[state=active]:text-green-400 font-medium text-xs flex items-center gap-1">
                       <IndianRupee className="w-3.5 h-3.5" />Payments
                     </TabsTrigger>
+                    )}
+                    {isZoneAllowed(globalSector, 'clients') && (
                     <TabsTrigger value="clients" className="px-4 py-2.5 rounded-lg data-[state=active]:bg-indigo-500/20 data-[state=active]:text-indigo-400 font-medium text-xs">Client Vault</TabsTrigger>
+                    )}
+                    {isZoneAllowed(globalSector, 'operations') && (
                     <TabsTrigger value="operations" className="px-4 py-2.5 rounded-lg data-[state=active]:bg-emerald-500/20 data-[state=active]:text-emerald-400 font-medium text-xs">Firm Operations</TabsTrigger>
+                    )}
+                    {isZoneAllowed(globalSector, 'ai-swarm') && (
                     <TabsTrigger value="ai-swarm" className="px-4 py-2.5 rounded-lg data-[state=active]:bg-purple-500/20 data-[state=active]:text-purple-400 font-medium text-xs">Regulatory News</TabsTrigger>
+                    )}
+                    {isZoneAllowed(globalSector, 'calculations') && (
                     <TabsTrigger value="calculations" className="px-4 py-2.5 rounded-lg data-[state=active]:bg-rose-500/20 data-[state=active]:text-rose-400 font-medium text-xs">Calculators</TabsTrigger>
+                    )}
+                    {isZoneAllowed(globalSector, 'enterprise-api') && (
                     <TabsTrigger value="enterprise-api" className="px-4 py-2.5 rounded-lg data-[state=active]:bg-amber-500/20 data-[state=active]:text-amber-400 font-medium text-xs flex items-center gap-1">
-                      <Code2 className="w-3.5 h-3.5" />API & Webhooks
+                      <Code2 className="w-3.5 h-3.5" />API &amp; Webhooks
                     </TabsTrigger>
+                    )}
+                    {isZoneAllowed(globalSector, 'erp-integration') && (
                     <TabsTrigger value="erp-integration" className="px-4 py-2.5 rounded-lg data-[state=active]:bg-teal-500/20 data-[state=active]:text-teal-400 font-medium text-xs flex items-center gap-1">
                       <Database className="w-3.5 h-3.5" />ERP Integration
                     </TabsTrigger>
+                    )}
+                    {isZoneAllowed(globalSector, 'doc-ocr') && (
                     <TabsTrigger value="doc-ocr" className="px-4 py-2.5 rounded-lg data-[state=active]:bg-violet-500/20 data-[state=active]:text-violet-400 font-medium text-xs flex items-center gap-1">
-                      <FileSearch className="w-3.5 h-3.5" />Docs & OCR
+                      <FileSearch className="w-3.5 h-3.5" />Docs &amp; OCR
                     </TabsTrigger>
-                    <TabsTrigger value="team-rbac" className="px-4 py-2.5 rounded-lg data-[state=active]:bg-rose-500/20 data-[state=active]:text-rose-400 font-medium text-xs flex items-center gap-1">
-                       <Shield className="w-3.5 h-3.5" />Team & RBAC
-                     </TabsTrigger>
+                    )}
+                    {isZoneAllowed(globalSector, 'team-rbac') && (
+                     <TabsTrigger value="team-rbac" className="px-4 py-2.5 rounded-lg data-[state=active]:bg-rose-500/20 data-[state=active]:text-rose-400 font-medium text-xs flex items-center gap-1">
+                        <Shield className="w-3.5 h-3.5" />Team &amp; RBAC
+                      </TabsTrigger>
+                    )}
+                     {isZoneAllowed(globalSector, 'notifications') && (
                      <TabsTrigger value="notifications" className="px-4 py-2.5 rounded-lg data-[state=active]:bg-orange-500/20 data-[state=active]:text-orange-400 font-medium text-xs flex items-center gap-1">
                        <BellRing className="w-3.5 h-3.5" />Notifications
                      </TabsTrigger>
+                    )}
+                     {isZoneAllowed(globalSector, 'audit-trail') && (
                      <TabsTrigger value="audit-trail" className="px-4 py-2.5 rounded-lg data-[state=active]:bg-indigo-500/20 data-[state=active]:text-indigo-400 font-medium text-xs flex items-center gap-1">
                        <Shield className="w-3.5 h-3.5" />{t('nav.auditTrail')}
                      </TabsTrigger>
+                    )}
+                     {isZoneAllowed(globalSector, 'language-hub') && (
                      <TabsTrigger value="language-hub" className="px-4 py-2.5 rounded-lg data-[state=active]:bg-teal-500/20 data-[state=active]:text-teal-400 font-medium text-xs flex items-center gap-1">
                        <Globe2 className="w-3.5 h-3.5" />{t('nav.languageHub')}
                      </TabsTrigger>
+                    )}
+                     {isZoneAllowed(globalSector, 'offline-hub') && (
                      <TabsTrigger value="offline-hub" className="px-4 py-2.5 rounded-lg data-[state=active]:bg-emerald-500/20 data-[state=active]:text-emerald-400 font-medium text-xs flex items-center gap-1">
-                       <Wifi className="w-3.5 h-3.5" />Offline & PWA
+                       <Wifi className="w-3.5 h-3.5" />Offline &amp; PWA
                      </TabsTrigger>
+                    )}
+                     {isZoneAllowed(globalSector, 'gov-scraper') && (
                      <TabsTrigger value="gov-scraper" className="px-4 py-2.5 rounded-lg data-[state=active]:bg-orange-500/20 data-[state=active]:text-orange-400 font-medium text-xs flex items-center gap-1">
                        <Cpu className="w-3.5 h-3.5" />Gov Scraper
                      </TabsTrigger>
+                    )}
                  </TabsList>
                  <Button onClick={() => setIsDrawerOpen(true)} className="ml-4 flex-shrink-0 bg-gradient-to-r from-purple-600 to-cyan-600 hover:from-purple-500 hover:to-cyan-500 text-white border-0 shadow-[0_0_20px_rgba(139,92,246,0.3)]">
                     <Cpu className="w-4 h-4 mr-2" /> Open Engine
@@ -2338,7 +2398,7 @@ const ExternalCADashboardReal = () => {
                     </div>
                   </motion.div>
                   <DailyGovernanceBrief />
-                  <ClientPortfolioSection />
+                  <ClientPortfolioSection sectorFilter={globalSector && globalSector !== 'general' ? globalSector : undefined} />
                   <LiveAIDraftingEngine />
                   {/* Full AI Drafting Engine — Inline trigger button */}
                   <motion.div

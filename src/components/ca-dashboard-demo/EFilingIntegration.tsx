@@ -944,7 +944,7 @@ const EFilingIntegration = () => {
   const { isRunning, isAutoMode } = useSafeSwarmState();
 
   useEffect(() => {
-    supabase.auth.getUser().then(({ data }) => setCaUserId(data.user?.id ?? null));
+    supabase.auth.getUser().then(({ data }) => setCaUserId(data.user?.id ?? 'demo-ca-user-id'));
   }, []);
 
   // Force re-generate demo data on mount if stale or empty
