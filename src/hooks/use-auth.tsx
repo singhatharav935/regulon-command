@@ -145,10 +145,10 @@ export const AuthProvider = ({ children }: { children: ReactNode }) => {
           { data: { session: null }, error: null },
         );
 
-        // Handle auth errors (e.g. Invalid Refresh Token) by signing out
+        // Handle auth errors (e.g. Invalid Refresh Token) by clearing local session only
+        // Use scope: 'local' so other devices remain logged in
         if (sessionResponse.error) {
-          // Clear the stale session silently — don't log to console
-          try { await supabase.auth.signOut(); } catch { /* ignore */ }
+          try { await supabase.auth.signOut({ scope: 'local' }); } catch { /* ignore */ }
           if (!mounted) return;
           setSession(null);
           setUser(null);
@@ -180,8 +180,8 @@ export const AuthProvider = ({ children }: { children: ReactNode }) => {
         }
       } catch (error) {
         if (!mounted) return;
-        // Silently handle auth failures — clear session
-        try { await supabase.auth.signOut(); } catch { /* ignore */ }
+        // Silently handle auth failures — clear local session only (don't log out other devices)
+        try { await supabase.auth.signOut({ scope: 'local' }); } catch { /* ignore */ }
         setSession(null);
         setUser(null);
         setRoles([]);

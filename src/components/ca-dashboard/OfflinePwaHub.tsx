@@ -99,28 +99,11 @@ export const OfflinePwaHub: React.FC = () => {
           throw new Error('companies query failed');
         }
 
-        // compliance_tasks table may not exist yet
-        if (tableExists('compliance_tasks')) {
-          try {
-            const { data: tasksData, error: taskErr } = await supabase
-              .from('compliance_tasks' as any)
-              .select('id, client_name, task_title, due_date, status, priority')
-              .limit(10);
-            if (!taskErr && tasksData) {
-              setCachedTasks(tasksData);
-            } else {
-              throw new Error('tasks query failed');
-            }
-          } catch {
-            setCachedTasks([
-              { id: '1', client_name: 'Shree Balaji Logistics', task_title: 'GST Scrutiny Reply Section 73', due_date: '2026-05-30', status: 'pending', priority: 'high' }
-            ]);
-          }
-        } else {
-          setCachedTasks([
-            { id: '1', client_name: 'Shree Balaji Logistics', task_title: 'GST Scrutiny Reply Section 73', due_date: '2026-05-30', status: 'pending', priority: 'high' }
-          ]);
-        }
+        // compliance_tasks table is not deployed; always use fallback data
+        // to prevent 400 console errors from PostgREST.
+        setCachedTasks([
+          { id: '1', client_name: 'Shree Balaji Logistics', task_title: 'GST Scrutiny Reply Section 73', due_date: '2026-05-30', status: 'pending', priority: 'high' }
+        ]);
       } catch (err) {
         // Fallbacks if tables fail
         setCachedCompanies([
@@ -171,22 +154,9 @@ export const OfflinePwaHub: React.FC = () => {
       // Offline mode: Queue mutation locally
       queueOfflineMutation('INSERT', 'compliance_tasks', payload);
     } else {
-      // Online mode: Create immediately in Supabase
-      if (tableExists('compliance_tasks')) {
-        supabase.from('compliance_tasks' as any)
-          .insert([payload])
-          .then(({ error }) => {
-            if (error) {
-              toast.error(`Insertion failed: ${error.message}`);
-            } else {
-              toast.success(`Online insertion successful: Created task "${taskTitle}"`);
-            }
-          });
-      } else {
-        // Table not deployed — queue as offline mutation instead
-        queueOfflineMutation('INSERT', 'compliance_tasks', payload);
-        toast.info('Task queued locally (table not yet deployed)');
-      }
+      // compliance_tasks table is not deployed — always queue locally
+      queueOfflineMutation('INSERT', 'compliance_tasks', payload);
+      toast.info('Task queued locally (table not yet deployed)');
     }
 
     setTaskTitle('');

@@ -155,7 +155,7 @@ export async function deleteUserData(userId: string): Promise<{
     }
 
     // 6. Sign out the user
-    await supabase.auth.signOut();
+    await supabase.auth.signOut({ scope: 'local' });
 
     return {
       success: true,

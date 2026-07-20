@@ -114,7 +114,7 @@ export async function loginUser(email: string, password: string): Promise<AuthRe
  */
 export async function logoutUser(): Promise<void> {
   try {
-    await supabase.auth.signOut();
+    await supabase.auth.signOut({ scope: 'local' });
   } catch (error) {
     console.error('Logout error:', error);
   } finally {
