@@ -66,9 +66,12 @@ import {
 } from "lucide-react";
 import { toast } from "@/hooks/use-toast";
 import { AgentOrchestratorProvider, AGENT_SECTION_MAP } from "@/components/agents/CompanyAgentOrchestrator";
-import { SmartERPModule } from "@/components/company-erp/SmartERPModule";
-import { VirtualCFOModule } from "@/components/company-erp/VirtualCFOModule";
+import { RealERPModule } from "@/components/company-erp/RealERPModule";
+import { RealCFOModule } from "@/components/company-erp/RealCFOModule";
 import { CommandCenterHeader } from "@/components/agents/CommandCenterHeader";
+import { CompanyDashboardShell, DashboardTab } from "@/components/company-dashboard/CompanyDashboardShell";
+import RegulatoryIntelligenceCenter from "@/components/dashboard/RegulatoryIntelligenceCenter";
+import RegulatoryNewsPanel from "@/components/dashboard/RegulatoryNewsPanel";
 
 import { CompanyActionInbox } from "@/components/agents/CompanyActionInbox";
 import { SectionAgentBadge } from "@/components/agents/SectionAgentBadge";
@@ -1726,7 +1729,6 @@ const DocumentVaultSection = ({
     </motion.div>
   );
 };
-
 // ========================================
 // MAIN DASHBOARD COMPONENT
 // ========================================
@@ -1736,6 +1738,7 @@ const CompanyDashboardReal = () => {
   const [isLoading, setIsLoading] = useState(true);
   const [companyId, setCompanyId] = useState<string | null>(null);
   const [chatDrawerOpen, setChatDrawerOpen] = useState(false);
+  const [activeTab, setActiveTab] = useState<DashboardTab>("overview");
   
   // Data states
   const [company, setCompany] = useState<CompanyData | null>(null);
@@ -1867,76 +1870,92 @@ const CompanyDashboardReal = () => {
     );
   }
 
+  const criticalGaps = gaps.filter(g => g.severity === 'critical' || g.severity === 'high').length;
+
   return (
     <AgentOrchestratorProvider>
     <div className="min-h-screen bg-background">
       <Navbar />
       
-      <main className="pt-24 pb-16">
-        <div className="container mx-auto px-4 max-w-7xl">
-          {/* Advanced Command Center Header */}
+      <main className="pt-20 pb-16">
+        <div className="container mx-auto px-4 max-w-7xl pt-4">
+          {/* Command Center Header — always visible */}
           <CommandCenterHeader 
             companyName={company?.company_name || 'Company'}
             complianceScore={company?.compliance_score || 0}
             healthStatus={company?.health_status || 'unknown'}
           />
-
-          {/* AI Action Inbox — Clean results from background agents */}
+          {/* AI Action Inbox */}
           <CompanyActionInbox />
-
-          <div className="space-y-6">
-            {/* Section 1: Sannidh AI Compliance Partner */}
-            <SannidhAIPartnerSection 
-              companyId={companyId || ''}
-              companyName={company?.company_name || 'Company'}
-              messages={aiMessages}
-              onRefresh={fetchDashboardData}
-              isLoading={isLoading}
-            />
-
-            {/* Section 2: Company Profile & Health Score */}
-            <CompanyProfileSection company={company} isLoading={isLoading} />
-
-            {/* Section 3: Regulatory Exposure */}
-            <RegulatoryExposureSection exposures={exposures} isLoading={isLoading} />
-
-            {/* Section 4: AI Business Intelligence */}
-            <AIBusinessIntelligenceSection 
-              insights={insights} 
-              companyName={company?.company_name || 'Company'}
-              isLoading={isLoading} 
-            />
-
-            {/* Section 5: Why Is Your Compliance Incomplete */}
-            <ComplianceGapsSection gaps={gaps} isLoading={isLoading} />
-
-            {/* Section 6: Upcoming Regulatory Impact */}
-            <RegulatoryImpactSection impacts={impacts} isLoading={isLoading} />
-
-            {/* Section 7: Audit & Inspection Ready Record */}
-            <AuditReadySection records={auditRecords} isLoading={isLoading} />
-
-            {/* Section 8: Quick Actions */}
-            <QuickActionsSection companyId={companyId || ''} />
-
-            {/* Section 9: Active Compliance Tasks */}
-            <ComplianceTasksSection tasks={tasks} isLoading={isLoading} />
-
-            {/* Section 10: Document Vault */}
-            <DocumentVaultSection 
-              documents={documents} 
-              companyId={companyId || ''}
-              isLoading={isLoading}
-              onRefresh={fetchDashboardData}
-            />
-
-            {/* Section 11: Smart Business ERP — Replaces Tally */}
-            <SmartERPModule />
-
-            {/* Section 12: Virtual CFO Intelligence Center */}
-            <VirtualCFOModule />
-          </div>
         </div>
+
+        {/* Tab Shell — full width sidebar layout */}
+        <CompanyDashboardShell
+          activeTab={activeTab}
+          onTabChange={setActiveTab}
+          companyName={company?.company_name || 'Company'}
+          complianceScore={company?.compliance_score || 0}
+          healthStatus={company?.health_status || 'unknown'}
+          alertCount={criticalGaps}
+        >
+          {/* ── Tab: Overview ─────────────────────────────── */}
+          {activeTab === 'overview' && (
+            <div className="space-y-6">
+              <CompanyProfileSection company={company} isLoading={isLoading} />
+              <QuickActionsSection companyId={companyId || ''} />
+              <AIBusinessIntelligenceSection
+                insights={insights}
+                companyName={company?.company_name || 'Company'}
+                isLoading={isLoading}
+              />
+            </div>
+          )}
+
+          {/* ── Tab: Compliance ───────────────────────────── */}
+          {activeTab === 'compliance' && (
+            <div className="space-y-6">
+              <RegulatoryExposureSection exposures={exposures} isLoading={isLoading} />
+              <RegulatoryIntelligenceCenter
+                currentHealthScore={company?.compliance_score || 0}
+                updates={[]}
+              />
+              <ComplianceGapsSection gaps={gaps} isLoading={isLoading} />
+              <RegulatoryImpactSection impacts={impacts} isLoading={isLoading} />
+              <AuditReadySection records={auditRecords} isLoading={isLoading} />
+              <ComplianceTasksSection tasks={tasks} isLoading={isLoading} />
+            </div>
+          )}
+
+          {/* ── Tab: News ──────────────────────────────────── */}
+          {activeTab === 'news' && (
+            <div className="space-y-6">
+              <RegulatoryNewsPanel />
+            </div>
+          )}
+
+          {/* ── Tab: Smart ERP ────────────────────────────── */}
+          {activeTab === 'erp' && (
+            <RealERPModule companyId={companyId || ''} />
+          )}
+
+          {/* ── Tab: CFO Intel ────────────────────────────── */}
+          {activeTab === 'cfo' && (
+            <RealCFOModule
+              companyId={companyId || ''}
+              companyName={company?.company_name}
+            />
+          )}
+
+          {/* ── Tab: Documents ───────────────────────────── */}
+          {activeTab === 'documents' && (
+            <DocumentVaultSection
+              documents={documents}
+              companyId={companyId || ''}
+              isLoading={isLoading}
+              onRefresh={fetchDashboardData}
+            />
+          )}
+        </CompanyDashboardShell>
       </main>
       
       <Footer />

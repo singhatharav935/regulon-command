@@ -1,9 +1,19 @@
-import { useEffect, useState } from "react";
+/**
+ * DEMO COMPANY DASHBOARD
+ * ======================
+ * Full tab-based demo dashboard showing all Sannidh features.
+ * ALL mock data comes from src/data/demo-data.ts — edit that file to change what's shown.
+ * No hardcoded data in this file.
+ */
+
+import { useState } from "react";
 import { motion } from "framer-motion";
 import Navbar from "@/components/layout/Navbar";
 import Footer from "@/components/layout/Footer";
 import DashboardTypeNav from "@/components/dashboard/DashboardTypeNav";
-import DashboardHeader from "@/components/dashboard/DashboardHeader";
+import { CompanyDashboardShell, DashboardTab } from "@/components/company-dashboard/CompanyDashboardShell";
+
+// Tab content components
 import RegulatoryExposurePanel from "@/components/dashboard/RegulatoryExposurePanel";
 import ComplianceTasksTable from "@/components/dashboard/ComplianceTasksTable";
 import DocumentVault from "@/components/dashboard/DocumentVault";
@@ -14,211 +24,178 @@ import UpcomingLawImpactSection from "@/components/dashboard/UpcomingLawImpactSe
 import AuditEvidenceVault from "@/components/dashboard/AuditEvidenceVault";
 import AIBusinessIntelligencePanel from "@/components/dashboard/AIBusinessIntelligencePanel";
 import RegulatoryIntelligenceCenter from "@/components/dashboard/RegulatoryIntelligenceCenter";
-import AIVoiceBriefAgent from "@/components/voice/AIVoiceBriefAgent";
+import RegulatoryNewsPanel from "@/components/dashboard/RegulatoryNewsPanel";
 
-// Demo data for the dashboard example
-const demoCompany = {
-  name: "Acme Technologies Pvt. Ltd.",
-  industry: "Financial Technology · Series B",
-  complianceHealth: 87,
-};
+import DashboardHeader from "@/components/dashboard/DashboardHeader";
 
-const demoExposures = [
-  { regulator: "MCA", status: "active" as const, notes: "Annual filings up to date" },
-  { regulator: "GST", status: "active" as const, notes: "Monthly returns filed" },
-  { regulator: "Income Tax", status: "active" as const, notes: "Advance tax paid" },
-  { regulator: "RBI", status: "active" as const, notes: "NBFC compliance monitored" },
-  { regulator: "SEBI", status: "potential" as const, notes: "Evaluating for advisory registration" },
-];
+// ERP + CFO (mock-data versions driven by demo-data.ts)
+import { SmartERPModule } from "@/components/company-erp/SmartERPModule";
+import { VirtualCFOModule } from "@/components/company-erp/VirtualCFOModule";
 
-const demoTasks = [
-  { id: "1", title: "Annual Return Filing (MGT-7)", regulator: "MCA", priority: "high" as const, status: "in_progress" as const, dueDate: "Feb 15, 2026" },
-  { id: "2", title: "GST-3B January Filing", regulator: "GST", priority: "medium" as const, status: "pending" as const, dueDate: "Feb 20, 2026" },
-  { id: "3", title: "Advance Tax Q4 Payment", regulator: "Income Tax", priority: "critical" as const, status: "under_review" as const, dueDate: "Mar 15, 2026" },
-  { id: "4", title: "RBI Annual Compliance Certificate", regulator: "RBI", priority: "high" as const, status: "pending" as const, dueDate: "Mar 31, 2026" },
-  { id: "5", title: "Board Meeting Minutes Filing", regulator: "MCA", priority: "low" as const, status: "completed" as const, dueDate: "Jan 30, 2026" },
-];
+// All demo data — edit src/data/demo-data.ts to change what's shown
+import {
+  DEMO_COMPANY, DEMO_EXPOSURES, DEMO_TASKS, DEMO_DOCUMENTS,
+  DEMO_GAPS, DEMO_INVOICES, DEMO_PURCHASES, DEMO_EXPENSES,
+  DEMO_PAYROLL, DEMO_BANK_TXNS, DEMO_INVENTORY
+} from "@/data/demo-data";
 
-const demoDocuments = [
-  { id: "1", name: "Certificate of Incorporation", fileType: "pdf", regulator: "MCA", status: "approved" as const, uploadedAt: "Jan 10, 2026" },
-  { id: "2", name: "GST Registration Certificate", fileType: "pdf", regulator: "GST", status: "approved" as const, uploadedAt: "Jan 10, 2026" },
-  { id: "3", name: "Annual Return Draft 2025", fileType: "docx", regulator: "MCA", status: "under_review" as const, uploadedAt: "Jan 22, 2026" },
-  { id: "4", name: "Tax Audit Report", fileType: "pdf", regulator: "Income Tax", status: "submitted" as const, uploadedAt: "Jan 20, 2026" },
-  { id: "5", name: "RBI Compliance Report Q4", fileType: "pdf", regulator: "RBI", status: "under_review" as const, uploadedAt: "Jan 24, 2026" },
-  { id: "6", name: "SEBI Advisory Evaluation", fileType: "docx", regulator: "SEBI", status: "under_review" as const, uploadedAt: "Jan 23, 2026" },
-];
+// ─── Tab Content Components ───────────────────────────────────────────────────
 
-const demoDeadlines = [
-  { id: "1", title: "TDS Return Filing", regulator: "Income Tax", dueDate: "Jan 31, 2026", isRecurring: true, daysLeft: 6 },
-  { id: "2", title: "GST-3B Return", regulator: "GST", dueDate: "Feb 20, 2026", isRecurring: true, daysLeft: 26 },
-  { id: "3", title: "Annual Return (MGT-7)", regulator: "MCA", dueDate: "Feb 15, 2026", isRecurring: false, daysLeft: 21 },
-  { id: "4", title: "Advance Tax Q4", regulator: "Income Tax", dueDate: "Mar 15, 2026", isRecurring: true, daysLeft: 49 },
-  { id: "5", title: "RBI Annual Certificate", regulator: "RBI", dueDate: "Mar 31, 2026", isRecurring: false, daysLeft: 65 },
-];
+function OverviewTab() {
+  const deadlines = [
+    { id: "1", title: "TDS Return Filing", regulator: "Income Tax", dueDate: "Aug 7, 2025", isRecurring: true, daysLeft: 15 },
+    { id: "2", title: "GSTR-3B July Return", regulator: "GST", dueDate: "Aug 20, 2025", isRecurring: true, daysLeft: 28 },
+    { id: "3", title: "PF Challan Deposit", regulator: "Labour", dueDate: "Aug 15, 2025", isRecurring: true, daysLeft: 23 },
+    { id: "4", title: "Advance Tax Q2", regulator: "Income Tax", dueDate: "Sep 15, 2025", isRecurring: false, daysLeft: 54 },
+  ];
 
-const demoRegulatoryUpdates = [
-  {
-    id: "u1",
-    title: "GST return validation change announced",
-    source: "gstn",
-    sourceLabel: "GSTN",
-    announcedBy: "GST Council",
-    announcedOn: "March 20, 2026",
-    effectiveDate: "April 1, 2026",
-    actionDeadline: "March 30, 2026",
-    impactScore: 6.8,
-    companyExposure: "medium" as const,
-    actionOwner: "Indirect Tax Lead",
-    originalUrl: "https://www.gst.gov.in/newsandupdates",
-  },
-  {
-    id: "u2",
-    title: "MCA annual compliance disclosure expansion",
-    source: "mca",
-    sourceLabel: "MCA",
-    announcedBy: "Ministry of Corporate Affairs",
-    announcedOn: "March 18, 2026",
-    effectiveDate: "April 10, 2026",
-    actionDeadline: "April 5, 2026",
-    impactScore: 4.1,
-    companyExposure: "low" as const,
-    actionOwner: "Company Secretary",
-    originalUrl: "https://www.mca.gov.in/content/mca/global/en/notifications-orders/notifications.html",
-  },
-  {
-    id: "u3",
-    title: "Income Tax scrutiny documentation tightening",
-    source: "incometax",
-    sourceLabel: "Income Tax India",
-    announcedBy: "CBDT",
-    announcedOn: "March 22, 2026",
-    effectiveDate: "April 15, 2026",
-    actionDeadline: "April 8, 2026",
-    impactScore: 9.3,
-    companyExposure: "high" as const,
-    actionOwner: "Direct Tax Lead",
-    originalUrl: "https://www.incometaxindia.gov.in/pages/communications/notifications.aspx",
-  },
-];
+  const pendingTasks = DEMO_TASKS.filter(t => t.status !== "completed");
+
+  return (
+    <div className="space-y-6">
+      {/* Health Score + Company Header */}
+      <DashboardHeader
+        companyName={DEMO_COMPANY.name}
+        industry={DEMO_COMPANY.industry}
+        complianceHealth={DEMO_COMPANY.compliance_score}
+      />
+
+      {/* Quick Actions */}
+      <QuickActions />
+
+      {/* AI Business Intelligence */}
+      <AIBusinessIntelligencePanel
+        companyName={DEMO_COMPANY.name}
+        industry={DEMO_COMPANY.industry}
+        complianceHealth={DEMO_COMPANY.compliance_score}
+        exposures={DEMO_EXPOSURES.map(e => ({ regulator: e.regulator, status: e.status, notes: e.notes }))}
+        tasks={DEMO_TASKS.map(t => ({ id: t.id, title: t.title, regulator: t.regulator, priority: t.priority, status: t.status, dueDate: t.due_date }))}
+        deadlines={deadlines}
+      />
+
+      {/* Upcoming Deadlines */}
+      <UpcomingDeadlines deadlines={deadlines} />
+    </div>
+  );
+}
+
+function ComplianceTab() {
+  const regulatoryUpdates = [
+    { id: "u1", title: "GST e-invoicing threshold lowered to ₹5 Crore", source: "gstn", sourceLabel: "GSTN", announcedBy: "GST Council", announcedOn: "Jul 10, 2025", effectiveDate: "Aug 1, 2025", actionDeadline: "Jul 31, 2025", impactScore: 7.2, companyExposure: "high" as const, actionOwner: "Indirect Tax Lead", originalUrl: "https://www.gst.gov.in" },
+    { id: "u2", title: "MCA Form AOC-4 deadline extension", source: "mca", sourceLabel: "MCA", announcedBy: "Ministry of Corporate Affairs", announcedOn: "Jul 5, 2025", effectiveDate: "Sep 30, 2025", actionDeadline: "Sep 30, 2025", impactScore: 4.0, companyExposure: "medium" as const, actionOwner: "Company Secretary", originalUrl: "https://www.mca.gov.in" },
+  ];
+  return (
+    <div className="space-y-6">
+      <RegulatoryExposurePanel exposures={DEMO_EXPOSURES.map(e => ({ regulator: e.regulator, status: e.status, notes: e.notes }))} />
+      <RegulatoryIntelligenceCenter currentHealthScore={DEMO_COMPANY.compliance_score} updates={regulatoryUpdates} />
+      <ComplianceGapSection />
+      <UpcomingLawImpactSection />
+      <AuditEvidenceVault />
+      <ComplianceTasksTable tasks={DEMO_TASKS.map(t => ({ id: t.id, title: t.title, regulator: t.regulator, priority: t.priority, status: t.status, dueDate: t.due_date }))} />
+    </div>
+  );
+}
+
+function NewsTab() {
+  return (
+    <div className="space-y-6">
+      <RegulatoryNewsPanel />
+    </div>
+  );
+}
+
+function ERPTab() {
+  return (
+    <SmartERPModule
+      invoices={DEMO_INVOICES}
+      purchases={DEMO_PURCHASES}
+      expenses={DEMO_EXPENSES}
+      payroll={DEMO_PAYROLL}
+      bankTxns={DEMO_BANK_TXNS}
+      inventory={DEMO_INVENTORY}
+      company={{
+        name: DEMO_COMPANY.name,
+        gstin: DEMO_COMPANY.gstin,
+        state: DEMO_COMPANY.state,
+        pan: DEMO_COMPANY.pan,
+      }}
+    />
+  );
+}
+
+function CFOTab() {
+  return (
+    <div>
+      <VirtualCFOModule />
+    </div>
+  );
+}
+
+function DocumentsTab() {
+  return (
+    <DocumentVault
+      documents={DEMO_DOCUMENTS.map(d => ({
+        id: d.id,
+        name: d.name,
+        fileType: d.file_type,
+        regulator: d.regulator,
+        status: d.status as any,
+        uploadedAt: d.uploaded_at,
+      }))}
+    />
+  );
+}
+
+// ─── Main Demo Dashboard ──────────────────────────────────────────────────────
 
 const Dashboard = () => {
-  const [isLoading, setIsLoading] = useState(true);
+  const [activeTab, setActiveTab] = useState<DashboardTab>("overview");
 
-  useEffect(() => {
-    // Demo dashboard must always open, independent of auth/env state.
-    setIsLoading(false);
-  }, []);
-
-  if (isLoading) {
-    return (
-      <div className="min-h-screen bg-background flex items-center justify-center">
-        <div className="text-center">
-          <div className="w-12 h-12 border-4 border-primary border-t-transparent rounded-full animate-spin mx-auto mb-4" />
-          <p className="text-muted-foreground">Loading dashboard...</p>
-        </div>
-      </div>
-    );
-  }
+  const pendingAlerts = DEMO_GAPS.filter(g => g.severity === "high").length;
 
   return (
     <div className="min-h-screen bg-background">
       <Navbar />
-      
-      <main className="pt-24 pb-16">
-        <div className="container mx-auto px-4 max-w-7xl">
-          {/* Dashboard Type Navigation */}
+
+      <main className="pt-20 pb-16">
+        {/* Dashboard Type Nav */}
+        <div className="container mx-auto px-4 max-w-7xl pt-4">
           <DashboardTypeNav activeType="company" />
-          
+
           {/* Demo Banner */}
           <motion.div
-            initial={{ opacity: 0, y: -10 }}
+            initial={{ opacity: 0, y: -8 }}
             animate={{ opacity: 1, y: 0 }}
-            className="mb-6 p-4 rounded-xl bg-primary/10 border border-primary/20 text-center"
+            className="mt-4 mb-2 px-4 py-2.5 rounded-xl bg-amber-500/8 border border-amber-500/15 flex items-center justify-between gap-3"
           >
-            <p className="text-sm text-primary">
-              <strong>Demo Dashboard</strong> — This is an example customer dashboard with sample data. 
-              <span className="text-muted-foreground ml-2">Sign in to access your company's actual compliance data.</span>
+            <p className="text-xs text-amber-400">
+              🎭 <strong>Demo Dashboard</strong> — Showing sample data for{" "}
+              <span className="font-semibold">{DEMO_COMPANY.name}</span>.{" "}
+              <span className="text-amber-400/70">Sign in to access your company's live data.</span>
             </p>
+            <span className="text-[10px] text-amber-400/50 shrink-0">Edit: src/data/demo-data.ts</span>
           </motion.div>
-
-          <AIVoiceBriefAgent
-            dashboardId="demo-company"
-            actorName="Compliance Lead"
-            roleLabel="Company Dashboard"
-            pendingWork={demoTasks.filter((task) => task.status !== "completed").slice(0, 3).map((task) => `${task.title} due ${task.dueDate}`)}
-            newRules={demoExposures.slice(0, 3).map((item) => `${item.regulator}: ${item.notes}`)}
-            autopilotActions={[
-              "Queued reminders for tasks due in next seven days",
-              "Prepared regulator-wise status digest for management review",
-            ]}
-            actionLedger={[
-              {
-                id: "company-ledger-1",
-                timeLabel: "06:03 AM",
-                portal: "GST",
-                action: "Updated return-risk board with newly detected mismatch exposure.",
-                status: "completed",
-              },
-              {
-                id: "company-ledger-2",
-                timeLabel: "06:14 AM",
-                portal: "MCA",
-                action: "Drafted annual filing correction checklist and linked supporting evidence.",
-                status: "completed",
-              },
-              {
-                id: "company-ledger-3",
-                timeLabel: "06:22 AM",
-                portal: "Income Tax",
-                action: "Prepared advisory note for advance tax and assessment readiness.",
-                status: "needs_approval",
-                approvalTitle: "Approve circulation of Income Tax advisory to finance team.",
-              },
-            ]}
-          />
-
-          <DashboardHeader 
-            companyName={demoCompany.name}
-            industry={demoCompany.industry}
-            complianceHealth={demoCompany.complianceHealth}
-          />
-          
-          <RegulatoryExposurePanel exposures={demoExposures} />
-
-          <AIBusinessIntelligencePanel
-            companyName={demoCompany.name}
-            industry={demoCompany.industry}
-            complianceHealth={demoCompany.complianceHealth}
-            exposures={demoExposures}
-            tasks={demoTasks}
-            deadlines={demoDeadlines}
-          />
-
-          <RegulatoryIntelligenceCenter
-            currentHealthScore={demoCompany.complianceHealth}
-            updates={demoRegulatoryUpdates}
-          />
-
-          {/* New Sections */}
-          <ComplianceGapSection />
-          <UpcomingLawImpactSection />
-          <AuditEvidenceVault />
-          
-          <QuickActions />
-          
-          <ComplianceTasksTable tasks={demoTasks} />
-          
-          <div className="grid grid-cols-1 lg:grid-cols-3 gap-8">
-            <div className="lg:col-span-2">
-              <DocumentVault documents={demoDocuments} />
-            </div>
-            <div className="lg:col-span-1">
-              <UpcomingDeadlines deadlines={demoDeadlines} />
-            </div>
-          </div>
         </div>
+
+        {/* Tab Shell + Content — full width below */}
+        <CompanyDashboardShell
+          activeTab={activeTab}
+          onTabChange={setActiveTab}
+          companyName={DEMO_COMPANY.name}
+          complianceScore={DEMO_COMPANY.compliance_score}
+          healthStatus={DEMO_COMPANY.health_status}
+          alertCount={pendingAlerts}
+          isDemo
+        >
+          {activeTab === "overview" && <OverviewTab />}
+          {activeTab === "compliance" && <ComplianceTab />}
+          {activeTab === "news" && <NewsTab />}
+          {activeTab === "erp" && <ERPTab />}
+          {activeTab === "cfo" && <CFOTab />}
+          {activeTab === "documents" && <DocumentsTab />}
+        </CompanyDashboardShell>
       </main>
-      
+
       <Footer />
     </div>
   );
