@@ -66,6 +66,8 @@ import {
 } from "lucide-react";
 import { toast } from "@/hooks/use-toast";
 import { AgentOrchestratorProvider, AGENT_SECTION_MAP } from "@/components/agents/CompanyAgentOrchestrator";
+import { SmartERPModule } from "@/components/company-erp/SmartERPModule";
+import { VirtualCFOModule } from "@/components/company-erp/VirtualCFOModule";
 import { CommandCenterHeader } from "@/components/agents/CommandCenterHeader";
 
 import { CompanyActionInbox } from "@/components/agents/CompanyActionInbox";
@@ -1927,6 +1929,12 @@ const CompanyDashboardReal = () => {
               isLoading={isLoading}
               onRefresh={fetchDashboardData}
             />
+
+            {/* Section 11: Smart Business ERP — Replaces Tally */}
+            <SmartERPModule />
+
+            {/* Section 12: Virtual CFO Intelligence Center */}
+            <VirtualCFOModule />
           </div>
         </div>
       </main>
