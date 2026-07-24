@@ -47,11 +47,16 @@ export const DEMO_PURCHASES = [
 // ─── Expenses ─────────────────────────────────────────────────────────────────
 
 export const DEMO_EXPENSES = [
-  { id: "1", date: "2025-07-23", description: "Office pantry & refreshments", category: "Office Expenses", amount: 2800, paid_by: "cash" as const, receipt_uploaded: true, tds_applicable: false },
-  { id: "2", date: "2025-07-22", description: "Electricity Bill — Unit 4 Factory", category: "Utilities", amount: 21000, paid_by: "bank" as const, receipt_uploaded: true, tds_applicable: false },
-  { id: "3", date: "2025-07-21", description: "Digital Marketing Agency — Monthly Retainer", category: "Marketing", amount: 40000, paid_by: "bank" as const, receipt_uploaded: true, tds_applicable: true, tds_amount: 4000 },
-  { id: "4", date: "2025-07-20", description: "Staff travel — Pune client visit", category: "Travel", amount: 7200, paid_by: "card" as const, receipt_uploaded: false, tds_applicable: false },
-  { id: "5", date: "2025-07-19", description: "CA Firm — Professional fees", category: "Professional Fees", amount: 18000, paid_by: "bank" as const, receipt_uploaded: true, tds_applicable: true, tds_amount: 1800 },
+  { id: "1", date: "2025-07-23", description: "Office pantry & tea refreshments", category: "Staff Welfare Expenses", amount: 2800, paid_by: "cash" as const, receipt_uploaded: true, tds_applicable: false },
+  { id: "2", date: "2025-07-22", description: "Electricity Bill — Unit 4 Factory", category: "Electricity Expenses", amount: 21000, paid_by: "bank" as const, receipt_uploaded: true, tds_applicable: false },
+  { id: "3", date: "2025-07-21", description: "Digital Marketing Agency — Retainer", category: "Marketing Expenses", amount: 40000, paid_by: "bank" as const, receipt_uploaded: true, tds_applicable: true, tds_amount: 4000 },
+  { id: "4", date: "2025-07-20", description: "Staff travel — Pune client visit", category: "Travelling Expenses", amount: 7200, paid_by: "card" as const, receipt_uploaded: false, tds_applicable: false },
+  { id: "5", date: "2025-07-19", description: "Statutory Auditor Fees — Half Yearly", category: "Audit Fees", amount: 18000, paid_by: "bank" as const, receipt_uploaded: true, tds_applicable: true, tds_amount: 1800 },
+  { id: "6", date: "2025-07-18", description: "Airtel Fiber High Speed Internet", category: "Internet Expenses", amount: 4500, paid_by: "bank" as const, receipt_uploaded: true, tds_applicable: false },
+  { id: "7", date: "2025-07-17", description: "A4 Printing Paper & Cartridge Refill", category: "Printing & Stationery", amount: 3200, paid_by: "cash" as const, receipt_uploaded: true, tds_applicable: false },
+  { id: "8", date: "2025-07-15", description: "HDFC Bank Processing & NEFT Charges", category: "Bank Charges", amount: 1450, paid_by: "bank" as const, receipt_uploaded: true, tds_applicable: false },
+  { id: "9", date: "2025-07-12", description: "Tally Prime Cloud Subscription", category: "Software Expenses", amount: 14400, paid_by: "bank" as const, receipt_uploaded: true, tds_applicable: false },
+  { id: "10", date: "2025-07-10", description: "Legal Retainer — Advocate V. Sharma", category: "Legal & Professional Fees", amount: 25000, paid_by: "bank" as const, receipt_uploaded: true, tds_applicable: true, tds_amount: 2500 },
 ];
 
 // ─── Payroll ──────────────────────────────────────────────────────────────────

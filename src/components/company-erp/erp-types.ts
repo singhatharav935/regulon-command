@@ -35,11 +35,26 @@ export interface ERPPurchase {
   category: string;
 }
 
+export type IndirectExpenseCategory =
+  | "Salary" | "Wages (Office)" | "Rent" | "Electricity Expenses" | "Telephone Expenses"
+  | "Internet Expenses" | "Printing & Stationery" | "Postage & Courier" | "Travelling Expenses"
+  | "Conveyance Expenses" | "Fuel & Petrol Expenses" | "Vehicle Maintenance" | "Repair & Maintenance"
+  | "Office Expenses" | "Staff Welfare Expenses" | "Refreshment Expenses" | "Advertisement Expenses"
+  | "Marketing Expenses" | "Commission Paid" | "Legal & Professional Fees" | "Audit Fees"
+  | "Consultancy Charges" | "Bank Charges" | "Interest Paid" | "Insurance Expenses"
+  | "Computer Expenses" | "Software Expenses" | "Security Expenses" | "Housekeeping Expenses"
+  | "Cleaning Expenses" | "Donation (Business Purpose)" | "Subscription Charges" | "Membership Fees"
+  | "Miscellaneous Expenses" | "Water Charges" | "Depreciation" | "Bad Debts"
+  | "GST Late Fee" | "Penalty & Fine" | "Packing Charges" | "Forwarding Charges"
+  | "Professional Tax" | "RTO Expenses" | "Indirect Labour Charges" | "Loading & Unloading Charges"
+  | "Gate Pass Charges" | "Weighment Charges" | "Sampling Charges" | "Testing Charges"
+  | "Loss by Theft / Fire";
+
 export interface ERPExpense {
   id: string;
   date: string;
   description: string;
-  category: string;
+  category: IndirectExpenseCategory | string;
   amount: number;
   paid_by: "cash" | "bank" | "card";
   receipt_uploaded: boolean;

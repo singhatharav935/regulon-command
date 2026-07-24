@@ -48,6 +48,59 @@ import type {
 const fmt = (n: number) => `₹${n.toLocaleString("en-IN")}`;
 const fmtL = (n: number) => n >= 100000 ? `₹${(n / 100000).toFixed(2)}L` : fmt(n);
 
+export const TALLY_50_INDIRECT_EXPENSE_LEDGERS = [
+  { no: 1, name: "Salary", group: "Personnel Expenses", desc: "Staff & management monthly remuneration" },
+  { no: 2, name: "Wages (Office)", group: "Personnel Expenses", desc: "Office support & casual administrative labour" },
+  { no: 3, name: "Rent", group: "Administrative Expenses", desc: "Office premises, warehouse & branch rent" },
+  { no: 4, name: "Electricity Expenses", group: "Utilities", desc: "Office & commercial power charges" },
+  { no: 5, name: "Telephone Expenses", group: "Utilities", desc: "Landline & corporate mobile connections" },
+  { no: 6, name: "Internet Expenses", group: "Utilities", desc: "Broadband, fiber & cloud network links" },
+  { no: 7, name: "Printing & Stationery", group: "Administrative Expenses", desc: "Paper, printing, toner & office supplies" },
+  { no: 8, name: "Postage & Courier", group: "Administrative Expenses", desc: "Postal stamps, speed post & courier services" },
+  { no: 9, name: "Travelling Expenses", group: "Operational Expenses", desc: "Outstation business travel, lodging & boarding" },
+  { no: 10, name: "Conveyance Expenses", group: "Operational Expenses", desc: "Local travel, cab & daily transit allowance" },
+  { no: 11, name: "Fuel & Petrol Expenses", group: "Operational Expenses", desc: "Vehicle fuel & diesel generator expenditure" },
+  { no: 12, name: "Vehicle Maintenance", group: "Operational Expenses", desc: "Company vehicle service, insurance & repairs" },
+  { no: 13, name: "Repair & Maintenance", group: "Operational Expenses", desc: "Building, office equipment & IT maintenance" },
+  { no: 14, name: "Office Expenses", group: "Administrative Expenses", desc: "General office overheads & supplies" },
+  { no: 15, name: "Staff Welfare Expenses", group: "Personnel Expenses", desc: "Employee tea, snacks, medical & wellness" },
+  { no: 16, name: "Refreshment Expenses", group: "Personnel Expenses", desc: "Client meetings & executive hospitality" },
+  { no: 17, name: "Advertisement Expenses", group: "Sales & Marketing", desc: "Print, TV, radio & outdoor advertisements" },
+  { no: 18, name: "Marketing Expenses", group: "Sales & Marketing", desc: "Digital campaigns, SEO & agency retainers" },
+  { no: 19, name: "Commission Paid", group: "Sales & Marketing", desc: "Sales channel, broker & agent commissions" },
+  { no: 20, name: "Legal & Professional Fees", group: "Legal & Statutory", desc: "Advocate, consultant & secretarial charges" },
+  { no: 21, name: "Audit Fees", group: "Legal & Statutory", desc: "Statutory, internal & tax auditor remuneration" },
+  { no: 22, name: "Consultancy Charges", group: "Legal & Statutory", desc: "Technical, management & advisory fees" },
+  { no: 23, name: "Bank Charges", group: "Financial Expenses", desc: "Bank processing, NEFT, RTGS & gateway fees" },
+  { no: 24, name: "Interest Paid", group: "Financial Expenses", desc: "Interest on loans, overdrafts & working capital" },
+  { no: 25, name: "Insurance Expenses", group: "Financial Expenses", desc: "Fire, transit, asset & director liability insurance" },
+  { no: 26, name: "Computer Expenses", group: "IT & Software", desc: "Hardware maintenance, peripherals & IT accessories" },
+  { no: 27, name: "Software Expenses", group: "IT & Software", desc: "SaaS subscriptions, Tally license & cloud hosting" },
+  { no: 28, name: "Security Expenses", group: "Administrative Expenses", desc: "Security guard agency & surveillance services" },
+  { no: 29, name: "Housekeeping Expenses", group: "Administrative Expenses", desc: "Sanitation, janitorial & facility management" },
+  { no: 30, name: "Cleaning Expenses", group: "Administrative Expenses", desc: "Office cleaning materials & waste management" },
+  { no: 31, name: "Donation (Business Purpose)", group: "Administrative Expenses", desc: "Approved business donations & statutory CSR" },
+  { no: 32, name: "Subscription Charges", group: "Administrative Expenses", desc: "Trade journals, industry reports & databases" },
+  { no: 33, name: "Membership Fees", group: "Administrative Expenses", desc: "Chamber of Commerce & industry association fees" },
+  { no: 34, name: "Miscellaneous Expenses", group: "Administrative Expenses", desc: "Sundry unclassified office expenditures" },
+  { no: 35, name: "Water Charges", group: "Utilities", desc: "Commercial water supply & tanker charges" },
+  { no: 36, name: "Depreciation", group: "Non-Cash Expenses", desc: "Section 32 Income Tax / Schedule II asset write-off" },
+  { no: 37, name: "Bad Debts", group: "Non-Cash Expenses", desc: "Irrecoverable customer balance write-off" },
+  { no: 38, name: "GST Late Fee", group: "Legal & Statutory", desc: "Late filing fee for GSTR-1, 3B & Annual returns" },
+  { no: 39, name: "Penalty & Fine", group: "Legal & Statutory", desc: "Statutory non-compliance fines (Non-deductible u/s 37)" },
+  { no: 40, name: "Packing Charges", group: "Sales & Marketing", desc: "Secondary & tertiary dispatch packaging" },
+  { no: 41, name: "Forwarding Charges", group: "Sales & Marketing", desc: "Outward freight & dispatch logistics" },
+  { no: 42, name: "Professional Tax", group: "Legal & Statutory", desc: "State Professional Tax (Employer registration liability)" },
+  { no: 43, name: "RTO Expenses", group: "Operational Expenses", desc: "Vehicle registration, fitness & road tax" },
+  { no: 44, name: "Indirect Labour Charges", group: "Personnel Expenses", desc: "Contract labour for non-production duties" },
+  { no: 45, name: "Loading & Unloading Charges", group: "Operational Expenses", desc: "Outward goods handling & coolie charges" },
+  { no: 46, name: "Gate Pass Charges", group: "Operational Expenses", desc: "Port, octroi, toll & gate entry charges" },
+  { no: 47, name: "Weighment Charges", group: "Operational Expenses", desc: "Dharamkanta & truck weighbridge fees" },
+  { no: 48, name: "Sampling Charges", group: "Operational Expenses", desc: "Product quality sampling & laboratory costs" },
+  { no: 49, name: "Testing Charges", group: "Operational Expenses", desc: "Quality assurance & ISO certification testing" },
+  { no: 50, name: "Loss by Theft / Fire", group: "Non-Cash Expenses", desc: "Abnormal inventory or asset loss (Extraordinary item)" },
+];
+
 function SBadge({ status }: { status: string }) {
   const map: Record<string, string> = {
     paid: "bg-emerald-500/15 text-emerald-400 border-emerald-500/25",
@@ -584,7 +637,7 @@ function PurchasesPanel({ purchases }: { purchases: ERPPurchase[] }) {
 
 function ExpensesPanel({ expenses }: { expenses: ERPExpense[] }) {
   const [search, setSearch] = useState("");
-  const [subTab, setSubTab] = useState<"expenses" | "petty" | "tds">("expenses");
+  const [subTab, setSubTab] = useState<"expenses" | "tally50" | "petty" | "tds">("expenses");
 
   const totalExp = expenses.reduce((s, e) => s + e.amount, 0);
   const tdsTotal = expenses.filter(e => e.tds_applicable).reduce((s, e) => s + (e.tds_amount || 0), 0);
@@ -607,10 +660,10 @@ function ExpensesPanel({ expenses }: { expenses: ERPExpense[] }) {
         <KPI label="Missing Receipts" value={missingReceipts} sub="Upload to avoid disallowance" icon={Upload} color="text-red-400" bg="bg-red-500/5" />
       </div>
 
-      <div className="flex gap-1 border-b border-white/5">
-        {(["expenses", "petty", "tds"] as const).map(t => (
-          <button key={t} onClick={() => setSubTab(t)} className={`px-3 py-2 text-xs font-medium border-b-2 transition-all -mb-px ${subTab === t ? "text-rose-400 border-rose-400" : "text-muted-foreground border-transparent hover:text-foreground"}`}>
-            {t === "expenses" ? "Expense Vouchers" : t === "petty" ? "Category Summary" : "TDS on Payments"}
+      <div className="flex gap-1 border-b border-white/5 overflow-x-auto">
+        {(["expenses", "tally50", "petty", "tds"] as const).map(t => (
+          <button key={t} onClick={() => setSubTab(t)} className={`px-3 py-2 text-xs font-medium border-b-2 transition-all -mb-px shrink-0 ${subTab === t ? "text-rose-400 border-rose-400" : "text-muted-foreground border-transparent hover:text-foreground"}`}>
+            {t === "expenses" ? "Expense Vouchers" : t === "tally50" ? "50 Tally Indirect Expense Ledgers" : t === "petty" ? "Category Summary" : "TDS on Payments"}
           </button>
         ))}
       </div>
@@ -649,6 +702,86 @@ function ExpensesPanel({ expenses }: { expenses: ERPExpense[] }) {
             </tbody>
           </TableWrap>
         </>
+      )}
+
+      {subTab === "tally50" && (
+        <div className="space-y-4">
+          <div className="flex items-center justify-between p-3 rounded-xl bg-gradient-to-r from-amber-500/10 via-rose-500/5 to-purple-500/10 border border-amber-500/20">
+            <div>
+              <p className="text-xs font-bold text-amber-300 flex items-center gap-2">
+                <BookOpen className="w-4 h-4 text-amber-400" /> 50 Most Important Indirect Expenses Ledgers List (Tally Prime Compatible)
+              </p>
+              <p className="text-[10px] text-muted-foreground mt-0.5">
+                Standard double-entry chart of accounts ledgers grouped under "Indirect Expenses" for Income Tax & P&L reporting.
+              </p>
+            </div>
+            <Button size="sm" variant="outline" className="h-7 text-[10px] border-amber-500/30 text-amber-300 gap-1 shrink-0">
+              <Download className="w-3 h-3" /> Export Tally Master (.xlsx)
+            </Button>
+          </div>
+
+          <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+            {/* Column 1: Ledgers 1 - 25 */}
+            <div className="rounded-xl border border-white/8 bg-muted/5 overflow-hidden">
+              <div className="px-3 py-2 bg-amber-500/10 border-b border-white/5 flex justify-between items-center">
+                <span className="text-xs font-bold text-amber-400 font-mono">No. 1 — 25 | INDIRECT EXPENSE LEDGERS</span>
+                <span className="text-[10px] text-muted-foreground">Tally Group: Indirect Expenses</span>
+              </div>
+              <TableWrap>
+                <thead>
+                  <tr className="bg-black/20 border-b border-white/5">
+                    <TH>No.</TH><TH>Ledger Name</TH><TH>Category Group</TH><TH right>Accrued Amount</TH>
+                  </tr>
+                </thead>
+                <tbody>
+                  {TALLY_50_INDIRECT_EXPENSE_LEDGERS.slice(0, 25).map((item) => {
+                    const spent = expenses.filter(e => e.category === item.name).reduce((s, e) => s + e.amount, 0);
+                    return (
+                      <tr key={item.no} className="border-b border-white/3 hover:bg-white/3 text-xs">
+                        <td className="px-3 py-2 font-mono text-muted-foreground font-semibold">{item.no}.</td>
+                        <td className="px-3 py-2 font-medium text-foreground">{item.name}</td>
+                        <td className="px-3 py-2 text-[10px] text-muted-foreground">{item.group}</td>
+                        <td className="px-3 py-2 text-right font-mono font-bold text-rose-400">
+                          {spent > 0 ? fmt(spent) : <span className="text-muted-foreground/40 font-normal">₹0</span>}
+                        </td>
+                      </tr>
+                    );
+                  })}
+                </tbody>
+              </TableWrap>
+            </div>
+
+            {/* Column 2: Ledgers 26 - 50 */}
+            <div className="rounded-xl border border-white/8 bg-muted/5 overflow-hidden">
+              <div className="px-3 py-2 bg-amber-500/10 border-b border-white/5 flex justify-between items-center">
+                <span className="text-xs font-bold text-amber-400 font-mono">No. 26 — 50 | INDIRECT EXPENSE LEDGERS</span>
+                <span className="text-[10px] text-muted-foreground">Tally Group: Indirect Expenses</span>
+              </div>
+              <TableWrap>
+                <thead>
+                  <tr className="bg-black/20 border-b border-white/5">
+                    <TH>No.</TH><TH>Ledger Name</TH><TH>Category Group</TH><TH right>Accrued Amount</TH>
+                  </tr>
+                </thead>
+                <tbody>
+                  {TALLY_50_INDIRECT_EXPENSE_LEDGERS.slice(25, 50).map((item) => {
+                    const spent = expenses.filter(e => e.category === item.name).reduce((s, e) => s + e.amount, 0);
+                    return (
+                      <tr key={item.no} className="border-b border-white/3 hover:bg-white/3 text-xs">
+                        <td className="px-3 py-2 font-mono text-muted-foreground font-semibold">{item.no}.</td>
+                        <td className="px-3 py-2 font-medium text-foreground">{item.name}</td>
+                        <td className="px-3 py-2 text-[10px] text-muted-foreground">{item.group}</td>
+                        <td className="px-3 py-2 text-right font-mono font-bold text-rose-400">
+                          {spent > 0 ? fmt(spent) : <span className="text-muted-foreground/40 font-normal">₹0</span>}
+                        </td>
+                      </tr>
+                    );
+                  })}
+                </tbody>
+              </TableWrap>
+            </div>
+          </div>
+        </div>
       )}
 
       {subTab === "petty" && (
@@ -1204,12 +1337,13 @@ function LedgerPanel({ invoices, purchases, expenses, bankTxns, payroll }: Smart
   ].sort((a, b) => a.date.localeCompare(b.date));
 
   const chartOfAccounts = [
-    { group: "Fixed Assets", accounts: ["Land & Building", "Plant & Machinery", "Furniture & Fixtures"] },
-    { group: "Current Assets", accounts: ["Bank Account", "Cash in Hand", "Accounts Receivable", "Inventory / Stock"] },
-    { group: "Current Liabilities", accounts: ["Accounts Payable", "GST Payable", "TDS Payable", "Salary Payable"] },
-    { group: "Equity", accounts: ["Share Capital", "Reserves & Surplus", "Retained Earnings"] },
-    { group: "Revenue", accounts: ["Sales Revenue", "Other Income"] },
-    { group: "Expenses", accounts: ["Purchases / COGS", "Salary Expense", "Rent", "Marketing", "Professional Fees", "Utilities", "Depreciation"] },
+    { group: "Fixed Assets", accounts: ["Land & Building", "Plant & Machinery", "Furniture & Fixtures", "Computers & IT Hardware", "Vehicles"] },
+    { group: "Current Assets", accounts: ["Bank Account (HDFC/SBI)", "Cash in Hand", "Accounts Receivable (Sundry Debtors)", "Raw Materials Inventory", "Finished Goods Inventory"] },
+    { group: "Current Liabilities", accounts: ["Accounts Payable (Sundry Creditors)", "GST Payable (CGST/SGST/IGST)", "TDS Payable (Sec 194C/194J/192)", "Salary Payable", "PF & ESIC Payable"] },
+    { group: "Equity & Capital", accounts: ["Share Capital", "Reserves & Surplus", "Retained Earnings", "Directors Capital Account"] },
+    { group: "Revenue & Income", accounts: ["Sales Revenue (B2B/B2C)", "Export Revenue", "Other Operating Income", "Interest Received", "Discount Received"] },
+    { group: "Direct Expenses (Trading/Manufacturing)", accounts: ["Purchases / COGS", "Freight Inward", "Carriage Inward", "Factory Power & Fuel", "Customs Duty & Import Charges", "Factory Direct Labour"] },
+    { group: "Indirect Expenses (50 Tally Ledgers)", accounts: TALLY_50_INDIRECT_EXPENSE_LEDGERS.map(l => l.name) },
   ];
 
   return (
