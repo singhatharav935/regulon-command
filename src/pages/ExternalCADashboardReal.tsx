@@ -2207,7 +2207,7 @@ const ExternalCADashboardReal = () => {
               </Badge>
 
               <Badge variant="outline" className="bg-indigo-500/10 text-indigo-400 border-indigo-500/30 text-[10px] px-2.5 py-1 flex items-center gap-1.5">
-                <Globe2 className="w-3.5 h-3.5" /> Language: <strong className="text-white">{LANGUAGE_LABELS[language].label.split(' ')[0]}</strong>
+                <Globe2 className="w-3.5 h-3.5" /> Language: <strong className="text-white">{(LANGUAGE_LABELS[language]?.label ?? 'English').split(' ')[0]}</strong>
               </Badge>
               <Select
                 value={language}

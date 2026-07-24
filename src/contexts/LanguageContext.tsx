@@ -374,7 +374,11 @@ export const LanguageProvider: React.FC<{ children: React.ReactNode }> = ({ chil
         if (userData?.user?.id) {
           const pref = await fetchLanguagePreference(userData.user.id);
           if (pref) {
-            setLanguage(pref.preferred_language);
+            // Validate that the stored language is actually supported
+            const lang = pref.preferred_language;
+            if (lang && LANGUAGE_LABELS[lang as Language]) {
+              setLanguage(lang as Language);
+            }
             setIsRtlLayout(pref.is_rtl_layout);
           }
         }
@@ -394,11 +398,11 @@ export const LanguageProvider: React.FC<{ children: React.ReactNode }> = ({ chil
       const { data: userData } = await supabase.auth.getUser();
       if (userData?.user?.id) {
         await saveLanguagePreference(userData.user.id, lang, rtl);
-        toast.success(`Language set to ${LANGUAGE_LABELS[lang].label}`);
+        toast.success(`Language set to ${LANGUAGE_LABELS[lang]?.label ?? lang}`);
       } else {
         localStorage.setItem('ca_preferred_lang', lang);
         localStorage.setItem('ca_is_rtl', String(rtl));
-        toast.success(`Language updated locally to ${LANGUAGE_LABELS[lang].label}`);
+        toast.success(`Language updated locally to ${LANGUAGE_LABELS[lang]?.label ?? lang}`);
       }
     } catch (err: any) {
       toast.error(`Error saving preferences: ${err.message}`);

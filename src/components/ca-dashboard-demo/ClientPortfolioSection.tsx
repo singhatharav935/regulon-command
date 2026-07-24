@@ -36,11 +36,13 @@ const statusColors: Record<string, string> = {
   "Verified":           "text-green-400",
 };
 
-const CONSENT_STATUS_CONFIG = {
+const CONSENT_STATUS_CONFIG: Record<string, { label: string; cls: string; icon: typeof Clock }> = {
   pending:  { label: "Awaiting Response", cls: "bg-amber-500/20 text-amber-400 border-amber-500/30",  icon: Clock },
   approved: { label: "Authorized",        cls: "bg-green-500/20 text-green-400 border-green-500/30",  icon: CheckCircle },
   rejected: { label: "Declined",          cls: "bg-red-500/20 text-red-400 border-red-500/30",        icon: XCircle },
 };
+
+const DEFAULT_CONSENT_STATUS = { label: "Unknown", cls: "bg-slate-500/20 text-slate-400 border-slate-500/30", icon: AlertCircle };
 
 interface ClientPortfolioSectionProps {
   governmentApiEnabled?: boolean;
@@ -513,7 +515,7 @@ const ClientPortfolioSection = ({
           {showPending && (
             <div className="divide-y divide-amber-500/10">
               {consentRequests.map(req => {
-                const cfg = CONSENT_STATUS_CONFIG[req.consent_status];
+                const cfg = CONSENT_STATUS_CONFIG[req.consent_status] || DEFAULT_CONSENT_STATUS;
                 const Icon = cfg.icon;
                 return (
                   <div key={req.id} className="flex items-center justify-between p-3 bg-amber-500/5">
