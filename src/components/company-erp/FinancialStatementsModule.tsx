@@ -792,14 +792,16 @@ function FinancialRatiosTab({ ratios }: { ratios: RatioData }) {
 // TAB 6: CARO 2020 CHECKLIST
 // ─────────────────────────────────────────────────────────────────────────────
 
-function CARO2020Tab({ clauses }: { clauses: CARO2020ClauseUI[] }) {
+function CARO2020Tab({ clauses = [] }: { clauses?: CARO2020ClauseUI[] }) {
   const [expandedClause, setExpandedClause] = useState<string | null>(null);
 
+  const safeClauses = Array.isArray(clauses) ? clauses : [];
+
   const stats = {
-    yes: clauses.filter(c => c.response === "yes").length,
-    no: clauses.filter(c => c.response === "no").length,
-    na: clauses.filter(c => c.response === "not_applicable").length,
-    pending: clauses.filter(c => c.response === "pending").length,
+    yes: safeClauses.filter(c => c?.response === "yes").length,
+    no: safeClauses.filter(c => c?.response === "no").length,
+    na: safeClauses.filter(c => c?.response === "not_applicable").length,
+    pending: safeClauses.filter(c => !c?.response || c.response === "pending").length,
   };
 
   const responseConfig = {
@@ -809,13 +811,15 @@ function CARO2020Tab({ clauses }: { clauses: CARO2020ClauseUI[] }) {
     pending: { label: "Pending Review", icon: Clock, color: "text-amber-400 bg-amber-500/10 border-amber-500/20" },
   };
 
+  const defaultCfg = responseConfig.pending;
+
   return (
     <div className="space-y-4">
       {/* Status summary */}
       <div className="grid grid-cols-4 gap-3">
         {Object.entries(stats).map(([key, count]) => {
-          const cfg = responseConfig[key as keyof typeof responseConfig];
-          const Icon = cfg.icon;
+          const cfg = responseConfig[key as keyof typeof responseConfig] || defaultCfg;
+          const Icon = cfg.icon || Clock;
           return (
             <div key={key} className={`rounded-xl border p-3 ${cfg.color}`}>
               <div className="flex items-center gap-2">
@@ -830,9 +834,10 @@ function CARO2020Tab({ clauses }: { clauses: CARO2020ClauseUI[] }) {
 
       {/* Clauses */}
       <div className="rounded-2xl border border-white/8 bg-card/40 overflow-hidden divide-y divide-white/5">
-        {clauses.map(clause => {
-          const cfg = responseConfig[clause.response];
-          const Icon = cfg.icon;
+        {safeClauses.map(clause => {
+          const respKey = (clause?.response || "pending").toLowerCase();
+          const cfg = responseConfig[respKey as keyof typeof responseConfig] || defaultCfg;
+          const Icon = cfg.icon || Clock;
           const isOpen = expandedClause === clause.clause_no;
           return (
             <div key={clause.clause_no}>
