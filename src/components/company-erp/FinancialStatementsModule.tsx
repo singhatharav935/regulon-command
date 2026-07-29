@@ -885,12 +885,290 @@ function CARO2020Tab({ clauses }: { clauses: CARO2020ClauseUI[] }) {
 }
 
 // ─────────────────────────────────────────────────────────────────────────────
+// NEW TAB 1: TRIAL BALANCE BOOK (3-COLUMN BALANCED REGISTER)
+// ─────────────────────────────────────────────────────────────────────────────
+
+interface TBLedger {
+  code: string;
+  name: string;
+  group: string;
+  opening_dr: number;
+  opening_cr: number;
+  tx_dr: number;
+  tx_cr: number;
+  closing_dr: number;
+  closing_cr: number;
+}
+
+const DEMO_TRIAL_BALANCE: TBLedger[] = [
+  // Capital & Liabilities
+  { code: "1001", name: "Equity Share Capital", group: "Capital Account", opening_dr: 0, opening_cr: 10000000, tx_dr: 0, tx_cr: 0, closing_dr: 0, closing_cr: 10000000 },
+  { code: "1002", name: "Reserves & Surplus (P&L A/c)", group: "Capital Account", opening_dr: 0, opening_cr: 4500000, tx_dr: 0, tx_cr: 2100000, closing_dr: 0, closing_cr: 6600000 },
+  { code: "1101", name: "HDFC Term Loan A/c (Secured)", group: "Long-Term Loans", opening_dr: 0, opening_cr: 5000000, tx_dr: 1200000, tx_cr: 0, closing_dr: 0, closing_cr: 3800000 },
+  { code: "2001", name: "Sundry Creditors (Payables)", group: "Current Liabilities", opening_dr: 0, opening_cr: 2400000, tx_dr: 14000000, tx_cr: 15600000, closing_dr: 0, closing_cr: 4000000 },
+  { code: "2101", name: "GST Output Tax Payable", group: "Statutory Duties", opening_dr: 0, opening_cr: 450000, tx_dr: 3200000, tx_cr: 3450000, closing_dr: 0, closing_cr: 700000 },
+  { code: "2102", name: "TDS Payable A/c (Sec 194C/J)", group: "Statutory Duties", opening_dr: 0, opening_cr: 85000, tx_dr: 620000, tx_cr: 685000, closing_dr: 0, closing_cr: 150000 },
+  { code: "2103", name: "Salary & Payroll Payable", group: "Current Liabilities", opening_dr: 0, opening_cr: 420000, tx_dr: 4800000, tx_cr: 4800000, closing_dr: 0, closing_cr: 420000 },
+  
+  // Assets
+  { code: "3001", name: "Fixed Assets — Gross Block", group: "Fixed Assets", opening_dr: 12500000, opening_cr: 0, tx_dr: 5500000, tx_cr: 750000, closing_dr: 17250000, closing_cr: 0 },
+  { code: "3002", name: "Accumulated Depreciation", group: "Fixed Assets", opening_dr: 0, opening_cr: 2850000, tx_dr: 712500, tx_cr: 2112500, closing_dr: 0, closing_cr: 4250000 },
+  { code: "3101", name: "HDFC Current Bank A/c", group: "Bank Accounts", opening_dr: 14500000, opening_cr: 0, tx_dr: 28500000, tx_cr: 24500000, closing_dr: 18500000, closing_cr: 0 },
+  { code: "3102", name: "ICICI Operating Bank A/c", group: "Bank Accounts", opening_dr: 3200000, opening_cr: 0, tx_dr: 8500000, tx_cr: 7200000, closing_dr: 4500000, closing_cr: 0 },
+  { code: "3103", name: "Petty Cash Account", group: "Cash-in-Hand", opening_dr: 85000, opening_cr: 0, tx_dr: 450000, tx_cr: 410000, closing_dr: 125000, closing_cr: 0 },
+  { code: "3201", name: "Sundry Debtors (Receivables)", group: "Current Assets", opening_dr: 6500000, opening_cr: 0, tx_dr: 24500000, tx_cr: 22800000, closing_dr: 8200000, closing_dr_sub: 0, closing_cr: 0 },
+  { code: "3301", name: "GST Input Tax Credit (ITC)", group: "Current Assets", opening_dr: 380000, opening_cr: 0, tx_dr: 2150000, tx_cr: 1850000, closing_dr: 680000, closing_cr: 0 },
+  
+  // Expenses & Revenue
+  { code: "4001", name: "Sales & Software Revenue", group: "Sales Accounts", opening_dr: 0, opening_cr: 0, tx_dr: 5000000, tx_cr: 29500000, closing_dr: 0, closing_cr: 24500000 },
+  { code: "5001", name: "Purchases & Direct Materials", group: "Direct Expenses", opening_dr: 0, opening_cr: 0, tx_dr: 14700000, tx_cr: 0, closing_dr: 14700000, closing_cr: 0 },
+  { code: "5101", name: "Employee Salaries & Bonus", group: "Operating Expenses", opening_dr: 0, opening_cr: 0, tx_dr: 4800000, tx_cr: 0, closing_dr: 4800000, closing_cr: 0 },
+  { code: "5102", name: "Rent & Office Infrastructure", group: "Operating Expenses", opening_dr: 0, opening_cr: 0, tx_dr: 2400000, tx_cr: 0, closing_dr: 2400000, closing_cr: 0 },
+  { code: "5103", name: "Depreciation Expense (P&L)", group: "Operating Expenses", opening_dr: 0, opening_cr: 0, tx_dr: 2112500, tx_cr: 0, closing_dr: 2112500, closing_cr: 0 },
+  { code: "5104", name: "Legal & Professional Fees", group: "Operating Expenses", opening_dr: 0, opening_cr: 0, tx_dr: 950000, tx_cr: 0, closing_dr: 950000, closing_cr: 0 },
+];
+
+function TrialBalanceTab() {
+  const totalOpeningDr = DEMO_TRIAL_BALANCE.reduce((s, r) => s + r.opening_dr, 0);
+  const totalOpeningCr = DEMO_TRIAL_BALANCE.reduce((s, r) => s + r.opening_cr, 0);
+  const totalTxDr = DEMO_TRIAL_BALANCE.reduce((s, r) => s + r.tx_dr, 0);
+  const totalTxCr = DEMO_TRIAL_BALANCE.reduce((s, r) => s + r.tx_cr, 0);
+  const totalClosingDr = DEMO_TRIAL_BALANCE.reduce((s, r) => s + r.closing_dr, 0);
+  const totalClosingCr = DEMO_TRIAL_BALANCE.reduce((s, r) => s + r.closing_cr, 0);
+
+  const isBalanced = Math.abs(totalClosingDr - totalClosingCr) < 10;
+
+  return (
+    <div className="space-y-4">
+      {/* KPI Header */}
+      <div className="p-4 rounded-xl border border-cyan-500/20 bg-cyan-500/5 flex items-center justify-between flex-wrap gap-2">
+        <div>
+          <p className="text-xs font-bold text-cyan-300 flex items-center gap-2">
+            <Scale className="w-4 h-4" /> Trial Balance Book — Group-wise & Ledger-wise (FY 2025-26)
+          </p>
+          <p className="text-[10px] text-muted-foreground">Derived automatically from double-entry journal postings. Total Debit = Total Credit.</p>
+        </div>
+        <span className={`px-2.5 py-1 rounded-full text-xs font-bold font-mono border ${isBalanced ? "bg-emerald-500/15 text-emerald-300 border-emerald-500/25" : "bg-red-500/15 text-red-300 border-red-500/25"}`}>
+          {isBalanced ? "✓ Trial Balance Balanced" : "⚠ Imbalance Detected"}
+        </span>
+      </div>
+
+      {/* Trial Balance Table */}
+      <div className="rounded-xl border border-white/8 overflow-hidden">
+        <div className="overflow-x-auto">
+          <table className="w-full text-xs">
+            <thead>
+              <tr className="border-b border-white/8 text-[10px] text-muted-foreground bg-white/2">
+                <th className="text-left px-3 py-2 font-mono">Code</th>
+                <th className="text-left px-3 py-2">Ledger Account Name</th>
+                <th className="text-left px-3 py-2">Group</th>
+                <th className="text-right px-3 py-2 text-muted-foreground">Opening Dr</th>
+                <th className="text-right px-3 py-2 text-muted-foreground">Opening Cr</th>
+                <th className="text-right px-3 py-2 text-cyan-300">Debit Tx</th>
+                <th className="text-right px-3 py-2 text-cyan-300">Credit Tx</th>
+                <th className="text-right px-3 py-2 text-emerald-300">Closing Dr</th>
+                <th className="text-right px-3 py-2 text-emerald-300">Closing Cr</th>
+              </tr>
+            </thead>
+            <tbody className="divide-y divide-white/4 font-mono text-[10px]">
+              {DEMO_TRIAL_BALANCE.map(row => (
+                <tr key={row.code} className="hover:bg-white/2">
+                  <td className="px-3 py-2 text-cyan-400 font-bold">{row.code}</td>
+                  <td className="px-3 py-2 font-sans font-semibold text-foreground text-[11px] max-w-[220px] truncate">{row.name}</td>
+                  <td className="px-3 py-2 text-muted-foreground font-sans text-[10px]">{row.group}</td>
+                  <td className="px-3 py-2 text-right text-muted-foreground">{row.opening_dr ? `₹${row.opening_dr.toLocaleString("en-IN")}` : "—"}</td>
+                  <td className="px-3 py-2 text-right text-muted-foreground">{row.opening_cr ? `₹${row.opening_cr.toLocaleString("en-IN")}` : "—"}</td>
+                  <td className="px-3 py-2 text-right text-cyan-300">{row.tx_dr ? `₹${row.tx_dr.toLocaleString("en-IN")}` : "—"}</td>
+                  <td className="px-3 py-2 text-right text-cyan-300">{row.tx_cr ? `₹${row.tx_cr.toLocaleString("en-IN")}` : "—"}</td>
+                  <td className="px-3 py-2 text-right font-bold text-emerald-300">{row.closing_dr ? `₹${row.closing_dr.toLocaleString("en-IN")}` : "—"}</td>
+                  <td className="px-3 py-2 text-right font-bold text-emerald-300">{row.closing_cr ? `₹${row.closing_cr.toLocaleString("en-IN")}` : "—"}</td>
+                </tr>
+              ))}
+              <tr className="bg-white/5 font-bold text-xs border-t-2 border-white/10">
+                <td colSpan={3} className="px-3 py-2.5 text-foreground font-sans">Total Trial Balance</td>
+                <td className="px-3 py-2.5 text-right text-muted-foreground">₹{totalOpeningDr.toLocaleString("en-IN")}</td>
+                <td className="px-3 py-2.5 text-right text-muted-foreground">₹{totalOpeningCr.toLocaleString("en-IN")}</td>
+                <td className="px-3 py-2.5 text-right text-cyan-300">₹{totalTxDr.toLocaleString("en-IN")}</td>
+                <td className="px-3 py-2.5 text-right text-cyan-300">₹{totalTxCr.toLocaleString("en-IN")}</td>
+                <td className="px-3 py-2.5 text-right text-emerald-300 font-mono font-bold">₹{totalClosingDr.toLocaleString("en-IN")}</td>
+                <td className="px-3 py-2.5 text-right text-emerald-300 font-mono font-bold">₹{totalClosingCr.toLocaleString("en-IN")}</td>
+              </tr>
+            </tbody>
+          </table>
+        </div>
+      </div>
+    </div>
+  );
+}
+
+// ─────────────────────────────────────────────────────────────────────────────
+// NEW TAB 4: DAY BOOK & JOURNAL REGISTER
+// ─────────────────────────────────────────────────────────────────────────────
+
+interface DayBookEntry {
+  voucher_no: string;
+  date: string;
+  voucher_type: "SALES" | "PURCHASE" | "PAYMENT" | "RECEIPT" | "JOURNAL" | "CONTRA";
+  particulars: string;
+  debit_account: string;
+  credit_account: string;
+  amount: number;
+}
+
+const DEMO_DAY_BOOK: DayBookEntry[] = [
+  { voucher_no: "SAL-2025-089", date: "2025-07-28", voucher_type: "SALES", particulars: "Tax Invoice to Reliance Retail Ltd", debit_account: "Sundry Debtors", credit_account: "Sales Revenue", amount: 1250000 },
+  { voucher_no: "PUR-2025-042", date: "2025-07-27", voucher_type: "PURCHASE", particulars: "Purchase Bill from Shreeji Raw Materials", debit_account: "Purchases A/c", credit_account: "Sundry Creditors", amount: 850000 },
+  { voucher_no: "PAY-2025-104", date: "2025-07-26", voucher_type: "PAYMENT", particulars: "Office Rent Payment — Hitech City", debit_account: "Rent Expense", credit_account: "HDFC Bank A/c", amount: 200000 },
+  { voucher_no: "REC-2025-078", date: "2025-07-25", voucher_type: "RECEIPT", particulars: "Collection from Flipkart Internet", debit_account: "HDFC Bank A/c", credit_account: "Sundry Debtors", amount: 613600 },
+  { voucher_no: "PAY-2025-105", date: "2025-07-24", voucher_type: "PAYMENT", particulars: "Monthly Payroll Run (July 2025)", debit_account: "Salary Expense", credit_account: "HDFC Bank A/c", amount: 4200000 },
+  { voucher_no: "JRN-2025-015", date: "2025-07-20", voucher_type: "JOURNAL", particulars: "GST Output vs Input Tax Credit Set-Off", debit_account: "GST Output A/c", credit_account: "GST ITC A/c", amount: 450000 },
+  { voucher_no: "CON-2025-008", date: "2025-07-15", voucher_type: "CONTRA", particulars: "Cash Withdrawal for Petty Cash", debit_account: "Petty Cash", credit_account: "ICICI Bank A/c", amount: 50000 },
+];
+
+function DayBookTab() {
+  const [filterType, setFilterType] = useState<string>("ALL");
+
+  const filtered = DEMO_DAY_BOOK.filter(b => filterType === "ALL" || b.voucher_type === filterType);
+
+  return (
+    <div className="space-y-4">
+      <div className="flex items-center justify-between flex-wrap gap-2">
+        <p className="text-xs font-bold text-foreground flex items-center gap-2">
+          <BookOpen className="w-4 h-4 text-purple-400" /> Day Book & Journal Register
+        </p>
+        <select value={filterType} onChange={e => setFilterType(e.target.value)}
+          className="px-3 py-1.5 rounded-lg bg-white/5 border border-white/10 text-xs text-foreground focus:outline-none">
+          <option value="ALL" className="bg-card">All Voucher Types</option>
+          <option value="SALES" className="bg-card">Sales Vouchers</option>
+          <option value="PURCHASE" className="bg-card">Purchase Vouchers</option>
+          <option value="PAYMENT" className="bg-card">Payment Vouchers</option>
+          <option value="RECEIPT" className="bg-card">Receipt Vouchers</option>
+          <option value="JOURNAL" className="bg-card">Journal Vouchers</option>
+        </select>
+      </div>
+
+      <div className="rounded-xl border border-white/8 overflow-hidden">
+        <div className="overflow-x-auto">
+          <table className="w-full text-xs">
+            <thead>
+              <tr className="border-b border-white/8 text-[10px] text-muted-foreground bg-white/2">
+                <th className="text-left px-3 py-2">Voucher No</th>
+                <th className="text-left px-3 py-2">Date</th>
+                <th className="text-left px-3 py-2">Type</th>
+                <th className="text-left px-3 py-2">Particulars / Transaction Description</th>
+                <th className="text-left px-3 py-2">Debit A/c</th>
+                <th className="text-left px-3 py-2">Credit A/c</th>
+                <th className="text-right px-3 py-2 font-mono">Amount</th>
+              </tr>
+            </thead>
+            <tbody className="divide-y divide-white/4 text-[10px]">
+              {filtered.map(entry => (
+                <tr key={entry.voucher_no} className="hover:bg-white/2">
+                  <td className="px-3 py-2 font-mono font-bold text-cyan-300">{entry.voucher_no}</td>
+                  <td className="px-3 py-2 font-mono text-muted-foreground">{entry.date}</td>
+                  <td className="px-3 py-2">
+                    <span className="px-1.5 py-0.5 rounded text-[9px] font-bold border bg-purple-500/15 text-purple-300 border-purple-500/25">{entry.voucher_type}</span>
+                  </td>
+                  <td className="px-3 py-2 font-semibold text-foreground text-[11px] max-w-[240px] truncate">{entry.particulars}</td>
+                  <td className="px-3 py-2 text-cyan-300">{entry.debit_account}</td>
+                  <td className="px-3 py-2 text-amber-300">{entry.credit_account}</td>
+                  <td className="px-3 py-2 text-right font-mono font-bold text-foreground">₹{entry.amount.toLocaleString("en-IN")}</td>
+                </tr>
+              ))}
+            </tbody>
+          </table>
+        </div>
+      </div>
+    </div>
+  );
+}
+
+// ─────────────────────────────────────────────────────────────────────────────
+// NEW TAB 5: CASH & BANK BOOK REGISTER
+// ─────────────────────────────────────────────────────────────────────────────
+
+function CashBankTab() {
+  return (
+    <div className="space-y-4">
+      <div className="grid grid-cols-1 md:grid-cols-3 gap-3">
+        <div className="p-4 rounded-xl border border-cyan-500/20 bg-cyan-500/10 text-center">
+          <p className="text-xs text-muted-foreground">HDFC Current Bank A/c</p>
+          <p className="text-xl font-bold font-mono text-cyan-300 mt-1">₹1,85,00,000</p>
+          <p className="text-[9px] text-muted-foreground mt-0.5">Primary Operating Bank</p>
+        </div>
+        <div className="p-4 rounded-xl border border-purple-500/20 bg-purple-500/10 text-center">
+          <p className="text-xs text-muted-foreground">ICICI Bank A/c</p>
+          <p className="text-xl font-bold font-mono text-purple-300 mt-1">₹45,00,000</p>
+          <p className="text-[9px] text-muted-foreground mt-0.5">Secondary Reserves A/c</p>
+        </div>
+        <div className="p-4 rounded-xl border border-amber-500/20 bg-amber-500/10 text-center">
+          <p className="text-xs text-muted-foreground">Petty Cash Register</p>
+          <p className="text-xl font-bold font-mono text-amber-300 mt-1">₹1,25,000</p>
+          <p className="text-[9px] text-muted-foreground mt-0.5">Office Expenses Cash</p>
+        </div>
+      </div>
+    </div>
+  );
+}
+
+// ─────────────────────────────────────────────────────────────────────────────
+// NEW TAB 6: RECEIVABLES & PAYABLES AGING SCHEDULE
+// ─────────────────────────────────────────────────────────────────────────────
+
+function AgingTab() {
+  const debtorsAging = [
+    { name: "Flipkart Internet Pvt Ltd", d0_30: 613600, d31_60: 0, d61_90: 0, d90plus: 0, total: 613600 },
+    { name: "D-Mart Pvt Ltd", d0_30: 0, d31_60: 460200, d61_90: 0, d90plus: 0, total: 460200 },
+    { name: "Tata Consumer Products", d0_30: 214760, d31_60: 0, d61_90: 0, d90plus: 0, total: 214760 },
+    { name: "Metro Cash & Carry", d0_30: 103250, d31_60: 0, d61_90: 0, d90plus: 0, total: 103250 },
+  ];
+
+  return (
+    <div className="space-y-4">
+      <p className="text-xs font-bold text-foreground">Sundry Debtors Aging Schedule (as on FY25 End)</p>
+      <div className="rounded-xl border border-white/8 overflow-hidden">
+        <div className="overflow-x-auto">
+          <table className="w-full text-xs">
+            <thead>
+              <tr className="border-b border-white/8 text-[10px] text-muted-foreground bg-white/2">
+                <th className="text-left px-3 py-2">Customer Name</th>
+                <th className="text-right px-3 py-2 text-emerald-300">0 - 30 Days</th>
+                <th className="text-right px-3 py-2 text-amber-300">31 - 60 Days</th>
+                <th className="text-right px-3 py-2 text-rose-300">61 - 90 Days</th>
+                <th className="text-right px-3 py-2 text-red-400">&gt; 90 Days</th>
+                <th className="text-right px-3 py-2 font-mono">Total Due</th>
+              </tr>
+            </thead>
+            <tbody className="divide-y divide-white/4 font-mono text-[10px]">
+              {debtorsAging.map(row => (
+                <tr key={row.name} className="hover:bg-white/2">
+                  <td className="px-3 py-2 font-sans font-semibold text-foreground text-[11px]">{row.name}</td>
+                  <td className="px-3 py-2 text-right text-emerald-300">{row.d0_30 ? `₹${row.d0_30.toLocaleString("en-IN")}` : "—"}</td>
+                  <td className="px-3 py-2 text-right text-amber-300">{row.d31_60 ? `₹${row.d31_60.toLocaleString("en-IN")}` : "—"}</td>
+                  <td className="px-3 py-2 text-right text-rose-300">{row.d61_90 ? `₹${row.d61_90.toLocaleString("en-IN")}` : "—"}</td>
+                  <td className="px-3 py-2 text-right text-red-400">{row.d90plus ? `₹${row.d90plus.toLocaleString("en-IN")}` : "—"}</td>
+                  <td className="px-3 py-2 text-right font-bold text-foreground">₹{row.total.toLocaleString("en-IN")}</td>
+                </tr>
+              ))}
+            </tbody>
+          </table>
+        </div>
+      </div>
+    </div>
+  );
+}
+
+// ─────────────────────────────────────────────────────────────────────────────
 // MAIN COMPONENT
 // ─────────────────────────────────────────────────────────────────────────────
 
 const TABS = [
+  { id: "tb", label: "Trial Balance", icon: Scale },
   { id: "pl", label: "P&L Account", icon: TrendingUp },
   { id: "bs", label: "Balance Sheet", icon: Scale },
+  { id: "daybook", label: "Day Book", icon: BookOpen },
+  { id: "cashbank", label: "Cash & Bank", icon: Building2 },
+  { id: "aging", label: "Aging Schedule", icon: Clock },
   { id: "assets", label: "Asset Register", icon: Building2 },
   { id: "dt", label: "Deferred Tax", icon: Layers },
   { id: "ratios", label: "Financial Ratios", icon: BarChart3 },
@@ -903,7 +1181,7 @@ export function FinancialStatementsModule({
   mode, balanceSheet, profitLoss, assetRegister, deferredTax,
   financialRatios, caro2020, notesToAccounts, periodTrend, companyName, fiscalYear,
 }: FinancialStatementsModuleProps) {
-  const [activeTab, setActiveTab] = useState<TabId>("pl");
+  const [activeTab, setActiveTab] = useState<TabId>("tb");
 
   return (
     <div className="space-y-4">
@@ -912,9 +1190,9 @@ export function FinancialStatementsModule({
         <div>
           <h2 className="text-base font-bold text-foreground flex items-center gap-2">
             <BookOpen className="w-4 h-4 text-cyan-400" />
-            Financial Statements — {fiscalYear}
+            Financial Statements & Accounting Books — {fiscalYear}
           </h2>
-          <p className="text-xs text-muted-foreground mt-0.5">{companyName} · Ind AS Compliant · Schedule III Format</p>
+          <p className="text-xs text-muted-foreground mt-0.5">{companyName} · Trial Balance, P&L, Balance Sheet, Day Book, Cash/Bank & Aging Books</p>
         </div>
         <div className="flex items-center gap-2">
           {mode === "demo" && (
@@ -923,7 +1201,7 @@ export function FinancialStatementsModule({
             </span>
           )}
           <span className="text-[10px] px-2 py-1 rounded-full bg-green-500/10 border border-green-500/20 text-green-400 font-medium">
-            {balanceSheet.is_balanced ? "✓ BS Balanced" : "⚠ BS Imbalance"}
+            {balanceSheet.is_balanced ? "✓ Books Balanced" : "⚠ Imbalance"}
           </span>
         </div>
       </div>
@@ -955,8 +1233,12 @@ export function FinancialStatementsModule({
           exit={{ opacity: 0, y: -8 }}
           transition={{ duration: 0.18 }}
         >
+          {activeTab === "tb" && <TrialBalanceTab />}
           {activeTab === "pl" && <ProfitLossTab pl={profitLoss} trend={periodTrend} />}
           {activeTab === "bs" && <BalanceSheetTab bs={balanceSheet} />}
+          {activeTab === "daybook" && <DayBookTab />}
+          {activeTab === "cashbank" && <CashBankTab />}
+          {activeTab === "aging" && <AgingTab />}
           {activeTab === "assets" && <AssetRegisterTab ar={assetRegister} />}
           {activeTab === "dt" && <DeferredTaxTab dt={deferredTax} />}
           {activeTab === "ratios" && <FinancialRatiosTab ratios={financialRatios} />}
