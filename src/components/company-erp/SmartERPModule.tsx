@@ -45,7 +45,6 @@ import { GovEFilingHubModule } from "./GovEFilingHubModule";
 import { BankReconciliationModule } from "./BankReconciliationModule";
 import { FXInternationalModule } from "./FXInternationalModule";
 import { FixedAssetModule } from "./FixedAssetModule";
-import { CFOIntelligenceModule } from "./CFOIntelligenceModule";
 import {
   DEMO_BALANCE_SHEET,
   DEMO_PROFIT_LOSS,
@@ -1433,16 +1432,6 @@ function FixedAssetPanel({ company }: SmartERPProps) {
   );
 }
 
-// ─── 17. ADVANCED VIRTUAL CFO AI INTELLIGENCE PANEL ──────────────────────
-
-function CFOIntelPanel({ company }: SmartERPProps) {
-  return (
-    <CFOIntelligenceModule
-      companyName={company?.name || "Sannidh Technologies Pvt. Ltd."}
-    />
-  );
-}
-
 // ─── MAIN ERP MODULE ─────────────────────────────────────────────────────────
 
 const ERP_TABS = [
@@ -1462,7 +1451,6 @@ const ERP_TABS = [
   { id: "bankrecon", label: "Bank Recon AI",   icon: Zap,            color: "text-green-400" },
   { id: "fxintl",    label: "FX & Intl Tax",  icon: Globe,          color: "text-emerald-400" },
   { id: "fixedassets",label: "Fixed Assets",   icon: Building2,      color: "text-cyan-400" },
-  { id: "cfointel",  label: "CFO Intel AI",    icon: Sparkles,       color: "text-cyan-400" },
 ] as const;
 
 type ERPSub = typeof ERP_TABS[number]["id"];
@@ -1545,7 +1533,6 @@ export function SmartERPModule({ invoices, purchases, expenses, payroll, bankTxn
             {activeTab === "bankrecon"   && <BankReconPanel company={company} />}
             {activeTab === "fxintl"      && <FXIntlPanel company={company} />}
             {activeTab === "fixedassets" && <FixedAssetPanel company={company} />}
-            {activeTab === "cfointel"    && <CFOIntelPanel company={company} />}
           </CardContent>
         </motion.div>
       </AnimatePresence>
