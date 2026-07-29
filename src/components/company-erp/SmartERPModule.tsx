@@ -35,9 +35,42 @@ import {
   CreditCard, Wallet, ArrowUpRight, ArrowDownRight,
   BookOpen, PieChart, FileBarChart2, Hash, Building2,
   ChevronDown, ChevronUp, Info, Star, Archive, Layers,
-  RotateCcw, PrinterIcon, ExternalLink, ListChecks
+  RotateCcw, PrinterIcon, ExternalLink, ListChecks, Globe
 } from "lucide-react";
 import { toast } from "@/hooks/use-toast";
+import { FinancialStatementsModule } from "./FinancialStatementsModule";
+import { StatutoryTaxModule } from "./StatutoryTaxModule";
+import { StatutoryNoticeModule } from "./StatutoryNoticeModule";
+import { GovEFilingHubModule } from "./GovEFilingHubModule";
+import { BankReconciliationModule } from "./BankReconciliationModule";
+import { FXInternationalModule } from "./FXInternationalModule";
+import { FixedAssetModule } from "./FixedAssetModule";
+import { CFOIntelligenceModule } from "./CFOIntelligenceModule";
+import {
+  DEMO_BALANCE_SHEET,
+  DEMO_PROFIT_LOSS,
+  DEMO_ASSET_REGISTER,
+  DEMO_DEFERRED_TAX,
+  DEMO_FINANCIAL_RATIOS,
+  DEMO_CARO_2020,
+  DEMO_NOTES_TO_ACCOUNTS,
+  DEMO_PERIOD_FINANCIALS,
+} from "@/data/demo-financial-statements-data";
+import {
+  DEMO_ADVANCE_TAX,
+  DEMO_FORM_138_SUMMARY,
+  DEMO_FORM_140_SUMMARY,
+  DEMO_FORM_143_SUMMARY,
+  DEMO_FORM_144_SUMMARY,
+  DEMO_GSTR3B_SET_OFF,
+  DEMO_GSTR2B_RECONCILIATION,
+} from "@/data/demo-statutory-tax-data";
+import {
+  DEMO_STATUTORY_NOTICES,
+  DEMO_LEGAL_DRAFTS,
+  DEMO_RISK_SCORES,
+  DEMO_NOTICE_DASHBOARD_SUMMARY,
+} from "@/data/demo-statutory-notice-data";
 import type {
   SmartERPProps, ERPInvoice, ERPPurchase, ERPExpense,
   ERPPayroll, ERPBankTxn, ERPStockItem
@@ -1100,225 +1133,43 @@ function PayrollPanel({ payroll }: { payroll: ERPPayroll[] }) {
 
 // ─── 7. GST RETURNS PANEL ────────────────────────────────────────────────────
 
-function GSTPanel({ invoices, purchases }: { invoices: ERPInvoice[]; purchases: ERPPurchase[] }) {
-  const [subTab, setSubTab] = useState<"gstr1" | "gstr3b" | "itc" | "ewaybill">("gstr1");
-
-  const totalOutputTax = invoices.reduce((s, i) => s + i.gst, 0);
-  const totalITC = purchases.filter(p => p.itc_eligible && p.itc_claimed).reduce((s, p) => s + p.gst, 0);
-  const netPayable = totalOutputTax - totalITC;
-  const b2bInvoices = invoices.filter(i => i.gstin !== "UNREGISTERED" && i.gstin !== "N/A");
-  const b2cInvoices = invoices.filter(i => i.gstin === "UNREGISTERED" || i.gstin === "N/A");
-
+function GSTPanel({ company }: SmartERPProps) {
   return (
-    <div className="space-y-4">
-      <div className="grid grid-cols-3 gap-3">
-        <KPI label="Output Tax (GSTR-1)" value={fmtL(totalOutputTax)} sub="Collected from sales" icon={TrendingUp} color="text-rose-400" bg="bg-rose-500/5" />
-        <KPI label="ITC Available (GSTR-2B)" value={fmtL(totalITC)} sub="From purchases" icon={TrendingDown} color="text-emerald-400" bg="bg-emerald-500/5" />
-        <KPI label="Net GST Payable" value={fmtL(netPayable)} sub="GSTR-3B liability" icon={IndianRupee} color="text-amber-400" bg="bg-amber-500/5" />
-      </div>
-
-      <div className="flex gap-1 border-b border-white/5">
-        {(["gstr1", "gstr3b", "itc", "ewaybill"] as const).map(t => (
-          <button key={t} onClick={() => setSubTab(t)} className={`px-3 py-2 text-xs font-medium border-b-2 transition-all -mb-px ${subTab === t ? "text-violet-400 border-violet-400" : "text-muted-foreground border-transparent hover:text-foreground"}`}>
-            {t === "gstr1" ? "GSTR-1 (B2B/B2C)" : t === "gstr3b" ? "GSTR-3B Draft" : t === "itc" ? "ITC Ledger" : "E-Way Bill"}
-          </button>
-        ))}
-      </div>
-
-      {subTab === "gstr1" && (
-        <div className="space-y-4">
-          <div className="grid grid-cols-2 gap-3">
-            <div className="rounded-xl p-3 border border-white/5 bg-muted/5">
-              <p className="text-[10px] text-muted-foreground mb-2 font-semibold">B2B — Registered Buyers</p>
-              <p className="text-base font-bold text-cyan-400">{b2bInvoices.length} invoices</p>
-              <p className="text-xs text-muted-foreground">Taxable: {fmtL(b2bInvoices.reduce((s, i) => s + i.amount, 0))}</p>
-              <p className="text-xs text-violet-400">GST: {fmtL(b2bInvoices.reduce((s, i) => s + i.gst, 0))}</p>
-            </div>
-            <div className="rounded-xl p-3 border border-white/5 bg-muted/5">
-              <p className="text-[10px] text-muted-foreground mb-2 font-semibold">B2C — Unregistered / Cash Sales</p>
-              <p className="text-base font-bold text-amber-400">{b2cInvoices.length} invoices</p>
-              <p className="text-xs text-muted-foreground">Taxable: {fmtL(b2cInvoices.reduce((s, i) => s + i.amount, 0))}</p>
-              <p className="text-xs text-violet-400">GST: {fmtL(b2cInvoices.reduce((s, i) => s + i.gst, 0))}</p>
-            </div>
-          </div>
-          <TableWrap>
-            <thead><tr className="bg-muted/20 border-b border-white/5">
-              <TH>GSTIN of Buyer</TH><TH>Invoice #</TH><TH>Date</TH>
-              <TH right>Taxable Value</TH><TH right>CGST</TH><TH right>SGST</TH><TH right>IGST</TH>
-            </tr></thead>
-            <tbody>
-              {invoices.map((inv, i) => {
-                const isInterState = inv.gstin.substring(0, 2) !== "27"; // assuming company is in MH (code 27)
-                return (
-                  <tr key={inv.id} className="border-b border-white/3 hover:bg-white/2">
-                    <td className="px-3 py-3 font-mono text-muted-foreground">{inv.gstin}</td>
-                    <td className="px-3 py-3 font-mono text-cyan-400">{inv.invoice_no}</td>
-                    <td className="px-3 py-3 text-muted-foreground">{inv.date}</td>
-                    <td className="px-3 py-3 text-right">{fmt(inv.amount)}</td>
-                    <td className="px-3 py-3 text-right text-violet-400">{isInterState ? "—" : fmt(inv.gst / 2)}</td>
-                    <td className="px-3 py-3 text-right text-violet-400">{isInterState ? "—" : fmt(inv.gst / 2)}</td>
-                    <td className="px-3 py-3 text-right text-violet-400">{isInterState ? fmt(inv.gst) : "—"}</td>
-                  </tr>
-                );
-              })}
-            </tbody>
-          </TableWrap>
-          <Button className="gap-1.5 text-xs h-8 bg-violet-500/15 border border-violet-500/25 text-violet-300">
-            <ExternalLink className="w-3 h-3" /> File GSTR-1 on GSTN Portal
-          </Button>
-        </div>
-      )}
-
-      {subTab === "gstr3b" && (
-        <div className="space-y-4">
-          <div className="p-3 rounded-xl border border-violet-500/20 bg-violet-500/5">
-            <p className="text-xs font-bold text-violet-300 mb-1">GSTR-3B Auto-Computed Draft — July 2025</p>
-            <p className="text-[10px] text-violet-400/70">This draft is computed from your sales invoices and purchase bills. Review and file by 20th August.</p>
-          </div>
-          <div className="space-y-2">
-            {[
-              { label: "3.1 Outward Taxable Supplies (other than zero rated)", taxable: invoices.reduce((s, i) => s + i.amount, 0), cgst: invoices.reduce((s, i) => s + i.gst, 0) / 2, sgst: invoices.reduce((s, i) => s + i.gst, 0) / 2, igst: 0 },
-              { label: "3.1(b) Zero Rated Supplies", taxable: 0, cgst: 0, sgst: 0, igst: 0 },
-              { label: "3.1(c) Nil Rated / Exempt", taxable: 0, cgst: 0, sgst: 0, igst: 0 },
-            ].map((row, i) => (
-              <div key={i} className="grid grid-cols-5 gap-2 p-3 rounded-lg bg-muted/5 border border-white/5 text-xs">
-                <span className="col-span-2 text-muted-foreground">{row.label}</span>
-                <span className="text-right">{fmt(row.taxable)}</span>
-                <span className="text-right text-violet-400">{fmt(row.cgst)}</span>
-                <span className="text-right text-violet-400">{fmt(row.sgst)}</span>
-              </div>
-            ))}
-            <div className="grid grid-cols-5 gap-2 p-3 rounded-lg bg-emerald-500/5 border border-emerald-500/20 text-xs font-semibold">
-              <span className="col-span-2 text-emerald-300">4. ITC Available (from GSTR-2B)</span>
-              <span className="text-right">{fmt(purchases.filter(p => p.itc_eligible && p.itc_claimed).reduce((s, p) => s + p.amount, 0))}</span>
-              <span className="text-right text-emerald-400">{fmt(totalITC / 2)}</span>
-              <span className="text-right text-emerald-400">{fmt(totalITC / 2)}</span>
-            </div>
-            <div className="grid grid-cols-5 gap-2 p-3 rounded-lg bg-amber-500/5 border border-amber-500/20 text-xs font-bold">
-              <span className="col-span-2 text-amber-300">NET TAX PAYABLE</span>
-              <span className="text-right">{fmt(invoices.reduce((s, i) => s + i.amount, 0))}</span>
-              <span className="text-right text-amber-400">{fmt(netPayable / 2)}</span>
-              <span className="text-right text-amber-400">{fmt(netPayable / 2)}</span>
-            </div>
-          </div>
-          <Button className="gap-1.5 text-xs h-8 bg-violet-500/15 border border-violet-500/25 text-violet-300">
-            <ExternalLink className="w-3 h-3" /> File GSTR-3B on GSTN Portal
-          </Button>
-        </div>
-      )}
-
-      {subTab === "itc" && (
-        <TableWrap>
-          <thead><tr className="bg-muted/20 border-b border-white/5">
-            <TH>Vendor</TH><TH>Bill #</TH><TH>Date</TH><TH right>Purchase Value</TH>
-            <TH right>ITC Amount</TH><TH>Eligibility</TH><TH>Status</TH>
-          </tr></thead>
-          <tbody>
-            {purchases.map((p, i) => (
-              <tr key={p.id} className="border-b border-white/3 hover:bg-white/2">
-                <td className="px-3 py-3 text-foreground">{p.vendor}</td>
-                <td className="px-3 py-3 font-mono text-amber-400">{p.bill_no}</td>
-                <td className="px-3 py-3 text-muted-foreground">{p.date}</td>
-                <td className="px-3 py-3 text-right">{fmt(p.amount)}</td>
-                <td className="px-3 py-3 text-right font-bold text-emerald-400">{p.gst > 0 ? fmt(p.gst) : "Nil"}</td>
-                <td className="px-3 py-3">
-                  {p.itc_eligible ? <span className="text-[10px] text-emerald-400 font-medium">Eligible</span> : <span className="text-[10px] text-red-400">Ineligible</span>}
-                </td>
-                <td className="px-3 py-3">
-                  {!p.itc_eligible ? <span className="text-[10px] text-muted-foreground">—</span> :
-                    p.itc_claimed ? <span className="flex items-center gap-1 text-[10px] text-emerald-400"><CheckCircle2 className="w-3 h-3" />Claimed</span> :
-                    <span className="flex items-center gap-1 text-[10px] text-amber-400"><Clock className="w-3 h-3" />Pending</span>}
-                </td>
-              </tr>
-            ))}
-          </tbody>
-        </TableWrap>
-      )}
-
-      {subTab === "ewaybill" && (
-        <div className="space-y-3">
-          <div className="p-3 rounded-xl border border-cyan-500/20 bg-cyan-500/5 flex items-start gap-3">
-            <Zap className="w-5 h-5 text-cyan-400 shrink-0 mt-0.5" />
-            <div>
-              <p className="text-sm font-bold text-cyan-300">e-Way Bill Auto-Generation</p>
-              <p className="text-xs text-cyan-400/70 mt-1">Required for goods movement exceeding ₹50,000. Connect NIC portal credentials to auto-generate from invoices.</p>
-              <Button size="sm" className="mt-2 h-7 text-[10px] bg-cyan-500/20 border border-cyan-500/30 text-cyan-300 gap-1"><ExternalLink className="w-3 h-3" />Connect NIC Portal</Button>
-            </div>
-          </div>
-          <EmptyState icon={Archive} title="No e-Way Bills Generated" sub="Connect your NIC credentials to start generating e-Way Bills from invoices" />
-        </div>
-      )}
-    </div>
+    <StatutoryTaxModule
+      mode="demo"
+      advanceTax={DEMO_ADVANCE_TAX}
+      form138={DEMO_FORM_138_SUMMARY}
+      form140={DEMO_FORM_140_SUMMARY}
+      form143={DEMO_FORM_143_SUMMARY}
+      form144={DEMO_FORM_144_SUMMARY}
+      gstr3bSetOff={DEMO_GSTR3B_SET_OFF}
+      gstr2bRecon={DEMO_GSTR2B_RECONCILIATION}
+      companyName={company?.name || "Sannidh Technologies Pvt. Ltd."}
+      pan={company?.pan || "AAKCS1234F"}
+      tan="MUMS12345T"
+      gstin={company?.gstin || "27AAKCS1234F1Z5"}
+    />
   );
 }
 
 // ─── 8. TDS / TCS PANEL ──────────────────────────────────────────────────────
 
-function TDSPanel({ expenses, payroll }: { expenses: ERPExpense[]; payroll: ERPPayroll[] }) {
-  const expTDS = expenses.filter(e => e.tds_applicable).reduce((s, e) => s + (e.tds_amount || 0), 0);
-  const salaryTDS = payroll.reduce((s, e) => s + e.tds, 0);
-  const totalTDS = expTDS + salaryTDS;
-
-  const entries = [
-    ...expenses.filter(e => e.tds_applicable).map(e => ({
-      payee: e.description, section: e.category === "Professional Fees" ? "194J" : "194C",
-      nature: e.category, payment: e.amount, rate: "10%", tds: e.tds_amount || 0, type: "Expense"
-    })),
-    ...payroll.filter(e => e.tds > 0).map(e => ({
-      payee: e.employee, section: "192", nature: "Salary", payment: e.gross, rate: "Slab", tds: e.tds, type: "Payroll"
-    })),
-  ];
-
+function TDSPanel({ company }: SmartERPProps) {
   return (
-    <div className="space-y-4">
-      <div className="grid grid-cols-3 gap-3">
-        <KPI label="TDS on Expenses" value={fmt(expTDS)} sub="194C/194J/194I" icon={Receipt} color="text-amber-400" bg="bg-amber-500/5" />
-        <KPI label="TDS on Salary" value={fmt(salaryTDS)} sub="Section 192" icon={Users} color="text-violet-400" bg="bg-violet-500/5" />
-        <KPI label="Total TDS Payable" value={fmt(totalTDS)} sub="Due by 7th Aug" icon={IndianRupee} color="text-red-400" bg="bg-red-500/5" />
-      </div>
-
-      <div className="p-3 rounded-xl bg-amber-500/5 border border-amber-500/20">
-        <p className="text-xs font-semibold text-amber-300 mb-1">TDS Deposit Deadline: August 7, 2025</p>
-        <p className="text-[10px] text-amber-400/70">Failure to deposit TDS attracts interest @ 1.5% per month u/s 201(1A) + penalty u/s 271C equal to TDS amount.</p>
-      </div>
-
-      <div className="flex items-center justify-between">
-        <p className="text-xs font-semibold text-foreground">TDS Deductions Register</p>
-        <div className="flex gap-2">
-          <Button size="sm" variant="outline" className="h-7 text-[10px] border-white/10 gap-1"><Download className="w-3 h-3" />Form 26Q</Button>
-          <Button size="sm" variant="outline" className="h-7 text-[10px] border-white/10 gap-1"><Download className="w-3 h-3" />Form 16A</Button>
-        </div>
-      </div>
-
-      <TableWrap>
-        <thead><tr className="bg-muted/20 border-b border-white/5">
-          <TH>Payee</TH><TH>Section</TH><TH>Nature</TH>
-          <TH right>Payment</TH><TH>Rate</TH><TH right>TDS</TH><TH>Type</TH>
-        </tr></thead>
-        <tbody>
-          {entries.map((e, i) => (
-            <motion.tr key={i} initial={{ opacity: 0 }} animate={{ opacity: 1 }} transition={{ delay: i * 0.04 }} className="border-b border-white/3 hover:bg-white/2">
-              <td className="px-3 py-3 text-foreground font-medium">{e.payee}</td>
-              <td className="px-3 py-3"><span className="px-2 py-0.5 rounded-full bg-amber-500/10 text-amber-400 border border-amber-500/20 text-[10px] font-mono">{e.section}</span></td>
-              <td className="px-3 py-3 text-muted-foreground">{e.nature}</td>
-              <td className="px-3 py-3 text-right">{fmt(e.payment)}</td>
-              <td className="px-3 py-3 text-muted-foreground">{e.rate}</td>
-              <td className="px-3 py-3 text-right font-bold text-amber-400">{fmt(e.tds)}</td>
-              <td className="px-3 py-3"><span className="text-[10px] text-muted-foreground">{e.type}</span></td>
-            </motion.tr>
-          ))}
-          <tr className="bg-muted/10 border-t border-white/10">
-            <td colSpan={5} className="px-3 py-2 text-xs font-bold text-foreground">TOTAL TDS PAYABLE</td>
-            <td className="px-3 py-2 text-right text-base font-bold text-amber-400">{fmt(totalTDS)}</td>
-            <td />
-          </tr>
-        </tbody>
-      </TableWrap>
-
-      <Button className="gap-1.5 text-xs h-8 bg-amber-500/15 border border-amber-500/25 text-amber-300">
-        <ExternalLink className="w-3 h-3" /> Pay TDS Challan on NSDL Portal
-      </Button>
-    </div>
+    <StatutoryTaxModule
+      mode="demo"
+      advanceTax={DEMO_ADVANCE_TAX}
+      form138={DEMO_FORM_138_SUMMARY}
+      form140={DEMO_FORM_140_SUMMARY}
+      form143={DEMO_FORM_143_SUMMARY}
+      form144={DEMO_FORM_144_SUMMARY}
+      gstr3bSetOff={DEMO_GSTR3B_SET_OFF}
+      gstr2bRecon={DEMO_GSTR2B_RECONCILIATION}
+      companyName={company?.name || "Sannidh Technologies Pvt. Ltd."}
+      pan={company?.pan || "AAKCS1234F"}
+      tan="MUMS12345T"
+      gstin={company?.gstin || "27AAKCS1234F1Z5"}
+    />
   );
 }
 
@@ -1505,155 +1356,90 @@ function InventoryPanel({ inventory = [] }: { inventory?: SmartERPProps["invento
   );
 }
 
-// ─── 11. REPORTS PANEL ───────────────────────────────────────────────────────
+// ─── 11. REPORTS PANEL — CA-GRADE FINANCIAL STATEMENTS ──────────────────────
 
-function ReportsPanel({ invoices, purchases, expenses, payroll, bankTxns, inventory }: SmartERPProps) {
-  const [subTab, setSubTab] = useState<"pl" | "bs" | "cashflow">("pl");
-
-  const revenue = invoices.reduce((s, i) => s + i.amount, 0);
-  const cogs = purchases.filter(p => p.category === "Raw Materials").reduce((s, p) => s + p.amount, 0);
-  const grossProfit = revenue - cogs;
-  const opex = expenses.reduce((s, e) => s + e.amount, 0) + payroll.reduce((s, e) => s + e.gross, 0);
-  const otherPurchases = purchases.filter(p => p.category !== "Raw Materials").reduce((s, p) => s + p.amount, 0);
-  const totalOpex = opex + otherPurchases;
-  const ebitda = grossProfit - totalOpex;
-  const dep = Math.round(revenue * 0.02);
-  const ebit = ebitda - dep;
-  const interest = purchases.filter(p => p.category === "Loan Repayment").reduce((s, p) => s + p.amount, 0) * 0.1;
-  const pbt = ebit - interest;
-  const tax = Math.max(0, Math.round(pbt * 0.25));
-  const pat = pbt - tax;
-
-  const bankBalance = bankTxns.length > 0 ? bankTxns[0].balance : 0;
-  const receivables = invoices.filter(i => i.status !== "paid").reduce((s, i) => s + i.total, 0);
-  const stockValue = (inventory || []).reduce((s, i) => s + i.current_qty * i.rate, 0);
-  const currentAssets = bankBalance + receivables + stockValue;
-  const fixedAssets = revenue * 1.5;
-  const totalAssets = currentAssets + fixedAssets;
-  const payables = purchases.reduce((s, p) => s + p.total, 0);
-  const taxLiab = invoices.reduce((s, i) => s + i.gst, 0) - purchases.filter(p => p.itc_claimed).reduce((s, p) => s + p.gst, 0);
-  const currentLiab = payables + taxLiab;
-  const longTermDebt = purchases.filter(p => p.category === "Loan Repayment").reduce((s, p) => s + p.amount, 0) * 8;
-  const equity = totalAssets - currentLiab - longTermDebt;
-
+function ReportsPanel({ company }: SmartERPProps) {
   return (
-    <div className="space-y-4">
-      <div className="flex gap-1 border-b border-white/5">
-        {(["pl", "bs", "cashflow"] as const).map(t => (
-          <button key={t} onClick={() => setSubTab(t)} className={`px-3 py-2 text-xs font-medium border-b-2 transition-all -mb-px ${subTab === t ? "text-emerald-400 border-emerald-400" : "text-muted-foreground border-transparent hover:text-foreground"}`}>
-            {t === "pl" ? "Profit & Loss" : t === "bs" ? "Balance Sheet" : "Cash Flow"}
-          </button>
-        ))}
-      </div>
+    <FinancialStatementsModule
+      mode="demo"
+      balanceSheet={DEMO_BALANCE_SHEET}
+      profitLoss={DEMO_PROFIT_LOSS}
+      assetRegister={DEMO_ASSET_REGISTER}
+      deferredTax={DEMO_DEFERRED_TAX}
+      financialRatios={DEMO_FINANCIAL_RATIOS}
+      caro2020={DEMO_CARO_2020}
+      notesToAccounts={DEMO_NOTES_TO_ACCOUNTS}
+      periodTrend={DEMO_PERIOD_FINANCIALS}
+      companyName={company?.name || "Sannidh Technologies Pvt. Ltd."}
+      fiscalYear="FY 2025-26"
+    />
+  );
+}
 
-      {subTab === "pl" && (
-        <div className="space-y-2">
-          <div className="flex items-center justify-between mb-3">
-            <p className="text-xs font-bold text-foreground">Profit & Loss Statement — Current Period</p>
-            <Button size="sm" variant="outline" className="h-7 text-[10px] border-white/10 gap-1"><Download className="w-3 h-3" />Export</Button>
-          </div>
-          {[
-            { label: "Revenue from Operations", value: revenue, indent: 0, bold: false, color: "text-emerald-400" },
-            { label: "Cost of Goods Sold (COGS)", value: -cogs, indent: 1, bold: false, color: "text-red-400" },
-            { label: "GROSS PROFIT", value: grossProfit, indent: 0, bold: true, color: "text-foreground", border: true },
-            { label: "Gross Margin", value: null, sub: `${((grossProfit / revenue) * 100).toFixed(1)}%`, indent: 1, bold: false, color: "text-muted-foreground" },
-            { label: "Operating Expenses", value: -totalOpex, indent: 1, bold: false, color: "text-red-400" },
-            { label: "EBITDA", value: ebitda, indent: 0, bold: true, color: "text-foreground", border: true },
-            { label: "Depreciation", value: -dep, indent: 1, bold: false, color: "text-red-400" },
-            { label: "EBIT", value: ebit, indent: 0, bold: true, color: "text-foreground" },
-            { label: "Interest / Finance Cost", value: -interest, indent: 1, bold: false, color: "text-red-400" },
-            { label: "Profit Before Tax (PBT)", value: pbt, indent: 0, bold: true, color: "text-foreground", border: true },
-            { label: "Income Tax (25%)", value: -tax, indent: 1, bold: false, color: "text-red-400" },
-            { label: "NET PROFIT AFTER TAX (PAT)", value: pat, indent: 0, bold: true, color: pat >= 0 ? "text-emerald-400" : "text-red-400", border: true },
-          ].map((row, i) => row.value === null ? null : (
-            <div key={i} className={`flex items-center justify-between py-1.5 ${row.border ? "border-t border-white/8 mt-1 pt-2" : ""}`} style={{ paddingLeft: `${row.indent * 16 + 12}px` }}>
-              <span className={`text-xs ${row.bold ? "font-bold text-foreground" : "text-muted-foreground"}`}>{row.label}</span>
-              <span className={`text-xs font-${row.bold ? "bold" : "medium"} ${row.color}`}>{fmtL(Math.abs(row.value))}{row.value < 0 ? " (Dr)" : ""}</span>
-            </div>
-          ))}
-        </div>
-      )}
+// ─── 12. AI TAX ASSISTANT / NOTICES PANEL ───────────────────────────────────
 
-      {subTab === "bs" && (
-        <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-          <div className="space-y-2">
-            <p className="text-xs font-bold text-foreground border-b border-white/5 pb-2">ASSETS</p>
-            {[
-              { label: "Fixed Assets (WDV)", value: fixedAssets, indent: 0 },
-              { label: "Bank Balance", value: bankBalance, indent: 1 },
-              { label: "Accounts Receivable", value: receivables, indent: 1 },
-              { label: "Inventory / Stock", value: stockValue, indent: 1 },
-              { label: "Current Assets Total", value: currentAssets, indent: 0, bold: true },
-              { label: "TOTAL ASSETS", value: totalAssets, indent: 0, bold: true, border: true },
-            ].map((r, i) => (
-              <div key={i} className={`flex justify-between py-1 ${r.border ? "border-t border-white/8 pt-2" : ""}`} style={{ paddingLeft: `${r.indent * 12}px` }}>
-                <span className={`text-xs ${r.bold ? "font-bold text-foreground" : "text-muted-foreground"}`}>{r.label}</span>
-                <span className={`text-xs ${r.bold ? "font-bold text-emerald-400" : "text-muted-foreground"}`}>{fmtL(r.value)}</span>
-              </div>
-            ))}
-          </div>
-          <div className="space-y-2">
-            <p className="text-xs font-bold text-foreground border-b border-white/5 pb-2">LIABILITIES & EQUITY</p>
-            {[
-              { label: "Accounts Payable", value: payables, indent: 1 },
-              { label: "GST / Tax Liabilities", value: taxLiab, indent: 1 },
-              { label: "Current Liabilities Total", value: currentLiab, indent: 0, bold: true },
-              { label: "Long-Term Debt", value: longTermDebt, indent: 0 },
-              { label: "Shareholders' Equity", value: equity, indent: 0, bold: true },
-              { label: "TOTAL LIABILITIES & EQUITY", value: totalAssets, indent: 0, bold: true, border: true },
-            ].map((r, i) => (
-              <div key={i} className={`flex justify-between py-1 ${r.border ? "border-t border-white/8 pt-2" : ""}`} style={{ paddingLeft: `${r.indent * 12}px` }}>
-                <span className={`text-xs ${r.bold ? "font-bold text-foreground" : "text-muted-foreground"}`}>{r.label}</span>
-                <span className={`text-xs ${r.bold ? "font-bold text-red-400" : "text-muted-foreground"}`}>{fmtL(r.value)}</span>
-              </div>
-            ))}
-          </div>
-        </div>
-      )}
+function NoticesPanel({ company }: SmartERPProps) {
+  return (
+    <StatutoryNoticeModule
+      mode="demo"
+      notices={DEMO_STATUTORY_NOTICES}
+      legalDrafts={DEMO_LEGAL_DRAFTS}
+      riskScores={DEMO_RISK_SCORES}
+      dashboardSummary={DEMO_NOTICE_DASHBOARD_SUMMARY}
+      companyName={company?.name || "Sannidh Technologies Pvt. Ltd."}
+    />
+  );
+}
 
-      {subTab === "cashflow" && (
-        <div className="space-y-3">
-          <p className="text-xs font-bold text-foreground">Cash Flow Statement — Indirect Method</p>
-          {[
-            { section: "A. Cash From Operations", items: [
-              { label: "Net Profit After Tax", value: pat },
-              { label: "Add: Depreciation (non-cash)", value: dep },
-              { label: "Add: Increase in Payables", value: purchases.reduce((s, p) => s + p.total, 0) * 0.2 },
-              { label: "Less: Increase in Receivables", value: -receivables },
-              { label: "Less: Increase in Inventory", value: -stockValue * 0.15 },
-            ]},
-            { section: "B. Cash From Investing", items: [
-              { label: "Purchase of Fixed Assets", value: -fixedAssets * 0.05 },
-            ]},
-            { section: "C. Cash From Financing", items: [
-              { label: "Loan Repayment", value: -purchases.filter(p => p.category === "Loan Repayment").reduce((s, p) => s + p.total, 0) },
-            ]},
-          ].map((sec, si) => (
-            <div key={si} className="rounded-xl border border-white/5 bg-muted/5 overflow-hidden">
-              <div className="px-3 py-2 bg-muted/10 border-b border-white/5">
-                <p className="text-xs font-bold text-foreground">{sec.section}</p>
-              </div>
-              <div className="p-3 space-y-1.5">
-                {sec.items.map((item, ii) => (
-                  <div key={ii} className="flex justify-between text-xs">
-                    <span className="text-muted-foreground">{item.label}</span>
-                    <span className={item.value >= 0 ? "text-emerald-400" : "text-red-400"}>{item.value >= 0 ? "" : "("}{fmtL(Math.abs(item.value))}{item.value < 0 ? ")" : ""}</span>
-                  </div>
-                ))}
-                <div className="flex justify-between text-xs border-t border-white/5 pt-1.5 font-bold">
-                  <span className="text-foreground">Net Cash {sec.section.split(". ")[1].split(" ").slice(2).join(" ")}</span>
-                  <span className={sec.items.reduce((s, i) => s + i.value, 0) >= 0 ? "text-emerald-400" : "text-red-400"}>{fmtL(Math.abs(sec.items.reduce((s, i) => s + i.value, 0)))}</span>
-                </div>
-              </div>
-            </div>
-          ))}
-          <div className="flex justify-between p-3 rounded-xl bg-emerald-500/5 border border-emerald-500/20 text-sm font-bold">
-            <span className="text-foreground">Closing Cash & Bank Balance</span>
-            <span className="text-emerald-400">{fmtL(bankBalance)}</span>
-          </div>
-        </div>
-      )}
-    </div>
+// ─── 13. GOV PORTAL API & E-FILING HUB PANEL ─────────────────────────────
+
+function GovApiPanel({ company }: SmartERPProps) {
+  return (
+    <GovEFilingHubModule
+      companyGstin="27AAKCS1234F1Z5"
+      companyPan="AAKCS1234F"
+      companyName={company?.name || "Sannidh Technologies Pvt. Ltd."}
+    />
+  );
+}
+
+// ─── 14. BANK STATEMENT AI AUTO-RECONCILIATION PANEL ─────────────────────
+
+function BankReconPanel({ company }: SmartERPProps) {
+  return (
+    <BankReconciliationModule
+      companyName={company?.name || "Sannidh Technologies Pvt. Ltd."}
+    />
+  );
+}
+
+// ─── 15. CROSS-BORDER FX, FEMA & INTERNATIONAL TAX PANEL ──────────────────
+
+function FXIntlPanel({ company }: SmartERPProps) {
+  return (
+    <FXInternationalModule
+      companyName={company?.name || "Sannidh Technologies Pvt. Ltd."}
+    />
+  );
+}
+
+// ─── 16. FIXED ASSETS & DUAL DEPRECIATION PANEL ─────────────────────────
+
+function FixedAssetPanel({ company }: SmartERPProps) {
+  return (
+    <FixedAssetModule
+      companyName={company?.name || "Sannidh Technologies Pvt. Ltd."}
+    />
+  );
+}
+
+// ─── 17. ADVANCED VIRTUAL CFO AI INTELLIGENCE PANEL ──────────────────────
+
+function CFOIntelPanel({ company }: SmartERPProps) {
+  return (
+    <CFOIntelligenceModule
+      companyName={company?.name || "Sannidh Technologies Pvt. Ltd."}
+    />
   );
 }
 
@@ -1671,6 +1457,12 @@ const ERP_TABS = [
   { id: "ledger",    label: "Ledger",          icon: BookOpen,       color: "text-teal-400" },
   { id: "inventory", label: "Inventory",       icon: Package,        color: "text-orange-400" },
   { id: "reports",   label: "Reports",         icon: FileBarChart2,  color: "text-green-400" },
+  { id: "notices",   label: "AI Tax Assistant", icon: AlertTriangle,  color: "text-purple-400" },
+  { id: "govapi",    label: "Gov API Hub",     icon: Landmark,       color: "text-cyan-400" },
+  { id: "bankrecon", label: "Bank Recon AI",   icon: Zap,            color: "text-green-400" },
+  { id: "fxintl",    label: "FX & Intl Tax",  icon: Globe,          color: "text-emerald-400" },
+  { id: "fixedassets",label: "Fixed Assets",   icon: Building2,      color: "text-cyan-400" },
+  { id: "cfointel",  label: "CFO Intel AI",    icon: Sparkles,       color: "text-cyan-400" },
 ] as const;
 
 type ERPSub = typeof ERP_TABS[number]["id"];
@@ -1743,11 +1535,17 @@ export function SmartERPModule({ invoices, purchases, expenses, payroll, bankTxn
             {activeTab === "expenses"  && <ExpensesPanel expenses={expenses} />}
             {activeTab === "bank"      && <BankPanel bankTxns={bankTxns} />}
             {activeTab === "payroll"   && <PayrollPanel payroll={payroll} />}
-            {activeTab === "gst"       && <GSTPanel invoices={invoices} purchases={purchases} />}
-            {activeTab === "tds"       && <TDSPanel expenses={expenses} payroll={payroll} />}
+            {activeTab === "gst"       && <GSTPanel company={company} />}
+            {activeTab === "tds"       && <TDSPanel company={company} />}
             {activeTab === "ledger"    && <LedgerPanel invoices={invoices} purchases={purchases} expenses={expenses} payroll={payroll} bankTxns={bankTxns} inventory={inventory} company={company} />}
             {activeTab === "inventory" && <InventoryPanel inventory={inventory} />}
             {activeTab === "reports"   && <ReportsPanel invoices={invoices} purchases={purchases} expenses={expenses} payroll={payroll} bankTxns={bankTxns} inventory={inventory} company={company} />}
+            {activeTab === "notices"   && <NoticesPanel company={company} />}
+            {activeTab === "govapi"    && <GovApiPanel company={company} />}
+            {activeTab === "bankrecon"   && <BankReconPanel company={company} />}
+            {activeTab === "fxintl"      && <FXIntlPanel company={company} />}
+            {activeTab === "fixedassets" && <FixedAssetPanel company={company} />}
+            {activeTab === "cfointel"    && <CFOIntelPanel company={company} />}
           </CardContent>
         </motion.div>
       </AnimatePresence>

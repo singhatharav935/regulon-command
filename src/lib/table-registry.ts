@@ -160,3 +160,4 @@ const EXISTING_RPCS = new Set<string>([
 export function rpcExists(rpcName: string): boolean {
   return EXISTING_RPCS.has(rpcName);
 }
+

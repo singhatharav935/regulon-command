@@ -38,6 +38,22 @@ const AuditTrailHub = lazy(() => import("@/components/ca-dashboard-demo/AuditTra
 const LocalizationHub = lazy(() => import("@/components/ca-dashboard-demo/LocalizationHub"));
 const OfflinePwaHub = lazy(() => import("@/components/ca-dashboard-demo/OfflinePwaHub"));
 const CaseRoom = lazy(() => import("@/components/ca-dashboard-demo/CaseRoom"));
+import { CAMultiClientStatutoryHub } from "@/components/ca-dashboard/CAMultiClientStatutoryHub";
+import {
+  DEMO_CA_CLIENTS,
+  DEMO_CLIENT_HEALTH_SCORES,
+  DEMO_BILLING_ENTRIES,
+  DEMO_STATUTORY_CALENDAR,
+  DEMO_CA_TEAM,
+  DEMO_WORKLOAD_ASSIGNMENTS,
+  DEMO_FIRM_SUMMARY,
+} from "@/data/demo-ca-practice-data";
+import {
+  DEMO_STATUTORY_NOTICES,
+  DEMO_LEGAL_DRAFTS,
+  DEMO_RISK_SCORES,
+  DEMO_NOTICE_DASHBOARD_SUMMARY,
+} from "@/data/demo-statutory-notice-data";
 import { isOnline } from "@/services/offline-sync-service";
 import { useLanguage, LANGUAGE_LABELS } from "@/contexts/LanguageContext";
 import { Globe2, Wifi, WifiOff } from "lucide-react";
@@ -2202,8 +2218,9 @@ const LiveAIDraftingEngine = () => {
       <Card className="glass-card border-border/50 bg-gradient-to-br from-purple-500/10 via-transparent to-cyan-500/10 border-purple-500/30">
         <CardContent className="p-6">
           <Tabs value={activeTab} onValueChange={setActiveTab} className="w-full">
-            <TabsList className="grid w-full grid-cols-6 mb-6">
+            <TabsList className="grid w-full grid-cols-7 mb-6">
               <TabsTrigger value="dashboard">Dashboard</TabsTrigger>
+              <TabsTrigger value="statutory_hub">🏛️ Statutory Hub</TabsTrigger>
               <TabsTrigger value="deploy">Deploy AI</TabsTrigger>
               <TabsTrigger value="drafting">Document Draft</TabsTrigger>
               <TabsTrigger value="news">Regulatory News</TabsTrigger>
@@ -2842,6 +2859,23 @@ const LiveAIDraftingEngine = () => {
             {/* Branding Tab */}
             <TabsContent value="branding" className="space-y-4">
               <FirmBrandingSettings />
+            </TabsContent>
+
+            {/* Statutory Intelligence Hub Tab — Phase 5 */}
+            <TabsContent value="statutory_hub" className="space-y-4">
+              <CAMultiClientStatutoryHub
+                clients={DEMO_CA_CLIENTS}
+                clientHealthScores={DEMO_CLIENT_HEALTH_SCORES}
+                billingEntries={DEMO_BILLING_ENTRIES}
+                statutoryCalendar={DEMO_STATUTORY_CALENDAR}
+                allNotices={DEMO_STATUTORY_NOTICES}
+                legalDrafts={DEMO_LEGAL_DRAFTS}
+                riskScores={DEMO_RISK_SCORES}
+                noticesDashboardSummary={DEMO_NOTICE_DASHBOARD_SUMMARY}
+                team={DEMO_CA_TEAM}
+                workloadAssignments={DEMO_WORKLOAD_ASSIGNMENTS}
+                firmSummary={DEMO_FIRM_SUMMARY}
+              />
             </TabsContent>
           </Tabs>
         </CardContent>
