@@ -1,7 +1,6 @@
 import { defineConfig, loadEnv } from "vite";
 import react from "@vitejs/plugin-react-swc";
 import path from "path";
-import { componentTagger } from "lovable-tagger";
 
 // https://vitejs.dev/config/
 export default defineConfig(({ mode }) => {
@@ -9,56 +8,32 @@ export default defineConfig(({ mode }) => {
   const supabaseUrl = env.VITE_SUPABASE_URL;
 
   return {
-    cacheDir: "/tmp/regulon-command-vite-cache",
     server: {
-      host: "::",
+      host: "localhost",
       port: 8000,
+      strictPort: false,
       watch: {
         ignored: ["**/node_modules/**", "**/node_modules.nosync/**", "**/.git/**", "**/dist/**", "**/supabase/**"],
       },
       hmr: {
+        host: "localhost",
+        port: 8000,
         overlay: false,
       },
-      proxy: {
-        "/api": {
-          target: "http://localhost:3000",
-          changeOrigin: true,
-          secure: false,
-        },
-        "/agent": {
-          target: "http://localhost:8787",
-          changeOrigin: true,
-          secure: false,
-          rewrite: (path) => path.replace(/^\/agent/, ""),
-        },
-        ...(supabaseUrl
-          ? {
-              "/api/ai-draft": {
-                target: supabaseUrl,
-                changeOrigin: true,
-                secure: true,
-                rewrite: () => "/functions/v1/ai-draft",
-              },
-            }
-          : {}),
-      },
     },
-    plugins: [react()].filter(Boolean),
+    plugins: [react()],
     resolve: {
       alias: {
         "@": path.resolve(__dirname, "./src"),
       },
     },
     build: {
-      // Performance optimizations
       target: "es2020",
       minify: "esbuild",
       sourcemap: mode === "development",
       rollupOptions: {
         output: {
-          // Manual chunk splitting for better caching
           manualChunks: {
-            // Vendor chunks
             "vendor-react": ["react", "react-dom", "react-router-dom"],
             "vendor-ui": [
               "@radix-ui/react-dialog",
@@ -78,10 +53,8 @@ export default defineConfig(({ mode }) => {
           },
         },
       },
-      // Increase chunk size warning limit (we're optimizing, but some chunks are legitimately large)
       chunkSizeWarningLimit: 800,
     },
-    // Optimize dependency pre-bundling
     optimizeDeps: {
       include: [
         "react",

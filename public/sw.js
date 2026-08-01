@@ -48,8 +48,17 @@ self.addEventListener('fetch', (event) => {
   const req = event.request;
   const url = new URL(req.url);
 
-  // Bypass service worker caches for auth and live database connections (real-time queries)
+  // Bypass service worker caches for localhost, Vite HMR, dev scripts, auth and live database connections
   if (
+    url.hostname === 'localhost' ||
+    url.hostname === '127.0.0.1' ||
+    url.pathname.includes('/@vite/') ||
+    url.pathname.includes('/@fs/') ||
+    url.pathname.includes('/src/') ||
+    url.pathname.includes('/node_modules/') ||
+    url.pathname.includes('/@react-refresh') ||
+    url.protocol === 'ws:' ||
+    url.protocol === 'wss:' ||
     url.hostname.includes('supabase.co') ||
     url.pathname.includes('/auth/') ||
     req.method !== 'GET'

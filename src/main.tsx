@@ -19,16 +19,26 @@ createRoot(rootElement).render(
   </StartupErrorBoundary>
 );
 
-// Register PWA Service Worker (Gap 15)
+// Register PWA Service Worker (Only in Production mode)
 if ('serviceWorker' in navigator) {
-  window.addEventListener('load', () => {
-    navigator.serviceWorker.register('/sw.js')
-      .then((reg) => {
-        console.log('[PWA] Service Worker registered successfully under scope:', reg.scope);
-      })
-      .catch((err) => {
-        console.error('[PWA] Service Worker registration failed:', err);
-      });
-  });
+  if (import.meta.env.PROD) {
+    window.addEventListener('load', () => {
+      navigator.serviceWorker.register('/sw.js')
+        .then((reg) => {
+          console.log('[PWA] Service Worker registered successfully under scope:', reg.scope);
+        })
+        .catch((err) => {
+          console.error('[PWA] Service Worker registration failed:', err);
+        });
+    });
+  } else {
+    // In development mode, unregister any active service worker to prevent dev server interference
+    navigator.serviceWorker.getRegistrations().then((registrations) => {
+      for (const registration of registrations) {
+        registration.unregister();
+        console.log('[PWA] Unregistered Service Worker for Development');
+      }
+    });
+  }
 }
 
