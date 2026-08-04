@@ -79,12 +79,10 @@ export interface CAAgentDefinition {
   icon: string;
 }
 
-export const CA_AGENT_SECTION_MAP: Record<number, CAAgentId> = {
-  1: 'A1_PRIME', 2: 'A2_CROSS', 3: 'A3_AUDIT',
-  4: 'D1_MAKER', 5: 'D2_REFINER', 6: 'D3_ALIGNER',
-  7: 'R1_TAX', 8: 'R2_LEGAL', 9: 'R3_FINAL',
-  10: 'M1_PULSE', 11: 'M2_TRACKER', 12: 'M3_HERALD'
-};
+// CA_AGENT_SECTION_MAP is exported from ./ca-agent-section-map.ts to keep this
+// file component-only (required by Vite SWC Fast Refresh).
+export { CA_AGENT_SECTION_MAP } from './ca-agent-section-map';
+
 
 // Domain-specific consensus messages per group
 const GROUP_CONSENSUS_MESSAGES: Record<CAAgentGroupId, {

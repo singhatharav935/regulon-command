@@ -2,10 +2,10 @@ import { useEffect, useState } from "react";
 import { Navigate } from "react-router-dom";
 import { useAuth } from "@/hooks/use-auth";
 import type { AppPersona } from "@/hooks/use-auth";
-import { previewBypassEnabled } from "@/lib/runtime-flags";
+import { isPreviewBypassEnabled } from "@/lib/runtime-flags";
 import { getLocalPreviewPersona, personaToFallbackRole } from "@/lib/local-preview-auth";
 
-const VERIFICATION_OPTIONAL_FOR_NOW = previewBypassEnabled;
+const VERIFICATION_OPTIONAL_FOR_NOW = isPreviewBypassEnabled();
 
 const inferPersonaFromMetadata = (registrationRole: unknown): AppPersona | null => {
   if (

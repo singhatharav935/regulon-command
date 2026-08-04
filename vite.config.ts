@@ -5,20 +5,15 @@ import path from "path";
 // https://vitejs.dev/config/
 export default defineConfig(({ mode }) => {
   const env = loadEnv(mode, process.cwd(), "");
-  const supabaseUrl = env.VITE_SUPABASE_URL;
 
   return {
+    cacheDir: "node_modules/.vite",
     server: {
-      host: "localhost",
+      host: "127.0.0.1",
       port: 8000,
-      strictPort: false,
+      strictPort: true,
       watch: {
-        ignored: ["**/node_modules/**", "**/node_modules.nosync/**", "**/.git/**", "**/dist/**", "**/supabase/**"],
-      },
-      hmr: {
-        host: "localhost",
-        port: 8000,
-        overlay: false,
+        ignored: ["**/node_modules*/**", "**/.git/**", "**/dist/**", "**/supabase/**", "**/.env*"],
       },
     },
     plugins: [react()],
@@ -58,7 +53,10 @@ export default defineConfig(({ mode }) => {
     optimizeDeps: {
       include: [
         "react",
+        "react/jsx-runtime",
+        "react/jsx-dev-runtime",
         "react-dom",
+        "react-dom/client",
         "react-router-dom",
         "@tanstack/react-query",
         "@supabase/supabase-js",

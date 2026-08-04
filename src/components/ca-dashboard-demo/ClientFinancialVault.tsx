@@ -21,6 +21,8 @@ import { useCAAgentOrchestrator } from '../agents-demo/CAAgentOrchestrator';
 import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
 import PaymentClassificationDemo from './PaymentClassificationDemo';
 import { DIRECT_TAX, INDIRECT_TAX, CORPORATE_LAW, LABOR_LAWS, FEMA_RBI } from '@/lib/compliance-modules-metadata';
+import { StatutoryDocumentViewerModal } from '../ca-dashboard/StatutoryDocumentViewerModal';
+import { SingleDocumentPdfViewerModal } from './SingleDocumentPdfViewerModal';
 
 const TOTAL_LIBRARY_FORMS = DIRECT_TAX.length + INDIRECT_TAX.length + CORPORATE_LAW.length + LABOR_LAWS.length + FEMA_RBI.length;
 
@@ -51,6 +53,7 @@ export default function ClientFinancialVault() {
   const [isEditing, setIsEditing] = useState(false);
   const [editContent, setEditContent] = useState('');
   const [deptVaultOpen, setDeptVaultOpen] = useState<string | null>(null);
+  const [openStatutorySuite, setOpenStatutorySuite] = useState(false);
 
   const DEPT_META = [
     { id: 'direct-tax',  label: 'Direct Tax',       shortLabel: 'Direct Tax',  color: 'text-purple-400', bg: 'bg-purple-500/10', border: 'border-purple-500/30', hoverBorder: 'hover:border-purple-500/60', icon: '📄', keywords: ['itr','form3','form2','deferred','form24','form26','form27','challan','form15','form16','regime','capital','advance','form35','form36','notices','form67','form10'] },
@@ -772,7 +775,34 @@ export default function ClientFinancialVault() {
                 </TabsList>
 
                 <TabsContent value="dataroom" className="space-y-4 outline-none">
+                  {/* ── Statutory Audit Package (5-View Suite) Banner ───────────────────────── */}
+                  <div className="p-5 rounded-2xl bg-gradient-to-r from-indigo-950/60 via-purple-950/40 to-zinc-950/80 border border-indigo-500/30 flex flex-col md:flex-row items-start md:items-center justify-between gap-4 shadow-xl">
+                    <div className="flex items-start gap-3.5">
+                      <div className="p-3 rounded-xl bg-indigo-500/15 border border-indigo-500/30 text-indigo-400 shrink-0 mt-0.5">
+                        <Landmark className="w-6 h-6" />
+                      </div>
+                      <div>
+                        <div className="flex items-center gap-2">
+                          <h3 className="font-bold text-sm text-white">Schedule III Statutory Financial Package</h3>
+                          <Badge className="bg-emerald-500/15 text-emerald-300 border border-emerald-500/30 text-[10px] px-2">
+                            5-View Audit Suite
+                          </Badge>
+                        </div>
+                        <p className="text-xs text-zinc-400 mt-1 max-w-2xl leading-relaxed">
+                          Complete CA Statutory Audit Suite: Working Trial Balance, Schedule III Bank/MCA PDF with UDIN Seal, Form 3CD Tax Audit Statement, E-Filing JSON Payload & Section 143(2) Evidence Vault.
+                        </p>
+                      </div>
+                    </div>
+                    <Button
+                      onClick={() => setOpenStatutorySuite(true)}
+                      className="shrink-0 bg-indigo-600 hover:bg-indigo-500 text-white text-xs font-semibold px-4 h-9 gap-2 shadow-lg shadow-indigo-600/20"
+                    >
+                      <FileText className="w-4 h-4" /> Open 5-View Audit Suite →
+                    </Button>
+                  </div>
+
                   <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+
                     {/* BS Summary */}
                     <div className="p-5 bg-card/40 border border-border/40 rounded-2xl flex flex-col justify-between">
                       <div>
@@ -1076,248 +1106,34 @@ export default function ClientFinancialVault() {
           </div>
           </div>
           </>)}
-        {/* PDF Viewer & Govt Submit Modal */}
-      <Dialog open={!!selectedPdf} onOpenChange={(open) => {
-        if (!open) {
-          setSelectedPdf(null);
-          setIsEditing(false);
-          setEditContent('');
-        }
-      }}>
-        <DialogContent className="max-w-6xl w-[95vw] bg-zinc-950 border-border/50 text-foreground h-[85vh] flex flex-col p-0 overflow-hidden">
-          <DialogHeader className="shrink-0 flex flex-row items-center justify-between border-b border-border/30 p-4 md:p-6 pb-4">
-            <div>
-              <DialogTitle className="flex items-center gap-2 text-xl">
-                <FileText className="w-5 h-5 text-indigo-400" />
-                {selectedPdf?.name}
-              </DialogTitle>
-              <DialogDescription className="mt-1">
-                {isEditing ? "Editing Mode • Modifying Statutory Draft Content" : "AI Generated Statutory Draft • Verified by SANNIDH 3-Agent Consensus"}
-              </DialogDescription>
-            </div>
-            <div className="flex items-center gap-3 pr-8">
-              {isEditing ? (
-                <>
-                  <Button 
-                    variant="outline" 
-                    className="bg-zinc-900 border-zinc-800 text-zinc-300 hover:text-white"
-                    onClick={() => {
-                      setIsEditing(false);
-                      setEditContent('');
-                    }}
-                  >
-                    <X className="w-4 h-4 mr-2" />
-                    Cancel
-                  </Button>
-                  <Button 
-                    className="bg-indigo-600 hover:bg-indigo-700 text-white"
-                    onClick={() => {
-                      if (selectedPdf) {
-                        selectedPdf.content = editContent;
-                        localStorage.setItem(`edited_doc_${selectedClient}_${selectedPdf.name}`, editContent);
-                        toast.success("Changes saved successfully!");
-                        fetchDataRoom();
-                        setIsEditing(false);
-                      }
-                    }}
-                  >
-                    <Save className="w-4 h-4 mr-2" />
-                    Save Changes
-                  </Button>
-                </>
-              ) : (
-                <>
-                  <Button 
-                    variant="outline" 
-                    className="bg-zinc-900 border-zinc-800 text-indigo-400 hover:text-indigo-300 border-indigo-500/20 hover:bg-indigo-500/10"
-                    onClick={() => {
-                      setEditContent(selectedPdf?.content || '');
-                      setIsEditing(true);
-                    }}
-                  >
-                    <Edit className="w-4 h-4 mr-2" />
-                    Edit Draft
-                  </Button>
-                  <Button 
-                    variant="outline" 
-                    className="bg-zinc-900 border-zinc-800 text-zinc-300 hover:text-white"
-                    onClick={() => toast.success("PDF Downloaded")}
-                  >
-                    <Download className="w-4 h-4 mr-2" />
-                    Download PDF
-                  </Button>
-                  <Button 
-                    className="bg-emerald-600 hover:bg-emerald-700 text-white animate-pulse"
-                    onClick={() => {
-                      toast.success("Draft Submitted Successfully!", {
-                        description: "Securely transmitted via dummy GSP API tunnel to Govt Portal."
-                      });
-                      setSelectedPdf(null);
-                    }}
-                  >
-                    <Send className="w-4 h-4 mr-2" />
-                    Submit to Govt Portal
-                  </Button>
-                </>
-              )}
-            </div>
-          </DialogHeader>
-          
-          {/* Main Layout: Outlined Sidebar + PDF Main Pane */}
-          <div className="flex-1 overflow-hidden flex bg-zinc-900 border-t border-border/20">
-            
-            {/* Outline Sidebar */}
-            <div className="w-64 border-r border-border/20 bg-zinc-950 p-4 shrink-0 flex flex-col gap-2 h-full overflow-y-auto hidden md:flex select-none">
-              <span className="text-[10px] font-semibold text-zinc-500 uppercase tracking-wider mb-2">
-                {isEditing ? "Editing Mode" : "Document Index"}
-              </span>
-              {isEditing ? (
-                <div className="text-xs text-zinc-500 space-y-3 leading-relaxed">
-                  <p>You are editing the draft report in raw Markdown format.</p>
-                  <p>You can edit section titles, table numbers, ledger names, dates, or response text.</p>
-                  <p>Use standard GFM syntax for bolding, lists, and tables.</p>
-                  <p>Click <strong>Save Changes</strong> above to compile it back into print-ready A4 PDF.</p>
-                </div>
-              ) : (
-                selectedPdf && selectedPdf.content.split('\n---\n').map((pageContent: string, idx: number) => {
-                  const headingMatch = pageContent.match(/^#+\s+(.*)$/m);
-                  let pageTitle = headingMatch ? headingMatch[1].replace(/\*\*|#/g, '').trim() : `Page ${idx + 1}`;
-                  if (pageTitle.length > 25) pageTitle = pageTitle.slice(0, 25) + '...';
-                  
-                  return (
-                    <button
-                      key={idx}
-                      onClick={() => {
-                        const el = document.getElementById(`pdf-page-${idx}`);
-                        el?.scrollIntoView({ behavior: 'smooth', block: 'start' });
-                      }}
-                      className="flex items-center gap-2 px-2 py-1.5 text-left text-xs rounded-lg hover:bg-zinc-900 hover:text-white transition-all text-zinc-400 outline-none"
-                    >
-                      <div className="w-5 h-5 rounded border border-zinc-700 bg-zinc-900 text-zinc-400 flex items-center justify-center font-mono text-[9px] shrink-0 font-bold">
-                        {idx + 1}
-                      </div>
-                      <span className="truncate font-medium">{pageTitle}</span>
-                    </button>
-                  );
-                })
-              )}
-            </div>
- 
-            {/* Right Pane: Tool Bar & Scrollable Content */}
-            <div className="flex-1 flex flex-col h-full bg-zinc-900 relative">
-              
-              {/* PDF Toolbar */}
-              <div className="h-10 border-b border-border/20 bg-zinc-950 px-4 flex items-center justify-between shrink-0 select-none">
-                <div className="flex items-center gap-3">
-                  {isEditing ? (
-                    <span className="text-xs text-indigo-400 font-medium">
-                      Markdown Editor
-                    </span>
-                  ) : (
-                    <>
-                      <span className="text-xs text-zinc-400 font-mono">
-                        Zoom: {zoom}%
-                      </span>
-                      <div className="flex items-center gap-1">
-                        <Button 
-                          size="icon" 
-                          variant="ghost" 
-                          className="h-6 w-6 text-zinc-400 hover:text-white hover:bg-zinc-800 font-bold" 
-                          onClick={() => setZoom(z => Math.max(50, z - 10))}
-                        >
-                          -
-                        </Button>
-                        <Button 
-                          size="icon" 
-                          variant="ghost" 
-                          className="h-6 w-6 text-zinc-400 hover:text-white hover:bg-zinc-800 font-bold"
-                          onClick={() => setZoom(z => Math.min(150, z + 10))}
-                        >
-                          +
-                        </Button>
-                        <Button 
-                          variant="ghost" 
-                          className="h-6 px-1.5 text-[10px] text-zinc-500 hover:text-zinc-300 hover:bg-zinc-800"
-                          onClick={() => setZoom(100)}
-                        >
-                          Reset
-                        </Button>
-                      </div>
-                    </>
-                  )}
-                </div>
-                <div className="text-[10px] text-zinc-500 font-mono hidden sm:block">
-                  {isEditing ? "Changes buffered locally" : "Standard A4 Print Layout • 300 DPI Rendering"}
-                </div>
-              </div>
- 
-              {isEditing ? (
-                <div className="flex-1 p-6 flex flex-col h-full overflow-hidden">
-                  <textarea
-                    value={editContent}
-                    onChange={(e) => setEditContent(e.target.value)}
-                    className="flex-1 w-full bg-zinc-950 border border-border/40 rounded-xl p-6 font-mono text-sm leading-relaxed text-zinc-100 placeholder-zinc-700 focus:outline-none focus:border-indigo-500/50 resize-none h-[calc(85vh-160px)]"
-                    placeholder="Enter document content in markdown format..."
-                  />
-                </div>
-              ) : (
-                <ScrollArea className="flex-1 bg-zinc-900/60 p-6">
-                <div className="flex flex-col items-center pb-20">
-                  {selectedPdf && selectedPdf.content.split('\n---\n').map((pageContent: string, idx: number, arr: string[]) => {
-                    const clientName = clients.find(c => c.id === selectedClient)?.name || "The Client";
-                    return (
-                      <div 
-                        id={`pdf-page-${idx}`}
-                        key={idx}
-                        style={{ width: `${680 * (zoom / 100)}px` }}
-                        className="bg-white text-black p-14 mb-8 rounded shadow-2xl relative min-h-[960px] border border-gray-300 flex flex-col justify-between transition-all duration-300"
-                      >
-                        {/* Running Header */}
-                        <div className="flex justify-between items-center text-[10px] text-gray-400 border-b border-gray-100 pb-2 mb-6 font-mono select-none uppercase tracking-wider">
-                          <span>{clientName} • FY {financialYear}</span>
-                          <span>Audited Financial Statements</span>
-                        </div>
 
-                        {/* Document Content */}
-                        <div className="flex-1 font-serif text-[12px] leading-relaxed text-black">
-                          <ReactMarkdown
-                            remarkPlugins={[remarkGfm]}
-                            components={{
-                              h1: ({node, ...props}) => <h1 className="text-xl font-bold mt-6 mb-4 text-center border-b-2 border-black pb-2 uppercase tracking-wider text-black font-serif" {...props}/>,
-                              h2: ({node, ...props}) => <h2 className="text-base font-bold mt-5 mb-3 text-left border-b border-gray-200 pb-1 text-black uppercase font-serif" {...props}/>,
-                              h3: ({node, ...props}) => <h3 className="text-[13px] font-bold mt-4 mb-2 text-gray-800 underline decoration-dotted font-serif" {...props}/>,
-                              p: ({node, ...props}) => <p className="mb-3 text-justify leading-relaxed text-black font-serif" {...props}/>,
-                              strong: ({node, ...props}) => <strong className="font-bold text-black" {...props}/>,
-                              em: ({node, ...props}) => <em className="italic text-gray-700" {...props}/>,
-                              table: ({node, ...props}) => <div className="overflow-x-auto my-4"><table className="w-full border-collapse border-y-2 border-black text-[11px] font-mono" {...props}/></div>,
-                              th: ({node, ...props}) => <th className="border-b border-black p-2 bg-gray-50 text-left font-bold text-[11px]" {...props}/>,
-                              td: ({node, ...props}) => <td className="border-b border-gray-100 p-2 align-top text-[11px]" {...props}/>,
-                              ul: ({node, ...props}) => <ul className="list-disc pl-6 mb-3 space-y-1 text-black" {...props}/>,
-                              ol: ({node, ...props}) => <ol className="list-decimal pl-6 mb-3 space-y-1 text-black" {...props}/>,
-                              li: ({node, ...props}) => <li className="" {...props}/>,
-                              blockquote: ({node, ...props}) => <blockquote className="border-l-4 border-gray-400 pl-4 py-1 italic text-gray-700 my-4 bg-gray-50" {...props}/>,
-                              hr: ({node, ...props}) => <hr className="my-8 border-t border-gray-200" {...props}/>,
-                            }}
-                          >
-                            {pageContent}
-                          </ReactMarkdown>
-                        </div>
+        {/* ── Single Document PDF Viewer Modal ────────────────────────────────────── */}
+        <SingleDocumentPdfViewerModal
+          open={!!selectedPdf}
+          onClose={() => setSelectedPdf(null)}
+          documentName={selectedPdf?.name || "Document"}
+          clientName={clients.find(c => c.id === selectedClient)?.name || "The Client"}
+          financialYear={financialYear}
+          content={selectedPdf?.content || ""}
+          onSaveContent={(newContent) => {
+            if (selectedPdf) {
+              selectedPdf.content = newContent;
+              localStorage.setItem(`edited_doc_${selectedClient}_${selectedPdf.name}`, newContent);
+            }
+          }}
+        />
 
-                        {/* Running Footer */}
-                        <div className="mt-8 pt-3 border-t border-gray-100 flex justify-between items-center text-[9px] text-gray-400 font-mono select-none">
-                          <span>SANNIDH & ASSOCIATES • STANDALONE STATEMENT</span>
-                          <span>Page {idx + 1} of {arr.length}</span>
-                        </div>
-                      </div>
-                    );
-                  })}
-                </div>
-              </ScrollArea>
-              )}
-            </div>
-          </div>
-        </DialogContent>
-      </Dialog>
-    </div>
-  );
+        {/* ── 5-View Statutory Document Viewer Suite ───────────────────────────── */}
+        <StatutoryDocumentViewerModal
+          open={openStatutorySuite}
+          onClose={() => setOpenStatutorySuite(false)}
+          documentName="Schedule III Statutory Financial Package"
+          clientName={clients.find(c => c.id === selectedClient)?.name || "The Client"}
+          financialYear={financialYear}
+          content=""
+          isRealMode={false}
+        />
+      </div>
+    );
 }
+

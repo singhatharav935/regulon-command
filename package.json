@@ -4,7 +4,7 @@
   "version": "0.0.0",
   "type": "module",
   "scripts": {
-    "dev": "./node_modules/.bin/vite --port 8000 --open",
+    "dev": "vite --port 8000",
     "dev:all": "concurrently \"npm run dev\" \"npm run server\"",
     "server": "cd ../server && /usr/local/bin/node --max-old-space-size=4096 server.js",
     "build": "vite build",

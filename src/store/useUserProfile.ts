@@ -161,3 +161,5 @@ export const useUserProfile = create<UserProfileState>((set, get) => ({
   loadFromStorage: () => {},
 }));
 
+export default useUserProfile;
+

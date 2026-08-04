@@ -341,14 +341,10 @@ const DICTIONARY: Record<Language, TranslationDictionary> = {
   },
 };
 
-export const LANGUAGE_LABELS: Record<Language, { label: string; code: string }> = {
-  en: { label: 'English', code: 'EN' },
-  hi: { label: 'हिन्दी (Hindi)', code: 'HI' },
-  mr: { label: 'मराठी (Marathi)', code: 'MR' },
-  ta: { label: 'தமிழ் (Tamil)', code: 'TA' },
-  te: { label: 'తెలుగు (Telugu)', code: 'TE' },
-  bn: { label: 'বাংলা (Bengali)', code: 'BN' },
-};
+// LANGUAGE_LABELS is exported from ./language-labels.ts to keep this file
+// component/hook-only (required by Vite SWC Fast Refresh).
+export { LANGUAGE_LABELS } from './language-labels';
+
 
 interface LanguageContextProps {
   language: Language;

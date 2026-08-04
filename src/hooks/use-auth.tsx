@@ -2,7 +2,7 @@ import { createContext, useContext, useEffect, useMemo, useState } from "react";
 import type { ReactNode } from "react";
 import type { Session, User } from "@supabase/supabase-js";
 import { supabase } from "@/integrations/supabase/client";
-import { useUserProfile } from "@/store/useUserProfile";
+import { useUserProfile } from "../store/useUserProfile";
 import type { Database } from "@/integrations/supabase/types";
 
 type AppRole = Database["public"]["Enums"]["app_role"];
@@ -74,10 +74,11 @@ export const AuthProvider = ({ children }: { children: ReactNode }) => {
     let mounted = true;
 
     const loadIdentity = async (activeUser: User) => {
-      const { data, error } = await supabase
-        .from("user_roles")
-        .select("role")
-        .eq("user_id", activeUser.id);
+      const { data, error } = await withTimeout(
+        supabase.from("user_roles").select("role").eq("user_id", activeUser.id),
+        4000,
+        { data: null, error: new Error("timeout") }
+      );
 
       if (!mounted) return;
       if (error) {
@@ -110,11 +111,11 @@ export const AuthProvider = ({ children }: { children: ReactNode }) => {
 
       // Load verification status from user_verifications table
       try {
-        const { data: verificationData, error: verificationError } = await supabase
-          .from("user_verifications")
-          .select("status, is_verified")
-          .eq("user_id", activeUser.id)
-          .maybeSingle();
+        const { data: verificationData, error: verificationError } = await withTimeout(
+          supabase.from("user_verifications").select("status, is_verified").eq("user_id", activeUser.id).maybeSingle(),
+          4000,
+          { data: null, error: new Error("timeout") }
+        );
 
         if (!mounted) return;
 

@@ -4,7 +4,7 @@ import type { ReactElement } from "react";
 import { useAuth } from "@/hooks/use-auth";
 import type { Database } from "@/integrations/supabase/types";
 import type { AppPersona } from "@/hooks/use-auth";
-import { previewBypassEnabled } from "@/lib/runtime-flags";
+import { isPreviewBypassEnabled } from "@/lib/runtime-flags";
 import { getLocalPreviewPersona, personaToFallbackRole } from "@/lib/local-preview-auth";
 
 type AppRole = Database["public"]["Enums"]["app_role"];
@@ -17,7 +17,7 @@ interface ProtectedRouteProps {
 }
 
 const verificationRequiredPersonas: AppPersona[] = ["external_ca", "in_house_ca", "in_house_lawyer", "company_owner", "admin", "ca_firm"];
-const VERIFICATION_OPTIONAL_FOR_NOW = previewBypassEnabled;
+const VERIFICATION_OPTIONAL_FOR_NOW = isPreviewBypassEnabled();
 
 const inferPersonaFromMetadata = (registrationRole: unknown): AppPersona | null => {
   if (
