@@ -11,6 +11,7 @@
 import { useEffect, useState, useCallback } from "react";
 import { motion, AnimatePresence } from "framer-motion";
 import { useNavigate } from "react-router-dom";
+import { supabase } from "@/integrations/supabase/client";
 import Navbar from "@/components/layout/Navbar";
 import Footer from "@/components/layout/Footer";
 import SannidhAIAgent from "@/components/ai-agent/SannidhAIAgent";
@@ -1753,23 +1754,34 @@ const CompanyDashboardReal = () => {
 
   // Load company from session/localStorage
   useEffect(() => {
-    const storedCompanyId = localStorage.getItem('sannidh_company_id');
-    const storedCompanyData = localStorage.getItem('sannidh_company_data');
-    
-    if (storedCompanyId) {
-      setCompanyId(storedCompanyId);
-      if (storedCompanyData) {
-        try {
-          const parsedData = JSON.parse(storedCompanyData);
-          // Ensure company has proper health status
-          setCompany({
-            ...parsedData,
-            compliance_score: parsedData.compliance_score || 0,
-            health_status: parsedData.health_status || 'unknown'
-          });
-        } catch (e) {
-          console.error('Error parsing stored company data:', e);
-          // Create default company from ID
+    const initCompany = async () => {
+      const storedCompanyId = localStorage.getItem('sannidh_company_id');
+      const storedCompanyData = localStorage.getItem('sannidh_company_data');
+
+      if (storedCompanyId) {
+        setCompanyId(storedCompanyId);
+        if (storedCompanyData) {
+          try {
+            const parsedData = JSON.parse(storedCompanyData);
+            // Ensure company has proper health status
+            setCompany({
+              ...parsedData,
+              compliance_score: parsedData.compliance_score || 0,
+              health_status: parsedData.health_status || 'unknown'
+            });
+          } catch (e) {
+            console.error('Error parsing stored company data:', e);
+            // Create default company from ID
+            setCompany({
+              id: storedCompanyId,
+              company_name: 'My Company',
+              industry: 'General',
+              compliance_score: 0,
+              health_status: 'unknown'
+            });
+          }
+        } else {
+          // No stored data, create minimal company object
           setCompany({
             id: storedCompanyId,
             company_name: 'My Company',
@@ -1778,19 +1790,44 @@ const CompanyDashboardReal = () => {
             health_status: 'unknown'
           });
         }
-      } else {
-        // No stored data, create minimal company object
-        setCompany({
-          id: storedCompanyId,
-          company_name: 'My Company',
-          industry: 'General',
-          compliance_score: 0,
-          health_status: 'unknown'
-        });
+        // Don't set loading false here - let fetchDashboardData handle it
+        return;
       }
-      // Don't set loading false here - let fetchDashboardData handle it
-    } else {
-      // No company ID - redirect to registration
+
+      // No company ID in localStorage — check for an active Supabase session
+      // before redirecting to /auth (prevents redirect loop)
+      try {
+        const { data: { session } } = await supabase.auth.getSession();
+        if (session?.user) {
+          // User is authenticated but has no company ID yet (e.g. logged in
+          // without going through the registration flow). Auto-provision one
+          // from the Supabase user ID so the dashboard can load.
+          const userId = session.user.id;
+          const meta = session.user.user_metadata || {};
+          const fallbackCompanyId = `user-${userId}`;
+          const companyName = meta.full_name
+            ? `${meta.full_name}'s Company`
+            : 'My Company';
+
+          localStorage.setItem('sannidh_company_id', fallbackCompanyId);
+          const companyData = {
+            id: fallbackCompanyId,
+            company_name: companyName,
+            industry: 'General',
+            compliance_score: 0,
+            health_status: 'unknown' as const,
+          };
+          localStorage.setItem('sannidh_company_data', JSON.stringify(companyData));
+
+          setCompanyId(fallbackCompanyId);
+          setCompany(companyData);
+          return;
+        }
+      } catch (err) {
+        console.warn('Session check failed during company init:', err);
+      }
+
+      // Truly unauthenticated — redirect to login
       toast({
         title: "Login Required",
         description: "Please register or login to access your dashboard.",
@@ -1798,7 +1835,9 @@ const CompanyDashboardReal = () => {
       });
       setIsLoading(false);
       navigate('/auth');
-    }
+    };
+
+    initCompany();
   }, [navigate]);
 
   // Fetch all dashboard data

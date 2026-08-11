@@ -124,6 +124,22 @@ const AuthReal = () => {
       // Keep localStorage in sync
       localStorage.setItem('current_user_role', role);
       localStorage.setItem('pending_registration_role', role);
+      // Auto-provision company ID for company_owner to prevent redirect loop
+      if (role === 'company_owner' && !localStorage.getItem('sannidh_company_id')) {
+        const userId = userOrSession?.id || userOrSession?.user?.id || '';
+        if (userId) {
+          const fallbackCompanyId = `user-${userId}`;
+          localStorage.setItem('sannidh_company_id', fallbackCompanyId);
+          const fullName = userOrSession?.user_metadata?.full_name || '';
+          localStorage.setItem('sannidh_company_data', JSON.stringify({
+            id: fallbackCompanyId,
+            company_name: fullName ? `${fullName}'s Company` : 'My Company',
+            industry: 'General',
+            compliance_score: 0,
+            health_status: 'unknown',
+          }));
+        }
+      }
       navigate(getDashboardRoute(role), { replace: true });
     };
 
@@ -199,6 +215,23 @@ const AuthReal = () => {
       // Keep localStorage in sync
       localStorage.setItem('current_user_role', effectiveRole);
       localStorage.setItem('pending_registration_role', effectiveRole);
+
+      // Auto-provision company ID for company_owner users if missing
+      // (prevents redirect loop: dashboard → /auth → dashboard)
+      if (effectiveRole === 'company_owner' && !localStorage.getItem('sannidh_company_id')) {
+        const fallbackCompanyId = `user-${response.user.id}`;
+        localStorage.setItem('sannidh_company_id', fallbackCompanyId);
+        const companyName = response.user.full_name
+          ? `${response.user.full_name}'s Company`
+          : 'My Company';
+        localStorage.setItem('sannidh_company_data', JSON.stringify({
+          id: fallbackCompanyId,
+          company_name: companyName,
+          industry: 'General',
+          compliance_score: 0,
+          health_status: 'unknown',
+        }));
+      }
 
       // Check if user needs email verification
       if (!response.user.email_verified) {
