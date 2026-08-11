@@ -120,20 +120,31 @@ const AuthReal = () => {
       if (cancelled) return;
       // Determine role: URL param > user_metadata > localStorage > default
       const urlRole = searchParams.get("role");
-      const role = urlRole || userOrSession?.user_metadata?.registration_role || localStorage.getItem('current_user_role') || 'company_owner';
+      const meta = userOrSession?.user_metadata || {};
+      const role = urlRole || meta.registration_role || localStorage.getItem('current_user_role') || 'company_owner';
       // Keep localStorage in sync
       localStorage.setItem('current_user_role', role);
       localStorage.setItem('pending_registration_role', role);
-      // Auto-provision company ID for company_owner to prevent redirect loop
+      // Recover company ID for company_owner to prevent redirect loop
       if (role === 'company_owner' && !localStorage.getItem('sannidh_company_id')) {
         const userId = userOrSession?.id || userOrSession?.user?.id || '';
-        if (userId) {
+        // Prefer real company_id from user_metadata (set during registration)
+        const metaCompanyId = meta.company_id;
+        if (metaCompanyId) {
+          localStorage.setItem('sannidh_company_id', metaCompanyId);
+          localStorage.setItem('sannidh_company_data', JSON.stringify({
+            id: metaCompanyId,
+            company_name: meta.full_name ? `${meta.full_name}'s Company` : 'My Company',
+            industry: 'General',
+            compliance_score: 0,
+            health_status: 'unknown',
+          }));
+        } else if (userId) {
           const fallbackCompanyId = `user-${userId}`;
           localStorage.setItem('sannidh_company_id', fallbackCompanyId);
-          const fullName = userOrSession?.user_metadata?.full_name || '';
           localStorage.setItem('sannidh_company_data', JSON.stringify({
             id: fallbackCompanyId,
-            company_name: fullName ? `${fullName}'s Company` : 'My Company',
+            company_name: meta.full_name ? `${meta.full_name}'s Company` : 'My Company',
             industry: 'General',
             compliance_score: 0,
             health_status: 'unknown',
@@ -216,21 +227,71 @@ const AuthReal = () => {
       localStorage.setItem('current_user_role', effectiveRole);
       localStorage.setItem('pending_registration_role', effectiveRole);
 
-      // Auto-provision company ID for company_owner users if missing
-      // (prevents redirect loop: dashboard → /auth → dashboard)
-      if (effectiveRole === 'company_owner' && !localStorage.getItem('sannidh_company_id')) {
-        const fallbackCompanyId = `user-${response.user.id}`;
-        localStorage.setItem('sannidh_company_id', fallbackCompanyId);
-        const companyName = response.user.full_name
-          ? `${response.user.full_name}'s Company`
-          : 'My Company';
-        localStorage.setItem('sannidh_company_data', JSON.stringify({
-          id: fallbackCompanyId,
-          company_name: companyName,
-          industry: 'General',
-          compliance_score: 0,
-          health_status: 'unknown',
-        }));
+      // Clear stale company data from previous user sessions
+      // (prevents seeing wrong user's dashboard after switching accounts)
+      localStorage.removeItem('sannidh_company_id');
+      localStorage.removeItem('sannidh_company_data');
+
+      // Recover company_id from Supabase user metadata (persists across devices)
+      // This was saved during registration so the friend's data is available
+      try {
+        const { data: { session: activeSession } } = await supabase.auth.getSession();
+        const metaCompanyId = activeSession?.user?.user_metadata?.company_id;
+        if (metaCompanyId) {
+          localStorage.setItem('sannidh_company_id', metaCompanyId);
+          // Also try to fetch fresh company profile from the API
+          const API_BASE = import.meta.env.VITE_API_URL || 'http://localhost:8001/api/v1';
+          try {
+            const profileResp = await fetch(`${API_BASE}/company/${metaCompanyId}/profile`);
+            if (profileResp.ok) {
+              const profileData = await profileResp.json();
+              localStorage.setItem('sannidh_company_data', JSON.stringify(profileData));
+            } else {
+              localStorage.setItem('sannidh_company_data', JSON.stringify({
+                id: metaCompanyId,
+                company_name: response.user.full_name ? `${response.user.full_name}'s Company` : 'My Company',
+                industry: 'General',
+                compliance_score: 0,
+                health_status: 'unknown',
+              }));
+            }
+          } catch {
+            localStorage.setItem('sannidh_company_data', JSON.stringify({
+              id: metaCompanyId,
+              company_name: response.user.full_name ? `${response.user.full_name}'s Company` : 'My Company',
+              industry: 'General',
+              compliance_score: 0,
+              health_status: 'unknown',
+            }));
+          }
+        } else if (effectiveRole === 'company_owner') {
+          // No company_id in metadata — auto-provision a fallback
+          const fallbackCompanyId = `user-${response.user.id}`;
+          localStorage.setItem('sannidh_company_id', fallbackCompanyId);
+          const companyName = response.user.full_name
+            ? `${response.user.full_name}'s Company`
+            : 'My Company';
+          localStorage.setItem('sannidh_company_data', JSON.stringify({
+            id: fallbackCompanyId,
+            company_name: companyName,
+            industry: 'General',
+            compliance_score: 0,
+            health_status: 'unknown',
+          }));
+        }
+      } catch (sessionErr) {
+        console.warn('Failed to recover company_id from session metadata:', sessionErr);
+        if (effectiveRole === 'company_owner') {
+          const fallbackCompanyId = `user-${response.user.id}`;
+          localStorage.setItem('sannidh_company_id', fallbackCompanyId);
+          localStorage.setItem('sannidh_company_data', JSON.stringify({
+            id: fallbackCompanyId,
+            company_name: response.user.full_name ? `${response.user.full_name}'s Company` : 'My Company',
+            industry: 'General',
+            compliance_score: 0,
+            health_status: 'unknown',
+          }));
+        }
       }
 
       // Check if user needs email verification
@@ -392,6 +453,15 @@ const AuthReal = () => {
               compliance_score: 0,
               health_status: 'unknown'
             }));
+            // Persist company_id to Supabase user_metadata so it's
+            // available when logging in from any other device/browser
+            try {
+              await supabase.auth.updateUser({
+                data: { company_id: companyData.company_id }
+              });
+            } catch (metaErr) {
+              console.warn('Failed to persist company_id to user metadata:', metaErr);
+            }
           }
         } catch (apiError) {
           console.warn('Backend company registration failed, using local fallback:', apiError);

@@ -172,6 +172,10 @@ class EnhancedAuthService {
         if (session.refresh_token) {
           localStorage.setItem('sannidh_refresh_token', session.refresh_token);
         }
+        // Sync company_id from user metadata if available and not yet in localStorage
+        if (meta.company_id && !localStorage.getItem('sannidh_company_id')) {
+          localStorage.setItem('sannidh_company_id', meta.company_id);
+        }
       } else {
         // User signed out or session expired
         this.currentUser = null;
@@ -452,6 +456,9 @@ class EnhancedAuthService {
       localStorage.removeItem('auth_token');
       localStorage.removeItem('current_user_role');
       localStorage.removeItem('pending_registration_role');
+      // Clear company data so a different user doesn't see stale dashboard
+      localStorage.removeItem('sannidh_company_id');
+      localStorage.removeItem('sannidh_company_data');
       if (this.refreshTimer) {
         clearInterval(this.refreshTimer);
         this.refreshTimer = null;

@@ -1799,11 +1799,47 @@ const CompanyDashboardReal = () => {
       try {
         const { data: { session } } = await supabase.auth.getSession();
         if (session?.user) {
-          // User is authenticated but has no company ID yet (e.g. logged in
-          // without going through the registration flow). Auto-provision one
-          // from the Supabase user ID so the dashboard can load.
+          // User is authenticated but has no company ID in localStorage.
+          // Try to recover it from Supabase user_metadata (set during registration).
           const userId = session.user.id;
           const meta = session.user.user_metadata || {};
+          const metaCompanyId = meta.company_id;
+
+          if (metaCompanyId) {
+            // Real company_id from registration — use it so the API returns actual data
+            localStorage.setItem('sannidh_company_id', metaCompanyId);
+            // Try fetching the live company profile
+            const API_BASE_URL = import.meta.env.VITE_API_URL || 'http://localhost:8001/api/v1';
+            try {
+              const profileResp = await fetch(`${API_BASE_URL}/company/${metaCompanyId}/profile`);
+              if (profileResp.ok) {
+                const profileData = await profileResp.json();
+                localStorage.setItem('sannidh_company_data', JSON.stringify(profileData));
+                setCompanyId(metaCompanyId);
+                setCompany({
+                  ...profileData,
+                  compliance_score: profileData.compliance_score || 0,
+                  health_status: profileData.health_status || 'unknown',
+                });
+                return;
+              }
+            } catch {
+              // Profile fetch failed — still use the metadata company_id
+            }
+            const fallbackData = {
+              id: metaCompanyId,
+              company_name: meta.full_name ? `${meta.full_name}'s Company` : 'My Company',
+              industry: 'General',
+              compliance_score: 0,
+              health_status: 'unknown' as const,
+            };
+            localStorage.setItem('sannidh_company_data', JSON.stringify(fallbackData));
+            setCompanyId(metaCompanyId);
+            setCompany(fallbackData);
+            return;
+          }
+
+          // No company_id in metadata — auto-provision a fallback from user ID
           const fallbackCompanyId = `user-${userId}`;
           const companyName = meta.full_name
             ? `${meta.full_name}'s Company`
