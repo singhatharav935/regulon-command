@@ -9,7 +9,7 @@
     "server": "cd ../server && /usr/local/bin/node --max-old-space-size=4096 server.js",
     "build": "vite build",
     "build:vercel": "cross-env NODE_OPTIONS=--max-old-space-size=4096 vite build",
-    "deploy": "npm run build:vercel && npx -y vercel deploy --prebuilt --prod --yes",
+    "deploy": "npx -y vercel build --prod && npx -y vercel deploy --prebuilt --prod --yes",
     "build:dev": "vite build --mode development",
     "start": "node index.js",
     "render-build": "npm install --legacy-peer-deps --include=dev && npm run build",
