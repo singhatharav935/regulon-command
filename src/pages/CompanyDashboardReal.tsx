@@ -191,8 +191,10 @@ interface Document {
 const API_BASE = import.meta.env.VITE_API_URL || 'http://localhost:8001/api/v1';
 
 // Local fallback IDs are created when the backend is unreachable during signup.
-// API calls with these IDs will always fail (400), so we skip them entirely.
-const isLocalFallbackId = (id: string) => id.startsWith('local-');
+// "user-" prefixed IDs are auto-provisioned from the Supabase user ID when no
+// real company_id exists in user_metadata (see initCompany below).
+// API calls with these IDs will always fail (404), so we skip them entirely.
+const isLocalFallbackId = (id: string) => id.startsWith('local-') || id.startsWith('user-');
 
 const companyAPI = {
   // Get company profile
