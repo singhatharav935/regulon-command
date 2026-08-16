@@ -1,0 +1,55 @@
+"  const handleApproveAndGeneratePDF = async () => {
+    if (!generatedDraft.trim()) {
+      toast.error('No draft to approve.');
+      return;
+    }
+    setIsGeneratingPDF(true);
+    addAgentLog('📄 Generating Professional PDF with Firm Letterhead...');
+    
+    try {
+      const { jsPDF } = await import('jspdf');
+      const doc = new jsPDF({ orientation: 'portrait', unit: 'mm', format: 'a4' });
+      const pageWidth = doc.internal.pageSize.getWidth();
+      const pageHeight = doc.internal.pageSize.getHeight();
+      const margin = 20;
+      const contentWidth = pageWidth - (margin * 2);
+      let yPos = margin;
+
+      // ── FIRM LETTERHEAD HEADER ──
+      doc.setFillColor(15, 23, 42); // Dark navy
+      doc.rect(0, 0, pageWidth, 38, 'F');
+      
+      // Firm Name
+      doc.setTextColor(56, 189, 248); // Cyan
+      doc.setFontSize(18);
+      doc.setFont('helvetica', 'bold');
+      doc.text('SANNIDH & CO.', margin, 15);
+      
+      // Subtitle
+      doc.setTextColor(148, 163, 184); // Slate
+      doc.setFontSize(8);
+      doc.setFont('helvetica', 'normal');
+      doc.text('Chartered Accountants & Legal Advisors | Autonomous Compliance Platform', margin, 22);
+      doc.text('GSTIN: 07AXXXX1234Z1ZP | PAN: AXXXX1234Z | ICAI Reg: 1029481W', margin, 27);
+      
+      // Confidential stamp
+      doc.setTextColor(239, 68, 68); // Red
+      doc.setFontSize(7);
+      doc.setFont('helvetica', 'bold');
+      doc.text('PRIVILEGED & CONFIDENTIAL', pageWidth - margin, 15, { align: 'right' });
+      doc.text('ATTORNEY-CLIENT PRIVILEGE', pageWidth - margin, 20, { align: 'right' });
+      
+      // Divider line
+      doc.setDrawColor(56, 189, 248);
+      doc.setLineWidth(0.5);
+      doc.line(margin, 39, pageWidth - margin, 39);
+      
+      yPos = 48;
+
+      // ── DOCUMENT METADATA ──
+      doc.setTextColor(30, 41, 59);
+      doc.setFontSize(13);
+      doc.setFont('helvetica', 'bold');
+      doc.text('LEGAL RESPONSE TO GOVERNMENT NOTICE', margin, yPos);
+   
+<truncated 10234 bytes>
