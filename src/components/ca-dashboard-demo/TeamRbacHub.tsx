@@ -951,7 +951,7 @@ const TeamRbacHub: React.FC = () => {
 
           {!selectedTeamId ? (
             <div className="text-center py-16 rounded-2xl border border-dashed border-border/40 bg-card/10">
-              <MailOpen className="w-12 h-12 text-muted-foreground/30 mx-auto mb-4 animate-bounce" />
+              <MailOpen className="w-12 h-12 text-muted-foreground/30 mx-auto mb-4" />
               <p className="text-muted-foreground">Select a team workspace to audit secure token invitations</p>
             </div>
           ) : invitationsLoading ? (

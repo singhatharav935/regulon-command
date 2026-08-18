@@ -214,7 +214,7 @@ const CADashboardSubNav: React.FC<CADashboardSubNavProps> = ({
                 {/* LIVE badge */}
                 {item.badge && (
                   <Badge className="text-[8px] py-0 px-1 h-3.5 bg-purple-500/15 text-purple-400 border-purple-500/30">
-                    <Radio className="w-1.5 h-1.5 mr-0.5 animate-pulse" />
+                    <Radio className="w-1.5 h-1.5 mr-0.5" />
                     {item.badge}
                   </Badge>
                 )}

@@ -81,7 +81,6 @@ const ExecutionPipeline = () => {
                 {/* Step number glow node */}
                 <div className="absolute left-8 md:left-1/2 -translate-x-1/2 w-10 h-10 rounded-full bg-background border border-primary/50 flex items-center justify-center z-10 shadow-[0_0_20px_rgba(var(--primary),0.3)] shadow-primary/30">
                   <span className="text-sm font-extrabold text-primary">{index + 1}</span>
-                  <div className="absolute inset-0 rounded-full bg-primary/20 animate-ping opacity-20" />
                 </div>
 
                 {/* Content card */}

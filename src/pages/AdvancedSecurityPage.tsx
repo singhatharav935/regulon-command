@@ -24,7 +24,6 @@ import {
   Award,
   Clock,
   Activity,
-  Wifi,
   HardDrive,
   CloudRain,
   Bug,

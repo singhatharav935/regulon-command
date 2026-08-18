@@ -145,18 +145,6 @@ const HeroSection = ({ content }: HeroSectionProps) => {
             transition={{ duration: 0.8, ease: [0.22, 1, 0.36, 1] }}
             className="relative mb-8"
           >
-            {/* Glowing backdrop */}
-            <motion.div
-              className="absolute inset-0 -m-6 rounded-full"
-              style={{
-                background: "radial-gradient(circle, rgba(0, 212, 255, 0.15) 0%, rgba(0, 136, 170, 0.05) 50%, transparent 70%)",
-              }}
-              animate={{
-                scale: [1, 1.15, 1],
-                opacity: [0.5, 0.8, 0.5],
-              }}
-              transition={{ duration: 3, repeat: Infinity, ease: "easeInOut" }}
-            />
             {/* Logo image */}
             <img
               src="/favicon.ico"
