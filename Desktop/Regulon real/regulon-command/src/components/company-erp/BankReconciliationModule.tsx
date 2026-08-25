@@ -23,17 +23,14 @@ import {
 
 import {
   DEFAULT_CATEGORIZATION_RULES, generateJournalEntry,
-  generateSuspenseJournalEntry, DEMO_BANK_ACCOUNTS,
+  generateSuspenseJournalEntry,
   type BankStatementLine, type MatchCandidate, type ReconciliationSummary,
   type PaymentChannel, type CategorizationRule, type BankAccount,
   type JournalEntry, type SupportedBank,
 } from "@/lib/accounting/bank-statement-reconciler";
 
-import {
-  DEMO_BANK_STATEMENT_LINES, DEMO_SYSTEM_DOCUMENTS,
-  DEMO_MATCH_CANDIDATES, DEMO_RECON_SUMMARY, DEMO_UNMATCHED_LINES,
-  DEMO_IMPORT_HISTORY, type StatementImportRecord,
-} from "@/data/demo-bank-statement-data";
+import { type StatementImportRecord } from "@/data/demo-bank-statement-data";
+import { EmptyDataState } from './EmptyDataState';
 
 // ─── Helpers ──────────────────────────────────────────────────────────────────
 
@@ -91,7 +88,7 @@ function OverviewTab({ summary: s }: { summary: ReconciliationSummary }) {
       <div className="grid grid-cols-2 md:grid-cols-4 gap-3">
         {[
           { label: "Reconciliation Rate", value: `${s.reconciliation_rate_pct}%`, sub: `${s.auto_matched_count} auto + ${s.suggested_matched_count} review`, color: "text-green-300", bg: "bg-green-500/10 border-green-500/20", icon: CheckCircle2 },
-          { label: "Total Bank Transactions", value: s.total_bank_lines, sub: `${DEMO_BANK_STATEMENT_LINES.filter(l=>l.type==="CREDIT").length} credits · ${DEMO_BANK_STATEMENT_LINES.filter(l=>l.type==="DEBIT").length} debits`, color: "text-cyan-300", bg: "bg-cyan-500/10 border-cyan-500/20", icon: Activity },
+          { label: "Total Bank Transactions", value: s.total_bank_lines, sub: `${[].filter(l=>l.type==="CREDIT").length} credits · ${[].filter(l=>l.type==="DEBIT").length} debits`, color: "text-cyan-300", bg: "bg-cyan-500/10 border-cyan-500/20", icon: Activity },
           { label: "Unmatched / Suspense", value: `${s.unmatched_count} / ${s.suspense_count}`, sub: "Pending manual allocation", color: "text-amber-300", bg: "bg-amber-500/10 border-amber-500/20", icon: AlertTriangle },
           { label: "Balance Difference", value: fmtCurrency(s.balance_difference), sub: s.balance_difference === 0 ? "Books fully in sync ✓" : "Unreconciled gap", color: s.balance_difference === 0 ? "text-green-300" : "text-red-300", bg: s.balance_difference === 0 ? "bg-green-500/10 border-green-500/20" : "bg-red-500/10 border-red-500/20", icon: Shield },
         ].map(({ label, value, sub, color, bg, icon: Icon }) => (
@@ -146,7 +143,7 @@ function OverviewTab({ summary: s }: { summary: ReconciliationSummary }) {
               </tr>
             </thead>
             <tbody className="divide-y divide-white/4">
-              {DEMO_BANK_STATEMENT_LINES.map((line, i) => (
+              {[].map((line, i) => (
                 <tr key={i} className="hover:bg-white/2">
                   <td className="px-3 py-1.5 font-mono text-[10px] whitespace-nowrap">{line.value_date}</td>
                   <td className="px-3 py-1.5"><BankBadge bank={line.bank_name} /></td>
@@ -350,12 +347,12 @@ function SuspenseDeskTab() {
         <AlertTriangle className="w-4 h-4 text-amber-400 shrink-0 mt-0.5" />
         <div>
           <p className="font-bold text-amber-300">Suspense & Unmatched Desk</p>
-          <p className="text-muted-foreground mt-0.5">These {DEMO_UNMATCHED_LINES.length} bank transactions could not be matched to any open document. Post to Suspense Account (9999) to keep books balanced, then allocate later when the document is identified.</p>
+          <p className="text-muted-foreground mt-0.5">These {[].length} bank transactions could not be matched to any open document. Post to Suspense Account (9999) to keep books balanced, then allocate later when the document is identified.</p>
         </div>
       </div>
 
       <div className="space-y-2">
-        {DEMO_UNMATCHED_LINES.map(line => {
+        {[].map(line => {
           const isPosted = postedIds.has(line.id);
           return (
             <div key={line.id} className={`p-4 rounded-xl border transition-all ${isPosted ? "bg-white/2 border-white/5 opacity-60" : "bg-card/40 border-amber-500/15 hover:border-amber-500/30"}`}>
@@ -386,7 +383,7 @@ function SuspenseDeskTab() {
           );
         })}
 
-        {DEMO_UNMATCHED_LINES.length === 0 && (
+        {[].length === 0 && (
           <div className="text-center py-12 text-muted-foreground text-xs">
             <CheckCircle2 className="w-8 h-8 text-green-400 mx-auto mb-2" />
             All transactions matched! No unmatched entries.
@@ -500,7 +497,7 @@ function CategorizationRulesTab() {
 // ─────────────────────────────────────────────────────────────────────────────
 
 function BankAccountRegisterTab() {
-  const accounts = DEMO_BANK_ACCOUNTS;
+  const accounts = [];
   const totalInr = accounts.filter(a => a.currency === "INR").reduce((s, a) => s + a.current_balance, 0);
 
   return (
@@ -690,7 +687,7 @@ function ImportHistoryTab() {
             </tr>
           </thead>
           <tbody className="divide-y divide-white/4">
-            {DEMO_IMPORT_HISTORY.map(imp => (
+            {[].map(imp => (
               <tr key={imp.id} className="hover:bg-white/2">
                 <td className="px-3 py-2 font-mono text-[10px] text-muted-foreground">{imp.id}</td>
                 <td className="px-3 py-2 text-foreground font-semibold text-[11px]">{imp.bank_name}</td>
@@ -721,18 +718,18 @@ function ImportHistoryTab() {
 
 type Tab = "overview" | "workspace" | "suspense" | "rules" | "accounts" | "parser" | "history";
 
-export function BankReconciliationModule({ companyName }: { companyName?: string }) {
+export function BankReconciliationModule({ companyName, bankTxns }: { companyName?: string, bankTxns?: any[] }) {
   const [activeTab, setActiveTab] = useState<Tab>("overview");
 
-  const tabs: { id: Tab; label: string; icon: any; badge?: string }[] = [
-    { id: "overview",   label: "Overview",       icon: Activity,    badge: `${DEMO_RECON_SUMMARY.reconciliation_rate_pct}%` },
-    { id: "workspace",  label: "AI Workspace",   icon: Zap,         badge: String(DEMO_MATCH_CANDIDATES.length) },
-    { id: "suspense",   label: "Suspense Desk",  icon: AlertTriangle, badge: String(DEMO_UNMATCHED_LINES.length) },
-    { id: "rules",      label: "AI Rules",       icon: Settings,    badge: String(DEFAULT_CATEGORIZATION_RULES.filter(r=>r.enabled).length) },
-    { id: "accounts",   label: "Bank Accounts",  icon: Landmark,    badge: String(DEMO_BANK_ACCOUNTS.length) },
-    { id: "parser",     label: "Import Parser",  icon: Upload },
-    { id: "history",    label: "Import History", icon: History,     badge: String(DEMO_IMPORT_HISTORY.length) },
-  ];
+  if (!bankTxns || bankTxns.length === 0) {
+    return <EmptyDataState icon="🏦" title="No Bank Reconciliation Data" message="Upload a bank statement CSV to begin reconciliation." />;
+  }
+
+  const totalTransactions = bankTxns.length;
+  const matchedCount = bankTxns.filter(t => t.matched || t.status === 'matched' || t.status === 'reconciled').length;
+  const unmatchedCount = totalTransactions - matchedCount;
+  const totalDebits = bankTxns.reduce((sum, t) => sum + (t.debit || 0), 0);
+  const totalCredits = bankTxns.reduce((sum, t) => sum + (t.credit || 0), 0);
 
   return (
     <div className="space-y-4">
@@ -744,45 +741,73 @@ export function BankReconciliationModule({ companyName }: { companyName?: string
             Bank Statement AI Auto-Reconciliation Engine (Phase 7)
           </h2>
           <p className="text-xs text-muted-foreground mt-0.5">
-            30 Transactions · ICICI, HDFC, SBI, Axis, Kotak, RazorpayX · UPI / NEFT / RTGS / IMPS / Cards / PG MDR / NACH / Cheque / FX SWIFT / Tax Challans
+            Real-time bank transactions mapped from selected company database.
           </p>
         </div>
-        <div className="flex items-center gap-2 shrink-0">
-          <span className="text-[10px] px-2.5 py-1 rounded-full bg-green-500/15 border border-green-500/25 text-green-300 font-bold">
-            {DEMO_RECON_SUMMARY.reconciliation_rate_pct}% Matched
-          </span>
-          <span className="text-[10px] px-2.5 py-1 rounded-full bg-white/5 border border-white/10 text-muted-foreground">
-            {DEMO_BANK_ACCOUNTS.length} Bank Accounts
-          </span>
+      </div>
+
+      {/* Summary Bar */}
+      <div className="grid grid-cols-2 md:grid-cols-5 gap-3">
+        <div className="p-3 rounded-xl border bg-cyan-500/10 border-cyan-500/20">
+          <p className="text-[10px] text-muted-foreground">Total Transactions</p>
+          <p className="text-lg font-bold font-mono text-cyan-300">{totalTransactions}</p>
+        </div>
+        <div className="p-3 rounded-xl border bg-green-500/10 border-green-500/20">
+          <p className="text-[10px] text-muted-foreground">Matched</p>
+          <p className="text-lg font-bold font-mono text-green-300">{matchedCount}</p>
+        </div>
+        <div className="p-3 rounded-xl border bg-amber-500/10 border-amber-500/20">
+          <p className="text-[10px] text-muted-foreground">Unmatched</p>
+          <p className="text-lg font-bold font-mono text-amber-300">{unmatchedCount}</p>
+        </div>
+        <div className="p-3 rounded-xl border bg-red-500/10 border-red-500/20">
+          <p className="text-[10px] text-muted-foreground">Total Debits</p>
+          <p className="text-lg font-bold font-mono text-red-300">₹{Math.abs(totalDebits).toLocaleString('en-IN')}</p>
+        </div>
+        <div className="p-3 rounded-xl border bg-emerald-500/10 border-emerald-500/20">
+          <p className="text-[10px] text-muted-foreground">Total Credits</p>
+          <p className="text-lg font-bold font-mono text-emerald-300">₹{Math.abs(totalCredits).toLocaleString('en-IN')}</p>
         </div>
       </div>
 
-      {/* Tab Bar */}
-      <div className="flex gap-1 flex-wrap border-b border-white/5 pb-1">
-        {tabs.map(({ id, label, icon: Icon, badge }) => (
-          <button key={id} onClick={() => setActiveTab(id)}
-            className={`flex items-center gap-1.5 px-3 py-1.5 rounded-lg text-xs font-medium transition-all ${activeTab === id ? "bg-cyan-500/15 border border-cyan-500/25 text-cyan-300" : "text-muted-foreground hover:bg-white/5"}`}>
-            <Icon className="w-3.5 h-3.5" />
-            {label}
-            {badge && (
-              <span className={`px-1.5 py-0.5 rounded-full text-[9px] font-bold ${activeTab === id ? "bg-cyan-500/20 text-cyan-200" : "bg-white/10 text-muted-foreground"}`}>{badge}</span>
-            )}
-          </button>
-        ))}
+      {/* Table */}
+      <div className="rounded-xl border border-white/8 overflow-hidden">
+        <div className="px-3 py-2 bg-white/2 border-b border-white/8">
+          <span className="text-xs font-bold text-foreground">Live Bank Transactions</span>
+        </div>
+        <div className="overflow-x-auto">
+          <table className="w-full text-xs">
+            <thead>
+              <tr className="border-b border-white/8 text-[10px] text-muted-foreground bg-white/1">
+                <th className="text-left px-3 py-1.5 whitespace-nowrap">Date</th>
+                <th className="text-left px-3 py-1.5 whitespace-nowrap">Description</th>
+                <th className="text-left px-3 py-1.5 whitespace-nowrap">Category</th>
+                <th className="text-right px-3 py-1.5 whitespace-nowrap">Debit</th>
+                <th className="text-right px-3 py-1.5 whitespace-nowrap">Credit</th>
+                <th className="text-right px-3 py-1.5 whitespace-nowrap">Balance</th>
+                <th className="text-center px-3 py-1.5 whitespace-nowrap">Status</th>
+              </tr>
+            </thead>
+            <tbody className="divide-y divide-white/4">
+              {bankTxns.map((t, i) => (
+                <tr key={i} className="hover:bg-white/2">
+                  <td className="px-3 py-1.5 font-mono text-[10px] whitespace-nowrap">{new Date(t.date).toLocaleDateString('en-GB')}</td>
+                  <td className="px-3 py-1.5 text-foreground max-w-[200px] truncate">{t.description}</td>
+                  <td className="px-3 py-1.5 text-muted-foreground">{t.category || '-'}</td>
+                  <td className="px-3 py-1.5 font-mono text-[10px] text-red-300 text-right">{t.debit ? `₹${t.debit.toLocaleString('en-IN')}` : '-'}</td>
+                  <td className="px-3 py-1.5 font-mono text-[10px] text-emerald-300 text-right">{t.credit ? `₹${t.credit.toLocaleString('en-IN')}` : '-'}</td>
+                  <td className="px-3 py-1.5 font-mono text-[10px] text-muted-foreground text-right">{t.balance ? `₹${t.balance.toLocaleString('en-IN')}` : '-'}</td>
+                  <td className="px-3 py-1.5 text-center">
+                    <span className={`px-1.5 py-0.5 rounded text-[9px] font-bold border ${(t.matched || t.status === 'matched' || t.status === 'reconciled') ? 'bg-green-500/15 text-green-300 border-green-500/25' : 'bg-amber-500/15 text-amber-300 border-amber-500/25'}`}>
+                      {(t.matched || t.status === 'matched' || t.status === 'reconciled') ? 'MATCHED' : 'UNMATCHED'}
+                    </span>
+                  </td>
+                </tr>
+              ))}
+            </tbody>
+          </table>
+        </div>
       </div>
-
-      {/* Tab Content */}
-      <AnimatePresence mode="wait">
-        <motion.div key={activeTab} initial={{ opacity: 0, y: 4 }} animate={{ opacity: 1, y: 0 }} exit={{ opacity: 0, y: -4 }} transition={{ duration: 0.15 }}>
-          {activeTab === "overview"  && <OverviewTab summary={DEMO_RECON_SUMMARY} />}
-          {activeTab === "workspace" && <AiMatchingWorkspaceTab candidates={DEMO_MATCH_CANDIDATES} />}
-          {activeTab === "suspense"  && <SuspenseDeskTab />}
-          {activeTab === "rules"     && <CategorizationRulesTab />}
-          {activeTab === "accounts"  && <BankAccountRegisterTab />}
-          {activeTab === "parser"    && <MultiBankParserTab />}
-          {activeTab === "history"   && <ImportHistoryTab />}
-        </motion.div>
-      </AnimatePresence>
     </div>
   );
 }

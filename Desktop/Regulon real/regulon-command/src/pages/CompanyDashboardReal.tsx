@@ -1776,20 +1776,20 @@ const CompanyDashboardReal = () => {
             // Create default company from ID
             setCompany({
               id: storedCompanyId,
-              company_name: 'My Company',
-              industry: 'General',
+              company_name: '',
+              industry: '',
               compliance_score: 0,
-              health_status: 'unknown'
+              health_status: 'pending'
             });
           }
         } else {
           // No stored data, create minimal company object
           setCompany({
             id: storedCompanyId,
-            company_name: 'My Company',
-            industry: 'General',
+            company_name: '',
+            industry: '',
             compliance_score: 0,
-            health_status: 'unknown'
+            health_status: 'pending'
           });
         }
         // Don't set loading false here - let fetchDashboardData handle it
@@ -1830,10 +1830,10 @@ const CompanyDashboardReal = () => {
             }
             const fallbackData = {
               id: metaCompanyId,
-              company_name: meta.full_name ? `${meta.full_name}'s Company` : 'My Company',
-              industry: 'General',
+              company_name: '',
+              industry: '',
               compliance_score: 0,
-              health_status: 'unknown' as const,
+              health_status: 'pending' as const,
             };
             localStorage.setItem('sannidh_company_data', JSON.stringify(fallbackData));
             setCompanyId(metaCompanyId);
@@ -1850,10 +1850,10 @@ const CompanyDashboardReal = () => {
           localStorage.setItem('sannidh_company_id', fallbackCompanyId);
           const companyData = {
             id: fallbackCompanyId,
-            company_name: companyName,
-            industry: 'General',
+            company_name: '',
+            industry: '',
             compliance_score: 0,
-            health_status: 'unknown' as const,
+            health_status: 'pending' as const,
           };
           localStorage.setItem('sannidh_company_data', JSON.stringify(companyData));
 

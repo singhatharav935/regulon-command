@@ -35,7 +35,7 @@ interface GovEFilingHubModuleProps {
 
 // ─── TAB 1: LIVE TAXPAYER LOOKUP ENGINE ──────────────────────────────────────
 
-function TaxpayerLookupTab({ defaultGstin = "27AAKCS1234F1Z5", defaultPan = "AAKCS1234F" }: { defaultGstin?: string; defaultPan?: string }) {
+function TaxpayerLookupTab({ defaultGstin = "", defaultPan = "" }: { defaultGstin?: string; defaultPan?: string }) {
   const [lookupType, setLookupType] = useState<"GSTIN" | "PAN" | "TAN" | "CIN">("GSTIN");
   const [query, setQuery] = useState(defaultGstin);
   const [gstResult, setGstResult] = useState<GSTINLookupResult | null>(null);
@@ -85,7 +85,7 @@ function TaxpayerLookupTab({ defaultGstin = "27AAKCS1234F1Z5", defaultPan = "AAK
                 key={t}
                 onClick={() => {
                   setLookupType(t);
-                  setQuery(t === "GSTIN" ? defaultGstin : t === "PAN" ? defaultPan : t === "TAN" ? "MUMS12345T" : "U72900MH2018PTC312456");
+                  setQuery(t === "GSTIN" ? defaultGstin : t === "PAN" ? defaultPan : t === "TAN" ? "" : "");
                   setError(null);
                 }}
                 className={`px-2.5 py-1 rounded-lg text-[10px] font-bold transition-all border ${lookupType === t ? "bg-cyan-500/15 text-cyan-300 border-cyan-500/25" : "bg-white/3 text-muted-foreground border-white/8 hover:bg-white/5"}`}
@@ -231,7 +231,7 @@ function ReturnJsonBuilderTab() {
     let json = "";
     if (returnType === "GSTR1") {
       const payload = buildGSTR1Payload({
-        gstin: "27AAKCS1234F1Z5",
+        gstin: "",
         tax_period: period,
         invoices: [
           { invoice_number: "INV-2025-001", invoice_date: "2025-10-05", customer_gstin: "27AABCM5678G1Z3", customer_state: "27-Maharashtra", taxable_value: 450000, gst_rate: 18, is_interstate: false },
@@ -243,12 +243,12 @@ function ReturnJsonBuilderTab() {
       json = JSON.stringify(payload, null, 2);
     } else if (returnType === "GSTR3B") {
       const payload = buildGSTR3BPayload({
-        gstin: "27AAKCS1234F1Z5", tax_period: period, outward_taxable: 1270000, outward_zero_rated: 500000, outward_nil_exempt: 0, inward_reverse_charge: 45000, itc_igst: 147600, itc_cgst: 40500, itc_sgst: 40500, itc_ineligible: 12000, gst_rate: 18, is_interstate_dominant: true,
+        gstin: "", tax_period: period, outward_taxable: 1270000, outward_zero_rated: 500000, outward_nil_exempt: 0, inward_reverse_charge: 45000, itc_igst: 147600, itc_cgst: 40500, itc_sgst: 40500, itc_ineligible: 12000, gst_rate: 18, is_interstate_dominant: true,
       });
       json = JSON.stringify(payload, null, 2);
     } else {
       const payload = buildTDS26QPayload({
-        tan: "MUMS12345T", pan: "AAKCS1234F", deductor_name: "Sannidh Technologies Pvt. Ltd.", financial_year: "2025-26", quarter: "Q2", deductee_records: [
+        tan: "", pan: "", deductor_name: "Sannidh Technologies Pvt. Ltd.", financial_year: "2025-26", quarter: "Q2", deductee_records: [
           { deductee_pan: "AABCP1234K", deductee_name: "TechSoft Consulting", payment_date: "2025-09-15", section: "194J", payment_amount: 480000, tds_rate: 2, challan_no: "CHL-2025-089" },
         ], challan_details: [{ challan_no: "CHL-2025-089", bsr_code: "0210001", date_of_deposit: "2025-10-07", amount_deposited: 9600 }],
       });
@@ -332,8 +332,8 @@ function EFilingSimulatorTab() {
       const res = simulateFilingSubmission({
         portal,
         return_type: portal === "GST" ? "GSTR-3B" : portal === "INCOME_TAX" ? "ITR-6" : "AOC-4",
-        gstin: "27AAKCS1234F1Z5",
-        pan: "AAKCS1234F",
+        gstin: "",
+        pan: "",
         tax_period: "October 2025",
         payload_size_kb: 42,
       });

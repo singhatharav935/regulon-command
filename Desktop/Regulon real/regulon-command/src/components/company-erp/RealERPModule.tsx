@@ -33,7 +33,8 @@ import {
   CheckCircle2, XCircle, ChevronDown, ChevronUp, Mail, Landmark,
   ShoppingCart, FileSpreadsheet, Clock, Info, BarChart3, TrendingUp,
   ArrowRight, AlertCircle, Loader2, Activity, BadgeCheck, Bell,
-  FileText, IndianRupee, Lock, Unlock, ClipboardCheck, Upload
+  FileText, IndianRupee, Lock, Unlock, ClipboardCheck, Upload,
+  Trash2, BookOpen, Settings, X
 } from "lucide-react";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
@@ -41,7 +42,6 @@ import { Progress } from "@/components/ui/progress";
 import { supabase } from "@/integrations/supabase/client";
 import { SmartERPModule } from "./SmartERPModule";
 import type { ERPInvoice, ERPPurchase, ERPExpense, ERPPayroll, ERPBankTxn, ERPStockItem } from "./erp-types";
-import { DEMO_INVOICES, DEMO_PURCHASES, DEMO_EXPENSES, DEMO_PAYROLL, DEMO_BANK_TXNS, DEMO_INVENTORY } from "@/data/demo-data";
 import { runFullZeroPenaltyAudit, type ZeroPenaltyReport, type ExceptionAlert } from "@/services/zeroPenaltyEngine";
 import { getAutonomousSyncStatus, type AutonomousSyncStatusBar } from "@/services/autonomousIngestionService";
 import { DataIngestionModal } from "./DataIngestionModal";
@@ -354,6 +354,66 @@ export function RealERPModule({ companyId, companyName }: Props) {
   const [showInbox,    setShowInbox]    = useState(true);
   const [inboxFilter,  setInboxFilter]  = useState<"all" | "critical" | "warning" | "info">("all");
   const [showIngestionModal, setShowIngestionModal] = useState(false);
+  const [showOpeningBalances, setShowOpeningBalances] = useState(false);
+  const [showDepreciationPolicy, setShowDepreciationPolicy] = useState(false);
+  const [showResetConfirm, setShowResetConfirm] = useState(false);
+
+  // Opening Balances state
+  const [openingBalances, setOpeningBalances] = useState<{
+    cash: number; bank: number; debtors: number; creditors: number;
+    stock: number; capital: number; reserves: number; loans: number;
+    fixedAssets: number; currentLiabilities: number;
+  }>(() => {
+    try {
+      const saved = localStorage.getItem(`sannidh_opening_balances_${companyId}`);
+      return saved ? JSON.parse(saved) : { cash: 0, bank: 0, debtors: 0, creditors: 0, stock: 0, capital: 0, reserves: 0, loans: 0, fixedAssets: 0, currentLiabilities: 0 };
+    } catch { return { cash: 0, bank: 0, debtors: 0, creditors: 0, stock: 0, capital: 0, reserves: 0, loans: 0, fixedAssets: 0, currentLiabilities: 0 }; }
+  });
+
+  // Depreciation Policy state
+  const [depPolicy, setDepPolicy] = useState<{
+    method: 'SLM' | 'WDV';
+    rates: Record<string, number>;
+  }>(() => {
+    try {
+      const saved = localStorage.getItem(`sannidh_dep_policy_${companyId}`);
+      return saved ? JSON.parse(saved) : { method: 'WDV', rates: { 'Plant & Machinery': 15, 'Furniture & Fixtures': 10, 'Computers & IT': 40, 'Vehicles': 15, 'Building': 10, 'Intangible Assets': 25 } };
+    } catch { return { method: 'WDV', rates: { 'Plant & Machinery': 15, 'Furniture & Fixtures': 10, 'Computers & IT': 40, 'Vehicles': 15, 'Building': 10, 'Intangible Assets': 25 } }; }
+  });
+
+  // ─── Reset All Data ─────────────────────────────────────────────────────────
+  const handleResetAllData = useCallback(() => {
+    const keys = [
+      `sannidh_bank_txns_${companyId}`, `company_bank_transactions_${companyId}`,
+      `sannidh_payroll_${companyId}`, `company_payroll_${companyId}`,
+      `sannidh_invoices_${companyId}`, `company_invoices_${companyId}`,
+      `sannidh_purchases_${companyId}`, `company_purchases_${companyId}`,
+      `sannidh_expenses_${companyId}`, `company_expenses_${companyId}`,
+      `sannidh_opening_balances_${companyId}`, `sannidh_dep_policy_${companyId}`,
+      `company_fixed_assets_${companyId}`, `company_manual_journals_${companyId}`,
+      `company_bank_accounts_${companyId}`, `company_bank_matches_${companyId}`,
+      `company_aging_payments_${companyId}`, `company_dt_custom_${companyId}`,
+      `sannidh_pnl_locked_${companyId}`, `sannidh_ca_signoff_${companyId}`,
+    ];
+    keys.forEach(k => { try { localStorage.removeItem(k); } catch {} });
+    setInvoices([]); setPurchases([]); setExpenses([]); setPayroll([]);
+    setBankTxns([]); setInventory([]); setIsLiveData(false);
+    setOpeningBalances({ cash: 0, bank: 0, debtors: 0, creditors: 0, stock: 0, capital: 0, reserves: 0, loans: 0, fixedAssets: 0, currentLiabilities: 0 });
+    setShowResetConfirm(false);
+    console.log('[RealERP] All data reset');
+  }, [companyId]);
+
+  // ─── Save Opening Balances ──────────────────────────────────────────────────
+  const saveOpeningBalances = useCallback(() => {
+    localStorage.setItem(`sannidh_opening_balances_${companyId}`, JSON.stringify(openingBalances));
+    setShowOpeningBalances(false);
+  }, [companyId, openingBalances]);
+
+  // ─── Save Depreciation Policy ───────────────────────────────────────────────
+  const saveDepPolicy = useCallback(() => {
+    localStorage.setItem(`sannidh_dep_policy_${companyId}`, JSON.stringify(depPolicy));
+    setShowDepreciationPolicy(false);
+  }, [companyId, depPolicy]);
 
   const syncIntervalRef = useRef<ReturnType<typeof setInterval> | null>(null);
 
@@ -378,15 +438,33 @@ export function RealERPModule({ companyId, companyName }: Props) {
       const liveBank = bank.data && bank.data.length > 0 ? (bank.data as ERPBankTxn[])   : null;
       const liveInvStk = inv_stk.data && inv_stk.data.length > 0 ? (inv_stk.data as ERPStockItem[]) : null;
 
-      const hasLive = !!(liveInv || livePur || liveExp || livePay || liveBank);
+      // ─── localStorage Fallbacks (for when Supabase RLS blocks reads) ────────
+      const lsFallback = (key: string): any[] => {
+        try {
+          const raw = localStorage.getItem(key);
+          return raw ? JSON.parse(raw) : [];
+        } catch { return []; }
+      };
+
+      const lsBankTxns = lsFallback(`sannidh_bank_txns_${companyId}`);
+      const lsPayroll  = lsFallback(`sannidh_payroll_${companyId}`);
+      const lsInvoices = lsFallback(`sannidh_invoices_${companyId}`);
+      const lsPurchases = lsFallback(`sannidh_purchases_${companyId}`);
+      const lsExpenses = lsFallback(`sannidh_expenses_${companyId}`);
+
+      const hasLive = !!(liveInv || livePur || liveExp || livePay || liveBank || lsBankTxns.length || lsPayroll.length || lsInvoices.length);
       setIsLiveData(hasLive);
 
-      const finalInvoices  = liveInv      ?? DEMO_INVOICES;
-      const finalPurchases = livePur      ?? DEMO_PURCHASES;
-      const finalExpenses  = liveExp      ?? DEMO_EXPENSES;
-      const finalPayroll   = livePay      ?? DEMO_PAYROLL;
-      const finalBankTxns  = liveBank     ?? DEMO_BANK_TXNS;
-      const finalInventory = liveInvStk   ?? DEMO_INVENTORY;
+      const finalInvoices  = liveInv      ?? (lsInvoices.length  > 0 ? lsInvoices  : []);
+      const finalPurchases = livePur      ?? (lsPurchases.length > 0 ? lsPurchases : []);
+      const finalExpenses  = liveExp      ?? (lsExpenses.length  > 0 ? lsExpenses  : []);
+      const finalPayroll   = livePay      ?? (lsPayroll.length   > 0 ? lsPayroll   : []);
+      const finalBankTxns  = liveBank     ?? (lsBankTxns.length  > 0 ? lsBankTxns  : []);
+      const finalInventory = liveInvStk   ?? [];
+
+      if (finalBankTxns.length > 0) {
+        console.log(`[RealERP] Loaded ${finalBankTxns.length} bank txns (source: ${liveBank ? 'Supabase' : 'localStorage'})`);
+      }
 
       setInvoices(finalInvoices);
       setPurchases(finalPurchases);
@@ -445,12 +523,12 @@ export function RealERPModule({ companyId, companyName }: Props) {
           rate: s.rate ?? 0,
           current_qty: s.current_qty ?? 0,
         })),
-        shareCapital: 1000000,
-        longTermBorrowings: 500000,
+        shareCapital: 0,
+        longTermBorrowings: 0,
         gstr2bVerifiedITC: finalPurchases
           .filter((p) => p.itc_eligible && p.itc_claimed)
           .reduce((s, p) => s + (p.gst ?? 0), 0) * 0.85, // 85% verified by GSTR-2B
-        bankBalance: 1645000,
+        bankBalance: finalBankTxns.length > 0 ? (finalBankTxns[0]?.balance || 0) : 0,
       });
 
       setAuditReport(report);
@@ -461,12 +539,12 @@ export function RealERPModule({ companyId, companyName }: Props) {
 
     } catch {
       // Ensure dashboard never crashes — always fall back to demo data
-      setInvoices(DEMO_INVOICES);
-      setPurchases(DEMO_PURCHASES);
-      setExpenses(DEMO_EXPENSES);
-      setPayroll(DEMO_PAYROLL);
-      setBankTxns(DEMO_BANK_TXNS);
-      setInventory(DEMO_INVENTORY);
+      setInvoices([]);
+      setPurchases([]);
+      setExpenses([]);
+      setPayroll([]);
+      setBankTxns([]);
+      setInventory([]);
       setIsLiveData(false);
     } finally {
       setLoading(false);
@@ -564,6 +642,30 @@ export function RealERPModule({ companyId, companyName }: Props) {
               className="h-7 text-[11px] border-primary/30 gap-1.5 px-3 text-primary hover:bg-primary/10"
             >
               <Upload className="w-3 h-3" /> Import Data
+            </Button>
+            <Button
+              onClick={() => setShowOpeningBalances(true)}
+              size="sm"
+              variant="outline"
+              className="h-7 text-[11px] border-emerald-500/30 gap-1.5 px-3 text-emerald-300 hover:bg-emerald-500/10"
+            >
+              <BookOpen className="w-3 h-3" /> Opening Balances
+            </Button>
+            <Button
+              onClick={() => setShowDepreciationPolicy(true)}
+              size="sm"
+              variant="outline"
+              className="h-7 text-[11px] border-violet-500/30 gap-1.5 px-3 text-violet-300 hover:bg-violet-500/10"
+            >
+              <Settings className="w-3 h-3" /> Depreciation Policy
+            </Button>
+            <Button
+              onClick={() => setShowResetConfirm(true)}
+              size="sm"
+              variant="outline"
+              className="h-7 text-[11px] border-red-500/30 gap-1.5 px-3 text-red-400 hover:bg-red-500/10"
+            >
+              <Trash2 className="w-3 h-3" /> Reset All Data
             </Button>
             <Button
               onClick={handleManualSync}
@@ -988,7 +1090,9 @@ export function RealERPModule({ companyId, companyName }: Props) {
           gstin: "",
           state: "",
         }}
+        companyId={companyId}
         financialYear="2025-26"
+        mode="real"
       />
 
       {/* ── Data Ingestion Modal ─────────────────────────────────────────────
@@ -1000,11 +1104,185 @@ export function RealERPModule({ companyId, companyName }: Props) {
         companyId={companyId}
         open={showIngestionModal}
         onClose={() => setShowIngestionModal(false)}
-        onDataImported={(_result) => {
-          // Re-fetch all dashboard data after a successful import
+        onDataImported={(result) => {
+          // Immediately use parsed data if available (bypasses Supabase RLS issues)
+          if (result.parsedData && result.parsedData.length > 0) {
+            if (result.type === 'bank') {
+              setBankTxns(result.parsedData as ERPBankTxn[]);
+              setIsLiveData(true);
+              console.log(`[RealERP] Loaded ${result.parsedData.length} bank txns directly from import`);
+            } else if (result.type === 'payroll') {
+              setPayroll(result.parsedData as ERPPayroll[]);
+              setIsLiveData(true);
+            }
+          }
+          // Also re-fetch all data (will pick up localStorage fallbacks too)
           fetchAll();
         }}
       />
+
+      {/* ── Reset All Data Confirmation ──────────────────────────────────── */}
+      <AnimatePresence>
+        {showResetConfirm && (
+          <motion.div initial={{ opacity: 0 }} animate={{ opacity: 1 }} exit={{ opacity: 0 }} className="fixed inset-0 z-[60] flex items-center justify-center bg-black/60 backdrop-blur-sm" onClick={() => setShowResetConfirm(false)}>
+            <motion.div initial={{ scale: 0.9 }} animate={{ scale: 1 }} exit={{ scale: 0.9 }} className="bg-[#0f1419] border border-red-500/30 rounded-2xl p-6 max-w-md w-full mx-4 shadow-2xl" onClick={e => e.stopPropagation()}>
+              <div className="flex items-center gap-3 mb-4">
+                <div className="p-2 rounded-full bg-red-500/15"><Trash2 className="w-5 h-5 text-red-400" /></div>
+                <h3 className="text-lg font-bold text-white">Reset All Data</h3>
+              </div>
+              <p className="text-sm text-gray-400 mb-6">This will permanently delete <strong className="text-red-300">all uploaded data</strong> — bank transactions, invoices, purchases, payroll, expenses, opening balances, and depreciation policy. This action cannot be undone.</p>
+              <div className="flex gap-3 justify-end">
+                <Button variant="ghost" size="sm" onClick={() => setShowResetConfirm(false)} className="h-9 px-4 text-sm">Cancel</Button>
+                <Button size="sm" onClick={handleResetAllData} className="h-9 px-4 text-sm bg-red-600 hover:bg-red-700 text-white border-0">
+                  <Trash2 className="w-3.5 h-3.5 mr-1.5" /> Yes, Reset Everything
+                </Button>
+              </div>
+            </motion.div>
+          </motion.div>
+        )}
+      </AnimatePresence>
+
+      {/* ── Opening Balances Modal ────────────────────────────────────────── */}
+      <AnimatePresence>
+        {showOpeningBalances && (
+          <motion.div initial={{ opacity: 0 }} animate={{ opacity: 1 }} exit={{ opacity: 0 }} className="fixed inset-0 z-[60] flex items-center justify-center bg-black/60 backdrop-blur-sm" onClick={() => setShowOpeningBalances(false)}>
+            <motion.div initial={{ scale: 0.9, y: 20 }} animate={{ scale: 1, y: 0 }} exit={{ scale: 0.9, y: 20 }} className="bg-[#0f1419] border border-emerald-500/30 rounded-2xl p-6 max-w-lg w-full mx-4 shadow-2xl max-h-[85vh] overflow-y-auto" onClick={e => e.stopPropagation()}>
+              <div className="flex items-center justify-between mb-5">
+                <div className="flex items-center gap-3">
+                  <div className="p-2 rounded-full bg-emerald-500/15"><BookOpen className="w-5 h-5 text-emerald-400" /></div>
+                  <div>
+                    <h3 className="text-lg font-bold text-white">Opening Balances</h3>
+                    <p className="text-[11px] text-gray-500">FY 2025-26 · As on 1st April 2025</p>
+                  </div>
+                </div>
+                <button onClick={() => setShowOpeningBalances(false)} className="p-1 rounded-full hover:bg-white/10"><X className="w-4 h-4 text-gray-400" /></button>
+              </div>
+
+              <div className="space-y-4">
+                <div>
+                  <p className="text-[11px] font-semibold text-emerald-300 uppercase tracking-wider mb-2">Assets</p>
+                  <div className="grid grid-cols-2 gap-3">
+                    {([['cash', 'Cash in Hand'], ['bank', 'Bank Balance'], ['debtors', 'Sundry Debtors'], ['stock', 'Closing Stock'], ['fixedAssets', 'Fixed Assets']] as const).map(([key, label]) => (
+                      <div key={key}>
+                        <label className="text-[11px] text-gray-400 mb-1 block">{label}</label>
+                        <div className="relative">
+                          <span className="absolute left-3 top-1/2 -translate-y-1/2 text-[11px] text-gray-500">₹</span>
+                          <input type="number" value={openingBalances[key] || ''} onChange={e => setOpeningBalances(prev => ({ ...prev, [key]: parseFloat(e.target.value) || 0 }))} className="w-full h-9 pl-7 pr-3 rounded-lg bg-white/5 border border-white/10 text-sm text-white focus:border-emerald-500/50 focus:outline-none" placeholder="0" />
+                        </div>
+                      </div>
+                    ))}
+                  </div>
+                </div>
+                <div>
+                  <p className="text-[11px] font-semibold text-red-300 uppercase tracking-wider mb-2">Liabilities & Equity</p>
+                  <div className="grid grid-cols-2 gap-3">
+                    {([['creditors', 'Sundry Creditors'], ['capital', 'Capital Account'], ['reserves', 'Reserves & Surplus'], ['loans', 'Loans (Secured)'], ['currentLiabilities', 'Current Liabilities']] as const).map(([key, label]) => (
+                      <div key={key}>
+                        <label className="text-[11px] text-gray-400 mb-1 block">{label}</label>
+                        <div className="relative">
+                          <span className="absolute left-3 top-1/2 -translate-y-1/2 text-[11px] text-gray-500">₹</span>
+                          <input type="number" value={openingBalances[key] || ''} onChange={e => setOpeningBalances(prev => ({ ...prev, [key]: parseFloat(e.target.value) || 0 }))} className="w-full h-9 pl-7 pr-3 rounded-lg bg-white/5 border border-white/10 text-sm text-white focus:border-red-500/50 focus:outline-none" placeholder="0" />
+                        </div>
+                      </div>
+                    ))}
+                  </div>
+                </div>
+
+                {/* Balance check */}
+                {(() => {
+                  const totalAssets = openingBalances.cash + openingBalances.bank + openingBalances.debtors + openingBalances.stock + openingBalances.fixedAssets;
+                  const totalLiabilities = openingBalances.creditors + openingBalances.capital + openingBalances.reserves + openingBalances.loans + openingBalances.currentLiabilities;
+                  const diff = totalAssets - totalLiabilities;
+                  return (
+                    <div className={`p-3 rounded-lg border ${Math.abs(diff) < 1 ? 'bg-emerald-500/8 border-emerald-500/20' : 'bg-amber-500/8 border-amber-500/20'}`}>
+                      <div className="flex items-center justify-between text-[11px]">
+                        <span className="text-gray-400">Total Assets: <strong className="text-emerald-300">₹{totalAssets.toLocaleString('en-IN')}</strong></span>
+                        <span className="text-gray-400">Total Liabilities: <strong className="text-red-300">₹{totalLiabilities.toLocaleString('en-IN')}</strong></span>
+                      </div>
+                      {Math.abs(diff) >= 1 && (
+                        <p className="text-[10px] text-amber-400 mt-1.5">⚠ Difference of ₹{Math.abs(diff).toLocaleString('en-IN')} — Assets and Liabilities must match.</p>
+                      )}
+                      {Math.abs(diff) < 1 && (
+                        <p className="text-[10px] text-emerald-400 mt-1.5">✓ Balanced — Assets = Liabilities + Equity</p>
+                      )}
+                    </div>
+                  );
+                })()}
+              </div>
+
+              <div className="flex gap-3 justify-end mt-5">
+                <Button variant="ghost" size="sm" onClick={() => setShowOpeningBalances(false)} className="h-9 px-4 text-sm">Cancel</Button>
+                <Button size="sm" onClick={saveOpeningBalances} className="h-9 px-4 text-sm bg-emerald-600 hover:bg-emerald-700 text-white border-0">
+                  <CheckCircle2 className="w-3.5 h-3.5 mr-1.5" /> Save Opening Balances
+                </Button>
+              </div>
+            </motion.div>
+          </motion.div>
+        )}
+      </AnimatePresence>
+
+      {/* ── Depreciation Policy Modal ────────────────────────────────────── */}
+      <AnimatePresence>
+        {showDepreciationPolicy && (
+          <motion.div initial={{ opacity: 0 }} animate={{ opacity: 1 }} exit={{ opacity: 0 }} className="fixed inset-0 z-[60] flex items-center justify-center bg-black/60 backdrop-blur-sm" onClick={() => setShowDepreciationPolicy(false)}>
+            <motion.div initial={{ scale: 0.9, y: 20 }} animate={{ scale: 1, y: 0 }} exit={{ scale: 0.9, y: 20 }} className="bg-[#0f1419] border border-violet-500/30 rounded-2xl p-6 max-w-lg w-full mx-4 shadow-2xl max-h-[85vh] overflow-y-auto" onClick={e => e.stopPropagation()}>
+              <div className="flex items-center justify-between mb-5">
+                <div className="flex items-center gap-3">
+                  <div className="p-2 rounded-full bg-violet-500/15"><Settings className="w-5 h-5 text-violet-400" /></div>
+                  <div>
+                    <h3 className="text-lg font-bold text-white">Depreciation Policy</h3>
+                    <p className="text-[11px] text-gray-500">As per Income Tax Act / Companies Act</p>
+                  </div>
+                </div>
+                <button onClick={() => setShowDepreciationPolicy(false)} className="p-1 rounded-full hover:bg-white/10"><X className="w-4 h-4 text-gray-400" /></button>
+              </div>
+
+              {/* Method selection */}
+              <div className="mb-5">
+                <p className="text-[11px] font-semibold text-violet-300 uppercase tracking-wider mb-2">Method</p>
+                <div className="flex gap-3">
+                  {(['SLM', 'WDV'] as const).map(m => (
+                    <button key={m} onClick={() => setDepPolicy(prev => ({ ...prev, method: m }))} className={`flex-1 py-2.5 rounded-lg text-sm font-semibold border transition-all ${depPolicy.method === m ? 'bg-violet-500/20 border-violet-500/40 text-violet-200' : 'bg-white/3 border-white/10 text-gray-400 hover:border-white/20'}`}>
+                      {m === 'SLM' ? 'Straight Line (SLM)' : 'Written Down Value (WDV)'}
+                    </button>
+                  ))}
+                </div>
+                <p className="text-[10px] text-gray-500 mt-1.5">{depPolicy.method === 'WDV' ? 'WDV applies depreciation on reducing balance — standard for Income Tax Act.' : 'SLM applies equal depreciation every year — standard for Companies Act.'}</p>
+              </div>
+
+              {/* Rates per asset class */}
+              <div>
+                <p className="text-[11px] font-semibold text-violet-300 uppercase tracking-wider mb-2">Rates by Asset Class (%)</p>
+                <div className="space-y-2.5">
+                  {Object.entries(depPolicy.rates).map(([assetClass, rate]) => (
+                    <div key={assetClass} className="flex items-center justify-between gap-3">
+                      <span className="text-sm text-gray-300 flex-1">{assetClass}</span>
+                      <div className="relative w-24">
+                        <input type="number" min={0} max={100} value={rate} onChange={e => setDepPolicy(prev => ({ ...prev, rates: { ...prev.rates, [assetClass]: parseFloat(e.target.value) || 0 } }))} className="w-full h-8 px-3 rounded-lg bg-white/5 border border-white/10 text-sm text-white text-right focus:border-violet-500/50 focus:outline-none" />
+                        <span className="absolute right-2 top-1/2 -translate-y-1/2 text-[10px] text-gray-500">%</span>
+                      </div>
+                    </div>
+                  ))}
+                </div>
+              </div>
+
+              {/* IT Act standard rates info */}
+              <div className="mt-4 p-3 rounded-lg bg-violet-500/5 border border-violet-500/15">
+                <p className="text-[10px] text-violet-300 font-semibold mb-1">Standard IT Act WDV Rates (Sec 32)</p>
+                <p className="text-[10px] text-gray-500 leading-relaxed">Building: 10% · Furniture: 10% · Plant & Machinery: 15% · Computers: 40% · Vehicles: 15% · Intangibles: 25%</p>
+              </div>
+
+              <div className="flex gap-3 justify-end mt-5">
+                <Button variant="ghost" size="sm" onClick={() => setShowDepreciationPolicy(false)} className="h-9 px-4 text-sm">Cancel</Button>
+                <Button size="sm" onClick={saveDepPolicy} className="h-9 px-4 text-sm bg-violet-600 hover:bg-violet-700 text-white border-0">
+                  <CheckCircle2 className="w-3.5 h-3.5 mr-1.5" /> Save Policy
+                </Button>
+              </div>
+            </motion.div>
+          </motion.div>
+        )}
+      </AnimatePresence>
+
     </motion.div>
   );
 }

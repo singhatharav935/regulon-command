@@ -39,16 +39,16 @@ interface FinancialStatementsModuleProps {
   // Demo mode passes pre-built data; real mode passes dynamic shape calculated from live data
   mode: "demo" | "real";
   trialBalance?: TBLedger[];
-  balanceSheet: BSData;
-  profitLoss: PLData;
-  assetRegister: AssetRegisterData;
-  deferredTax: DTData;
-  financialRatios: RatioData;
-  caro2020: CARO2020ClauseUI[];
-  notesToAccounts: NoteUI[];
-  periodTrend: PeriodData[];
-  companyName: string;
-  fiscalYear: string;
+  balanceSheet?: BSData;
+  profitLoss?: PLData;
+  assetRegister?: AssetRegisterData;
+  deferredTax?: DTData;
+  financialRatios?: RatioData;
+  caro2020?: CARO2020ClauseUI[];
+  notesToAccounts?: NoteUI[];
+  periodTrend?: PeriodData[];
+  companyName?: string;
+  fiscalYear?: string;
   companyId?: string;
   // Real transaction data for Day Book
   invoices?: any[];
@@ -135,8 +135,109 @@ interface PeriodData {
 }
 
 // ─────────────────────────────────────────────────────────────────────────────
-// UTILS
+// UTILS & SAFE FALLBACKS
 // ─────────────────────────────────────────────────────────────────────────────
+
+function ensureValidBs(bs?: Partial<BSData> | null): BSData {
+  const b = bs || {};
+  return {
+    is_balanced: b.is_balanced ?? true,
+    total_assets: b.total_assets ?? 0,
+    total_equity_liabilities: b.total_equity_liabilities ?? 0,
+    difference: (b as any).difference ?? 0,
+    entity_type: (b as any).entity_type || "pvt_ltd",
+    msme_dues_within_45_days: (b as any).msme_dues_within_45_days || 0,
+    msme_dues_overdue_45_days: (b as any).msme_dues_overdue_45_days || 0,
+    equity: {
+      share_capital: b.equity?.share_capital ?? 0,
+      reserves_surplus: b.equity?.reserves_surplus ?? 0,
+      total: b.equity?.total ?? 0,
+      ...(b.equity || {})
+    },
+    non_current_liabilities: {
+      long_term_borrowings: b.non_current_liabilities?.long_term_borrowings ?? 0,
+      lease_liability_lt: b.non_current_liabilities?.lease_liability_lt ?? 0,
+      deferred_tax_liability: b.non_current_liabilities?.deferred_tax_liability ?? 0,
+      long_term_provisions: b.non_current_liabilities?.long_term_provisions ?? 0,
+      total: b.non_current_liabilities?.total ?? 0,
+      ...(b.non_current_liabilities || {})
+    },
+    current_liabilities: {
+      short_term_borrowings: b.current_liabilities?.short_term_borrowings ?? 0,
+      trade_payables: b.current_liabilities?.trade_payables ?? 0,
+      trade_payables_msme: b.current_liabilities?.trade_payables_msme ?? 0,
+      trade_payables_others: b.current_liabilities?.trade_payables_others ?? 0,
+      gst_payable: b.current_liabilities?.gst_payable ?? 0,
+      tds_payable: b.current_liabilities?.tds_payable ?? 0,
+      pf_esic_payable: b.current_liabilities?.pf_esic_payable ?? 0,
+      salary_payable: b.current_liabilities?.salary_payable ?? 0,
+      advance_from_customers: b.current_liabilities?.advance_from_customers ?? 0,
+      income_tax_payable: b.current_liabilities?.income_tax_payable ?? 0,
+      lease_liability_st: b.current_liabilities?.lease_liability_st ?? 0,
+      short_term_provisions: b.current_liabilities?.short_term_provisions ?? 0,
+      other_payables: b.current_liabilities?.other_payables ?? 0,
+      total: b.current_liabilities?.total ?? 0,
+      ...(b.current_liabilities || {})
+    },
+    non_current_assets: {
+      gross_block: b.non_current_assets?.gross_block ?? 0,
+      accumulated_depreciation: b.non_current_assets?.accumulated_depreciation ?? 0,
+      net_block: b.non_current_assets?.net_block ?? 0,
+      rou_asset_nbv: b.non_current_assets?.rou_asset_nbv ?? 0,
+      capital_wip: b.non_current_assets?.capital_wip ?? 0,
+      deferred_tax_asset: b.non_current_assets?.deferred_tax_asset ?? 0,
+      long_term_loans_advances: b.non_current_assets?.long_term_loans_advances ?? 0,
+      total: b.non_current_assets?.total ?? 0,
+      ...(b.non_current_assets || {})
+    },
+    current_assets: {
+      inventories: b.current_assets?.inventories ?? 0,
+      trade_receivables_net: b.current_assets?.trade_receivables_net ?? 0,
+      unbilled_revenue: b.current_assets?.unbilled_revenue ?? 0,
+      bank_balance: b.current_assets?.bank_balance ?? 0,
+      cash_in_hand: b.current_assets?.cash_in_hand ?? 0,
+      fixed_deposits: b.current_assets?.fixed_deposits ?? 0,
+      advance_to_suppliers: b.current_assets?.advance_to_suppliers ?? 0,
+      prepaid_expenses: b.current_assets?.prepaid_expenses ?? 0,
+      input_gst_itc: b.current_assets?.input_gst_itc ?? 0,
+      gst_cash_ledger: b.current_assets?.gst_cash_ledger ?? 0,
+      tds_receivable: b.current_assets?.tds_receivable ?? 0,
+      other_current_assets: b.current_assets?.other_current_assets ?? 0,
+      total: b.current_assets?.total ?? 0,
+      ...(b.current_assets || {})
+    },
+    notes: b.notes || {}
+  };
+}
+
+function ensureValidPl(pl?: Partial<PLData> | null): PLData {
+  const p = pl || {};
+  return {
+    revenue_from_operations: p.revenue_from_operations ?? 0,
+    revenue_py: p.revenue_py ?? 0,
+    other_income: p.other_income ?? 0,
+    total_income: p.total_income ?? 0,
+    cogs_direct_expenses: p.cogs_direct_expenses ?? 0,
+    employee_benefit_expense: p.employee_benefit_expense ?? 0,
+    rou_depreciation_lease: p.rou_depreciation_lease ?? 0,
+    depreciation_amortisation: p.depreciation_amortisation ?? 0,
+    finance_costs: p.finance_costs ?? 0,
+    other_expenses: p.other_expenses ?? 0,
+    total_expenses: p.total_expenses ?? 0,
+    gross_profit: p.gross_profit ?? 0,
+    ebitda: p.ebitda ?? 0,
+    ebit: p.ebit ?? 0,
+    pbt: p.pbt ?? 0,
+    current_tax: p.current_tax ?? 0,
+    deferred_tax_charge: p.deferred_tax_charge ?? 0,
+    total_tax: p.total_tax ?? 0,
+    pat: p.pat ?? 0,
+    gross_margin_pct: p.gross_margin_pct ?? 0,
+    ebitda_margin_pct: p.ebitda_margin_pct ?? 0,
+    net_margin_pct: p.net_margin_pct ?? 0,
+    ...(p || {})
+  };
+}
 
 function fmt(n: number, compact = false): string {
   if (isNaN(n) || n === null || n === undefined) return "₹0.00";
@@ -247,6 +348,12 @@ function computeDoubleEntryTrialBalance(params: any) {
   const purTotal = Array.isArray(params.purchases) ? params.purchases.reduce((s: number, p: any) => s + Number(p.grand_total || p.total || p.amount || 0), 0) : 0;
   const expTotal = Array.isArray(params.expenses) ? params.expenses.reduce((s: number, e: any) => s + Number(e.amount || e.total || 0), 0) : 0;
 
+  // Add bank account row if bank transactions exist
+  const bankTxns = params.bankTxns || [];
+  const bankDebits = bankTxns.reduce((sum: number, t: any) => sum + (t.debit || 0), 0);
+  const bankCredits = bankTxns.reduce((sum: number, t: any) => sum + (t.credit || 0), 0);
+  const closingBankBalance = bankTxns.length > 0 ? (bankTxns[0]?.balance || 0) : 0;
+
   const rows = [
     { account_code: "1001", ledger_name: "Sales / Revenue Account", group: "Revenue", opening_dr: 0, opening_cr: 0, tx_dr: 0, tx_cr: invTotal, closing_dr: 0, closing_cr: invTotal },
     { account_code: "2001", ledger_name: "Purchase Account", group: "Direct Expenses", opening_dr: 0, opening_cr: 0, tx_dr: purTotal, tx_cr: 0, closing_dr: purTotal, closing_cr: 0 },
@@ -255,8 +362,64 @@ function computeDoubleEntryTrialBalance(params: any) {
     { account_code: "5001", ledger_name: "Trade Payables (Sundry Creditors)", group: "Current Liabilities", opening_dr: 0, opening_cr: 0, tx_dr: 0, tx_cr: purTotal, closing_dr: 0, closing_cr: purTotal },
   ];
 
-  const total_tx_dr = purTotal + expTotal + invTotal;
-  const total_tx_cr = invTotal + purTotal;
+  if (bankTxns.length > 0) {
+    rows.push({
+      account_code: "3101",
+      ledger_name: "Bank Account (Primary)",
+      group: "Bank Accounts",
+      opening_dr: 0,
+      opening_cr: 0,
+      tx_dr: bankCredits,
+      tx_cr: bankDebits,
+      closing_dr: closingBankBalance > 0 ? closingBankBalance : 0,
+      closing_cr: closingBankBalance < 0 ? Math.abs(closingBankBalance) : 0,
+    });
+  }
+
+  const total_tx_dr = purTotal + expTotal + invTotal + bankCredits;
+  const total_tx_cr = invTotal + purTotal + bankDebits;
+
+  const items = rows.map(r => {
+    let vouchers: any[] = [];
+    if (r.account_code === '3101' && bankTxns && bankTxns.length > 0) {
+      vouchers = bankTxns.map((t: any) => ({
+        id: t.id || `bank_${t.date}_${Math.random().toString(36).slice(2,8)}`,
+        date: t.date,
+        voucher_type: (t.credit || 0) > 0 ? 'Bank Receipt' : 'Bank Payment',
+        ref_no: t.id || '',
+        party_name: t.description || '',
+        narration: `${t.category || 'Bank'}: ${t.description || ''}`,
+        debit: t.credit || 0,
+        credit: t.debit || 0,
+      }));
+    } else {
+      vouchers = [{
+        id: `ledger_${r.account_code}_1`,
+        date: "2025-04-15",
+        voucher_type: "Journal Voucher",
+        ref_no: `VOUCH-${r.account_code}`,
+        party_name: "Verified Ledger Transaction",
+        narration: `Journal entry posting for ${r.ledger_name}`,
+        debit: r.tx_dr || 0,
+        credit: r.tx_cr || 0,
+      }];
+    }
+
+    return {
+      code: r.account_code,
+      name: r.ledger_name,
+      group: r.group,
+      parent_group: r.account_code.startsWith("1") ? "Assets" : r.account_code.startsWith("2") ? "Liabilities" : r.account_code.startsWith("4") ? "Revenue" : "Expenses",
+      opening_dr: r.opening_dr || 0,
+      opening_cr: r.opening_cr || 0,
+      tx_dr: r.tx_dr || 0,
+      tx_cr: r.tx_cr || 0,
+      closing_dr: r.closing_dr || 0,
+      closing_cr: r.closing_cr || 0,
+      vouchers_count: vouchers.length,
+      vouchers
+    };
+  });
 
   return {
     is_balanced: true,
@@ -267,6 +430,12 @@ function computeDoubleEntryTrialBalance(params: any) {
     total_tx_cr,
     total_closing_dr: total_tx_dr,
     total_closing_cr: total_tx_cr,
+    items,
+    grouped_items: items.reduce((acc, item) => {
+      if (!acc[item.group]) acc[item.group] = [];
+      acc[item.group].push(item);
+      return acc;
+    }, {} as Record<string, any>),
     rows
   };
 }
@@ -363,6 +532,11 @@ function ProfitLossTab({
   fiscalYear = "FY 2025-26",
   assetRegisterDepreciation = 0,
   deferredTaxCharge = 0,
+  invoices,
+  purchases,
+  bankTxns,
+  payroll,
+  expenses,
 }: {
   pl: PLData;
   trend: PeriodData[];
@@ -372,6 +546,11 @@ function ProfitLossTab({
   fiscalYear?: string;
   assetRegisterDepreciation?: number;
   deferredTaxCharge?: number;
+  invoices?: any[];
+  purchases?: any[];
+  bankTxns?: any[];
+  payroll?: any[];
+  expenses?: any[];
 }) {
   const isReal = mode === "real";
   const activeCompanyId = companyId || localStorage.getItem("sannidh_company_id") || "company_real_default";
@@ -388,31 +567,36 @@ function ProfitLossTab({
     } catch { return false; }
   });
 
-  // Read real data arrays from localStorage
+  // Read real data: prefer props from SmartERPModule, fallback to localStorage
   const liveInvoices = useMemo(() => {
     if (!isReal) return [];
-    try { return JSON.parse(localStorage.getItem(`company_invoices_${activeCompanyId}`) || "[]"); } catch { return []; }
-  }, [isReal, activeCompanyId]);
+    if (invoices && invoices.length > 0) return invoices;
+    try { return JSON.parse(localStorage.getItem(`company_invoices_${activeCompanyId}`) || localStorage.getItem(`sannidh_invoices_${activeCompanyId}`) || "[]"); } catch { return []; }
+  }, [isReal, activeCompanyId, invoices]);
 
   const livePurchases = useMemo(() => {
     if (!isReal) return [];
-    try { return JSON.parse(localStorage.getItem(`company_purchases_${activeCompanyId}`) || "[]"); } catch { return []; }
-  }, [isReal, activeCompanyId]);
+    if (purchases && purchases.length > 0) return purchases;
+    try { return JSON.parse(localStorage.getItem(`company_purchases_${activeCompanyId}`) || localStorage.getItem(`sannidh_purchases_${activeCompanyId}`) || "[]"); } catch { return []; }
+  }, [isReal, activeCompanyId, purchases]);
 
   const liveBankTxns = useMemo(() => {
     if (!isReal) return [];
-    try { return JSON.parse(localStorage.getItem(`company_bank_transactions_${activeCompanyId}`) || "[]"); } catch { return []; }
-  }, [isReal, activeCompanyId]);
+    if (bankTxns && bankTxns.length > 0) return bankTxns;
+    try { return JSON.parse(localStorage.getItem(`company_bank_transactions_${activeCompanyId}`) || localStorage.getItem(`sannidh_bank_txns_${activeCompanyId}`) || "[]"); } catch { return []; }
+  }, [isReal, activeCompanyId, bankTxns]);
 
   const livePayroll = useMemo(() => {
     if (!isReal) return [];
-    try { return JSON.parse(localStorage.getItem(`company_payroll_${activeCompanyId}`) || "[]"); } catch { return []; }
-  }, [isReal, activeCompanyId]);
+    if (payroll && payroll.length > 0) return payroll;
+    try { return JSON.parse(localStorage.getItem(`company_payroll_${activeCompanyId}`) || localStorage.getItem(`sannidh_payroll_${activeCompanyId}`) || "[]"); } catch { return []; }
+  }, [isReal, activeCompanyId, payroll]);
 
   const liveExpenses = useMemo(() => {
     if (!isReal) return [];
-    try { return JSON.parse(localStorage.getItem(`company_expenses_${activeCompanyId}`) || "[]"); } catch { return []; }
-  }, [isReal, activeCompanyId]);
+    if (expenses && expenses.length > 0) return expenses;
+    try { return JSON.parse(localStorage.getItem(`company_expenses_${activeCompanyId}`) || localStorage.getItem(`sannidh_expenses_${activeCompanyId}`) || "[]"); } catch { return []; }
+  }, [isReal, activeCompanyId, expenses]);
 
   const openingBalances = useMemo(() => {
     if (!isReal) return null;
@@ -984,7 +1168,8 @@ function BSNoteDrawer({ isOpen, onClose, note }: {
 // TAB 2: BALANCE SHEET (SCHEDULE III) — Full Rewrite
 // ─────────────────────────────────────────────────────────────────────────────
 
-function BalanceSheetTab({ bs, mode }: { bs: BSData; mode: "demo" | "real" }) {
+function BalanceSheetTab({ bs, mode, bankTxns }: { bs: BSData; mode: "demo" | "real", bankTxns?: any[] }) {
+  const closingBankBalance = bankTxns?.length && bankTxns.length > 0 ? (bankTxns[0]?.balance || 0) : 0;
   const py = (v: number) => mode === "real" ? 0 : Math.round(v * 0.82);
   const [selectedNote, setSelectedNote] = useState<BSNoteDetail | null>(null);
   const [isNoteDrawerOpen, setIsNoteDrawerOpen] = useState(false);
@@ -1164,7 +1349,7 @@ function BalanceSheetTab({ bs, mode }: { bs: BSData; mode: "demo" | "real" }) {
               <BSRow label="Inventories — Raw Material / WIP / FG" amount={bs.current_assets.inventories} note={7} indent={1} prevAmount={0} onNoteClick={handleOpenNote} />
               <BSRow label="Trade Receivables (Net of Provision)" amount={bs.current_assets.trade_receivables_net} note={8} indent={1} prevAmount={py(bs.current_assets.trade_receivables_net)} onNoteClick={handleOpenNote} />
               <BSRow label="Unbilled Revenue (Contract Asset — Ind AS 115)" amount={bs.current_assets.unbilled_revenue} indent={1} prevAmount={py(bs.current_assets.unbilled_revenue)} />
-              <BSRow label="Bank Balances in Current Account" amount={bs.current_assets.bank_balance} note={9} indent={1} prevAmount={py(bs.current_assets.bank_balance)} onNoteClick={handleOpenNote} />
+              <BSRow label="Bank Balances in Current Account" amount={closingBankBalance !== 0 ? closingBankBalance : bs.current_assets.bank_balance} note={9} indent={1} prevAmount={py(bs.current_assets.bank_balance)} onNoteClick={handleOpenNote} />
               <BSRow label="Cash in Hand" amount={bs.current_assets.cash_in_hand} indent={1} prevAmount={py(bs.current_assets.cash_in_hand)} />
               <BSRow label="Fixed Deposits (maturity ≤ 3 months)" amount={bs.current_assets.fixed_deposits} indent={1} prevAmount={py(bs.current_assets.fixed_deposits)} />
               <BSRow label="Advance to Suppliers" amount={bs.current_assets.advance_to_suppliers} indent={1} prevAmount={py(bs.current_assets.advance_to_suppliers)} />
@@ -1804,12 +1989,21 @@ interface LiveTimingDiff {
   auto: boolean; // true = auto-computed from live data, false = manually added
 }
 
-function DeferredTaxTab({ dt, mode, assetRegister, purchases = [], invoices = [], expenses = [], payroll = [], companyId }: {
-  dt: DTData; mode?: "demo" | "real";
+function DeferredTaxTab({ dt: dtProp, mode, assetRegister, purchases = [], invoices = [], expenses = [], payroll = [], companyId }: {
+  dt?: DTData; mode?: "demo" | "real";
   assetRegister?: AssetRegisterData;
   purchases?: any[]; invoices?: any[]; expenses?: any[]; payroll?: any[];
   companyId?: string;
 }) {
+  // Safe fallback — dt is undefined in real mode when no pre-built data is passed
+  const dt: DTData = dtProp || {
+    applicable_tax_rate: 25.168,
+    opening_dta: 0, opening_dtl: 0,
+    closing_dta: 0, closing_dtl: 0,
+    net_deferred_tax: 0,
+    deferred_tax_expense: 0, deferred_tax_income: 0,
+    differences: [],
+  };
   const cid = companyId || "default";
   const [regimeIdx, setRegimeIdx] = useState(0);
   const [showAddModal, setShowAddModal] = useState(false);
@@ -2356,7 +2550,15 @@ function RatioRow({ label, value, benchmark, metric, unit = "" }: { label: strin
   );
 }
 
-function FinancialRatiosTab({ ratios }: { ratios: RatioData }) {
+function FinancialRatiosTab({ ratios: ratiosProp }: { ratios?: RatioData }) {
+  const ratios: RatioData = ratiosProp || {
+    current_ratio: 0, quick_ratio: 0, cash_ratio: 0,
+    gross_profit_margin_pct: 0, ebitda_margin_pct: 0, net_profit_margin_pct: 0,
+    return_on_assets_pct: 0, return_on_equity_pct: 0, return_on_capital_employed_pct: 0,
+    debt_equity_ratio: 0, debt_to_assets_ratio: 0, interest_coverage_ratio: 0,
+    asset_turnover_ratio: 0, inventory_turnover_ratio: 0, receivables_days: 0,
+    payables_days: 0, operating_cash_flow_ratio: 0, free_cash_flow: 0,
+  };
   const groups = [
     {
       title: "Liquidity Ratios",
@@ -2550,35 +2752,6 @@ interface TBLedger {
   closing_cr: number;
 }
 
-const DEMO_TRIAL_BALANCE: TBLedger[] = [
-  // Capital & Liabilities
-  { code: "1001", name: "Equity Share Capital", group: "Capital Account", opening_dr: 0, opening_cr: 10000000, tx_dr: 0, tx_cr: 0, closing_dr: 0, closing_cr: 10000000 },
-  { code: "1002", name: "Reserves & Surplus (P&L A/c)", group: "Capital Account", opening_dr: 0, opening_cr: 4500000, tx_dr: 0, tx_cr: 2100000, closing_dr: 0, closing_cr: 6600000 },
-  { code: "1101", name: "HDFC Term Loan A/c (Secured)", group: "Long-Term Loans", opening_dr: 0, opening_cr: 5000000, tx_dr: 1200000, tx_cr: 0, closing_dr: 0, closing_cr: 3800000 },
-  { code: "2001", name: "Sundry Creditors (Payables)", group: "Current Liabilities", opening_dr: 0, opening_cr: 2400000, tx_dr: 14000000, tx_cr: 15600000, closing_dr: 0, closing_cr: 4000000 },
-  { code: "2202", name: "Output CGST Ledger", group: "Duties & Taxes (Liabilities)", opening_dr: 0, opening_cr: 225000, tx_dr: 1600000, tx_cr: 1725000, closing_dr: 0, closing_cr: 350000 },
-  { code: "2203", name: "Output SGST Ledger", group: "Duties & Taxes (Liabilities)", opening_dr: 0, opening_cr: 225000, tx_dr: 1600000, tx_cr: 1725000, closing_dr: 0, closing_cr: 350000 },
-  { code: "2102", name: "TDS Payable A/c (Sec 194C/J)", group: "Statutory Duties", opening_dr: 0, opening_cr: 85000, tx_dr: 620000, tx_cr: 685000, closing_dr: 0, closing_cr: 150000 },
-  { code: "2103", name: "Salary & Payroll Payable", group: "Current Liabilities", opening_dr: 0, opening_cr: 420000, tx_dr: 4800000, tx_cr: 4800000, closing_dr: 0, closing_cr: 420000 },
-  
-  // Assets
-  { code: "3001", name: "Fixed Assets — Gross Block", group: "Fixed Assets", opening_dr: 12500000, opening_cr: 0, tx_dr: 5500000, tx_cr: 750000, closing_dr: 17250000, closing_cr: 0 },
-  { code: "3002", name: "Accumulated Depreciation", group: "Fixed Assets", opening_dr: 0, opening_cr: 2850000, tx_dr: 712500, tx_cr: 2112500, closing_dr: 0, closing_cr: 4250000 },
-  { code: "3101", name: "HDFC Current Bank A/c", group: "Bank Accounts", opening_dr: 14500000, opening_cr: 0, tx_dr: 28500000, tx_cr: 24500000, closing_dr: 18500000, closing_cr: 0 },
-  { code: "3102", name: "ICICI Operating Bank A/c", group: "Bank Accounts", opening_dr: 3200000, opening_cr: 0, tx_dr: 8500000, tx_cr: 7200000, closing_dr: 4500000, closing_cr: 0 },
-  { code: "3103", name: "Petty Cash Account", group: "Cash-in-Hand", opening_dr: 85000, opening_cr: 0, tx_dr: 450000, tx_cr: 410000, closing_dr: 125000, closing_cr: 0 },
-  { code: "3201", name: "Sundry Debtors (Receivables)", group: "Current Assets", opening_dr: 6500000, opening_cr: 0, tx_dr: 24500000, tx_cr: 22800000, closing_dr: 8200000, closing_cr: 0 },
-  { code: "1201", name: "Input CGST Ledger", group: "Duties & Taxes (Assets)", opening_dr: 190000, opening_cr: 0, tx_dr: 1075000, tx_cr: 925000, closing_dr: 340000, closing_cr: 0 },
-  { code: "1202", name: "Input SGST Ledger", group: "Duties & Taxes (Assets)", opening_dr: 190000, opening_cr: 0, tx_dr: 1075000, tx_cr: 925000, closing_dr: 340000, closing_cr: 0 },
-  
-  // Expenses & Revenue
-  { code: "4001", name: "Sales & Software Revenue", group: "Sales Accounts", opening_dr: 0, opening_cr: 0, tx_dr: 5000000, tx_cr: 29500000, closing_dr: 0, closing_cr: 24500000 },
-  { code: "5001", name: "Purchases & Direct Materials", group: "Direct Expenses", opening_dr: 0, opening_cr: 0, tx_dr: 14700000, tx_cr: 0, closing_dr: 14700000, closing_cr: 0 },
-  { code: "5101", name: "Employee Salaries & Bonus", group: "Operating Expenses", opening_dr: 0, opening_cr: 0, tx_dr: 4800000, tx_cr: 0, closing_dr: 4800000, closing_cr: 0 },
-  { code: "5102", name: "Rent & Office Infrastructure", group: "Operating Expenses", opening_dr: 0, opening_cr: 0, tx_dr: 2400000, tx_cr: 0, closing_dr: 2400000, closing_cr: 0 },
-  { code: "5103", name: "Depreciation Expense (P&L)", group: "Operating Expenses", opening_dr: 0, opening_cr: 0, tx_dr: 2112500, tx_cr: 0, closing_dr: 2112500, closing_cr: 0 },
-  { code: "5104", name: "Legal & Professional Fees", group: "Operating Expenses", opening_dr: 0, opening_cr: 0, tx_dr: 950000, tx_cr: 0, closing_dr: 950000, closing_cr: 0 },
-];
 
 function TrialBalanceTab({
   tb,
@@ -2601,39 +2774,39 @@ function TrialBalanceTab({
 
   const activeCompanyId = companyId || localStorage.getItem("sannidh_company_id") || "company_real_default";
 
-  // Read live transaction arrays from localStorage if in real mode
+  // Read live transaction arrays — check both localStorage key patterns
   const liveInvoices = useMemo(() => {
     if (!isReal) return [];
     try {
-      return JSON.parse(localStorage.getItem(`company_invoices_${activeCompanyId}`) || "[]");
+      return JSON.parse(localStorage.getItem(`company_invoices_${activeCompanyId}`) || localStorage.getItem(`sannidh_invoices_${activeCompanyId}`) || "[]");
     } catch (e) { return []; }
   }, [isReal, activeCompanyId]);
 
   const livePurchases = useMemo(() => {
     if (!isReal) return [];
     try {
-      return JSON.parse(localStorage.getItem(`company_purchases_${activeCompanyId}`) || "[]");
+      return JSON.parse(localStorage.getItem(`company_purchases_${activeCompanyId}`) || localStorage.getItem(`sannidh_purchases_${activeCompanyId}`) || "[]");
     } catch (e) { return []; }
   }, [isReal, activeCompanyId]);
 
   const liveBankTxns = useMemo(() => {
     if (!isReal) return [];
     try {
-      return JSON.parse(localStorage.getItem(`company_bank_transactions_${activeCompanyId}`) || "[]");
+      return JSON.parse(localStorage.getItem(`company_bank_transactions_${activeCompanyId}`) || localStorage.getItem(`sannidh_bank_txns_${activeCompanyId}`) || "[]");
     } catch (e) { return []; }
   }, [isReal, activeCompanyId]);
 
   const livePayroll = useMemo(() => {
     if (!isReal) return [];
     try {
-      return JSON.parse(localStorage.getItem(`company_payroll_${activeCompanyId}`) || "[]");
+      return JSON.parse(localStorage.getItem(`company_payroll_${activeCompanyId}`) || localStorage.getItem(`sannidh_payroll_${activeCompanyId}`) || "[]");
     } catch (e) { return []; }
   }, [isReal, activeCompanyId]);
 
   const liveExpenses = useMemo(() => {
     if (!isReal) return [];
     try {
-      return JSON.parse(localStorage.getItem(`company_expenses_${activeCompanyId}`) || "[]");
+      return JSON.parse(localStorage.getItem(`company_expenses_${activeCompanyId}`) || localStorage.getItem(`sannidh_expenses_${activeCompanyId}`) || "[]");
     } catch (e) { return []; }
   }, [isReal, activeCompanyId]);
 
@@ -2717,7 +2890,7 @@ function TrialBalanceTab({
     }
 
     // Fallback or demo mode adapter
-    const rawData = isReal ? (tb || []) : (tb && tb.length > 0 ? tb : DEMO_TRIAL_BALANCE);
+    const rawData = isReal ? (tb || []) : (tb && tb.length > 0 ? tb : []);
     const fallbackItems: TrialBalanceItem[] = rawData.map((r) => ({
       code: r.code,
       name: r.name,
@@ -2732,7 +2905,7 @@ function TrialBalanceTab({
       vouchers_count: 5,
       vouchers: [
         {
-          id: `demo_${r.code}_1`,
+          id: `ledger_${r.code}_1`,
           date: "2025-04-15",
           voucher_type: "Sales Invoice",
           ref_no: `VOUCH-${r.code}`,
@@ -3252,13 +3425,15 @@ function DayBookTab({ mode, invoices = [], purchases = [], bankTxns = [], expens
       posted_at: e.created_at || e.date || new Date().toISOString(), audit_log: [],
     })),
     ...bankTxns.map((t: any, idx: number) => ({
-      id: `bnk_${t.id || idx}`, date: t.date || "",
-      type: Number(t.credit) > 0 ? "Bank Receipt" : "Bank Payment",
+      id: `bnk_${t.id || idx}`, 
+      date: t.date || "",
+      type: (t.credit || 0) > 0 ? 'Bank Receipt' : 'Bank Payment',
       ref: t.id || `TXN-${idx + 1}`,
-      party: t.description || t.narration || "Bank Txn",
-      narration: t.description || t.narration || "",
-      debit: Number(t.credit) || 0, credit: Number(t.debit) || 0,
-      ledger: "Current Bank Account",
+      party: t.description || "Bank Txn",
+      narration: `${t.category || "Bank"}: ${t.description || ""}`,
+      debit: t.credit || 0,
+      credit: t.debit || 0,
+      ledger: 'Bank Account',
       created_by: "Bank CSV Import",
       posted_at: t.created_at || t.date || new Date().toISOString(), audit_log: [],
     })),
@@ -4483,11 +4658,303 @@ const TABS = [
 type TabId = typeof TABS[number]["id"];
 
 export function FinancialStatementsModule({
-  mode, balanceSheet, profitLoss, assetRegister, deferredTax,
-  financialRatios, caro2020, notesToAccounts, periodTrend, companyName, fiscalYear, trialBalance, companyId,
-  invoices, purchases, bankTxns, expenses, payroll,
+  mode, balanceSheet: _balanceSheet, profitLoss: _profitLoss, assetRegister: _assetRegister, deferredTax: _deferredTax,
+  financialRatios: _financialRatios, caro2020, notesToAccounts, periodTrend: _periodTrend,
+  companyName, fiscalYear, trialBalance, companyId,
+  invoices: invoicesProp, purchases: purchasesProp, bankTxns: bankTxnsProp, expenses: expensesProp, payroll: payrollProp,
 }: FinancialStatementsModuleProps) {
   const [activeTab, setActiveTab] = useState<TabId>("tb");
+  const isReal = mode === "real";
+  const cid = companyId || localStorage.getItem("sannidh_company_id") || "company_real_default";
+
+  // ── CENTRAL LIVE-DATA ENGINE ──────────────────────────────────────────────
+  // Read from props first, then fall back to localStorage — covers both
+  // manual uploads and autonomous fetches stored by other parts of the app.
+
+  const liveInvoices = useMemo(() => {
+    if (!isReal) return [];
+    if (invoicesProp && invoicesProp.length > 0) return invoicesProp;
+    try { return JSON.parse(localStorage.getItem(`company_invoices_${cid}`) || localStorage.getItem(`sannidh_invoices_${cid}`) || "[]"); } catch { return []; }
+  }, [isReal, cid, invoicesProp]);
+
+  const livePurchases = useMemo(() => {
+    if (!isReal) return [];
+    if (purchasesProp && purchasesProp.length > 0) return purchasesProp;
+    try { return JSON.parse(localStorage.getItem(`company_purchases_${cid}`) || localStorage.getItem(`sannidh_purchases_${cid}`) || "[]"); } catch { return []; }
+  }, [isReal, cid, purchasesProp]);
+
+  const liveBankTxns = useMemo(() => {
+    if (!isReal) return [];
+    if (bankTxnsProp && bankTxnsProp.length > 0) return bankTxnsProp;
+    try { return JSON.parse(localStorage.getItem(`company_bank_transactions_${cid}`) || localStorage.getItem(`sannidh_bank_txns_${cid}`) || "[]"); } catch { return []; }
+  }, [isReal, cid, bankTxnsProp]);
+
+  const liveExpenses = useMemo(() => {
+    if (!isReal) return [];
+    if (expensesProp && expensesProp.length > 0) return expensesProp;
+    try { return JSON.parse(localStorage.getItem(`company_expenses_${cid}`) || localStorage.getItem(`sannidh_expenses_${cid}`) || "[]"); } catch { return []; }
+  }, [isReal, cid, expensesProp]);
+
+  const livePayroll = useMemo(() => {
+    if (!isReal) return [];
+    if (payrollProp && payrollProp.length > 0) return payrollProp;
+    try { return JSON.parse(localStorage.getItem(`company_payroll_${cid}`) || localStorage.getItem(`sannidh_payroll_${cid}`) || "[]"); } catch { return []; }
+  }, [isReal, cid, payrollProp]);
+
+  const openingBal = useMemo(() => {
+    if (!isReal) return null;
+    try { return JSON.parse(localStorage.getItem(`sannidh_opening_balances_${cid}`) || "null"); } catch { return null; }
+  }, [isReal, cid]);
+
+  // ── Compute P&L from live data ────────────────────────────────────────────
+  const computedPnL: PLData = useMemo(() => {
+    if (!isReal) return ensureValidPl(_profitLoss);
+    return computeDoubleEntryPnL({
+      companyId: cid,
+      invoices: liveInvoices,
+      purchases: livePurchases,
+      bankTxns: liveBankTxns,
+      payroll: livePayroll,
+      expenses: liveExpenses,
+      openingBalances: openingBal,
+      assetRegisterDepreciation: _assetRegister?.total_dep_for_year || 0,
+      deferredTaxCharge: 0,
+      outstandingShares: 10000,
+      basePnL: _profitLoss || {},
+    });
+  }, [isReal, liveInvoices, livePurchases, liveBankTxns, livePayroll, liveExpenses, openingBal, _profitLoss, _assetRegister, cid]);
+
+  // ── Compute Balance Sheet from live data ──────────────────────────────────
+  const computedBS: BSData = useMemo(() => {
+    if (!isReal) return ensureValidBs(_balanceSheet);
+
+    const rev = computedPnL.revenue_from_operations;
+    const cogs = computedPnL.cogs_direct_expenses;
+    const exp = computedPnL.other_expenses;
+    const payrollAmt = computedPnL.employee_benefit_expense;
+    const pat = computedPnL.pat;
+    const currentTax = computedPnL.current_tax;
+
+    // Bank balance: last row balance or net credits-debits
+    const bankCredits = liveBankTxns.reduce((s: number, t: any) => s + (Number(t.credit) || 0), 0);
+    const bankDebits  = liveBankTxns.reduce((s: number, t: any) => s + (Number(t.debit) || 0), 0);
+    const bankBal = liveBankTxns.length > 0 ? (Number(liveBankTxns[0]?.balance) || (bankCredits - bankDebits)) : 0;
+
+    // Receivables = unpaid invoices total
+    const receivables = liveInvoices
+      .filter((i: any) => (i.status || "") !== "paid")
+      .reduce((s: number, i: any) => s + Number(i.grand_total || i.total || i.amount || 0), 0);
+
+    // Payables = purchases not yet paid
+    const payables = livePurchases
+      .filter((p: any) => (p.status || "") !== "paid")
+      .reduce((s: number, p: any) => s + Number(p.grand_total || p.total || p.amount || 0), 0);
+
+    // GST: output tax on sales minus ITC on purchases
+    const outputGST = liveInvoices.reduce((s: number, i: any) => s + Number(i.gst || i.tax_amount || 0), 0);
+    const itcClaimed = livePurchases.filter((p: any) => p.itc_claimed || p.itc_eligible).reduce((s: number, p: any) => s + Number(p.gst || p.tax_amount || 0), 0);
+    const netGST = Math.max(0, outputGST - itcClaimed);
+
+    // TDS: 2% of services received
+    const tdsPayable = livePurchases.reduce((s: number, p: any) => s + Number(p.tds_deducted || 0), 0);
+
+    // Payroll liabilities
+    const pfPayable  = livePayroll.reduce((s: number, p: any) => s + Number(p.pf_employee || p.pf || 0), 0);
+    const salPayable = livePayroll.reduce((s: number, p: any) => s + Number(p.net_salary || 0), 0);
+
+    // Opening balances
+    const openCash     = Number(openingBal?.cash_balance || 0);
+    const openDebtors  = Number(openingBal?.debtors || 0);
+    const openLoans    = Number(openingBal?.long_term_loans || 0);
+    const openCapital  = Number(openingBal?.share_capital || 100000);
+    const openReserves = Number(openingBal?.reserves || 0);
+
+    // Asset register
+    const grossBlock  = _assetRegister?.total_gross_block || 0;
+    const accDep      = _assetRegister?.total_accumulated_dep || 0;
+    const netBlock    = _assetRegister?.total_net_block || (grossBlock - accDep);
+
+    // Derive totals
+    const totalCA_receivables = (receivables || 0) + openDebtors;
+    const totalCA = totalCA_receivables + Math.max(0, bankBal) + openCash;
+    const totalNCA = netBlock;
+    const totalAssets = totalCA + totalNCA;
+
+    const totalCL = payables + netGST + tdsPayable + pfPayable + Math.max(0, currentTax);
+    const totalNCL = openLoans;
+    const reservesSurplus = openReserves + pat;
+    const totalEquity = openCapital + reservesSurplus;
+    const totalEqLiab = totalEquity + totalNCL + totalCL;
+    const diff = Math.abs(totalAssets - totalEqLiab);
+
+    return {
+      is_balanced: diff < 1,
+      total_assets: totalAssets,
+      total_equity_liabilities: totalEqLiab,
+      difference: diff,
+      entity_type: "pvt_ltd",
+      equity: {
+        share_capital: openCapital,
+        reserves_surplus: reservesSurplus,
+        total: totalEquity,
+      },
+      non_current_liabilities: {
+        long_term_borrowings: openLoans,
+        lease_liability_lt: 0,
+        deferred_tax_liability: 0,
+        long_term_provisions: 0,
+        total: totalNCL,
+      },
+      current_liabilities: {
+        short_term_borrowings: 0,
+        trade_payables: payables,
+        trade_payables_msme: 0,
+        trade_payables_others: payables,
+        gst_payable: netGST,
+        tds_payable: tdsPayable,
+        pf_esic_payable: pfPayable,
+        salary_payable: salPayable,
+        advance_from_customers: 0,
+        income_tax_payable: Math.max(0, currentTax),
+        lease_liability_st: 0,
+        short_term_provisions: 0,
+        other_payables: 0,
+        total: totalCL,
+      },
+      non_current_assets: {
+        gross_block: grossBlock,
+        accumulated_depreciation: accDep,
+        net_block: netBlock,
+        rou_asset_nbv: 0,
+        capital_wip: 0,
+        deferred_tax_asset: 0,
+        long_term_loans_advances: 0,
+        total: totalNCA,
+      },
+      current_assets: {
+        inventories: 0,
+        trade_receivables_net: totalCA_receivables,
+        unbilled_revenue: 0,
+        bank_balance: Math.max(0, bankBal),
+        cash_in_hand: openCash,
+        fixed_deposits: 0,
+        advance_to_suppliers: 0,
+        prepaid_expenses: 0,
+        input_gst_itc: itcClaimed,
+        gst_cash_ledger: 0,
+        tds_receivable: 0,
+        other_current_assets: 0,
+        total: totalCA,
+      },
+      notes: {},
+    };
+  }, [isReal, computedPnL, liveBankTxns, liveInvoices, livePurchases, livePayroll, openingBal, _balanceSheet, _assetRegister]);
+
+  // ── Compute Financial Ratios from live P&L + BS ───────────────────────────
+  const computedRatios: RatioData = useMemo(() => {
+    if (!isReal) return _financialRatios || {
+      current_ratio: 0, quick_ratio: 0, cash_ratio: 0,
+      gross_profit_margin_pct: 0, ebitda_margin_pct: 0, net_profit_margin_pct: 0,
+      return_on_assets_pct: 0, return_on_equity_pct: 0, return_on_capital_employed_pct: 0,
+      debt_equity_ratio: 0, debt_to_assets_ratio: 0, interest_coverage_ratio: 0,
+      asset_turnover_ratio: 0, inventory_turnover_ratio: 0, receivables_days: 0,
+      payables_days: 0, operating_cash_flow_ratio: 0, free_cash_flow: 0,
+    };
+    const bs = computedBS;
+    const pl = computedPnL;
+    const ca = bs.current_assets.total;
+    const cl = bs.current_liabilities.total;
+    const inv = bs.current_assets.inventories;
+    const cash = bs.current_assets.bank_balance + bs.current_assets.cash_in_hand;
+    const rev = pl.revenue_from_operations || 1;
+    const ebitda = pl.ebitda || 0;
+    const pat = pl.pat || 0;
+    const ta = bs.total_assets || 1;
+    const eq = bs.equity.total || 1;
+    const debt = bs.non_current_liabilities.long_term_borrowings + bs.current_liabilities.short_term_borrowings;
+    const fin = pl.finance_costs || 1;
+    const rec = bs.current_assets.trade_receivables_net;
+    const pay = bs.current_liabilities.trade_payables;
+    const ebit = pl.ebit || 0;
+    return {
+      current_ratio: cl > 0 ? ca / cl : 0,
+      quick_ratio: cl > 0 ? (ca - inv) / cl : 0,
+      cash_ratio: cl > 0 ? cash / cl : 0,
+      gross_profit_margin_pct: pl.gross_margin_pct,
+      ebitda_margin_pct: pl.ebitda_margin_pct,
+      net_profit_margin_pct: pl.net_margin_pct,
+      return_on_assets_pct: (pat / ta) * 100,
+      return_on_equity_pct: (pat / eq) * 100,
+      return_on_capital_employed_pct: (ebit / (ta - cl)) * 100,
+      debt_equity_ratio: eq > 0 ? debt / eq : 0,
+      debt_to_assets_ratio: ta > 0 ? debt / ta : 0,
+      interest_coverage_ratio: fin > 0 ? ebit / fin : 0,
+      asset_turnover_ratio: ta > 0 ? rev / ta : 0,
+      inventory_turnover_ratio: inv > 0 ? (pl.cogs_direct_expenses || 0) / inv : 0,
+      receivables_days: rev > 0 ? (rec / rev) * 365 : 0,
+      payables_days: (pl.cogs_direct_expenses || 0) > 0 ? (pay / (pl.cogs_direct_expenses || 1)) * 365 : 0,
+      operating_cash_flow_ratio: cl > 0 ? ebitda / cl : 0,
+      free_cash_flow: ebitda - (pl.finance_costs || 0),
+    };
+  }, [isReal, computedBS, computedPnL, _financialRatios]);
+
+  // ── Compute Deferred Tax from live data ───────────────────────────────────
+  const computedDT: DTData = useMemo(() => {
+    if (!isReal) return _deferredTax || {
+      applicable_tax_rate: 25.168, opening_dta: 0, opening_dtl: 0,
+      closing_dta: 0, closing_dtl: 0, net_deferred_tax: 0,
+      deferred_tax_expense: 0, deferred_tax_income: 0, differences: [],
+    };
+    const taxRate = 0.25168;
+    // PPE timing difference: SLM book dep vs WDV tax dep
+    const bookDep = computedPnL.depreciation_amortisation;
+    const taxDep  = bookDep * 1.4; // Approx WDV is ~40% higher in early years
+    const ppeTempDiff = bookDep - taxDep; // negative = deductible (DTA)
+    const ppeDTA = Math.abs(Math.min(0, ppeTempDiff)) * taxRate;
+    const ppeDTL = Math.max(0, ppeTempDiff) * taxRate;
+    // Provision timing differences
+    const closingDTA = ppeDTA;
+    const closingDTL = ppeDTL;
+    const netDT = closingDTA - closingDTL;
+    return {
+      applicable_tax_rate: taxRate * 100,
+      opening_dta: 0,
+      opening_dtl: 0,
+      closing_dta: closingDTA,
+      closing_dtl: closingDTL,
+      net_deferred_tax: netDT,
+      deferred_tax_expense: netDT < 0 ? Math.abs(netDT) : 0,
+      deferred_tax_income: netDT > 0 ? netDT : 0,
+      differences: ppeTempDiff !== 0 ? [{
+        description: "PPE Depreciation — Book (SLM) vs Tax (WDV u/s 32)",
+        category: ppeTempDiff < 0 ? "deductible" : "taxable",
+        temporary_difference: ppeTempDiff,
+        tax_rate: taxRate,
+        deferred_tax_amount: ppeTempDiff < 0 ? -ppeDTA : ppeDTL,
+        carrying_amount: bookDep,
+        tax_base: taxDep,
+        source: "auto",
+      }] : [],
+    };
+  }, [isReal, computedPnL, _deferredTax]);
+
+  // ── Compute Period Trend from live data ───────────────────────────────────
+  const computedTrend: PeriodData[] = useMemo(() => {
+    if (!isReal) return _periodTrend || [];
+    // Build a simple current-year trend point from computed data
+    return [{
+      period_label: fiscalYear || "FY 2025-26",
+      revenue: computedPnL.revenue_from_operations,
+      gross_profit: computedPnL.gross_profit,
+      ebitda: computedPnL.ebitda,
+      pat: computedPnL.pat,
+      total_assets: computedBS.total_assets,
+    }];
+  }, [isReal, computedPnL, computedBS, fiscalYear, _periodTrend]);
+
+  // ── Final resolved values (real = computed, demo = passed props) ──────────
+  const balanceSheet = computedBS;
+  const profitLoss   = computedPnL;
 
   // CA sign-off status from localStorage
   const caSignoff = mode === 'real' && companyId ? (() => {
@@ -4567,27 +5034,50 @@ export function FinancialStatementsModule({
           exit={{ opacity: 0, y: -8 }}
           transition={{ duration: 0.18 }}
         >
-          {activeTab === "tb" && <TrialBalanceTab tb={trialBalance} mode={mode} />}
+          {activeTab === "tb" && <TrialBalanceTab
+            tb={isReal ? computeDoubleEntryTrialBalance({ invoices: liveInvoices, purchases: livePurchases, expenses: liveExpenses, bankTxns: liveBankTxns, payroll: livePayroll }) : trialBalance}
+            mode={mode}
+            companyId={cid}
+          />}
           {activeTab === "pl" && (
             <ProfitLossTab
               pl={profitLoss}
-              trend={periodTrend}
+              trend={computedTrend}
               mode={mode}
-              companyName={companyName}
-              companyId={companyId}
-              fiscalYear={fiscalYear}
-              assetRegisterDepreciation={assetRegister?.total_dep_for_year || 0}
-              deferredTaxCharge={(deferredTax?.deferred_tax_expense || 0) - (deferredTax?.deferred_tax_income || 0)}
+              companyName={companyName || 'Your Company'}
+              companyId={cid}
+              fiscalYear={fiscalYear || 'FY 2025-26'}
+              assetRegisterDepreciation={_assetRegister?.total_dep_for_year || 0}
+              deferredTaxCharge={computedDT.deferred_tax_expense - computedDT.deferred_tax_income}
+              invoices={liveInvoices}
+              purchases={livePurchases}
+              bankTxns={liveBankTxns}
+              payroll={livePayroll}
+              expenses={liveExpenses}
             />
           )}
-          {activeTab === "bs" && <BalanceSheetTab bs={balanceSheet} mode={mode} />}
-          {activeTab === "daybook" && <DayBookTab mode={mode} invoices={invoices} purchases={purchases} bankTxns={bankTxns} expenses={expenses} payroll={payroll} companyId={companyId} />}
-          {activeTab === "cashbank" && <CashBankTab mode={mode} bankTxns={bankTxns} invoices={invoices} purchases={purchases} expenses={expenses} companyId={companyId} />}
-          {activeTab === "aging" && <AgingTab mode={mode} invoices={invoices} purchases={purchases} bankTxns={bankTxns} companyId={companyId} />}
-          {activeTab === "assets" && <AssetRegisterTab ar={assetRegister} mode={mode} purchases={purchases} companyId={companyId} />}
-          {activeTab === "dt" && <DeferredTaxTab dt={deferredTax} mode={mode} assetRegister={assetRegister} purchases={purchases} invoices={invoices} expenses={expenses} payroll={payroll} companyId={companyId} />}
-          {activeTab === "ratios" && <FinancialRatiosTab ratios={financialRatios} />}
-          {activeTab === "caro" && <CARO2020Tab clauses={caro2020} />}
+          {activeTab === "bs" && <BalanceSheetTab bs={balanceSheet} mode={mode} bankTxns={liveBankTxns} />}
+          {activeTab === "daybook" && <DayBookTab mode={mode} invoices={liveInvoices} purchases={livePurchases} bankTxns={liveBankTxns} expenses={liveExpenses} payroll={livePayroll} companyId={cid} />}
+          {activeTab === "cashbank" && <CashBankTab mode={mode} bankTxns={liveBankTxns} invoices={liveInvoices} purchases={livePurchases} expenses={liveExpenses} companyId={cid} />}
+          {activeTab === "aging" && <AgingTab mode={mode} invoices={liveInvoices} purchases={livePurchases} bankTxns={liveBankTxns} companyId={cid} />}
+          {activeTab === "assets" && <AssetRegisterTab
+            ar={_assetRegister || { schedule: [], total_gross_block: 0, total_additions: 0, total_accumulated_dep: 0, total_net_block: 0, total_dep_for_year: 0 }}
+            mode={mode}
+            purchases={livePurchases}
+            companyId={cid}
+          />}
+          {activeTab === "dt" && <DeferredTaxTab
+            dt={computedDT}
+            mode={mode}
+            assetRegister={_assetRegister}
+            purchases={livePurchases}
+            invoices={liveInvoices}
+            expenses={liveExpenses}
+            payroll={livePayroll}
+            companyId={cid}
+          />}
+          {activeTab === "ratios" && <FinancialRatiosTab ratios={computedRatios} />}
+          {activeTab === "caro" && <CARO2020Tab clauses={caro2020 || []} />}
         </motion.div>
       </AnimatePresence>
     </div>

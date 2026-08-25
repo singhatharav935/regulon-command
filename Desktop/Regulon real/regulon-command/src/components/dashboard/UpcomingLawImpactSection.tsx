@@ -47,7 +47,7 @@ const demoLawImpacts: LawImpact[] = [
   },
 ];
 
-const UpcomingLawImpactSection = ({ impacts, useDemoFallback = true }: UpcomingLawImpactSectionProps) => {
+const UpcomingLawImpactSection = ({ impacts, useDemoFallback = false }: UpcomingLawImpactSectionProps) => {
   const effectiveImpacts = impacts && impacts.length > 0 ? impacts : useDemoFallback ? demoLawImpacts : [];
   const getRiskBadgeClass = (level: LawImpact["riskLevel"]) => {
     switch (level) {

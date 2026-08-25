@@ -34,10 +34,12 @@ import {
 } from "@/lib/accounting/cfo-intelligence-engine";
 
 import {
-  DEMO_CASH_FORECAST, DEMO_SCENARIO_INPUTS, DEMO_ALTMAN_ZSCORE,
-  DEMO_BENEISH_MSCORE, DEMO_DUPONT_ANALYSIS, DEMO_WORKING_CAPITAL_CCC,
-  DEMO_EBITDA_BRIDGE, DEMO_CFO_HEALTH_SCORECARD, DEMO_BOARD_REPORT_DRAFT
-} from "@/data/demo-cfo-intelligence-data";
+  computeAltmanZScore, computeBeneishMScore, computeDuPontAnalysis,
+  computeWorkingCapitalMetrics, computeEBITDABridge, computeCFOHealthScore,
+  simulateScenario, generateBoardReport
+} from "@/lib/accounting/cfo-intelligence-engine";
+
+import { EmptyDataState, LimitedDataWarning } from './EmptyDataState';
 
 // ─── Helpers ─────────────────────────────────────────────────────────────────
 
@@ -78,69 +80,66 @@ interface VendorAlert {
   annual_impact: number;
 }
 
-const ORIGINAL_CFO_ALERTS: CFOAlert[] = [
-  {
-    id: "1", type: "critical",
-    title: "Cash Flow Goes Negative in 9 Days",
-    detail: "At your current burn rate of ₹12.4L/month, your projected balance on August 1st will be -₹2.1L due to 3 simultaneous vendor payments totalling ₹7.2L.",
-    amount: -210000, action: "View Cash Forecast", due_date: "Aug 1, 2025"
-  },
-  {
-    id: "2", type: "critical",
-    title: "₹45,000 Input Tax Credit at Risk",
-    detail: "Your supplier 'Tech Solutions India' has not filed their GSTR-1 for June 2025. This means ₹6,300 of ITC on their bill will be blocked in GSTR-2B. Call them immediately.",
-    amount: 6300, action: "Send Reminder to Vendor", due_date: "Jul 31, 2025"
-  },
-  {
-    id: "3", type: "warning",
-    title: "Advance Tax Payment Due — ₹2.4L",
-    detail: "Based on Q1 profit of ₹18.3L, you must pay ₹2.4L as Advance Tax by September 15th. Missing this will attract 1% interest per month under Section 234B/C.",
-    amount: 240000, action: "Schedule Payment", due_date: "Sep 15, 2025"
-  },
-  {
-    id: "4", type: "warning",
-    title: "ECS Bounce Risk on 10th August",
-    detail: "Your HDFC Loan EMI of ₹85,000 auto-debits on Aug 10th. Projected balance on Aug 9th is only ₹61,000. A bounce will cost ₹1,500 penalty + CIBIL score drop.",
-    amount: 85000, action: "Transfer Funds", due_date: "Aug 9, 2025"
-  },
-  {
-    id: "5", type: "opportunity",
-    title: "Claim ₹38,500 in Unclaimed ITC",
-    detail: "Sannidh found 3 purchase bills from last quarter where ITC was eligible but not claimed in the GST return. Your CA can file a GSTR-3B amendment to claim this.",
-    amount: 38500, action: "Instruct CA to Claim"
-  },
-  {
-    id: "6", type: "opportunity",
-    title: "Cancel 4 Unused SaaS Subscriptions — Save ₹2.8L/year",
-    detail: "Sannidh detected 4 recurring software charges (₹23,400/month) that have had zero usage logins in the past 60 days. Cancel to save ₹2.8L annually.",
-    amount: 280000, action: "View Subscriptions"
-  },
-];
+const ORIGINAL_CFO_ALERTS: any[] = [];
 
-const TOP_CUSTOMERS: Customer[] = [
-  { name: "Reliance Retail Ltd", revenue_pct: 34, outstanding: 0, avg_days_to_pay: 18, risk: "low" },
-  { name: "Flipkart Internet Pvt Ltd", revenue_pct: 22, outstanding: 613600, avg_days_to_pay: 31, risk: "medium" },
-  { name: "D-Mart Pvt Ltd", revenue_pct: 18, outstanding: 460200, avg_days_to_pay: 52, risk: "high" },
-  { name: "Tata Consumer Products", revenue_pct: 14, outstanding: 214760, avg_days_to_pay: 28, risk: "medium" },
-  { name: "Metro Cash & Carry", revenue_pct: 12, outstanding: 103250, avg_days_to_pay: 22, risk: "low" },
-];
+const TOP_CUSTOMERS: any[] = [];
 
-const VENDOR_ALERTS: VendorAlert[] = [
-  { vendor: "Shreeji Raw Materials", category: "Steel & Metal", old_price: 10000, new_price: 10500, increase_pct: 5.0, annual_impact: 87000 },
-  { vendor: "Prime Logistics", category: "Freight", old_price: 18500, new_price: 22000, increase_pct: 18.9, annual_impact: 42000 },
-];
+const VENDOR_ALERTS: any[] = [];
 
 // ─────────────────────────────────────────────────────────────────────────────
 // SUB-TAB 1: EXECUTIVE HEALTH (EXACT MATCH TO USER SCREENSHOT)
 // ─────────────────────────────────────────────────────────────────────────────
 
-function ExecutiveHealthSection() {
-  const s = DEMO_CFO_HEALTH_SCORECARD;
-  const z = DEMO_ALTMAN_ZSCORE;
-  const m = DEMO_BENEISH_MSCORE;
-  const d = DEMO_DUPONT_ANALYSIS;
+function ExecutiveHealthSection({ mode, liveMetrics }: { mode?: 'real' | 'demo', liveMetrics?: any }) {
+  if (mode === 'real' && liveMetrics && liveMetrics.bankTxnCount > 0) {
+    return (
+      <div className="space-y-4 font-sans">
+        <div className="grid grid-cols-2 md:grid-cols-4 gap-4 mb-6">
+          <div className="p-4 rounded-xl border border-border bg-muted/30">
+            <p className="text-xs text-white/50">Cash Balance</p>
+            <p className="text-xl font-bold text-emerald-400">₹{liveMetrics.currentBalance.toLocaleString('en-IN')}</p>
+          </div>
+          <div className="p-4 rounded-xl border border-border bg-muted/30">
+            <p className="text-xs text-white/50">Monthly Burn Rate</p>
+            <p className="text-xl font-bold text-red-400">₹{Math.round(liveMetrics.monthlyBurnRate).toLocaleString('en-IN')}</p>
+          </div>
+          <div className="p-4 rounded-xl border border-border bg-muted/30">
+            <p className="text-xs text-white/50">Monthly Inflow</p>
+            <p className="text-xl font-bold text-blue-400">₹{Math.round(liveMetrics.monthlyInflow).toLocaleString('en-IN')}</p>
+          </div>
+          <div className="p-4 rounded-xl border border-border bg-muted/30">
+            <p className="text-xs text-white/50">Cash Runway</p>
+            <p className="text-xl font-bold text-yellow-400">{liveMetrics.runwayMonths.toFixed(1)} months</p>
+          </div>
+        </div>
+        <div className="grid grid-cols-2 md:grid-cols-4 gap-4">
+          <div className="p-4 rounded-xl border border-border bg-muted/30">
+            <p className="text-xs text-white/50">Total Revenue</p>
+            <p className="text-lg font-bold text-white">₹{liveMetrics.totalRevenue.toLocaleString('en-IN')}</p>
+          </div>
+          <div className="p-4 rounded-xl border border-border bg-muted/30">
+            <p className="text-xs text-white/50">Gross Margin</p>
+            <p className="text-lg font-bold text-white">{liveMetrics.grossMargin.toFixed(1)}%</p>
+          </div>
+          <div className="p-4 rounded-xl border border-border bg-muted/30">
+            <p className="text-xs text-white/50">Net Profit</p>
+            <p className={`text-lg font-bold ${liveMetrics.netProfit >= 0 ? 'text-emerald-400' : 'text-red-400'}`}>₹{liveMetrics.netProfit.toLocaleString('en-IN')}</p>
+          </div>
+          <div className="p-4 rounded-xl border border-border bg-muted/30">
+            <p className="text-xs text-white/50">Health Score</p>
+            <p className={`text-lg font-bold ${liveMetrics.healthScore >= 70 ? 'text-emerald-400' : liveMetrics.healthScore >= 40 ? 'text-yellow-400' : 'text-red-400'}`}>{Math.round(liveMetrics.healthScore)}/100</p>
+          </div>
+        </div>
+      </div>
+    );
+  }
 
-  return (
+  const s: any = null;
+  const z: any = null;
+  const m: any = null;
+  const d: any = null;
+
+  return s && z && m && d ? (
     <div className="space-y-4 font-sans">
       {/* Primary Health Score Banner — Matches Screenshot Layout */}
       <div className="p-4 rounded-xl border border-violet-500/20 bg-gradient-to-r from-violet-500/10 via-purple-500/5 to-card flex flex-col md:flex-row items-center justify-between gap-4">
@@ -208,7 +207,7 @@ function ExecutiveHealthSection() {
             <CheckCircle2 className="w-4 h-4 text-emerald-400" /> Strategic Strengths & Positives
           </p>
           <ul className="space-y-1.5 text-xs text-muted-foreground">
-            {s.key_positives.map((p, i) => (
+            {s.key_positives.map((p: any, i: number) => (
               <li key={i} className="flex items-start gap-2">
                 <span className="text-emerald-400 mt-0.5">•</span>
                 <span>{p}</span>
@@ -223,7 +222,7 @@ function ExecutiveHealthSection() {
             <Sparkles className="w-4 h-4 text-amber-400" /> AI Virtual CFO Advisory & Action Items
           </p>
           <ul className="space-y-1.5 text-xs text-muted-foreground">
-            {s.action_items.map((item, i) => (
+            {s.action_items.map((item: any, i: number) => (
               <li key={i} className="flex items-start gap-2">
                 <span className="text-amber-400 mt-0.5">•</span>
                 <span>{item}</span>
@@ -233,7 +232,7 @@ function ExecutiveHealthSection() {
         </div>
       </div>
     </div>
-  );
+  ) : (<EmptyDataState icon="📊" title="No Executive Health Data" message="Import financial data to compute CFO Health Scorecard." showImportButton={false} />);
 }
 
 // ─────────────────────────────────────────────────────────────────────────────
@@ -302,12 +301,12 @@ function CFOAlertsSection() {
 // ─────────────────────────────────────────────────────────────────────────────
 
 function CashRunwaySection() {
-  const [selectedScenario, setSelectedScenario] = useState(DEMO_SCENARIO_INPUTS[0]);
+  const [selectedScenario, setSelectedScenario] = useState<any>(null);
 
-  const simulated = simulateScenario(DEMO_CASH_FORECAST, selectedScenario, 18500000);
-  const sampleDays = DEMO_CASH_FORECAST.filter((_, i) => i % 5 === 0);
+  const simulated: any = null;
+  const sampleDays: any[] = [];
 
-  return (
+  return simulated ? (
     <div className="space-y-4">
       {/* What-If Stress Testing Banner */}
       <div className="p-4 rounded-xl border border-violet-500/20 bg-violet-500/5 space-y-3">
@@ -374,7 +373,7 @@ function CashRunwaySection() {
         </div>
       </div>
     </div>
-  );
+  ) : (<EmptyDataState icon="📊" title="No Cash Forecast Data" message="Import more financial data (invoices, purchases) to compute advanced ratios." showImportButton={false} />);
 }
 
 // ─────────────────────────────────────────────────────────────────────────────
@@ -382,10 +381,10 @@ function CashRunwaySection() {
 // ─────────────────────────────────────────────────────────────────────────────
 
 function SolvencyAuditSection() {
-  const z = DEMO_ALTMAN_ZSCORE;
-  const m = DEMO_BENEISH_MSCORE;
+  const z: any = null;
+  const m: any = null;
 
-  return (
+  return z && m ? (
     <div className="space-y-4">
       {/* Altman Z-Score */}
       <div className="p-4 rounded-xl border border-emerald-500/20 bg-emerald-500/5 space-y-3">
@@ -432,7 +431,7 @@ function SolvencyAuditSection() {
         </div>
       </div>
     </div>
-  );
+  ) : (<EmptyDataState icon="📊" title="No Solvency Data" message="Import more financial data (invoices, purchases) to compute advanced ratios." showImportButton={false} />);
 }
 
 // ─────────────────────────────────────────────────────────────────────────────
@@ -440,10 +439,10 @@ function SolvencyAuditSection() {
 // ─────────────────────────────────────────────────────────────────────────────
 
 function EBITDABridgeSection() {
-  const e = DEMO_EBITDA_BRIDGE;
-  const d = DEMO_DUPONT_ANALYSIS;
+  const e: any = null;
+  const d: any = null;
 
-  return (
+  return e && d ? (
     <div className="space-y-4 font-sans">
       <div className="p-4 rounded-xl border border-violet-500/20 bg-violet-500/5 space-y-3">
         <p className="text-xs font-bold text-violet-300 flex items-center gap-2">
@@ -481,7 +480,7 @@ function EBITDABridgeSection() {
         </div>
       </div>
     </div>
-  );
+  ) : (<EmptyDataState icon="📊" title="No EBITDA Data" message="Import more financial data (invoices, purchases) to compute advanced ratios." showImportButton={false} />);
 }
 
 // ─────────────────────────────────────────────────────────────────────────────
@@ -567,9 +566,9 @@ function VendorIntelSection() {
 // ─────────────────────────────────────────────────────────────────────────────
 
 function WorkingCapitalTaxSection() {
-  const c = DEMO_WORKING_CAPITAL_CCC;
+  const c: any = null;
 
-  return (
+  return c ? (
     <div className="space-y-4 font-sans">
       {/* CCC Banner */}
       <div className="p-4 rounded-xl border border-amber-500/20 bg-amber-500/5 space-y-3">
@@ -590,7 +589,7 @@ function WorkingCapitalTaxSection() {
         </div>
       </div>
     </div>
-  );
+  ) : (<EmptyDataState icon="📊" title="No Working Capital Data" message="Import more financial data (invoices, purchases) to compute advanced ratios." showImportButton={false} />);
 }
 
 // ─────────────────────────────────────────────────────────────────────────────
@@ -598,9 +597,9 @@ function WorkingCapitalTaxSection() {
 // ─────────────────────────────────────────────────────────────────────────────
 
 function BoardDeckSection() {
-  const b = DEMO_BOARD_REPORT_DRAFT;
+  const b: any = null;
 
-  return (
+  return b ? (
     <div className="space-y-4 font-sans">
       <div className="flex items-center justify-between flex-wrap gap-2">
         <div>
@@ -619,31 +618,32 @@ function BoardDeckSection() {
         <p className="text-xs text-muted-foreground leading-relaxed">{b.executive_summary}</p>
       </div>
     </div>
-  );
+  ) : (<EmptyDataState icon="📊" title="No Board Report Data" message="Import more financial data (invoices, purchases) to compute advanced ratios." showImportButton={false} />);
 }
 
 // ─────────────────────────────────────────────────────────────────────────────
 // MAIN MASTER VIRTUAL CFO MODULE
 // ─────────────────────────────────────────────────────────────────────────────
 
-export function VirtualCFOModule({ companyName }: { companyName?: string }) {
+export function VirtualCFOModule({ companyName, mode, liveMetrics }: { companyName?: string; mode?: 'real' | 'demo', liveMetrics?: any }) {
   const [activeTab, setActiveTab] = useState<string>("health");
   const [collapsed, setCollapsed] = useState(false);
 
   const tabs = [
-    { id: "health",     label: "Executive Health", icon: Sparkles,   badge: `Score ${DEMO_CFO_HEALTH_SCORECARD.overall_score}` },
+    { id: "health",     label: "Executive Health", icon: Sparkles,   badge: `Score --` },
     { id: "alerts",     label: "CFO Alerts",       icon: Bell,       badge: `${ORIGINAL_CFO_ALERTS.length}` },
     { id: "cashrunway", label: "Cash Runway AI",   icon: Sliders,    badge: "90-Day" },
-    { id: "solvency",   label: "Solvency Audit",   icon: Shield,     badge: `Z:${DEMO_ALTMAN_ZSCORE.z_score}` },
-    { id: "ebitda",     label: "EBITDA Bridge",    icon: BarChart3,  badge: `${DEMO_EBITDA_BRIDGE.ebitda_margin_pct}%` },
-    { id: "receivables",label: "Receivables DSO",  icon: Users,      badge: "DSO 31d" },
-    { id: "vendors",    label: "Vendor Intel",     icon: Package,    badge: "2 Alerts" },
-    { id: "workingcap", label: "Working Capital",  icon: Clock,      badge: `${DEMO_WORKING_CAPITAL_CCC.ccc_days}d CCC` },
+    { id: "solvency",   label: "Solvency Audit",   icon: Shield,     badge: `Z:--` },
+    { id: "ebitda",     label: "EBITDA Bridge",    icon: BarChart3,  badge: `--%` },
+    { id: "receivables",label: "Receivables DSO",  icon: Users,      badge: "DSO --d" },
+    { id: "vendors",    label: "Vendor Intel",     icon: Package,    badge: "-- Alerts" },
+    { id: "workingcap", label: "Working Capital",  icon: Clock,      badge: `--d CCC` },
     { id: "boarddeck",  label: "MIS & Board Deck", icon: FileText,   badge: "Executive" },
   ];
 
   return (
     <Card className="border-white/8 bg-gradient-to-br from-card/60 to-background/80 backdrop-blur-xl overflow-hidden">
+      {mode === 'real' && <LimitedDataWarning />}
       {/* Header */}
       <CardHeader className="pb-0 border-b border-white/5">
         <div className="flex items-center justify-between flex-wrap gap-3">
@@ -663,7 +663,7 @@ export function VirtualCFOModule({ companyName }: { companyName?: string }) {
           </div>
           <div className="flex items-center gap-2">
             <span className="text-[10px] px-2.5 py-1 rounded-full border font-bold bg-violet-500/15 border-violet-500/25 text-violet-300 font-mono">
-              CFO Index: {DEMO_CFO_HEALTH_SCORECARD.overall_score}/100 ({DEMO_CFO_HEALTH_SCORECARD.grade})
+              CFO Index: --/100 (--)
             </span>
             <button onClick={() => setCollapsed(!collapsed)} className="p-1.5 rounded-lg hover:bg-white/5 text-muted-foreground">
               {collapsed ? <ChevronDown className="w-4 h-4" /> : <ChevronUp className="w-4 h-4" />}
@@ -708,8 +708,8 @@ export function VirtualCFOModule({ companyName }: { companyName?: string }) {
             transition={{ duration: 0.18 }}
           >
             <CardContent className="pt-5">
-              {activeTab === "health font-sans"     && <ExecutiveHealthSection />}
-              {activeTab === "health"               && <ExecutiveHealthSection />}
+              {activeTab === "health font-sans"     && <ExecutiveHealthSection mode={mode} liveMetrics={liveMetrics} />}
+              {activeTab === "health"               && <ExecutiveHealthSection mode={mode} liveMetrics={liveMetrics} />}
               {activeTab === "alerts"               && <CFOAlertsSection />}
               {activeTab === "cashrunway"           && <CashRunwaySection />}
               {activeTab === "solvency"             && <SolvencyAuditSection />}
