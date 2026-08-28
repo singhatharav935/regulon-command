@@ -2,7 +2,6 @@ import { CAAgentProvider } from "@/components/agents-demo/CAAgentOrchestrator";
 import { useState, useEffect, useRef, useCallback, Suspense, lazy } from "react";
 import { isCABackendConfigured } from "@/lib/ca-backend-guard";
 import { getLiveRegulatoryNews, getStatutoryDeadlines } from "@/services/ca-supabase-service";
-import { buildOfflineDraft, readyNoticeTemplates } from "@/components/ca-dashboard-demo/AIDraftingEngine";
 const MultiClientMasterHub = lazy(() => import("@/components/ca-dashboard-demo/MultiClientMasterHub"));
 const PracticeBillingPanel = lazy(() => import("@/components/ca-dashboard-demo/PracticeBillingPanel"));
 const SecureFileSharingPanel = lazy(() => import("@/components/ca-dashboard-demo/SecureFileSharingPanel"));
