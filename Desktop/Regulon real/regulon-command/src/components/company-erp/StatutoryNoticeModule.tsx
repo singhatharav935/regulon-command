@@ -26,6 +26,12 @@ import type {
   NoticeAuthority, NoticeCategory, NoticeSeverity,
 } from "@/lib/accounting/statutory-notice-parser";
 import { CASE_LAW_DATABASE } from "@/lib/accounting/statutory-notice-parser";
+import {
+  DEMO_STATUTORY_NOTICES,
+  DEMO_LEGAL_DRAFTS,
+  DEMO_RISK_SCORES,
+  DEMO_NOTICE_DASHBOARD_SUMMARY,
+} from "@/data/demo-statutory-notice-data";
 
 interface StatutoryNoticeModuleProps {
   mode: "demo" | "real";
@@ -747,6 +753,11 @@ export function StatutoryNoticeModule({
   const [activeTab, setActiveTab] = useState<NoticeTabId>("inbox");
   const [selectedNoticeId, setSelectedNoticeId] = useState<string | null>(null);
 
+  const activeNotices = notices || DEMO_STATUTORY_NOTICES;
+  const activeDrafts = legalDrafts || DEMO_LEGAL_DRAFTS;
+  const activeRiskScores = riskScores || DEMO_RISK_SCORES;
+  const summary = dashboardSummary || DEMO_NOTICE_DASHBOARD_SUMMARY;
+
   const handleSelectNotice = (id: string) => {
     setSelectedNoticeId(id);
     setActiveTab("detail");
@@ -766,13 +777,13 @@ export function StatutoryNoticeModule({
             AI Tax Assistant & Statutory Notice Engine
           </h2>
           <p className="text-xs text-muted-foreground mt-0.5">
-            {companyName} · {dashboardSummary.total_notices} Notices · {fmtL(dashboardSummary.total_demand)} Total Demand
+            {companyName} · {summary?.total_notices ?? 0} Notices · {fmtL(summary?.total_demand ?? 0)} Total Demand
           </p>
         </div>
         <div className="flex items-center gap-2">
-          {dashboardSummary.critical_notices > 0 && (
+          {(summary?.critical_notices ?? 0) > 0 && (
             <span className="text-[10px] px-2.5 py-1 rounded-full bg-red-500/15 border border-red-500/25 text-red-300 font-bold animate-pulse">
-              🚨 {dashboardSummary.critical_notices} Critical
+              🚨 {summary.critical_notices} Critical
             </span>
           )}
           {mode === "demo" && (
@@ -797,9 +808,9 @@ export function StatutoryNoticeModule({
           >
             <Icon className="w-3.5 h-3.5" />
             {label}
-            {id === "inbox" && dashboardSummary.overdue_notices > 0 && (
+            {id === "inbox" && (summary?.overdue_notices ?? 0) > 0 && (
               <span className="w-4 h-4 rounded-full bg-red-500 text-[9px] font-bold text-white flex items-center justify-center">
-                {dashboardSummary.overdue_notices}
+                {summary.overdue_notices}
               </span>
             )}
           </button>
@@ -817,15 +828,15 @@ export function StatutoryNoticeModule({
         >
           {activeTab === "inbox" && (
             <NoticeInboxTab
-              notices={notices}
-              riskScores={riskScores}
-              summary={dashboardSummary}
+              notices={activeNotices}
+              riskScores={activeRiskScores}
+              summary={summary}
               onSelect={handleSelectNotice}
             />
           )}
           {activeTab === "detail" && selectedNoticeId && (
             <NoticeDetailTab
-              notice={notices.find(n => n.id === selectedNoticeId)!}
+              notice={activeNotices.find(n => n.id === selectedNoticeId)!}
               onBack={() => setActiveTab("inbox")}
             />
           )}
@@ -837,14 +848,14 @@ export function StatutoryNoticeModule({
           )}
           {activeTab === "draft" && (
             <AILegalDraftTab
-              notices={notices}
-              drafts={legalDrafts}
+              notices={activeNotices}
+              drafts={activeDrafts}
               onSelectNotice={handleSelectForDraft}
               selectedId={selectedNoticeId}
             />
           )}
           {activeTab === "risk" && (
-            <RiskAnalyserTab notices={notices} riskScores={riskScores} />
+            <RiskAnalyserTab notices={activeNotices} riskScores={activeRiskScores} />
           )}
           {activeTab === "caselaws" && <CaseLawLibraryTab />}
         </motion.div>
