@@ -13,7 +13,8 @@
  *  7. Financial Ratios — 20 key ratios with traffic-light indicators
  */
 
-import { useState, useMemo } from "react";
+import { useState, useMemo, useEffect } from "react";
+import { useFinancialEngineStore, hasAnyData as storeHasAnyData } from '@/stores/useFinancialEngineStore';
 import { createPortal } from "react-dom";
 import { motion, AnimatePresence } from "framer-motion";
 import { Badge } from "@/components/ui/badge";
@@ -4667,44 +4668,40 @@ export function FinancialStatementsModule({
   const isReal = mode === "real";
   const cid = companyId || localStorage.getItem("sannidh_company_id") || "company_real_default";
 
-  // ── CENTRAL LIVE-DATA ENGINE ──────────────────────────────────────────────
-  // Read from props first, then fall back to localStorage — covers both
-  // manual uploads and autonomous fetches stored by other parts of the app.
+  // ── CENTRAL LIVE-DATA ENGINE (via Zustand Store) ───────────────────────────
+  // The store is hydrated by SmartERPModule on mount and updated by DataIngestionModal on upload.
+  // This module reads directly from the store — single source of truth.
 
-  const liveInvoices = useMemo(() => {
-    if (!isReal) return [];
-    if (invoicesProp && invoicesProp.length > 0) return invoicesProp;
-    try { return JSON.parse(localStorage.getItem(`company_invoices_${cid}`) || localStorage.getItem(`sannidh_invoices_${cid}`) || "[]"); } catch { return []; }
-  }, [isReal, cid, invoicesProp]);
+  const engineStore = useFinancialEngineStore();
 
-  const livePurchases = useMemo(() => {
-    if (!isReal) return [];
-    if (purchasesProp && purchasesProp.length > 0) return purchasesProp;
-    try { return JSON.parse(localStorage.getItem(`company_purchases_${cid}`) || localStorage.getItem(`sannidh_purchases_${cid}`) || "[]"); } catch { return []; }
-  }, [isReal, cid, purchasesProp]);
-
-  const liveBankTxns = useMemo(() => {
-    if (!isReal) return [];
-    if (bankTxnsProp && bankTxnsProp.length > 0) return bankTxnsProp;
-    try { return JSON.parse(localStorage.getItem(`company_bank_transactions_${cid}`) || localStorage.getItem(`sannidh_bank_txns_${cid}`) || "[]"); } catch { return []; }
-  }, [isReal, cid, bankTxnsProp]);
-
-  const liveExpenses = useMemo(() => {
-    if (!isReal) return [];
-    if (expensesProp && expensesProp.length > 0) return expensesProp;
-    try { return JSON.parse(localStorage.getItem(`company_expenses_${cid}`) || localStorage.getItem(`sannidh_expenses_${cid}`) || "[]"); } catch { return []; }
-  }, [isReal, cid, expensesProp]);
-
-  const livePayroll = useMemo(() => {
-    if (!isReal) return [];
-    if (payrollProp && payrollProp.length > 0) return payrollProp;
-    try { return JSON.parse(localStorage.getItem(`company_payroll_${cid}`) || localStorage.getItem(`sannidh_payroll_${cid}`) || "[]"); } catch { return []; }
-  }, [isReal, cid, payrollProp]);
-
-  const openingBal = useMemo(() => {
-    if (!isReal) return null;
-    try { return JSON.parse(localStorage.getItem(`sannidh_opening_balances_${cid}`) || "null"); } catch { return null; }
+  // Hydrate store if not already hydrated (handles direct navigation to this module)
+  useEffect(() => {
+    if (isReal && cid && engineStore.companyId !== cid) {
+      engineStore.hydrateFromLocalStorage(cid);
+      engineStore.setCompanyContext(cid, companyName, fiscalYear);
+    }
   }, [isReal, cid]);
+
+  // Sync props into store if they contain data (covers demo → real transitions)
+  useEffect(() => {
+    if (isReal) {
+      engineStore.syncFromProps({
+        invoices: invoicesProp,
+        purchases: purchasesProp,
+        expenses: expensesProp,
+        payroll: payrollProp,
+        bankTxns: bankTxnsProp,
+      });
+    }
+  }, [isReal, invoicesProp, purchasesProp, expensesProp, payrollProp, bankTxnsProp]);
+
+  // Read live data from store (store is truth in real mode; empty arrays in demo mode)
+  const liveInvoices = isReal ? (engineStore.invoices.length > 0 ? engineStore.invoices : (invoicesProp || [])) : [];
+  const livePurchases = isReal ? (engineStore.purchases.length > 0 ? engineStore.purchases : (purchasesProp || [])) : [];
+  const liveBankTxns = isReal ? (engineStore.bankTxns.length > 0 ? engineStore.bankTxns : (bankTxnsProp || [])) : [];
+  const liveExpenses = isReal ? (engineStore.expenses.length > 0 ? engineStore.expenses : (expensesProp || [])) : [];
+  const livePayroll = isReal ? (engineStore.payroll.length > 0 ? engineStore.payroll : (payrollProp || [])) : [];
+  const openingBal = isReal ? engineStore.openingBalances : null;
 
   // ── Compute P&L from live data ────────────────────────────────────────────
   const computedPnL: PLData = useMemo(() => {

@@ -12,6 +12,7 @@
  */
 
 import { useState } from "react";
+import { useFinancialEngineStore } from '@/stores/useFinancialEngineStore';
 import { motion, AnimatePresence } from "framer-motion";
 import {
   Building2, HardDrive, Cpu, Truck, Wrench, Shield, TrendingUp, TrendingDown,
@@ -528,18 +529,19 @@ type Tab9 = "dashboard" | "register" | "dualdep" | "itblock" | "cwip" | "disposa
 
 export function FixedAssetModule({ companyName }: { companyName?: string }) {
   const [activeTab, setActiveTab] = useState<Tab9>("dashboard");
+  const { fixedAssets } = useFinancialEngineStore();
 
-  if ([].length === 0) {
+  if (fixedAssets.length === 0) {
     return <EmptyDataState icon="🏭" title="No Fixed Assets Recorded" message="Import purchase bills with asset account codes to populate the Asset Register." />;
   }
 
   const tabs: { id: Tab9; label: string; icon: any; badge?: string }[] = [
-    { id: "dashboard",   label: "Portfolio",     icon: Building2,   badge: `${[].length} Assets` },
-    { id: "register",    label: "Asset Register",icon: HardDrive,   badge: String([].length) },
+    { id: "dashboard",   label: "Portfolio",     icon: Building2,   badge: `${fixedAssets.length} Assets` },
+    { id: "register",    label: "Asset Register",icon: HardDrive,   badge: String(fixedAssets.length) },
     { id: "dualdep",     label: "Dual Dep Run",  icon: Calculator,  badge: "CA vs IT" },
     { id: "itblock",     label: "IT Block Schedule", icon: FileCheck2, badge: "Form 3CD" },
-    { id: "cwip",        label: "CWIP Desk",     icon: Clock,       badge: String([].length) },
-    { id: "disposal",    label: "Disposals",     icon: TrendingDown,badge: String([].length) },
+    { id: "cwip",        label: "CWIP Desk",     icon: Clock,       badge: "0" },
+    { id: "disposal",    label: "Disposals",     icon: TrendingDown,badge: "0" },
     { id: "deferredtax", label: "Deferred Tax",  icon: Scale,       badge: "AS-22" },
   ];
 

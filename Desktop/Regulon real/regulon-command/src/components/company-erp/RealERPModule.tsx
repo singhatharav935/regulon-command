@@ -45,6 +45,7 @@ import type { ERPInvoice, ERPPurchase, ERPExpense, ERPPayroll, ERPBankTxn, ERPSt
 import { runFullZeroPenaltyAudit, type ZeroPenaltyReport, type ExceptionAlert } from "@/services/zeroPenaltyEngine";
 import { getAutonomousSyncStatus, type AutonomousSyncStatusBar } from "@/services/autonomousIngestionService";
 import { DataIngestionModal } from "./DataIngestionModal";
+import { useFinancialEngineStore } from '@/stores/useFinancialEngineStore';
 
 // ─── PROPS ────────────────────────────────────────────────────────────────────
 
@@ -399,13 +400,28 @@ export function RealERPModule({ companyId, companyName }: Props) {
     setInvoices([]); setPurchases([]); setExpenses([]); setPayroll([]);
     setBankTxns([]); setInventory([]); setIsLiveData(false);
     setOpeningBalances({ cash: 0, bank: 0, debtors: 0, creditors: 0, stock: 0, capital: 0, reserves: 0, loans: 0, fixedAssets: 0, currentLiabilities: 0 });
+    // Clear central financial engine store
+    useFinancialEngineStore.getState().resetAllData();
     setShowResetConfirm(false);
-    console.log('[RealERP] All data reset');
+    console.log('[RealERP] All data reset (local state + Zustand store + localStorage)');
   }, [companyId]);
 
   // ─── Save Opening Balances ──────────────────────────────────────────────────
   const saveOpeningBalances = useCallback(() => {
     localStorage.setItem(`sannidh_opening_balances_${companyId}`, JSON.stringify(openingBalances));
+    // Sync to central financial engine store
+    useFinancialEngineStore.getState().setOpeningBalances({
+      cash_balance: openingBalances.cash,
+      bank_balance: openingBalances.bank,
+      debtors: openingBalances.debtors,
+      creditors: openingBalances.creditors,
+      stock: openingBalances.stock,
+      share_capital: openingBalances.capital,
+      reserves: openingBalances.reserves,
+      long_term_loans: openingBalances.loans,
+      fixed_assets_gross: openingBalances.fixedAssets,
+      accumulated_depreciation: 0,
+    });
     setShowOpeningBalances(false);
   }, [companyId, openingBalances]);
 
@@ -472,6 +488,15 @@ export function RealERPModule({ companyId, companyName }: Props) {
       setPayroll(finalPayroll);
       setBankTxns(finalBankTxns);
       setInventory(finalInventory);
+
+      // ─── Sync into central Zustand financial engine store ──────────────────
+      const engineStore = useFinancialEngineStore.getState();
+      engineStore.setCompanyContext(companyId, companyName || '', 'FY 2025-26');
+      if (finalInvoices.length > 0) engineStore.ingestInvoices(finalInvoices);
+      if (finalPurchases.length > 0) engineStore.ingestPurchases(finalPurchases);
+      if (finalExpenses.length > 0) engineStore.ingestExpenses(finalExpenses);
+      if (finalPayroll.length > 0) engineStore.ingestPayroll(finalPayroll);
+      if (finalBankTxns.length > 0) engineStore.ingestBankTxns(finalBankTxns);
 
       // ─── Run Zero-Penalty Audit Engine ────────────────────────────────────
       const report = runFullZeroPenaltyAudit({

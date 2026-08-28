@@ -71,6 +71,7 @@ import { OCRGateway, type OCRExtractedInvoice } from '@/services/externalApiGate
 import type {
   ERPBankTxn, ERPPurchase, ERPPayroll
 } from './erp-types';
+import { useFinancialEngineStore } from '@/stores/useFinancialEngineStore';
 
 // ─── PROPS ────────────────────────────────────────────────────────────────────
 
@@ -920,6 +921,8 @@ export function DataIngestionModal({ companyId, open, onClose, onDataImported }:
           // - company_bank_transactions_ → used by FinancialStatementsModule (Trial Balance, P&L, Balance Sheet, Day Book, Cash Book)
           localStorage.setItem(`sannidh_bank_txns_${companyId}`, JSON.stringify(deduped));
           localStorage.setItem(`company_bank_transactions_${companyId}`, JSON.stringify(deduped));
+          // Push to central financial engine store
+          useFinancialEngineStore.getState().ingestBankTxns(deduped);
           console.log(`[DataIngestion] Saved ${deduped.length} bank txns to localStorage (both keys)`);
         } catch (lsErr) {
           console.warn('[DataIngestion] localStorage save failed:', lsErr);
@@ -954,6 +957,26 @@ export function DataIngestionModal({ companyId, open, onClose, onDataImported }:
         const result = await OCRGateway.saveOCRInvoiceToSupabase(companyId, ocrResult);
         saved = result.saved ? 1 : 0;
         if (!result.saved) warnings++;
+        // Push OCR result as a purchase into the central store
+        if (ocrResult) {
+          const purchaseEntry = {
+            id: `ocr_${companyId}_${Date.now()}`,
+            bill_no: ocrResult.invoiceNumber || `OCR-${Date.now()}`,
+            date: ocrResult.invoiceDate || new Date().toISOString().slice(0, 10),
+            vendor: ocrResult.vendorName || 'Unknown Vendor',
+            gstin: ocrResult.vendorGstin || '',
+            amount: Number(ocrResult.totalAmount || 0) - Number(ocrResult.totalTax || 0),
+            gst: Number(ocrResult.totalTax || 0),
+            total: Number(ocrResult.totalAmount || 0),
+            itc_eligible: true,
+            itc_claimed: false,
+            status: 'pending_review' as const,
+            ai_confidence: ocrResult.confidence || 0.85,
+            category: 'General',
+          };
+          const store = useFinancialEngineStore.getState();
+          store.ingestPurchases([...store.purchases, purchaseEntry]);
+        }
         setProgress(100);
       }
 
@@ -1012,6 +1035,8 @@ export function DataIngestionModal({ companyId, open, onClose, onDataImported }:
         try {
           localStorage.setItem(`sannidh_payroll_${companyId}`, JSON.stringify(normalizedPayroll));
           localStorage.setItem(`company_payroll_${companyId}`, JSON.stringify(normalizedPayroll));
+          // Push to central financial engine store
+          useFinancialEngineStore.getState().ingestPayroll(normalizedPayroll);
         } catch (e) { console.warn('[DataIngestion] payroll localStorage save failed:', e); }
 
         const { error } = await supabase

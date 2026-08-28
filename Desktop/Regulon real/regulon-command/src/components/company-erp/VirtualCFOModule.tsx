@@ -33,12 +33,6 @@ import {
   simulateScenario, generateBoardReport
 } from "@/lib/accounting/cfo-intelligence-engine";
 
-import {
-  computeAltmanZScore, computeBeneishMScore, computeDuPontAnalysis,
-  computeWorkingCapitalMetrics, computeEBITDABridge, computeCFOHealthScore,
-  simulateScenario, generateBoardReport
-} from "@/lib/accounting/cfo-intelligence-engine";
-
 import { EmptyDataState, LimitedDataWarning } from './EmptyDataState';
 
 // ─── Helpers ─────────────────────────────────────────────────────────────────

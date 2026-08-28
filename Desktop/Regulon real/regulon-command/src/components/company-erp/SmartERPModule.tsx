@@ -20,7 +20,7 @@
  * 11.  Reports        — P&L, Balance Sheet, Cash Flow, Receivable/Payable Aging
  */
 
-import { useState, useMemo } from "react";
+import { useState, useMemo, useEffect } from "react";
 import { motion, AnimatePresence } from "framer-motion";
 import { Card, CardContent, CardHeader } from "@/components/ui/card";
 import { Badge } from "@/components/ui/badge";
@@ -50,6 +50,7 @@ import type {
   SmartERPProps, ERPInvoice, ERPPurchase, ERPExpense,
   ERPPayroll, ERPBankTxn, ERPStockItem
 } from "./erp-types";
+import { useFinancialEngineStore } from '@/stores/useFinancialEngineStore';
 
 // ─── Helper UI ────────────────────────────────────────────────────────────────
 
@@ -1460,6 +1461,28 @@ export function SmartERPModule({ invoices, purchases, expenses, payroll, bankTxn
   if (companyId && typeof window !== 'undefined') {
     try { localStorage.setItem('sannidh_company_id', companyId); } catch {}
   }
+
+  // Hydrate financial engine store from localStorage on mount
+  const storeState = useFinancialEngineStore();
+  useEffect(() => {
+    if (companyId) {
+      storeState.hydrateFromLocalStorage(companyId);
+      storeState.setCompanyContext(companyId, company?.name, 'FY 2025-26');
+    }
+  }, [companyId]);
+
+  // Sync props into store (for data passed from parent)
+  useEffect(() => {
+    storeState.syncFromProps({ invoices, purchases, expenses, payroll, bankTxns });
+  }, [invoices, purchases, expenses, payroll, bankTxns]);
+
+  // Read live data from store (prefer store data over raw props)
+  const liveInvoices = storeState.invoices.length > 0 ? storeState.invoices : invoices;
+  const livePurchases = storeState.purchases.length > 0 ? storeState.purchases : purchases;
+  const liveExpenses = storeState.expenses.length > 0 ? storeState.expenses : expenses;
+  const livePayroll = storeState.payroll.length > 0 ? storeState.payroll : payroll;
+  const liveBankTxns = storeState.bankTxns.length > 0 ? storeState.bankTxns : bankTxns;
+
   const [activeTab, setActiveTab] = useState<ERPSub>("summary");
 
   const currentTab = ERP_TABS.find(t => t.id === activeTab)!;
@@ -1521,20 +1544,20 @@ export function SmartERPModule({ invoices, purchases, expenses, payroll, bankTxn
           transition={{ duration: 0.18 }}
         >
           <CardContent className="pt-5">
-            {activeTab === "summary"   && <SummaryPanel invoices={invoices} purchases={purchases} expenses={expenses} payroll={payroll} bankTxns={bankTxns} inventory={inventory} company={company} />}
-            {activeTab === "sales"     && <SalesPanel invoices={invoices} />}
-            {activeTab === "purchases" && <PurchasesPanel purchases={purchases} />}
-            {activeTab === "expenses"  && <ExpensesPanel expenses={expenses} />}
-            {activeTab === "bank"      && <BankPanel bankTxns={bankTxns} />}
-            {activeTab === "payroll"   && <PayrollPanel payroll={payroll} />}
+            {activeTab === "summary"   && <SummaryPanel invoices={liveInvoices} purchases={livePurchases} expenses={liveExpenses} payroll={livePayroll} bankTxns={liveBankTxns} inventory={inventory} company={company} />}
+            {activeTab === "sales"     && <SalesPanel invoices={liveInvoices} />}
+            {activeTab === "purchases" && <PurchasesPanel purchases={livePurchases} />}
+            {activeTab === "expenses"  && <ExpensesPanel expenses={liveExpenses} />}
+            {activeTab === "bank"      && <BankPanel bankTxns={liveBankTxns} />}
+            {activeTab === "payroll"   && <PayrollPanel payroll={livePayroll} />}
             {activeTab === "gst"       && <GSTPanel company={company} mode={mode} />}
             {activeTab === "tds"       && <TDSPanel company={company} mode={mode} />}
-            {activeTab === "ledger"    && <LedgerPanel invoices={invoices} purchases={purchases} expenses={expenses} payroll={payroll} bankTxns={bankTxns} inventory={inventory} company={company} />}
+            {activeTab === "ledger"    && <LedgerPanel invoices={liveInvoices} purchases={livePurchases} expenses={liveExpenses} payroll={livePayroll} bankTxns={liveBankTxns} inventory={inventory} company={company} />}
             {activeTab === "inventory" && <InventoryPanel inventory={inventory} />}
-            {activeTab === "reports"   && <ReportsPanel invoices={invoices} purchases={purchases} expenses={expenses} payroll={payroll} bankTxns={bankTxns} inventory={inventory} company={company} companyId={companyId} mode={mode} />}
+            {activeTab === "reports"   && <ReportsPanel invoices={liveInvoices} purchases={livePurchases} expenses={liveExpenses} payroll={livePayroll} bankTxns={liveBankTxns} inventory={inventory} company={company} companyId={companyId} mode={mode} />}
             {activeTab === "notices"   && <NoticesPanel company={company} mode={mode} />}
             {activeTab === "govapi"    && <GovApiPanel company={company} />}
-            {activeTab === "bankrecon"   && <BankReconPanel company={company} bankTxns={bankTxns} />}
+            {activeTab === "bankrecon"   && <BankReconPanel company={company} bankTxns={liveBankTxns} />}
             {activeTab === "fxintl"      && <FXIntlPanel company={company} />}
             {activeTab === "fixedassets" && <FixedAssetPanel company={company} />}
           </CardContent>

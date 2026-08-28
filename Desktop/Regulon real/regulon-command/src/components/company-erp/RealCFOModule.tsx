@@ -1,13 +1,13 @@
 /**
- * REAL VIRTUAL CFO MODULE — Live Data Binding
- * ============================================
- * Fetches live financial data from Supabase using companyId,
+ * REAL VIRTUAL CFO MODULE — Live Data from Central Financial Engine Store
+ * ======================================================================
+ * Reads live financial data from the Zustand store (useFinancialEngineStore),
  * computes CFO metrics, and passes them to VirtualCFOModule.
+ * Zero Supabase/localStorage calls — the store is the single source of truth.
  */
 
-import { useEffect, useState } from "react";
-import { supabase } from "@/integrations/supabase/client";
 import { VirtualCFOModule } from "./VirtualCFOModule";
+import { useFinancialEngineStore } from '@/stores/useFinancialEngineStore';
 
 interface RealCFOModuleProps {
   companyId?: string;
@@ -15,62 +15,8 @@ interface RealCFOModuleProps {
 }
 
 export function RealCFOModule({ companyId, companyName }: RealCFOModuleProps) {
-  const [bankTxns, setBankTxns] = useState<any[]>([]);
-  const [invoices, setInvoices] = useState<any[]>([]);
-  const [purchases, setPurchases] = useState<any[]>([]);
-  const [expenses, setExpenses] = useState<any[]>([]);
-  const [payroll, setPayroll] = useState<any[]>([]);
-
-  // Fetch live data from Supabase
-  useEffect(() => {
-    if (!companyId) return;
-
-    const lsFallback = (key: string): any[] => {
-      try {
-        const raw = localStorage.getItem(key);
-        return raw ? JSON.parse(raw) : [];
-      } catch { return []; }
-    };
-
-    const fetchData = async () => {
-      try {
-        const [bankRes, invRes, purRes, expRes, payRes] = await Promise.all([
-          supabase.from("company_bank_transactions" as never).select("*").eq("company_id", companyId).order("date", { ascending: false }).limit(200),
-          supabase.from("company_invoices" as never).select("*").eq("company_id", companyId).limit(200),
-          supabase.from("company_purchases" as never).select("*").eq("company_id", companyId).limit(200),
-          supabase.from("company_expenses" as never).select("*").eq("company_id", companyId).limit(200),
-          supabase.from("company_payroll" as never).select("*").eq("company_id", companyId).limit(200),
-        ]);
-
-        // Use Supabase data if available, otherwise fall back to localStorage
-        const bankData = (bankRes.data as any[])?.length ? (bankRes.data as any[]) : lsFallback(`sannidh_bank_txns_${companyId}`);
-        const invData  = (invRes.data as any[])?.length  ? (invRes.data as any[])  : lsFallback(`sannidh_invoices_${companyId}`);
-        const purData  = (purRes.data as any[])?.length  ? (purRes.data as any[])  : lsFallback(`sannidh_purchases_${companyId}`);
-        const expData  = (expRes.data as any[])?.length  ? (expRes.data as any[])  : lsFallback(`sannidh_expenses_${companyId}`);
-        const payData  = (payRes.data as any[])?.length  ? (payRes.data as any[])  : lsFallback(`sannidh_payroll_${companyId}`);
-
-        setBankTxns(bankData);
-        setInvoices(invData);
-        setPurchases(purData);
-        setExpenses(expData);
-        setPayroll(payData);
-
-        if (bankData.length > 0) {
-          console.log(`[RealCFOModule] Loaded ${bankData.length} bank txns`);
-        }
-      } catch (err) {
-        console.warn("[RealCFOModule] Data fetch error:", err);
-        // Even if Supabase completely fails, try localStorage
-        setBankTxns(lsFallback(`sannidh_bank_txns_${companyId}`));
-        setInvoices(lsFallback(`sannidh_invoices_${companyId}`));
-        setPurchases(lsFallback(`sannidh_purchases_${companyId}`));
-        setExpenses(lsFallback(`sannidh_expenses_${companyId}`));
-        setPayroll(lsFallback(`sannidh_payroll_${companyId}`));
-      }
-    };
-
-    fetchData();
-  }, [companyId]);
+  // Read directly from the central Zustand store
+  const { invoices, purchases, expenses, payroll, bankTxns } = useFinancialEngineStore();
 
   // ─── Compute Live CFO Metrics ──────────────────────────────────────────────
 
@@ -78,19 +24,19 @@ export function RealCFOModule({ companyId, companyName }: RealCFOModuleProps) {
   const currentBalance = bankTxns.length > 0 ? (bankTxns[0]?.balance || 0) : 0;
 
   // Monthly burn rate (total debits / number of months)
-  const totalDebits = bankTxns.reduce((sum, t) => sum + (t.debit || 0), 0);
-  const totalCredits = bankTxns.reduce((sum, t) => sum + (t.credit || 0), 0);
-  const dates = bankTxns.map(t => new Date(t.date).getTime()).filter(d => !isNaN(d));
+  const totalDebits = bankTxns.reduce((sum: number, t: any) => sum + (Number(t.debit) || 0), 0);
+  const totalCredits = bankTxns.reduce((sum: number, t: any) => sum + (Number(t.credit) || 0), 0);
+  const dates = bankTxns.map((t: any) => new Date(t.date).getTime()).filter((d: number) => !isNaN(d));
   const monthSpan = dates.length > 1 ? Math.max(1, Math.ceil((Math.max(...dates) - Math.min(...dates)) / (30 * 24 * 60 * 60 * 1000))) : 1;
   const monthlyBurnRate = totalDebits / monthSpan;
   const monthlyInflow = totalCredits / monthSpan;
   const runwayMonths = monthlyBurnRate > 0 ? currentBalance / monthlyBurnRate : 0;
 
   // Revenue from invoices
-  const totalRevenue = invoices.reduce((sum, inv) => sum + (inv.amount || inv.total || inv.grand_total || 0), 0);
-  const totalPurchasesAmt = purchases.reduce((sum, p) => sum + (p.amount || p.total || p.grand_total || 0), 0);
-  const totalExpensesAmt = expenses.reduce((sum, e) => sum + (e.amount || 0), 0);
-  const totalPayrollAmt = payroll.reduce((sum, p) => sum + (p.gross_salary || p.net_pay || 0), 0);
+  const totalRevenue = invoices.reduce((sum: number, inv: any) => sum + (Number(inv.amount) || Number(inv.total) || 0), 0);
+  const totalPurchasesAmt = purchases.reduce((sum: number, p: any) => sum + (Number(p.amount) || Number(p.total) || 0), 0);
+  const totalExpensesAmt = expenses.reduce((sum: number, e: any) => sum + (Number(e.amount) || 0), 0);
+  const totalPayrollAmt = payroll.reduce((sum: number, p: any) => sum + (Number(p.gross) || Number(p.net_pay) || 0), 0);
 
   // Gross Profit
   const grossProfit = totalRevenue - totalPurchasesAmt;
