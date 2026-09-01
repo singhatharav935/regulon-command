@@ -76,7 +76,7 @@ export const AuthProvider = ({ children }: { children: ReactNode }) => {
     const loadIdentity = async (activeUser: User) => {
       const { data, error } = await withTimeout(
         supabase.from("user_roles").select("role").eq("user_id", activeUser.id),
-        4000,
+        10000,
         { data: null, error: new Error("timeout") }
       );
 
@@ -113,7 +113,7 @@ export const AuthProvider = ({ children }: { children: ReactNode }) => {
       try {
         const { data: verificationData, error: verificationError } = await withTimeout(
           supabase.from("user_verifications").select("status, is_verified").eq("user_id", activeUser.id).maybeSingle(),
-          4000,
+          10000,
           { data: null, error: new Error("timeout") }
         );
 
@@ -142,7 +142,7 @@ export const AuthProvider = ({ children }: { children: ReactNode }) => {
       try {
         const sessionResponse = await withTimeout(
           supabase.auth.getSession(),
-          3000,
+          10000,
           { data: { session: null }, error: null },
         );
 

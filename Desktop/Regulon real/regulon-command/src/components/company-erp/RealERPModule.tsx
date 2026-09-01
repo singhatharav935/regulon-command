@@ -447,14 +447,22 @@ export function RealERPModule({ companyId, companyName }: Props) {
         supabase.from("company_inventory"         as never).select("*").eq("company_id", companyId).order("name"),
       ]);
 
-      const liveInv  = inv.data  && inv.data.length  > 0 ? (inv.data  as ERPInvoice[])   : null;
-      const livePur  = pur.data  && pur.data.length  > 0 ? (pur.data  as ERPPurchase[])  : null;
-      const liveExp  = exp.data  && exp.data.length  > 0 ? (exp.data  as ERPExpense[])   : null;
-      const livePay  = pay.data  && pay.data.length  > 0 ? (pay.data  as ERPPayroll[])   : null;
-      const liveBank = bank.data && bank.data.length > 0 ? (bank.data as ERPBankTxn[])   : null;
-      const liveInvStk = inv_stk.data && inv_stk.data.length > 0 ? (inv_stk.data as ERPStockItem[]) : null;
+      // Supabase returned results (even if empty [] means "no data uploaded")
+      // Only fall back to localStorage when Supabase returned an actual ERROR (network/RLS failure)
+      const invError  = !!inv.error;
+      const purError  = !!pur.error;
+      const expError  = !!exp.error;
+      const payError  = !!pay.error;
+      const bankError = !!bank.error;
 
-      // ─── localStorage Fallbacks (for when Supabase RLS blocks reads) ────────
+      const liveInv  = !invError  ? (inv.data  as ERPInvoice[]  ?? []) : null;
+      const livePur  = !purError  ? (pur.data  as ERPPurchase[] ?? []) : null;
+      const liveExp  = !expError  ? (exp.data  as ERPExpense[]  ?? []) : null;
+      const livePay  = !payError  ? (pay.data  as ERPPayroll[]  ?? []) : null;
+      const liveBank = !bankError ? (bank.data as ERPBankTxn[]  ?? []) : null;
+      const liveInvStk = inv_stk.data ?? [];
+
+      // ─── localStorage Fallbacks (ONLY used when Supabase returned an error) ──
       const lsFallback = (key: string): any[] => {
         try {
           const raw = localStorage.getItem(key);
@@ -462,21 +470,29 @@ export function RealERPModule({ companyId, companyName }: Props) {
         } catch { return []; }
       };
 
-      const lsBankTxns = lsFallback(`sannidh_bank_txns_${companyId}`);
-      const lsPayroll  = lsFallback(`sannidh_payroll_${companyId}`);
-      const lsInvoices = lsFallback(`sannidh_invoices_${companyId}`);
-      const lsPurchases = lsFallback(`sannidh_purchases_${companyId}`);
-      const lsExpenses = lsFallback(`sannidh_expenses_${companyId}`);
+      // Only read localStorage when Supabase itself failed
+      const lsBankTxns  = bankError ? lsFallback(`sannidh_bank_txns_${companyId}`)  : [];
+      const lsPayroll   = payError  ? lsFallback(`sannidh_payroll_${companyId}`)    : [];
+      const lsInvoices  = invError  ? lsFallback(`sannidh_invoices_${companyId}`)   : [];
+      const lsPurchases = purError  ? lsFallback(`sannidh_purchases_${companyId}`)  : [];
+      const lsExpenses  = expError  ? lsFallback(`sannidh_expenses_${companyId}`)   : [];
 
-      const hasLive = !!(liveInv || livePur || liveExp || livePay || liveBank || lsBankTxns.length || lsPayroll.length || lsInvoices.length);
+      const hasLive = !!(
+        (liveInv  && liveInv.length  > 0) ||
+        (livePur  && livePur.length  > 0) ||
+        (liveExp  && liveExp.length  > 0) ||
+        (livePay  && livePay.length  > 0) ||
+        (liveBank && liveBank.length > 0) ||
+        lsBankTxns.length > 0 || lsPayroll.length > 0 || lsInvoices.length > 0
+      );
       setIsLiveData(hasLive);
 
-      const finalInvoices  = liveInv      ?? (lsInvoices.length  > 0 ? lsInvoices  : []);
-      const finalPurchases = livePur      ?? (lsPurchases.length > 0 ? lsPurchases : []);
-      const finalExpenses  = liveExp      ?? (lsExpenses.length  > 0 ? lsExpenses  : []);
-      const finalPayroll   = livePay      ?? (lsPayroll.length   > 0 ? lsPayroll   : []);
-      const finalBankTxns  = liveBank     ?? (lsBankTxns.length  > 0 ? lsBankTxns  : []);
-      const finalInventory = liveInvStk   ?? [];
+      const finalInvoices  = liveInv  ?? (lsInvoices.length  > 0 ? lsInvoices  : []);
+      const finalPurchases = livePur  ?? (lsPurchases.length > 0 ? lsPurchases : []);
+      const finalExpenses  = liveExp  ?? (lsExpenses.length  > 0 ? lsExpenses  : []);
+      const finalPayroll   = livePay  ?? (lsPayroll.length   > 0 ? lsPayroll   : []);
+      const finalBankTxns  = liveBank ?? (lsBankTxns.length  > 0 ? lsBankTxns  : []);
+      const finalInventory = liveInvStk ?? [];
 
       if (finalBankTxns.length > 0) {
         console.log(`[RealERP] Loaded ${finalBankTxns.length} bank txns (source: ${liveBank ? 'Supabase' : 'localStorage'})`);

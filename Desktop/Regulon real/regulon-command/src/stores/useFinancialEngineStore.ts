@@ -192,6 +192,7 @@ interface FinancialEngineState {
   companyId: string;
   companyName: string;
   fiscalYear: string;
+  isDemoMode: boolean;
 
   // ─ Raw Data (Single Source of Truth)
   invoices: ERPInvoice[];
@@ -207,7 +208,7 @@ interface FinancialEngineState {
   lastIngestionTimestamp: number;
 
   // ─ Actions
-  setCompanyContext: (companyId: string, companyName?: string, fiscalYear?: string) => void;
+  setCompanyContext: (companyId: string, companyName?: string, fiscalYear?: string, isDemo?: boolean) => void;
   ingestBankTxns: (txns: ERPBankTxn[]) => void;
   ingestInvoices: (invoices: ERPInvoice[]) => void;
   ingestPurchases: (purchases: ERPPurchase[]) => void;
@@ -224,8 +225,9 @@ interface FinancialEngineState {
     payroll?: ERPPayroll[];
     bankTxns?: ERPBankTxn[];
   }) => void;
-  hydrateFromLocalStorage: (companyId: string) => void;
+  hydrateFromLocalStorage: (companyId: string, isDemo?: boolean) => void;
   resetAllData: () => void;
+  resetStoreForCompany: (companyId: string, isDemo?: boolean) => void;
 
   // ─ Persist helper
   _persistToLocalStorage: () => void;
@@ -258,6 +260,13 @@ const DEFAULT_DEP_POLICY: DepreciationPolicy = {
   },
 };
 
+// Helper for strict key prefixing
+const getStoragePrefix = (companyId: string, isDemo: boolean): string => {
+  if (isDemo) return 'sannidh_demo';
+  const cleanId = companyId || 'default_real';
+  return `sannidh_real_${cleanId}`;
+};
+
 // ─── STORE CREATION ──────────────────────────────────────────────────────────
 
 export const useFinancialEngineStore = create<FinancialEngineState>((set, get) => ({
@@ -265,6 +274,7 @@ export const useFinancialEngineStore = create<FinancialEngineState>((set, get) =
   companyId: '',
   companyName: '',
   fiscalYear: 'FY 2025-26',
+  isDemoMode: false,
   invoices: [],
   purchases: [],
   expenses: [],
@@ -276,8 +286,9 @@ export const useFinancialEngineStore = create<FinancialEngineState>((set, get) =
   lastIngestionTimestamp: 0,
 
   // ─ Set company context
-  setCompanyContext: (companyId, companyName, fiscalYear) => set({
+  setCompanyContext: (companyId, companyName, fiscalYear, isDemo = false) => set({
     companyId,
+    isDemoMode: isDemo,
     ...(companyName ? { companyName } : {}),
     ...(fiscalYear ? { fiscalYear } : {}),
   }),
@@ -365,9 +376,11 @@ export const useFinancialEngineStore = create<FinancialEngineState>((set, get) =
     }
   },
 
-  // ─ Hydrate from localStorage on mount
-  hydrateFromLocalStorage: (companyId) => {
+  // ─ Hydrate from localStorage on mount (strictly namespaced)
+  hydrateFromLocalStorage: (companyId, isDemo = false) => {
     if (typeof window === 'undefined') return;
+    const prefix = getStoragePrefix(companyId, isDemo);
+
     const tryParse = (key: string) => {
       try {
         const raw = localStorage.getItem(key);
@@ -375,22 +388,23 @@ export const useFinancialEngineStore = create<FinancialEngineState>((set, get) =
       } catch { return null; }
     };
 
-    const bankTxns = tryParse(`company_bank_transactions_${companyId}`) || tryParse(`sannidh_bank_txns_${companyId}`) || [];
-    const invoices = tryParse(`company_invoices_${companyId}`) || tryParse(`sannidh_invoices_${companyId}`) || [];
-    const purchases = tryParse(`company_purchases_${companyId}`) || tryParse(`sannidh_purchases_${companyId}`) || [];
-    const expenses = tryParse(`company_expenses_${companyId}`) || tryParse(`sannidh_expenses_${companyId}`) || [];
-    const payroll = tryParse(`company_payroll_${companyId}`) || tryParse(`sannidh_payroll_${companyId}`) || [];
-    const openingBalances = tryParse(`sannidh_opening_balances_${companyId}`) || DEFAULT_OPENING_BALANCES;
-    const depPolicy = tryParse(`sannidh_dep_policy_${companyId}`);
-    const fixedAssets = tryParse(`company_fixed_assets_${companyId}`) || [];
+    const bankTxns = tryParse(`${prefix}_bank_txns`) || [];
+    const invoices = tryParse(`${prefix}_invoices`) || [];
+    const purchases = tryParse(`${prefix}_purchases`) || [];
+    const expenses = tryParse(`${prefix}_expenses`) || [];
+    const payroll = tryParse(`${prefix}_payroll`) || [];
+    const openingBalances = tryParse(`${prefix}_opening_balances`) || DEFAULT_OPENING_BALANCES;
+    const depPolicy = tryParse(`${prefix}_dep_policy`);
+    const fixedAssets = tryParse(`${prefix}_fixed_assets`) || [];
 
     set({
       companyId,
-      bankTxns: bankTxns.length > 0 ? bankTxns : [],
-      invoices: invoices.length > 0 ? invoices : [],
-      purchases: purchases.length > 0 ? purchases : [],
-      expenses: expenses.length > 0 ? expenses : [],
-      payroll: payroll.length > 0 ? payroll : [],
+      isDemoMode: isDemo,
+      bankTxns,
+      invoices,
+      purchases,
+      expenses,
+      payroll,
       openingBalances: { ...DEFAULT_OPENING_BALANCES, ...openingBalances },
       depreciationPolicy: depPolicy ? { ...DEFAULT_DEP_POLICY, ...depPolicy } : DEFAULT_DEP_POLICY,
       fixedAssets,
@@ -398,25 +412,11 @@ export const useFinancialEngineStore = create<FinancialEngineState>((set, get) =
     });
   },
 
-  // ─ Reset all data
-  resetAllData: () => {
-    const { companyId } = get();
-    if (typeof window !== 'undefined' && companyId) {
-      const keys = [
-        `company_bank_transactions_${companyId}`, `sannidh_bank_txns_${companyId}`,
-        `company_invoices_${companyId}`, `sannidh_invoices_${companyId}`,
-        `company_purchases_${companyId}`, `sannidh_purchases_${companyId}`,
-        `company_expenses_${companyId}`, `sannidh_expenses_${companyId}`,
-        `company_payroll_${companyId}`, `sannidh_payroll_${companyId}`,
-        `sannidh_opening_balances_${companyId}`, `sannidh_dep_policy_${companyId}`,
-        `company_fixed_assets_${companyId}`, `company_manual_journals_${companyId}`,
-        `company_dt_custom_${companyId}`, `sannidh_pnl_locked_${companyId}`,
-        `sannidh_ca_signoff_${companyId}`, `company_bank_matches_${companyId}`,
-        `company_aging_payments_${companyId}`, `company_bank_accounts_${companyId}`,
-      ];
-      keys.forEach(k => { try { localStorage.removeItem(k); } catch {} });
-    }
+  // ─ Reset store for company switch
+  resetStoreForCompany: (companyId, isDemo = false) => {
     set({
+      companyId,
+      isDemoMode: isDemo,
       invoices: [],
       purchases: [],
       expenses: [],
@@ -427,6 +427,56 @@ export const useFinancialEngineStore = create<FinancialEngineState>((set, get) =
       fixedAssets: [],
       lastIngestionTimestamp: Date.now(),
     });
+    get().hydrateFromLocalStorage(companyId, isDemo);
+  },
+
+  // ─ Reset all data for current environment
+  resetAllData: () => {
+    const { companyId, isDemoMode } = get();
+    if (typeof window !== 'undefined') {
+      const prefix = getStoragePrefix(companyId, isDemoMode);
+      const keys = [
+        `${prefix}_bank_txns`,
+        `${prefix}_invoices`,
+        `${prefix}_purchases`,
+        `${prefix}_expenses`,
+        `${prefix}_payroll`,
+        `${prefix}_opening_balances`,
+        `${prefix}_dep_policy`,
+        `${prefix}_fixed_assets`,
+      ];
+      keys.forEach(k => { try { localStorage.removeItem(k); } catch {} });
+    }
+
+    set({
+      invoices: [],
+      purchases: [],
+      expenses: [],
+      payroll: [],
+      bankTxns: [],
+      fixedAssets: [],
+      openingBalances: { ...DEFAULT_OPENING_BALANCES },
+      depreciationPolicy: { ...DEFAULT_DEP_POLICY },
+      lastIngestionTimestamp: Date.now(),
+    });
+  },
+
+  // ─ Persist helper (strictly namespaced)
+  _persistToLocalStorage: () => {
+    const { companyId, isDemoMode, bankTxns, invoices, purchases, expenses, payroll, openingBalances, depreciationPolicy, fixedAssets } = get();
+    if (typeof window === 'undefined') return;
+    const prefix = getStoragePrefix(companyId, isDemoMode);
+
+    try {
+      localStorage.setItem(`${prefix}_bank_txns`, JSON.stringify(bankTxns));
+      localStorage.setItem(`${prefix}_invoices`, JSON.stringify(invoices));
+      localStorage.setItem(`${prefix}_purchases`, JSON.stringify(purchases));
+      localStorage.setItem(`${prefix}_expenses`, JSON.stringify(expenses));
+      localStorage.setItem(`${prefix}_payroll`, JSON.stringify(payroll));
+      localStorage.setItem(`${prefix}_opening_balances`, JSON.stringify(openingBalances));
+      localStorage.setItem(`${prefix}_dep_policy`, JSON.stringify(depreciationPolicy));
+      localStorage.setItem(`${prefix}_fixed_assets`, JSON.stringify(fixedAssets));
+    } catch {}
   },
 
   // ─ Persist to localStorage

@@ -51,28 +51,70 @@ const securityLinks = [
   { title: "SOC 2 Type II Certified", detail: "Enterprise-Grade Operational Security.", href: "/security/soc2-type-ii", icon: Shield },
 ] satisfies NavDropdownItem[];
 
+import type { User } from "@supabase/supabase-js";
+
 const Navbar = () => {
   const navigate = useNavigate();
   const location = useLocation();
-  const { user, persona, loading } = useAuth();
+  const { user: authUser, persona } = useAuth();
   const { displayName, avatarUrl, clearProfile } = useUserProfile();
   const [mobileOpen, setMobileOpen] = useState(false);
   const [activeDropdown, setActiveDropdown] = useState<string | null>(null);
 
-  const isLoggedIn = !loading && !!user;
+  // ── Direct Supabase auth listener — bypasses useAuth() timeout issues ──
+  const [directUser, setDirectUser] = useState<User | null>(null);
+
+  useEffect(() => {
+    // Get current session immediately (reads localStorage synchronously)
+    supabase.auth.getSession().then(({ data: { session } }) => {
+      if (session?.user) setDirectUser(session.user);
+    });
+
+    // Listen for any auth state changes (login, logout, token refresh)
+    const { data: { subscription } } = supabase.auth.onAuthStateChange((_event, session) => {
+      setDirectUser(session?.user ?? null);
+    });
+
+    return () => subscription.unsubscribe();
+  }, []);
+
+  // Check localStorage session backups (persona_session, sannidh_user, auth_token)
+  const getLocalStorageUser = () => {
+    try {
+      const sannidh = localStorage.getItem('sannidh_user');
+      if (sannidh) return JSON.parse(sannidh);
+      const personaUser = localStorage.getItem('persona_session');
+      if (personaUser) return JSON.parse(personaUser);
+      const token = localStorage.getItem('auth_token') || localStorage.getItem('sannidh_auth_token');
+      if (token) return { email: 'user@sannidh.in', full_name: 'Logged-in User' };
+    } catch {
+      return null;
+    }
+    return null;
+  };
+
+  const lsUser = getLocalStorageUser();
+  const effectiveUser = directUser || authUser || lsUser;
+  const isLoggedIn = !!effectiveUser;
   const dashboardPath = isLoggedIn ? getDashboardRoute(persona) : "/auth?mode=login&role=company_owner";
 
-  // Hide "Return to Dashboard" when user is already on a dashboard page
+  // Hide avatar dropdown and show "Return to Dashboard" when NOT on a dashboard page
   const dashboardPrefixes = [
     "/real-company-dashboard", "/real-external-ca-dashboard", "/real-inhouse-ca-dashboard",
-    "/ca-firm-dashboard", "/dashboards/ca-firm", "/dashboards/lawyer", "/lawyer-dashboard", "/admin-dashboard", "/dashboard",
-    "/app/", "/agent-control", "/drafting"
+    "/ca-firm-dashboard", "/dashboards/ca-firm", "/dashboards/lawyer", "/lawyer-dashboard",
+    "/admin-dashboard", "/dashboard", "/ca-dashboard",
+    "/app/", "/agent-control", "/drafting", "/profile", "/settings"
   ];
   const isOnDashboard = dashboardPrefixes.some(prefix => location.pathname.startsWith(prefix));
 
   const handleLogout = async () => {
-    clearProfile(); // Wipe stale avatar/name before navigating
-    await supabase.auth.signOut({ scope: 'local' });
+    clearProfile();
+    try { await supabase.auth.signOut({ scope: 'local' }); } catch {}
+    setDirectUser(null);
+    localStorage.removeItem("sannidh_user");
+    localStorage.removeItem("persona_session");
+    localStorage.removeItem("auth_token");
+    localStorage.removeItem("sannidh_auth_token");
     localStorage.removeItem("current_user_role");
     localStorage.removeItem("pending_registration_role");
     navigate("/");
@@ -86,8 +128,8 @@ const Navbar = () => {
     setActiveDropdown(null);
   };
 
-  // Compute avatar initials
-  const userName = displayName || user?.user_metadata?.full_name || user?.email?.split("@")[0] || "U";
+  // Compute avatar initials from store or Supabase metadata
+  const userName = displayName || effectiveUser?.user_metadata?.full_name || effectiveUser?.email?.split("@")[0] || "U";
   const initials = userName
     .split(/[\s@]+/)
     .map((s: string) => s[0]?.toUpperCase())
@@ -250,7 +292,7 @@ const Navbar = () => {
                 >
                   <DropdownMenuLabel className="px-3 py-2">
                     <p className="text-sm font-semibold text-foreground truncate">{userName}</p>
-                    <p className="text-xs text-muted-foreground truncate">{user?.email}</p>
+                    <p className="text-xs text-muted-foreground truncate">{effectiveUser?.email}</p>
                   </DropdownMenuLabel>
                   <DropdownMenuSeparator className="bg-border/30" />
                   <DropdownMenuItem
@@ -295,7 +337,7 @@ const Navbar = () => {
                   >
                     <DropdownMenuLabel className="px-3 py-2">
                       <p className="text-sm font-semibold text-foreground truncate">{userName}</p>
-                      <p className="text-xs text-muted-foreground truncate">{user?.email}</p>
+                      <p className="text-xs text-muted-foreground truncate">{effectiveUser?.email}</p>
                     </DropdownMenuLabel>
                     <DropdownMenuSeparator className="bg-border/30" />
                     <DropdownMenuItem
@@ -402,7 +444,7 @@ const Navbar = () => {
                       </Avatar>
                       <div className="flex-1 min-w-0">
                         <p className="text-sm font-medium text-foreground truncate">{userName}</p>
-                        <p className="text-xs text-muted-foreground truncate">{user?.email}</p>
+                        <p className="text-xs text-muted-foreground truncate">{effectiveUser?.email}</p>
                       </div>
                     </div>
                     <Button

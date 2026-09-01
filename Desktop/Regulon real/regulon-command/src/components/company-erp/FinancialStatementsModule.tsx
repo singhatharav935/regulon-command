@@ -2891,7 +2891,7 @@ function TrialBalanceTab({
     }
 
     // Fallback or demo mode adapter
-    const rawData = isReal ? (tb || []) : (tb && tb.length > 0 ? tb : []);
+    const rawData: TBLedger[] = Array.isArray(tb) ? tb : [];
     const fallbackItems: TrialBalanceItem[] = rawData.map((r) => ({
       code: r.code,
       name: r.name,
@@ -5032,7 +5032,7 @@ export function FinancialStatementsModule({
           transition={{ duration: 0.18 }}
         >
           {activeTab === "tb" && <TrialBalanceTab
-            tb={isReal ? computeDoubleEntryTrialBalance({ invoices: liveInvoices, purchases: livePurchases, expenses: liveExpenses, bankTxns: liveBankTxns, payroll: livePayroll }) : trialBalance}
+            tb={isReal ? undefined : (Array.isArray(trialBalance) ? trialBalance : undefined)}
             mode={mode}
             companyId={cid}
           />}
