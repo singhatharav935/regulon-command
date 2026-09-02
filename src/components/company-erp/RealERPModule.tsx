@@ -462,7 +462,10 @@ export function RealERPModule({ companyId, companyName }: Props) {
       const liveBank = !bankError ? (bank.data as ERPBankTxn[]  ?? []) : null;
       const liveInvStk = inv_stk.data ?? [];
 
-      // ─── localStorage Fallbacks (ONLY used when Supabase returned an error) ──
+      // ─── localStorage Fallbacks — used when Supabase returned error OR empty results ──
+      // The DataIngestionModal saves imported data to localStorage first (always reliable).
+      // If Supabase returns [] (RLS blocks, no rows, or tables not set up), we MUST
+      // read from localStorage to show the user their imported data.
       const lsFallback = (key: string): any[] => {
         try {
           const raw = localStorage.getItem(key);
@@ -470,12 +473,12 @@ export function RealERPModule({ companyId, companyName }: Props) {
         } catch { return []; }
       };
 
-      // Only read localStorage when Supabase itself failed
-      const lsBankTxns  = bankError ? lsFallback(`sannidh_bank_txns_${companyId}`)  : [];
-      const lsPayroll   = payError  ? lsFallback(`sannidh_payroll_${companyId}`)    : [];
-      const lsInvoices  = invError  ? lsFallback(`sannidh_invoices_${companyId}`)   : [];
-      const lsPurchases = purError  ? lsFallback(`sannidh_purchases_${companyId}`)  : [];
-      const lsExpenses  = expError  ? lsFallback(`sannidh_expenses_${companyId}`)   : [];
+      // Always read localStorage — it is the ground truth for imported data
+      const lsBankTxns  = lsFallback(`sannidh_bank_txns_${companyId}`);
+      const lsPayroll   = lsFallback(`sannidh_payroll_${companyId}`);
+      const lsInvoices  = lsFallback(`sannidh_invoices_${companyId}`);
+      const lsPurchases = lsFallback(`sannidh_purchases_${companyId}`);
+      const lsExpenses  = lsFallback(`sannidh_expenses_${companyId}`);
 
       const hasLive = !!(
         (liveInv  && liveInv.length  > 0) ||
@@ -483,15 +486,17 @@ export function RealERPModule({ companyId, companyName }: Props) {
         (liveExp  && liveExp.length  > 0) ||
         (livePay  && livePay.length  > 0) ||
         (liveBank && liveBank.length > 0) ||
-        lsBankTxns.length > 0 || lsPayroll.length > 0 || lsInvoices.length > 0
+        lsBankTxns.length > 0 || lsPayroll.length > 0 || lsInvoices.length > 0 ||
+        lsPurchases.length > 0 || lsExpenses.length > 0
       );
       setIsLiveData(hasLive);
 
-      const finalInvoices  = liveInv  ?? (lsInvoices.length  > 0 ? lsInvoices  : []);
-      const finalPurchases = livePur  ?? (lsPurchases.length > 0 ? lsPurchases : []);
-      const finalExpenses  = liveExp  ?? (lsExpenses.length  > 0 ? lsExpenses  : []);
-      const finalPayroll   = livePay  ?? (lsPayroll.length   > 0 ? lsPayroll   : []);
-      const finalBankTxns  = liveBank ?? (lsBankTxns.length  > 0 ? lsBankTxns  : []);
+      // Use Supabase data if it has rows; otherwise fall back to localStorage
+      const finalInvoices  = (liveInv  && liveInv.length  > 0) ? liveInv  : lsInvoices;
+      const finalPurchases = (livePur  && livePur.length  > 0) ? livePur  : lsPurchases;
+      const finalExpenses  = (liveExp  && liveExp.length  > 0) ? liveExp  : lsExpenses;
+      const finalPayroll   = (livePay  && livePay.length  > 0) ? livePay  : lsPayroll;
+      const finalBankTxns  = (liveBank && liveBank.length > 0) ? liveBank : lsBankTxns;
       const finalInventory = liveInvStk ?? [];
 
       if (finalBankTxns.length > 0) {
