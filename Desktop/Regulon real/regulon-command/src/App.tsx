@@ -53,7 +53,7 @@ const AppVerification = lazyWithRetry(() => import("./pages/AppVerification"));
 const CAFirmDashboard = lazyWithRetry(() => import("./pages/CAFirmDashboard"));
 // const AppCAFirmDashboard = lazy(() => import("./pages/AppCAFirmDashboard")); // Removed - use demo dashboards
 // const RealCADashboard = lazy(() => import("./pages/RealCADashboard")); // Removed - use demo dashboards
-import CompanyDashboardReal from "./pages/CompanyDashboardReal"; // REAL Company Owner Dashboard (Eagerly loaded to prevent Vite dynamic fetch errors)
+const CompanyDashboardReal = lazyWithRetry(() => import("./pages/CompanyDashboardReal")); // REAL Company Owner Dashboard
 const ExternalCADashboardReal = lazyWithRetry(() => import("./pages/ExternalCADashboardReal")); // REAL External CA Dashboard
 const InhouseCADashboardReal = lazyWithRetry(() => import("./pages/InhouseCADashboardReal")); // REAL In-House CA Dashboard
 const AgentControlCenter = lazyWithRetry(() => import("./pages/AgentControlCenter")); // CA Agent Control Center Settings
