@@ -38,26 +38,27 @@ import ProtectedRoute from "./components/auth/ProtectedRoute";
 import { LanguageProvider } from "./contexts/LanguageContext";
 import { PersonaAuthProvider } from "./lib/persona-auth-context";
 import { PersonaRoute } from "./components/auth/PersonaRoute";
+import { lazyWithRetry } from "./lib/lazyWithRetry";
 
-const Dashboard = lazy(() => import("./pages/Dashboard"));
-const CADashboard = lazy(() => import("./pages/CADashboard"));
-const AdminDashboard = lazy(() => import("./pages/AdminDashboard"));
-const EFilingAckPdfViewer = lazy(() => import("./pages/EFilingAckPdfViewer"));
-const PaymentChallanPdfViewer = lazy(() => import("./pages/PaymentChallanPdfViewer"));
+const Dashboard = lazyWithRetry(() => import("./pages/Dashboard"));
+const CADashboard = lazyWithRetry(() => import("./pages/CADashboard"));
+const AdminDashboard = lazyWithRetry(() => import("./pages/AdminDashboard"));
+const EFilingAckPdfViewer = lazyWithRetry(() => import("./pages/EFilingAckPdfViewer"));
+const PaymentChallanPdfViewer = lazyWithRetry(() => import("./pages/PaymentChallanPdfViewer"));
 // const AppDashboard = lazy(() => import("./pages/AppDashboard")); // Removed - use demo dashboards
 // const AppCADashboard = lazy(() => import("./pages/AppCADashboard")); // Removed - use demo dashboards
 // const AppAdminDashboard = lazy(() => import("./pages/AppAdminDashboard")); // Removed - use demo dashboards
 // const AppLegalDashboard = lazy(() => import("./pages/AppLegalDashboard")); // Removed - use demo dashboards
-const AppVerification = lazy(() => import("./pages/AppVerification"));
-const CAFirmDashboard = lazy(() => import("./pages/CAFirmDashboard"));
+const AppVerification = lazyWithRetry(() => import("./pages/AppVerification"));
+const CAFirmDashboard = lazyWithRetry(() => import("./pages/CAFirmDashboard"));
 // const AppCAFirmDashboard = lazy(() => import("./pages/AppCAFirmDashboard")); // Removed - use demo dashboards
 // const RealCADashboard = lazy(() => import("./pages/RealCADashboard")); // Removed - use demo dashboards
-const ExternalCADashboardReal = lazy(() => import("./pages/ExternalCADashboardReal")); // REAL External CA Dashboard
-const CompanyDashboardReal = lazy(() => import("./pages/CompanyDashboardReal")); // REAL Company Owner Dashboard
-const InhouseCADashboardReal = lazy(() => import("./pages/InhouseCADashboardReal")); // REAL In-House CA Dashboard
-const AgentControlCenter = lazy(() => import("./pages/AgentControlCenter")); // CA Agent Control Center Settings
-const CompanyAgentControlCenter = lazy(() => import("./pages/CompanyAgentControlCenter")); // Company Agent Control Center Settings
-const AgentWorkReview = lazy(() => import("./pages/AgentWorkReview"));
+const CompanyDashboardReal = lazyWithRetry(() => import("./pages/CompanyDashboardReal")); // REAL Company Owner Dashboard
+const ExternalCADashboardReal = lazyWithRetry(() => import("./pages/ExternalCADashboardReal")); // REAL External CA Dashboard
+const InhouseCADashboardReal = lazyWithRetry(() => import("./pages/InhouseCADashboardReal")); // REAL In-House CA Dashboard
+const AgentControlCenter = lazyWithRetry(() => import("./pages/AgentControlCenter")); // CA Agent Control Center Settings
+const CompanyAgentControlCenter = lazyWithRetry(() => import("./pages/CompanyAgentControlCenter")); // Company Agent Control Center Settings
+const AgentWorkReview = lazyWithRetry(() => import("./pages/AgentWorkReview"));
 const LegalPolicyPage = lazy(() => import("./pages/LegalPolicyPage"));
 const ComplianceCenter = lazy(() => import("./pages/ComplianceCenter"));
 const AdvancedPlatformPage = lazy(() => import("./pages/AdvancedPlatformPage"));

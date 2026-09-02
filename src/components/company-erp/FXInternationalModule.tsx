@@ -28,12 +28,7 @@ import {
   type Form15CA, type Form15CB, type TransferPricingRecord, type TRCRecord,
 } from "@/lib/accounting/fx-international-tax-engine";
 
-import {
-  DEMO_FX_TRANSACTIONS, DEMO_FX_GL_RESULTS, DEMO_PORTFOLIO_SUMMARY,
-  DEMO_FIRC_RECORDS, DEMO_LUT_RECORDS, DEMO_ZERO_RATED_SUPPLIES,
-  DEMO_RFD01_CLAIMS, DEMO_FORM15CA_LIST, DEMO_FORM15CB_LIST,
-  DEMO_TP_RECORDS, DEMO_TRC_RECORDS,
-} from "@/data/demo-fx-international-data";
+import { EmptyDataState } from './EmptyDataState';
 
 // ─── Helpers ─────────────────────────────────────────────────────────────────
 
@@ -92,7 +87,7 @@ function StatusPill({ status }: { status: string }) {
 // ─────────────────────────────────────────────────────────────────────────────
 
 function FXDashboardTab() {
-  const p = DEMO_PORTFOLIO_SUMMARY;
+  const p = ({ open_exposure_by_currency: {} } as any);
   const currencies = Object.keys(p.open_exposure_by_currency) as FXCurrency[];
 
   return (
@@ -103,7 +98,7 @@ function FXDashboardTab() {
           { label: "Net Forex P&L", value: fmtINR(Math.abs(p.net_forex_pnl)), sub: p.net_forex_pnl >= 0 ? "Net Gain" : "Net Loss", color: p.net_forex_pnl >= 0 ? "text-green-300" : "text-red-300", bg: p.net_forex_pnl >= 0 ? "bg-green-500/10 border-green-500/20" : "bg-red-500/10 border-red-500/20", icon: p.net_forex_pnl >= 0 ? TrendingUp : TrendingDown },
           { label: "Realized Gain", value: fmtINR(p.total_realized_gain), sub: `vs Loss ${fmtINR(p.total_realized_loss)}`, color: "text-emerald-300", bg: "bg-emerald-500/10 border-emerald-500/20", icon: CheckCircle2 },
           { label: "Unrealized G/L", value: fmtINR(p.total_unrealized_gain - p.total_unrealized_loss), sub: "Period-End Revaluation", color: p.total_unrealized_gain >= p.total_unrealized_loss ? "text-cyan-300" : "text-amber-300", bg: "bg-cyan-500/10 border-cyan-500/20", icon: Clock },
-          { label: "FX Transactions", value: DEMO_FX_TRANSACTIONS.length, sub: `${DEMO_FX_TRANSACTIONS.filter(t => !t.is_settled).length} open · ${DEMO_FX_TRANSACTIONS.filter(t => t.is_settled).length} settled`, color: "text-purple-300", bg: "bg-purple-500/10 border-purple-500/20", icon: Globe },
+          { label: "FX Transactions", value: [].length, sub: `${[].filter(t => !t.is_settled).length} open · ${[].filter(t => t.is_settled).length} settled`, color: "text-purple-300", bg: "bg-purple-500/10 border-purple-500/20", icon: Globe },
         ].map(({ label, value, sub, color, bg, icon: Icon }) => (
           <div key={label} className={`p-3 rounded-xl border ${bg} flex items-center gap-3`}>
             <div className="p-2 rounded-lg bg-black/20 shrink-0"><Icon className={`w-4 h-4 ${color}`} /></div>
@@ -177,10 +172,10 @@ function ForexLedgerTab() {
     <div className="space-y-3">
       <p className="text-xs font-bold text-foreground flex items-center gap-2">
         <DollarSign className="w-3.5 h-3.5 text-cyan-400" />
-        Foreign Currency Transaction Ledger — {DEMO_FX_TRANSACTIONS.length} Transactions (AS-11 / Ind AS 21)
+        Foreign Currency Transaction Ledger — {[].length} Transactions (AS-11 / Ind AS 21)
       </p>
-      {DEMO_FX_TRANSACTIONS.map(txn => {
-        const gl = DEMO_FX_GL_RESULTS.find(r => r.transaction_id === txn.id);
+      {[].map(txn => {
+        const gl = [].find(r => r.transaction_id === txn.id);
         return (
           <div key={txn.id} className="rounded-xl border border-white/8 bg-card/40 overflow-hidden">
             <div className="p-3 flex items-start justify-between gap-3 flex-wrap">
@@ -265,9 +260,9 @@ function FIRCTrackerTab() {
     <div className="space-y-3">
       <div className="grid grid-cols-3 gap-3 text-xs">
         {[
-          { label: "Total FIRCs", value: DEMO_FIRC_RECORDS.length, color: "text-cyan-300", bg: "bg-cyan-500/10 border-cyan-500/20" },
-          { label: "Utilized", value: DEMO_FIRC_RECORDS.filter(f => f.status === "Utilized").length, color: "text-purple-300", bg: "bg-purple-500/10 border-purple-500/20" },
-          { label: "Pending", value: DEMO_FIRC_RECORDS.filter(f => f.status === "Received").length, color: "text-amber-300", bg: "bg-amber-500/10 border-amber-500/20" },
+          { label: "Total FIRCs", value: [].length, color: "text-cyan-300", bg: "bg-cyan-500/10 border-cyan-500/20" },
+          { label: "Utilized", value: [].filter(f => f.status === "Utilized").length, color: "text-purple-300", bg: "bg-purple-500/10 border-purple-500/20" },
+          { label: "Pending", value: [].filter(f => f.status === "Received").length, color: "text-amber-300", bg: "bg-amber-500/10 border-amber-500/20" },
         ].map(({ label, value, color, bg }) => (
           <div key={label} className={`p-3 rounded-xl border ${bg} text-center`}>
             <p className={`text-xl font-bold font-mono ${color}`}>{value}</p>
@@ -290,7 +285,7 @@ function FIRCTrackerTab() {
               </tr>
             </thead>
             <tbody className="divide-y divide-white/4">
-              {DEMO_FIRC_RECORDS.map(firc => (
+              {[].map(firc => (
                 <tr key={firc.id} className="hover:bg-white/2">
                   <td className="px-3 py-2 font-mono text-cyan-300 text-[10px]">{firc.firc_number}</td>
                   <td className="px-3 py-2 text-[10px]">{firc.bank_name}</td>
@@ -318,9 +313,9 @@ function FIRCTrackerTab() {
 // ─────────────────────────────────────────────────────────────────────────────
 
 function LUTTrackerTab() {
-  const lut = DEMO_LUT_RECORDS[0];
-  const refundClaimed = DEMO_ZERO_RATED_SUPPLIES.filter(s => s.refund_status !== "NOT_FILED").reduce((s, z) => s + z.igst_applicable, 0);
-  const refundPending = DEMO_ZERO_RATED_SUPPLIES.filter(s => s.refund_status === "NOT_FILED").reduce((s, z) => s + z.igst_applicable, 0);
+  const lut = ([{}] as any[])[0];
+  const refundClaimed = [].filter(s => s.refund_status !== "NOT_FILED").reduce((s, z) => s + z.igst_applicable, 0);
+  const refundPending = [].filter(s => s.refund_status === "NOT_FILED").reduce((s, z) => s + z.igst_applicable, 0);
 
   return (
     <div className="space-y-4">
@@ -370,7 +365,7 @@ function LUTTrackerTab() {
               </tr>
             </thead>
             <tbody className="divide-y divide-white/4">
-              {DEMO_ZERO_RATED_SUPPLIES.map(s => (
+              {[].map(s => (
                 <tr key={s.id} className="hover:bg-white/2">
                   <td className="px-3 py-2 font-mono text-cyan-300 text-[10px]">{s.invoice_number}</td>
                   <td className="px-3 py-2 font-mono text-[10px] text-muted-foreground">{s.invoice_date}</td>
@@ -397,8 +392,8 @@ function LUTTrackerTab() {
 // ─────────────────────────────────────────────────────────────────────────────
 
 function RFD01Tab() {
-  const totalClaimed = DEMO_RFD01_CLAIMS.reduce((s, r) => s + r.total_igst_claimed, 0);
-  const totalPaid = DEMO_RFD01_CLAIMS.filter(r => r.amount_paid).reduce((s, r) => s + (r.amount_paid || 0), 0);
+  const totalClaimed = [].reduce((s, r) => s + r.total_igst_claimed, 0);
+  const totalPaid = [].filter(r => r.amount_paid).reduce((s, r) => s + (r.amount_paid || 0), 0);
 
   return (
     <div className="space-y-4">
@@ -406,7 +401,7 @@ function RFD01Tab() {
         {[
           { label: "Total IGST Claimed", value: fmtINR(totalClaimed), color: "text-cyan-300", bg: "bg-cyan-500/10 border-cyan-500/20" },
           { label: "Total Refund Received", value: fmtINR(totalPaid), color: "text-green-300", bg: "bg-green-500/10 border-green-500/20" },
-          { label: "Pending Claim", value: fmtINR(DEMO_ZERO_RATED_SUPPLIES.filter(s => s.refund_status === "NOT_FILED").reduce((s, z) => s + z.igst_applicable, 0)), color: "text-amber-300", bg: "bg-amber-500/10 border-amber-500/20" },
+          { label: "Pending Claim", value: fmtINR([].filter(s => s.refund_status === "NOT_FILED").reduce((s, z) => s + z.igst_applicable, 0)), color: "text-amber-300", bg: "bg-amber-500/10 border-amber-500/20" },
         ].map(({ label, value, color, bg }) => (
           <div key={label} className={`p-3 rounded-xl border ${bg} text-center`}>
             <p className={`text-base font-bold font-mono ${color}`}>{value}</p>
@@ -415,7 +410,7 @@ function RFD01Tab() {
         ))}
       </div>
 
-      {DEMO_RFD01_CLAIMS.map(claim => (
+      {[].map(claim => (
         <div key={claim.id} className="p-4 rounded-xl border border-white/8 bg-card/40 space-y-3">
           <div className="flex items-center justify-between flex-wrap gap-2">
             <div className="flex items-center gap-2">
@@ -472,7 +467,7 @@ function Form15CATab() {
         </div>
       </div>
 
-      {activeView === "15CA" && DEMO_FORM15CA_LIST.map(f => (
+      {activeView === "15CA" && [].map(f => (
         <div key={f.id} className="rounded-xl border border-purple-500/15 bg-card/40 overflow-hidden">
           <button onClick={() => setExpanded(expanded === f.id ? null : f.id)}
             className="w-full p-3 flex items-center justify-between gap-3 hover:bg-white/2 transition-all">
@@ -513,7 +508,7 @@ function Form15CATab() {
         </div>
       ))}
 
-      {activeView === "15CB" && DEMO_FORM15CB_LIST.map(f => (
+      {activeView === "15CB" && [].map(f => (
         <div key={f.id} className="p-4 rounded-xl border border-amber-500/15 bg-card/40 space-y-2">
           <div className="flex items-center justify-between flex-wrap gap-2">
             <div className="flex items-center gap-2">
@@ -653,21 +648,21 @@ function TransferPricingTab() {
       {view === "tp" && (
         <div className="space-y-3">
           <div className="grid grid-cols-3 gap-3 text-xs">
-            <div className={`p-3 rounded-xl border text-center ${DEMO_TP_RECORDS.every(t => t.form3ceb_filed) ? "bg-green-500/10 border-green-500/20" : "bg-amber-500/10 border-amber-500/20"}`}>
-              <p className={`text-xl font-bold font-mono ${DEMO_TP_RECORDS.every(t => t.form3ceb_filed) ? "text-green-300" : "text-amber-300"}`}>{DEMO_TP_RECORDS.filter(t => t.form3ceb_filed).length}/{DEMO_TP_RECORDS.length}</p>
+            <div className={`p-3 rounded-xl border text-center ${[].every(t => t.form3ceb_filed) ? "bg-green-500/10 border-green-500/20" : "bg-amber-500/10 border-amber-500/20"}`}>
+              <p className={`text-xl font-bold font-mono ${[].every(t => t.form3ceb_filed) ? "text-green-300" : "text-amber-300"}`}>{[].filter(t => t.form3ceb_filed).length}/{[].length}</p>
               <p className="text-[10px] text-muted-foreground mt-0.5">Form 3CEB Filed</p>
             </div>
             <div className="p-3 rounded-xl border bg-cyan-500/10 border-cyan-500/20 text-center">
-              <p className="text-xl font-bold font-mono text-cyan-300">{fmtINR(DEMO_TP_RECORDS.reduce((s, t) => s + t.transaction_value_inr, 0))}</p>
+              <p className="text-xl font-bold font-mono text-cyan-300">{fmtINR([].reduce((s, t) => s + t.transaction_value_inr, 0))}</p>
               <p className="text-[10px] text-muted-foreground mt-0.5">Total AE Transaction Value</p>
             </div>
             <div className="p-3 rounded-xl border bg-amber-500/10 border-amber-500/20 text-center">
-              <p className="text-xl font-bold font-mono text-amber-300">{fmtINR(DEMO_TP_RECORDS.reduce((s, t) => s + (t.adjustment || 0), 0))}</p>
+              <p className="text-xl font-bold font-mono text-amber-300">{fmtINR([].reduce((s, t) => s + (t.adjustment || 0), 0))}</p>
               <p className="text-[10px] text-muted-foreground mt-0.5">Total TP Adjustments</p>
             </div>
           </div>
 
-          {DEMO_TP_RECORDS.map(tp => (
+          {[].map(tp => (
             <div key={tp.id} className="p-4 rounded-xl border border-white/8 bg-card/40 space-y-2">
               <div className="flex items-center justify-between flex-wrap gap-2">
                 <div className="flex items-center gap-2 flex-wrap">
@@ -691,7 +686,7 @@ function TransferPricingTab() {
 
       {view === "trc" && (
         <div className="space-y-3">
-          {DEMO_TRC_RECORDS.map(trc => (
+          {[].map(trc => (
             <div key={trc.id} className={`p-4 rounded-xl border ${trc.status === "VALID" ? "border-green-500/20 bg-green-500/5" : trc.status === "EXPIRED" ? "border-red-500/20 bg-red-500/5" : "border-amber-500/20 bg-amber-500/5"}`}>
               <div className="flex items-center justify-between flex-wrap gap-2 mb-2">
                 <div className="flex items-center gap-2 flex-wrap">
@@ -724,15 +719,19 @@ type Tab8 = "dashboard" | "ledger" | "firc" | "lut" | "rfd01" | "form15ca" | "dt
 export function FXInternationalModule({ companyName }: { companyName?: string }) {
   const [activeTab, setActiveTab] = useState<Tab8>("dashboard");
 
+  if ([].length === 0) {
+    return <EmptyDataState icon="💱" title="No International Transactions" message="No FX or cross-border transactions recorded. Import data to activate this module." />;
+  }
+
   const tabs: { id: Tab8; label: string; icon: any; badge?: string }[] = [
-    { id: "dashboard", label: "FX Dashboard",      icon: Globe,       badge: `${DEMO_FX_TRANSACTIONS.length} Txns` },
-    { id: "ledger",    label: "FX Ledger & G/L",  icon: DollarSign,  badge: String(DEMO_FX_GL_RESULTS.length) },
-    { id: "firc",      label: "FIRC Tracker",      icon: FileCheck2,  badge: String(DEMO_FIRC_RECORDS.length) },
-    { id: "lut",       label: "LUT / Zero-Rated",  icon: Shield,      badge: String(DEMO_ZERO_RATED_SUPPLIES.length) },
-    { id: "rfd01",     label: "RFD-01 Refunds",    icon: ArrowDownRight, badge: String(DEMO_RFD01_CLAIMS.length) },
-    { id: "form15ca",  label: "Form 15CA / 15CB",  icon: FileText,    badge: String(DEMO_FORM15CA_LIST.length) },
+    { id: "dashboard", label: "FX Dashboard",      icon: Globe,       badge: `${[].length} Txns` },
+    { id: "ledger",    label: "FX Ledger & G/L",  icon: DollarSign,  badge: String([].length) },
+    { id: "firc",      label: "FIRC Tracker",      icon: FileCheck2,  badge: String([].length) },
+    { id: "lut",       label: "LUT / Zero-Rated",  icon: Shield,      badge: String([].length) },
+    { id: "rfd01",     label: "RFD-01 Refunds",    icon: ArrowDownRight, badge: String([].length) },
+    { id: "form15ca",  label: "Form 15CA / 15CB",  icon: FileText,    badge: String([].length) },
     { id: "dtaa",      label: "DTAA & WHT",        icon: Scale,       badge: `${DTAA_RATES.length} Treaties` },
-    { id: "tp",        label: "TP & TRC",          icon: Building2,   badge: String(DEMO_TP_RECORDS.length) },
+    { id: "tp",        label: "TP & TRC",          icon: Building2,   badge: String([].length) },
   ];
 
   return (
@@ -749,8 +748,8 @@ export function FXInternationalModule({ companyName }: { companyName?: string })
           </p>
         </div>
         <div className="flex items-center gap-2 shrink-0">
-          <span className={`text-[10px] px-2.5 py-1 rounded-full border font-bold ${DEMO_PORTFOLIO_SUMMARY.net_forex_pnl >= 0 ? "bg-green-500/15 border-green-500/25 text-green-300" : "bg-red-500/15 border-red-500/25 text-red-300"}`}>
-            {DEMO_PORTFOLIO_SUMMARY.net_forex_pnl >= 0 ? "Net FX Gain" : "Net FX Loss"} {fmtINR(Math.abs(DEMO_PORTFOLIO_SUMMARY.net_forex_pnl))}
+          <span className={`text-[10px] px-2.5 py-1 rounded-full border font-bold ${({ open_exposure_by_currency: {} } as any).net_forex_pnl >= 0 ? "bg-green-500/15 border-green-500/25 text-green-300" : "bg-red-500/15 border-red-500/25 text-red-300"}`}>
+            {({ open_exposure_by_currency: {} } as any).net_forex_pnl >= 0 ? "Net FX Gain" : "Net FX Loss"} {fmtINR(Math.abs(({ open_exposure_by_currency: {} } as any).net_forex_pnl))}
           </span>
         </div>
       </div>

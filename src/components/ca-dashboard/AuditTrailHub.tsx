@@ -306,7 +306,7 @@ const AuditTrailHub: React.FC = () => {
                 </Badge>
               )}
               {tab.alert && (
-                <span className="absolute -top-1 -right-1 w-2 h-2 rounded-full bg-red-500" />
+                <span className="absolute -top-1 -right-1 w-2.5 h-2.5 rounded-full bg-red-500 animate-ping" />
               )}
             </button>
           );

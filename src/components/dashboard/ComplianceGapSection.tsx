@@ -24,7 +24,7 @@ const demoGaps: GapItem[] = [
   { id: "5", type: "pending", title: "RBI Foreign Liabilities Return", regulator: "RBI", impact: "+2%", timeToClose: "3-4 days" },
 ];
 
-const ComplianceGapSection = ({ gaps, useDemoFallback = true }: ComplianceGapSectionProps) => {
+const ComplianceGapSection = ({ gaps, useDemoFallback = false }: ComplianceGapSectionProps) => {
   const effectiveGaps = gaps && gaps.length > 0 ? gaps : useDemoFallback ? demoGaps : [];
   const getTypeIcon = (type: GapItem["type"]) => {
     switch (type) {

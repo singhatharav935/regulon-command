@@ -1712,7 +1712,7 @@ We submit the complete factual registry for the disputed supplies:
                   <span className="text-xs text-zinc-400 font-bold ml-2">Appellate Portal Filing - Rejoinder Gateway</span>
                 </div>
                 <div className="flex items-center gap-2">
-                  <span className="w-2 h-2 rounded-full bg-green-400 animate-pulse" />
+                  <span className="w-2 h-2 rounded-full bg-green-400 animate-ping" />
                   <span className="text-[10px] text-green-400 font-sans font-bold">TRANSMITTING</span>
                 </div>
               </div>
@@ -1776,7 +1776,7 @@ We submit the complete factual registry for the disputed supplies:
                   </div>
                 </div>
                 <div className="flex items-center gap-2">
-                  <span className={`w-2 h-2 rounded-full ${vcStatus === 'connecting' ? 'bg-yellow-400 animate-pulse' : vcStatus === 'active' ? 'bg-red-400 animate-pulse' : 'bg-green-400'}`} />
+                  <span className={`w-2 h-2 rounded-full ${vcStatus === 'connecting' ? 'bg-yellow-400 animate-ping' : vcStatus === 'active' ? 'bg-red-400 animate-pulse' : 'bg-green-400'}`} />
                   <span className={`text-[10px] font-bold ${vcStatus === 'connecting' ? 'text-yellow-400' : vcStatus === 'active' ? 'text-red-400' : 'text-green-400'}`}>
                     {vcStatus.toUpperCase()}
                   </span>
@@ -1826,7 +1826,7 @@ We submit the complete factual registry for the disputed supplies:
                     
                     {vcStatus === 'active' && vcLogs.length > 0 && (vcLogs[vcLogs.length - 1].startsWith("[Appellate Authority]") || vcLogs[vcLogs.length - 1]?.startsWith("[Commissioner]")) ? (
                       <>
-                        <div className="absolute top-3 left-3 bg-red-600 text-white font-bold text-[8px] px-2 py-0.5 rounded-full">
+                        <div className="absolute top-3 left-3 bg-red-600 text-white font-bold text-[8px] px-2 py-0.5 rounded-full animate-bounce">
                           SPEAKING
                         </div>
                         <div className="absolute bottom-3 left-3 flex items-end gap-1 h-5 pointer-events-none">
@@ -1855,7 +1855,7 @@ We submit the complete factual registry for the disputed supplies:
                     
                     {vcStatus === 'active' && vcLogs.length > 0 && (vcLogs[vcLogs.length - 1].startsWith("[Assessing Officer]") || vcLogs[vcLogs.length - 1]?.startsWith("[Department Rep]")) ? (
                       <>
-                        <div className="absolute top-3 left-3 bg-red-600 text-white font-bold text-[8px] px-2 py-0.5 rounded-full">
+                        <div className="absolute top-3 left-3 bg-red-600 text-white font-bold text-[8px] px-2 py-0.5 rounded-full animate-bounce">
                           SPEAKING
                         </div>
                         <div className="absolute bottom-3 left-3 flex items-end gap-1 h-5 pointer-events-none">
@@ -1885,7 +1885,7 @@ We submit the complete factual registry for the disputed supplies:
                     {vcStatus === 'active' && vcLogs.length > 0 && vcLogs[vcLogs.length - 1].startsWith("[Sannidh AI]") ? (
                       <>
                         <div className="absolute top-3 left-3 bg-purple-600 text-white font-bold text-[8px] px-2 py-0.5 rounded-full animate-pulse flex items-center gap-1">
-                          <span className="w-1.5 h-1.5 rounded-full bg-white animate-pulse" />
+                          <span className="w-1.5 h-1.5 rounded-full bg-white animate-ping" />
                           ADVOCATING
                         </div>
                         <div className="absolute bottom-3 left-3 flex items-end gap-1 h-5 pointer-events-none">
@@ -1927,7 +1927,7 @@ We submit the complete factual registry for the disputed supplies:
                         <span className="text-[10px] text-cyan-400 mt-1">watching observer</span>
                         
                         <div className="absolute top-3 right-3 bg-cyan-600 text-white font-bold text-[8px] px-2 py-0.5 rounded-full flex items-center gap-1">
-                          <span className="w-1.5 h-1.5 rounded-full bg-white animate-pulse" />
+                          <span className="w-1.5 h-1.5 rounded-full bg-white animate-ping" />
                           LIVE
                         </div>
                       </>
@@ -1984,7 +1984,7 @@ We submit the complete factual registry for the disputed supplies:
                       
                       {vcStatus === 'active' && (
                         <div className="flex items-center gap-2 text-red-400 animate-pulse py-1 font-sans text-[10px]">
-                          <span className="w-1.5 h-1.5 rounded-full bg-red-400 animate-pulse" />
+                          <span className="w-1.5 h-1.5 rounded-full bg-red-400 animate-ping" />
                           <span>Oral arguments in progress...</span>
                         </div>
                       )}

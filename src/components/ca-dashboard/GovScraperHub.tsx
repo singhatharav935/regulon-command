@@ -562,7 +562,7 @@ export default function GovScraperHub() {
                     <div className="space-y-4">
                       {repairLogs.map(log => (
                         <div key={log.id} className="relative pl-6 pb-2 border-l border-orange-500/30 last:pb-0">
-                          <span className="absolute left-[-5px] top-1.5 w-2 h-2 rounded-full bg-orange-500" />
+                          <span className="absolute left-[-5px] top-1.5 w-2 h-2 rounded-full bg-orange-500 animate-ping" />
                           <div className="flex items-center justify-between flex-wrap gap-2 text-xs">
                             <span className="font-semibold text-orange-200">
                               Healed {log.portal} :: {log.selector_key}

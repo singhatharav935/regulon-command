@@ -161,8 +161,24 @@ const AdvancedComplianceRadar = ({
 
   return (
     <div className="space-y-6 mb-8">
-      {/* Section separator */}
-      <div className="w-full h-px bg-gradient-to-r from-transparent via-border/40 to-transparent mb-4" />
+      {/* Full-Width Animated Green Line */}
+      <motion.div
+        className="relative w-full h-1 mb-4"
+        style={{
+          background: 'linear-gradient(90deg, transparent, #10b981, transparent)',
+          filter: 'drop-shadow(0 0 8px rgba(16, 185, 129, 0.8))',
+        }}
+        animate={{
+          y: [-2, 2, -2],
+          scaleY: [1, 1.5, 1],
+          opacity: [0.6, 1, 0.6],
+        }}
+        transition={{
+          duration: 2.5,
+          repeat: Infinity,
+          ease: "easeInOut"
+        }}
+      />
       
       {/* Main Header */}
       <motion.section
@@ -292,7 +308,8 @@ const AdvancedComplianceRadar = ({
           <div className="flex items-center justify-between">
             <div className="flex items-center gap-3">
               <div className="relative">
-                <div className="w-2.5 h-2.5 bg-emerald-400 rounded-full animate-pulse"></div>
+                <div className="w-3 h-3 bg-emerald-400 rounded-full animate-pulse"></div>
+                <div className="absolute inset-0 w-3 h-3 bg-emerald-400 rounded-full animate-ping opacity-75"></div>
               </div>
               <div>
                 <p className="text-sm font-medium text-foreground">Live Monitoring Active</p>
@@ -304,10 +321,32 @@ const AdvancedComplianceRadar = ({
             
             {/* Proper Live Line Chart Animation - like stock market ticker */}
             <div className="flex items-center gap-2">
-              <Badge variant="outline" className="border-emerald-500/40 text-emerald-400 text-[10px] px-2 py-0.5 flex items-center gap-1.5">
-                <span className="w-1.5 h-1.5 rounded-full bg-emerald-400 animate-pulse" />
-                MONITORING
-              </Badge>
+              <div className="flex items-end gap-px h-10 bg-black/20 rounded px-2">
+                {[...Array(20)].map((_, i) => (
+                  <motion.div
+                    key={i}
+                    className="bg-emerald-400 w-px rounded-full min-h-[2px]"
+                    initial={{ height: "4px" }}
+                    animate={{ 
+                      height: [
+                        `${Math.random() * 30 + 4}px`, 
+                        `${Math.random() * 30 + 4}px`,
+                        `${Math.random() * 30 + 4}px`
+                      ]
+                    }}
+                    transition={{ 
+                      duration: 3 + Math.random() * 2,
+                      repeat: Infinity,
+                      ease: "easeInOut",
+                      delay: i * 0.1
+                    }}
+                  />
+                ))}
+              </div>
+              <div className="flex flex-col items-center">
+                <TrendingUp className="w-4 h-4 text-emerald-400" />
+                <span className="text-xs text-emerald-400 font-mono">LIVE</span>
+              </div>
             </div>
           </div>
         </div>

@@ -1023,7 +1023,7 @@ const EFilingIntegration = () => {
       {/* Swarm Offline Warning Banner */}
       {!isRunning && (
         <div className="p-4 rounded-xl bg-rose-500/10 border border-rose-500/20 flex items-start gap-3 shadow-lg backdrop-blur-md">
-          <AlertTriangle className="w-5 h-5 text-rose-400 flex-shrink-0 mt-0.5" />
+          <AlertTriangle className="w-5 h-5 text-rose-400 flex-shrink-0 mt-0.5 animate-bounce" />
           <div className="flex-1">
             <h4 className="text-sm font-semibold text-rose-400">AI Swarm Engine Offline</h4>
             <p className="text-xs text-muted-foreground mt-1">

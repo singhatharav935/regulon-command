@@ -289,129 +289,185 @@ const ProfileSettings = () => {
             </p>
           </motion.div>
 
-          {/* ─── Section 1: CA Details ─────────────────────────── */}
-          <motion.div
-            initial={{ opacity: 0, y: 20 }}
-            animate={{ opacity: 1, y: 0 }}
-            transition={{ delay: 0.1 }}
-          >
-            <Card className="bg-card/50 border-border/40 backdrop-blur-sm">
-              <CardHeader className="pb-4">
-                <CardTitle className="text-lg flex items-center gap-2">
-                  <div className="p-2 rounded-lg bg-cyan-500/10">
-                    <User className="w-5 h-5 text-cyan-400" />
-                  </div>
-                  CA Details
-                </CardTitle>
-              </CardHeader>
-              <CardContent className="space-y-6">
-                {/* Avatar Section */}
-                <div className="flex items-center gap-6">
-                  <div className="relative group">
-                    <Avatar className="w-24 h-24 border-2 border-border/50 ring-2 ring-cyan-500/20">
-                      <AvatarImage src={avatarUrl || undefined} alt={localName} />
-                      <AvatarFallback className="text-2xl font-bold bg-gradient-to-br from-cyan-500/20 to-blue-600/20 text-cyan-300">
-                        {initials || "U"}
-                      </AvatarFallback>
-                    </Avatar>
-                    <button
-                      className="absolute inset-0 flex items-center justify-center bg-black/50 rounded-full opacity-0 group-hover:opacity-100 transition-opacity cursor-pointer"
-                      onClick={() => fileInputRef.current?.click()}
-                      disabled={uploading}
-                    >
-                      <Camera className="w-6 h-6 text-white" />
-                    </button>
-                    <input
-                      ref={fileInputRef}
-                      type="file"
-                      accept="image/*"
-                      className="hidden"
-                      onChange={handleAvatarUpload}
-                    />
-                  </div>
-                  <div className="flex-1">
-                    <div className="flex items-center gap-2 mb-1">
-                      <h3 className="text-xl font-bold text-foreground">
-                        {localName || "User"}
-                      </h3>
-                      <Badge className="bg-emerald-500/20 text-emerald-400 border-emerald-500/30 text-xs">
-                        <Shield className="w-3 h-3 mr-1" />
-                        Verified Partner
-                      </Badge>
+          {/* ─── Section 1: Entity & User Details (Role-Aware) ─────────────────────────── */}
+          {(() => {
+            const userRole = persona || user?.user_metadata?.registration_role || 'company_owner';
+            const isCA = userRole === 'external_ca' || userRole === 'ca_firm' || userRole === 'in_house_ca';
+            const isLawyer = userRole === 'in_house_lawyer';
+
+            const sectionTitle = isCA
+              ? "CA Details & Practice Info"
+              : isLawyer
+              ? "Legal Counsel & Regulatory Details"
+              : "Company Owner & Entity Details";
+
+            const badgeLabel = isCA
+              ? "Verified CA Partner"
+              : isLawyer
+              ? "Verified Legal Counsel"
+              : "Verified Entity Owner";
+
+            const nameLabel = isCA
+              ? "Full Name"
+              : isLawyer
+              ? "Full Name"
+              : "Director / Authorized Signatory Name";
+
+            const entityLabel = isCA
+              ? "CA Firm Name"
+              : isLawyer
+              ? "Law Firm / Organization Name"
+              : "Registered Business / Company Name";
+
+            const entityPlaceholder = isCA
+              ? "e.g. Shukla & Associates"
+              : isLawyer
+              ? "e.g. Lex Juris LLP"
+              : "e.g. Regulon Command Technologies Pvt Ltd";
+
+            const registrationLabel = isCA
+              ? "ICAI Membership Number"
+              : isLawyer
+              ? "Bar Council Enrollment Number"
+              : "GSTIN / CIN / PAN Number";
+
+            const registrationPlaceholder = isCA
+              ? "e.g. 123456"
+              : isLawyer
+              ? "e.g. MAH/1234/2020"
+              : "e.g. 27AAACR1234F1Z5 / U72900MH2025PTC123456";
+
+            return (
+              <motion.div
+                initial={{ opacity: 0, y: 20 }}
+                animate={{ opacity: 1, y: 0 }}
+                transition={{ delay: 0.1 }}
+              >
+                <Card className="bg-card/50 border-border/40 backdrop-blur-sm">
+                  <CardHeader className="pb-4">
+                    <CardTitle className="text-lg flex items-center gap-2">
+                      <div className="p-2 rounded-lg bg-cyan-500/10">
+                        {isCA ? (
+                          <Award className="w-5 h-5 text-cyan-400" />
+                        ) : isLawyer ? (
+                          <Shield className="w-5 h-5 text-cyan-400" />
+                        ) : (
+                          <Building2 className="w-5 h-5 text-cyan-400" />
+                        )}
+                      </div>
+                      {sectionTitle}
+                    </CardTitle>
+                  </CardHeader>
+                  <CardContent className="space-y-6">
+                    {/* Avatar Section */}
+                    <div className="flex items-center gap-6">
+                      <div className="relative group">
+                        <Avatar className="w-24 h-24 border-2 border-border/50 ring-2 ring-cyan-500/20">
+                          <AvatarImage src={avatarUrl || undefined} alt={localName} />
+                          <AvatarFallback className="text-2xl font-bold bg-gradient-to-br from-cyan-500/20 to-blue-600/20 text-cyan-300">
+                            {initials || "U"}
+                          </AvatarFallback>
+                        </Avatar>
+                        <button
+                          className="absolute inset-0 flex items-center justify-center bg-black/50 rounded-full opacity-0 group-hover:opacity-100 transition-opacity cursor-pointer"
+                          onClick={() => fileInputRef.current?.click()}
+                          disabled={uploading}
+                        >
+                          <Camera className="w-6 h-6 text-white" />
+                        </button>
+                        <input
+                          ref={fileInputRef}
+                          type="file"
+                          accept="image/*"
+                          className="hidden"
+                          onChange={handleAvatarUpload}
+                        />
+                      </div>
+                      <div className="flex-1">
+                        <div className="flex items-center gap-2 mb-1">
+                          <h3 className="text-xl font-bold text-foreground">
+                            {localName || "User"}
+                          </h3>
+                          <Badge className="bg-emerald-500/20 text-emerald-400 border-emerald-500/30 text-xs">
+                            <Shield className="w-3 h-3 mr-1" />
+                            {badgeLabel}
+                          </Badge>
+                        </div>
+                        <p className="text-sm text-muted-foreground">{userEmail}</p>
+                        <Button
+                          variant="outline"
+                          size="sm"
+                          className="mt-3 border-cyan-500/30 text-cyan-400 hover:bg-cyan-500/10"
+                          onClick={() => fileInputRef.current?.click()}
+                          disabled={uploading}
+                        >
+                          <Camera className="w-3.5 h-3.5 mr-1.5" />
+                          {uploading ? "Uploading..." : "Change Photo"}
+                        </Button>
+                      </div>
                     </div>
-                    <p className="text-sm text-muted-foreground">{userEmail}</p>
-                    <Button
-                      variant="outline"
-                      size="sm"
-                      className="mt-3 border-cyan-500/30 text-cyan-400 hover:bg-cyan-500/10"
-                      onClick={() => fileInputRef.current?.click()}
-                      disabled={uploading}
-                    >
-                      <Camera className="w-3.5 h-3.5 mr-1.5" />
-                      {uploading ? "Uploading..." : "Change Photo"}
-                    </Button>
-                  </div>
-                </div>
 
-                {/* Fields */}
-                <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-                  <div className="space-y-2">
-                    <Label className="text-muted-foreground text-xs uppercase tracking-wider flex items-center gap-1.5">
-                      <User className="w-3 h-3" /> Full Name
-                    </Label>
-                    <Input
-                      value={localName}
-                      onChange={(e) => setLocalName(e.target.value)}
-                      placeholder="Your full name"
-                      className="bg-background/50 border-border/50"
-                    />
-                  </div>
-                  <div className="space-y-2">
-                    <Label className="text-muted-foreground text-xs uppercase tracking-wider flex items-center gap-1.5">
-                      <Mail className="w-3 h-3" /> Email
-                    </Label>
-                    <Input
-                      value={userEmail}
-                      disabled
-                      className="bg-background/30 border-border/30 text-muted-foreground cursor-not-allowed"
-                    />
-                  </div>
-                  <div className="space-y-2">
-                    <Label className="text-muted-foreground text-xs uppercase tracking-wider flex items-center gap-1.5">
-                      <Building2 className="w-3 h-3" /> CA Firm Name
-                    </Label>
-                    <Input
-                      value={localFirm}
-                      onChange={(e) => setLocalFirm(e.target.value)}
-                      placeholder="e.g. Shukla & Associates"
-                      className="bg-background/50 border-border/50"
-                    />
-                  </div>
-                  <div className="space-y-2">
-                    <Label className="text-muted-foreground text-xs uppercase tracking-wider flex items-center gap-1.5">
-                      <Award className="w-3 h-3" /> ICAI Membership Number
-                    </Label>
-                    <Input
-                      value={localIcai}
-                      onChange={(e) => setLocalIcai(e.target.value)}
-                      placeholder="e.g. 123456"
-                      className="bg-background/50 border-border/50"
-                    />
-                  </div>
-                </div>
+                    {/* Fields */}
+                    <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+                      <div className="space-y-2">
+                        <Label className="text-muted-foreground text-xs uppercase tracking-wider flex items-center gap-1.5">
+                          <User className="w-3 h-3" /> {nameLabel}
+                        </Label>
+                        <Input
+                          value={localName}
+                          onChange={(e) => setLocalName(e.target.value)}
+                          placeholder="Your full name"
+                          className="bg-background/50 border-border/50"
+                        />
+                      </div>
+                      <div className="space-y-2">
+                        <Label className="text-muted-foreground text-xs uppercase tracking-wider flex items-center gap-1.5">
+                          <Mail className="w-3 h-3" /> Email Address
+                        </Label>
+                        <Input
+                          value={userEmail}
+                          disabled
+                          className="bg-background/30 border-border/30 text-muted-foreground cursor-not-allowed"
+                        />
+                      </div>
+                      <div className="space-y-2">
+                        <Label className="text-muted-foreground text-xs uppercase tracking-wider flex items-center gap-1.5">
+                          <Building2 className="w-3 h-3" /> {entityLabel}
+                        </Label>
+                        <Input
+                          value={localFirm}
+                          onChange={(e) => setLocalFirm(e.target.value)}
+                          placeholder={entityPlaceholder}
+                          className="bg-background/50 border-border/50"
+                        />
+                      </div>
+                      <div className="space-y-2">
+                        <Label className="text-muted-foreground text-xs uppercase tracking-wider flex items-center gap-1.5">
+                          <Award className="w-3 h-3" /> {registrationLabel}
+                        </Label>
+                        <Input
+                          value={localIcai}
+                          onChange={(e) => setLocalIcai(e.target.value)}
+                          placeholder={registrationPlaceholder}
+                          className="bg-background/50 border-border/50"
+                        />
+                      </div>
+                    </div>
 
-                <div className="flex justify-end">
-                  <Button
-                    onClick={handleSaveDetails}
-                    className="bg-cyan-600 hover:bg-cyan-700 text-white"
-                  >
-                    <Sparkles className="w-4 h-4 mr-2" />
-                    Save Changes
-                  </Button>
-                </div>
-              </CardContent>
-            </Card>
-          </motion.div>
+                    <div className="flex justify-end">
+                      <Button
+                        onClick={handleSaveDetails}
+                        className="bg-cyan-600 hover:bg-cyan-700 text-white"
+                      >
+                        <Sparkles className="w-4 h-4 mr-2" />
+                        Save Changes
+                      </Button>
+                    </div>
+                  </CardContent>
+                </Card>
+              </motion.div>
+            );
+          })()}
 
           {/* ─── Section: AI Swarm & Dashboard Settings ─────────── */}
           <motion.div

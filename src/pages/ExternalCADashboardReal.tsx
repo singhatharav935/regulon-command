@@ -39,7 +39,7 @@ const OfflinePwaHub = lazy(() => import("@/components/ca-dashboard/OfflinePwaHub
 const GovScraperHub = lazy(() => import("@/components/ca-dashboard/GovScraperHub"));
 import { isOnline } from "@/services/offline-sync-service";
 import { useLanguage, LANGUAGE_LABELS } from "@/contexts/LanguageContext";
-import { Globe2, Globe, CloudOff } from "lucide-react";
+import { Globe2, Wifi, WifiOff } from "lucide-react";
 import { type ClientSector, getSectorConfig, isZoneAllowed } from "@/lib/client-sector";
 import { RealSectorSelectorBar } from "@/components/ca-dashboard/SectorSelectorBar";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
@@ -2202,7 +2202,7 @@ const ExternalCADashboardReal = () => {
                   ? 'bg-emerald-500/10 text-emerald-400 border-emerald-500/30' 
                   : 'bg-amber-500/10 text-amber-400 border-amber-500/30 animate-pulse'
               }`}>
-                {dashboardOnline ? <Globe className="w-3.5 h-3.5 text-emerald-400" /> : <CloudOff className="w-3.5 h-3.5 text-amber-400" />}
+                {dashboardOnline ? <Wifi className="w-3.5 h-3.5 text-emerald-400" /> : <WifiOff className="w-3.5 h-3.5 text-amber-400" />}
                 <span>{dashboardOnline ? 'ONLINE' : 'OFFLINE MODE'}</span>
               </Badge>
 
@@ -2340,7 +2340,7 @@ const ExternalCADashboardReal = () => {
                     )}
                      {isZoneAllowed(globalSector, 'offline-hub') && (
                      <TabsTrigger value="offline-hub" className="px-4 py-2.5 rounded-lg data-[state=active]:bg-emerald-500/20 data-[state=active]:text-emerald-400 font-medium text-xs flex items-center gap-1">
-                       <Globe className="w-3.5 h-3.5" />Offline &amp; PWA
+                       <Wifi className="w-3.5 h-3.5" />Offline &amp; PWA
                      </TabsTrigger>
                     )}
                      {isZoneAllowed(globalSector, 'gov-scraper') && (

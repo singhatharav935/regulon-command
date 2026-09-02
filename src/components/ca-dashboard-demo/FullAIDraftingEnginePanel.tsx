@@ -273,7 +273,7 @@ export const FullAIDraftingEnginePanel = () => {
               variant={isAgentActive ? 'default' : 'secondary'} 
               className={`ml-3 ${isAgentActive ? 'bg-green-500/20 text-green-400 border-green-500/50' : ''}`}
             >
-              <Radio className="w-3 h-3 mr-1" />
+              <Radio className={`w-3 h-3 mr-1 ${isAgentActive ? 'animate-pulse' : ''}`} />
               {isAgentActive ? 'LIVE' : 'PAUSED'}
             </Badge>
           </h2>

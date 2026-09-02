@@ -597,7 +597,7 @@ export const LocalizationHub: React.FC = () => {
           <Card className="bg-card/40 border-border/40 backdrop-blur-sm max-w-2xl mx-auto">
             <CardHeader>
               <CardTitle className="text-lg font-bold flex items-center gap-2 text-indigo-400">
-                <UploadCloud className="w-5 h-5 text-indigo-400" /> Indica AI Notice Translator
+                <UploadCloud className="w-5 h-5 text-indigo-400 animate-bounce" /> Indica AI Notice Translator
               </CardTitle>
               <CardDescription className="text-xs">
                 Upload a scanned notice PDF/Image in Hindi, Marathi, Tamil, Telugu, or Bengali. The engine will auto-OCR, translate to English, and extract action items.

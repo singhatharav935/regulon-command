@@ -20,7 +20,7 @@
  * 11.  Reports        — P&L, Balance Sheet, Cash Flow, Receivable/Payable Aging
  */
 
-import { useState, useMemo } from "react";
+import { useState, useMemo, useEffect } from "react";
 import { motion, AnimatePresence } from "framer-motion";
 import { Card, CardContent, CardHeader } from "@/components/ui/card";
 import { Badge } from "@/components/ui/badge";
@@ -45,35 +45,12 @@ import { GovEFilingHubModule } from "./GovEFilingHubModule";
 import { BankReconciliationModule } from "./BankReconciliationModule";
 import { FXInternationalModule } from "./FXInternationalModule";
 import { FixedAssetModule } from "./FixedAssetModule";
-import {
-  DEMO_BALANCE_SHEET,
-  DEMO_PROFIT_LOSS,
-  DEMO_ASSET_REGISTER,
-  DEMO_DEFERRED_TAX,
-  DEMO_FINANCIAL_RATIOS,
-  DEMO_CARO_2020,
-  DEMO_NOTES_TO_ACCOUNTS,
-  DEMO_PERIOD_FINANCIALS,
-} from "@/data/demo-financial-statements-data";
-import {
-  DEMO_ADVANCE_TAX,
-  DEMO_FORM_138_SUMMARY,
-  DEMO_FORM_140_SUMMARY,
-  DEMO_FORM_143_SUMMARY,
-  DEMO_FORM_144_SUMMARY,
-  DEMO_GSTR3B_SET_OFF,
-  DEMO_GSTR2B_RECONCILIATION,
-} from "@/data/demo-statutory-tax-data";
-import {
-  DEMO_STATUTORY_NOTICES,
-  DEMO_LEGAL_DRAFTS,
-  DEMO_RISK_SCORES,
-  DEMO_NOTICE_DASHBOARD_SUMMARY,
-} from "@/data/demo-statutory-notice-data";
+
 import type {
   SmartERPProps, ERPInvoice, ERPPurchase, ERPExpense,
   ERPPayroll, ERPBankTxn, ERPStockItem
 } from "./erp-types";
+import { useFinancialEngineStore } from '@/stores/useFinancialEngineStore';
 
 // ─── Helper UI ────────────────────────────────────────────────────────────────
 
@@ -240,29 +217,44 @@ function EmptyState({ icon: Icon, title, sub }: { icon: React.ElementType; title
 // ─── 1. SUMMARY PANEL ────────────────────────────────────────────────────────
 
 function SummaryPanel({ invoices, purchases, expenses, payroll, bankTxns, inventory }: SmartERPProps) {
-  const totalRevenue = invoices.reduce((s, i) => s + i.amount, 0);
-  const totalPurchases = purchases.reduce((s, p) => s + p.amount, 0);
-  const totalExpenses = expenses.reduce((s, e) => s + e.amount, 0);
-  const totalPayroll = payroll.reduce((s, p) => s + p.gross, 0);
+  // ── Derive financials from bank data when invoices/purchases aren't uploaded yet ──
+  const bankCredits = bankTxns.reduce((s, t) => s + (t.credit || 0), 0);
+  const bankDebits = bankTxns.reduce((s, t) => s + (t.debit || 0), 0);
+
+  const invoiceRevenue = invoices.reduce((s, i) => s + i.amount, 0);
+  const purchaseTotal = purchases.reduce((s, p) => s + p.amount, 0);
+  const expenseTotal = expenses.reduce((s, e) => s + e.amount, 0);
+  const payrollTotal = payroll.reduce((s, p) => s + p.gross, 0);
+
+  // Use invoice data if available, otherwise derive from bank transactions
+  const totalRevenue = invoiceRevenue > 0 ? invoiceRevenue : bankCredits;
+  const totalPurchases = purchaseTotal > 0 ? purchaseTotal : 0;
+  const totalExpenses = expenseTotal > 0 ? expenseTotal : (invoiceRevenue > 0 ? 0 : bankDebits);
+  const totalPayroll = payrollTotal;
+
   const grossProfit = totalRevenue - totalPurchases;
   const netProfit = grossProfit - totalExpenses - totalPayroll;
   const receivable = invoices.filter(i => i.status !== "paid").reduce((s, i) => s + i.total, 0);
   const payable = purchases.filter(p => p.status === "pending_review").reduce((s, p) => s + p.total, 0);
-  const bankBalance = bankTxns.length > 0 ? bankTxns[0].balance : 0;
+  const bankBalance = bankTxns.length > 0 ? (bankTxns[0].balance || (bankCredits - bankDebits)) : 0;
   const totalGSTCollected = invoices.reduce((s, i) => s + i.gst, 0);
   const totalITCAvailable = purchases.filter(p => p.itc_eligible && p.itc_claimed).reduce((s, p) => s + p.gst, 0);
   const netGSTPayable = totalGSTCollected - totalITCAvailable;
   const overdueInvoices = invoices.filter(i => i.status === "overdue");
   const stockValue = (inventory || []).reduce((s, item) => s + item.current_qty * item.rate, 0);
 
+  // Source label for sub text
+  const revenueSource = invoiceRevenue > 0 ? "From all invoices" : (bankCredits > 0 ? "From bank credits" : "No data uploaded");
+  const expenseSource = expenseTotal > 0 ? "Direct expenses" : (bankDebits > 0 ? "From bank debits" : "No data uploaded");
+
   return (
     <div className="space-y-5">
       {/* P&L Strip */}
       <div className="grid grid-cols-2 md:grid-cols-4 gap-3">
-        <KPI label="Total Revenue" value={fmtL(totalRevenue)} sub="From all invoices" icon={TrendingUp} color="text-emerald-400" bg="bg-emerald-500/5" />
+        <KPI label="Total Revenue" value={fmtL(totalRevenue)} sub={revenueSource} icon={TrendingUp} color="text-emerald-400" bg="bg-emerald-500/5" />
         <KPI label="Total Purchases" value={fmtL(totalPurchases)} sub="Raw material + services" icon={ShoppingCart} color="text-amber-400" bg="bg-amber-500/5" />
-        <KPI label="Gross Profit" value={fmtL(grossProfit)} sub={`${((grossProfit / totalRevenue) * 100).toFixed(1)}% margin`} icon={BarChart3} color="text-cyan-400" bg="bg-cyan-500/5" />
-        <KPI label="Net Profit" value={fmtL(netProfit)} sub="After all expenses" icon={IndianRupee} color={netProfit >= 0 ? "text-emerald-400" : "text-red-400"} bg={netProfit >= 0 ? "bg-emerald-500/5" : "bg-red-500/5"} />
+        <KPI label="Gross Profit" value={fmtL(grossProfit)} sub={totalRevenue > 0 ? `${((grossProfit / totalRevenue) * 100).toFixed(1)}% margin` : 'No revenue yet'} icon={BarChart3} color="text-cyan-400" bg="bg-cyan-500/5" />
+        <KPI label="Net Profit" value={fmtL(netProfit)} sub={expenseSource} icon={IndianRupee} color={netProfit >= 0 ? "text-emerald-400" : "text-red-400"} bg={netProfit >= 0 ? "bg-emerald-500/5" : "bg-red-500/5"} />
       </div>
 
       {/* Working Capital */}
@@ -951,7 +943,9 @@ function BankPanel({ bankTxns }: { bankTxns: ERPBankTxn[] }) {
         <div className="space-y-3">
           <div className="p-3 rounded-xl bg-muted/5 border border-white/5 flex items-center justify-between">
             <span className="text-xs text-muted-foreground">Cash in Hand</span>
-            <span className="text-base font-bold text-foreground">₹8,350</span>
+            <span className="text-base font-bold text-foreground">
+              {fmt(bankTxns.filter(t => t.category === "Salary" || t.category === "Tax Payment").reduce((s, t) => s + (t.credit || 0) - (t.debit || 0), 0))}
+            </span>
           </div>
           <TableWrap>
             <thead><tr className="bg-muted/20 border-b border-white/5">
@@ -1132,17 +1126,17 @@ function PayrollPanel({ payroll }: { payroll: ERPPayroll[] }) {
 
 // ─── 7. GST RETURNS PANEL ────────────────────────────────────────────────────
 
-function GSTPanel({ company }: SmartERPProps) {
+function GSTPanel({ company, mode }: SmartERPProps & { mode?: 'real' | 'demo' }) {
   return (
     <StatutoryTaxModule
-      mode="demo"
-      advanceTax={DEMO_ADVANCE_TAX}
-      form138={DEMO_FORM_138_SUMMARY}
-      form140={DEMO_FORM_140_SUMMARY}
-      form143={DEMO_FORM_143_SUMMARY}
-      form144={DEMO_FORM_144_SUMMARY}
-      gstr3bSetOff={DEMO_GSTR3B_SET_OFF}
-      gstr2bRecon={DEMO_GSTR2B_RECONCILIATION}
+      mode={mode}
+      advanceTax={undefined}
+      form138={undefined}
+      form140={undefined}
+      form143={undefined}
+      form144={undefined}
+      gstr3bSetOff={undefined}
+      gstr2bRecon={undefined}
       companyName={company?.name || "Sannidh Technologies Pvt. Ltd."}
       pan={company?.pan || "AAKCS1234F"}
       tan="MUMS12345T"
@@ -1153,17 +1147,17 @@ function GSTPanel({ company }: SmartERPProps) {
 
 // ─── 8. TDS / TCS PANEL ──────────────────────────────────────────────────────
 
-function TDSPanel({ company }: SmartERPProps) {
+function TDSPanel({ company, mode }: SmartERPProps & { mode?: 'real' | 'demo' }) {
   return (
     <StatutoryTaxModule
-      mode="demo"
-      advanceTax={DEMO_ADVANCE_TAX}
-      form138={DEMO_FORM_138_SUMMARY}
-      form140={DEMO_FORM_140_SUMMARY}
-      form143={DEMO_FORM_143_SUMMARY}
-      form144={DEMO_FORM_144_SUMMARY}
-      gstr3bSetOff={DEMO_GSTR3B_SET_OFF}
-      gstr2bRecon={DEMO_GSTR2B_RECONCILIATION}
+      mode={mode}
+      advanceTax={undefined}
+      form138={undefined}
+      form140={undefined}
+      form143={undefined}
+      form144={undefined}
+      gstr3bSetOff={undefined}
+      gstr2bRecon={undefined}
       companyName={company?.name || "Sannidh Technologies Pvt. Ltd."}
       pan={company?.pan || "AAKCS1234F"}
       tan="MUMS12345T"
@@ -1357,18 +1351,24 @@ function InventoryPanel({ inventory = [] }: { inventory?: SmartERPProps["invento
 
 // ─── 11. REPORTS PANEL — CA-GRADE FINANCIAL STATEMENTS ──────────────────────
 
-function ReportsPanel({ company }: SmartERPProps) {
+function ReportsPanel({ company, mode, bankTxns, invoices, purchases, expenses, payroll, companyId }: SmartERPProps & { mode?: 'real' | 'demo' }) {
   return (
     <FinancialStatementsModule
-      mode="demo"
-      balanceSheet={DEMO_BALANCE_SHEET}
-      profitLoss={DEMO_PROFIT_LOSS}
-      assetRegister={DEMO_ASSET_REGISTER}
-      deferredTax={DEMO_DEFERRED_TAX}
-      financialRatios={DEMO_FINANCIAL_RATIOS}
-      caro2020={DEMO_CARO_2020}
-      notesToAccounts={DEMO_NOTES_TO_ACCOUNTS}
-      periodTrend={DEMO_PERIOD_FINANCIALS}
+      mode={mode}
+      bankTxns={bankTxns}
+      invoices={invoices}
+      purchases={purchases}
+      expenses={expenses}
+      payroll={payroll}
+      companyId={companyId}
+      balanceSheet={undefined}
+      profitLoss={undefined}
+      assetRegister={undefined}
+      deferredTax={undefined}
+      financialRatios={undefined}
+      caro2020={undefined}
+      notesToAccounts={undefined}
+      periodTrend={undefined}
       companyName={company?.name || "Sannidh Technologies Pvt. Ltd."}
       fiscalYear="FY 2025-26"
     />
@@ -1377,14 +1377,14 @@ function ReportsPanel({ company }: SmartERPProps) {
 
 // ─── 12. AI TAX ASSISTANT / NOTICES PANEL ───────────────────────────────────
 
-function NoticesPanel({ company }: SmartERPProps) {
+function NoticesPanel({ company, mode }: SmartERPProps & { mode?: 'real' | 'demo' }) {
   return (
     <StatutoryNoticeModule
-      mode="demo"
-      notices={DEMO_STATUTORY_NOTICES}
-      legalDrafts={DEMO_LEGAL_DRAFTS}
-      riskScores={DEMO_RISK_SCORES}
-      dashboardSummary={DEMO_NOTICE_DASHBOARD_SUMMARY}
+      mode={mode}
+      notices={undefined}
+      legalDrafts={undefined}
+      riskScores={undefined}
+      dashboardSummary={undefined}
       companyName={company?.name || "Sannidh Technologies Pvt. Ltd."}
     />
   );
@@ -1404,10 +1404,11 @@ function GovApiPanel({ company }: SmartERPProps) {
 
 // ─── 14. BANK STATEMENT AI AUTO-RECONCILIATION PANEL ─────────────────────
 
-function BankReconPanel({ company }: SmartERPProps) {
+function BankReconPanel({ company, bankTxns }: SmartERPProps) {
   return (
     <BankReconciliationModule
       companyName={company?.name || "Sannidh Technologies Pvt. Ltd."}
+      bankTxns={bankTxns}
     />
   );
 }
@@ -1455,7 +1456,33 @@ const ERP_TABS = [
 
 type ERPSub = typeof ERP_TABS[number]["id"];
 
-export function SmartERPModule({ invoices, purchases, expenses, payroll, bankTxns, inventory, company }: SmartERPProps) {
+export function SmartERPModule({ invoices, purchases, expenses, payroll, bankTxns, inventory, company, companyId, mode }: SmartERPProps & { mode?: 'real' | 'demo' }) {
+  // Set companyId in localStorage so all sub-modules can find it
+  if (companyId && typeof window !== 'undefined') {
+    try { localStorage.setItem('sannidh_company_id', companyId); } catch {}
+  }
+
+  // Hydrate financial engine store from localStorage on mount
+  const storeState = useFinancialEngineStore();
+  useEffect(() => {
+    if (companyId) {
+      storeState.hydrateFromLocalStorage(companyId);
+      storeState.setCompanyContext(companyId, company?.name, 'FY 2025-26');
+    }
+  }, [companyId]);
+
+  // Sync props into store (for data passed from parent)
+  useEffect(() => {
+    storeState.syncFromProps({ invoices, purchases, expenses, payroll, bankTxns });
+  }, [invoices, purchases, expenses, payroll, bankTxns]);
+
+  // Read live data from store (prefer store data over raw props)
+  const liveInvoices = storeState.invoices.length > 0 ? storeState.invoices : invoices;
+  const livePurchases = storeState.purchases.length > 0 ? storeState.purchases : purchases;
+  const liveExpenses = storeState.expenses.length > 0 ? storeState.expenses : expenses;
+  const livePayroll = storeState.payroll.length > 0 ? storeState.payroll : payroll;
+  const liveBankTxns = storeState.bankTxns.length > 0 ? storeState.bankTxns : bankTxns;
+
   const [activeTab, setActiveTab] = useState<ERPSub>("summary");
 
   const currentTab = ERP_TABS.find(t => t.id === activeTab)!;
@@ -1517,20 +1544,20 @@ export function SmartERPModule({ invoices, purchases, expenses, payroll, bankTxn
           transition={{ duration: 0.18 }}
         >
           <CardContent className="pt-5">
-            {activeTab === "summary"   && <SummaryPanel invoices={invoices} purchases={purchases} expenses={expenses} payroll={payroll} bankTxns={bankTxns} inventory={inventory} company={company} />}
-            {activeTab === "sales"     && <SalesPanel invoices={invoices} />}
-            {activeTab === "purchases" && <PurchasesPanel purchases={purchases} />}
-            {activeTab === "expenses"  && <ExpensesPanel expenses={expenses} />}
-            {activeTab === "bank"      && <BankPanel bankTxns={bankTxns} />}
-            {activeTab === "payroll"   && <PayrollPanel payroll={payroll} />}
-            {activeTab === "gst"       && <GSTPanel company={company} />}
-            {activeTab === "tds"       && <TDSPanel company={company} />}
-            {activeTab === "ledger"    && <LedgerPanel invoices={invoices} purchases={purchases} expenses={expenses} payroll={payroll} bankTxns={bankTxns} inventory={inventory} company={company} />}
+            {activeTab === "summary"   && <SummaryPanel invoices={liveInvoices} purchases={livePurchases} expenses={liveExpenses} payroll={livePayroll} bankTxns={liveBankTxns} inventory={inventory} company={company} />}
+            {activeTab === "sales"     && <SalesPanel invoices={liveInvoices} />}
+            {activeTab === "purchases" && <PurchasesPanel purchases={livePurchases} />}
+            {activeTab === "expenses"  && <ExpensesPanel expenses={liveExpenses} />}
+            {activeTab === "bank"      && <BankPanel bankTxns={liveBankTxns} />}
+            {activeTab === "payroll"   && <PayrollPanel payroll={livePayroll} />}
+            {activeTab === "gst"       && <GSTPanel company={company} mode={mode} />}
+            {activeTab === "tds"       && <TDSPanel company={company} mode={mode} />}
+            {activeTab === "ledger"    && <LedgerPanel invoices={liveInvoices} purchases={livePurchases} expenses={liveExpenses} payroll={livePayroll} bankTxns={liveBankTxns} inventory={inventory} company={company} />}
             {activeTab === "inventory" && <InventoryPanel inventory={inventory} />}
-            {activeTab === "reports"   && <ReportsPanel invoices={invoices} purchases={purchases} expenses={expenses} payroll={payroll} bankTxns={bankTxns} inventory={inventory} company={company} />}
-            {activeTab === "notices"   && <NoticesPanel company={company} />}
+            {activeTab === "reports"   && <ReportsPanel invoices={liveInvoices} purchases={livePurchases} expenses={liveExpenses} payroll={livePayroll} bankTxns={liveBankTxns} inventory={inventory} company={company} companyId={companyId} mode={mode} />}
+            {activeTab === "notices"   && <NoticesPanel company={company} mode={mode} />}
             {activeTab === "govapi"    && <GovApiPanel company={company} />}
-            {activeTab === "bankrecon"   && <BankReconPanel company={company} />}
+            {activeTab === "bankrecon"   && <BankReconPanel company={company} bankTxns={liveBankTxns} />}
             {activeTab === "fxintl"      && <FXIntlPanel company={company} />}
             {activeTab === "fixedassets" && <FixedAssetPanel company={company} />}
           </CardContent>

@@ -26,7 +26,7 @@ const demoAuditRecords: AuditRecord[] = [
   { id: "6", category: "evidence", title: "RBI Compliance Declarations", regulator: "RBI", date: "Dec 2025", status: "ready" },
 ];
 
-const AuditEvidenceVault = ({ records, useDemoFallback = true }: AuditEvidenceVaultProps) => {
+const AuditEvidenceVault = ({ records, useDemoFallback = false }: AuditEvidenceVaultProps) => {
   const effectiveRecords = records && records.length > 0 ? records : useDemoFallback ? demoAuditRecords : [];
   const getCategoryIcon = (category: AuditRecord["category"]) => {
     switch (category) {

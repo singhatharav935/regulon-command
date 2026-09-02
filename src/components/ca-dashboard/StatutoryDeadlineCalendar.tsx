@@ -1369,7 +1369,7 @@ export default function StatutoryDeadlineCalendar() {
           <Card className="border-border/50 bg-card/20 backdrop-blur-md">
             <CardHeader className="py-4 border-b border-border/30">
               <CardTitle className="text-sm flex items-center gap-2">
-                <BellRing className="w-4 h-4 text-indigo-400" />
+                <BellRing className="w-4 h-4 text-indigo-400 animate-bounce" />
                 <span>Triggered Alerts Logs</span>
               </CardTitle>
               <CardDescription>Immutable log audits of notifications sent out to client entities.</CardDescription>

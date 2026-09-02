@@ -118,4 +118,5 @@ export interface SmartERPProps {
   inventory?: ERPStockItem[];
   company?: ERPCompany;
   financialYear?: string;
+  companyId?: string;
 }

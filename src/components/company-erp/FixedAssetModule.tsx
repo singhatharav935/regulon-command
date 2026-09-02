@@ -12,6 +12,7 @@
  */
 
 import { useState } from "react";
+import { useFinancialEngineStore } from '@/stores/useFinancialEngineStore';
 import { motion, AnimatePresence } from "framer-motion";
 import {
   Building2, HardDrive, Cpu, Truck, Wrench, Shield, TrendingUp, TrendingDown,
@@ -26,12 +27,7 @@ import {
   type AssetBlock, type DisposalRecord, type CWIPRecord, type DeferredTaxRecord,
 } from "@/lib/accounting/fixed-asset-engine";
 
-import {
-  DEMO_FIXED_ASSETS, DEMO_CWIP_RECORDS, DEMO_DISPOSAL_RECORDS,
-  DEMO_DEPRECIATION_RESULTS, DEMO_DEFERRED_TAX_RECORDS,
-  DEMO_ASSET_BLOCKS, DEMO_DEP_JOURNAL, DEMO_PURCHASE_JOURNALS,
-  DEMO_ASSET_PORTFOLIO_SUMMARY,
-} from "@/data/demo-fixed-asset-data";
+import { EmptyDataState } from './EmptyDataState';
 
 // ─── Helpers ─────────────────────────────────────────────────────────────────
 
@@ -87,7 +83,7 @@ function StatusPill({ status }: { status: string }) {
 // ─────────────────────────────────────────────────────────────────────────────
 
 function PortfolioDashboardTab() {
-  const s = DEMO_ASSET_PORTFOLIO_SUMMARY;
+  const s = ({ by_category: {} } as any);
 
   return (
     <div className="space-y-4">
@@ -97,7 +93,7 @@ function PortfolioDashboardTab() {
           { label: "Gross Block (Original Cost)", value: fmtINR(s.total_gross_block), sub: `${s.active_count} Active Assets`, color: "text-cyan-300", bg: "bg-cyan-500/10 border-cyan-500/20", icon: Building2 },
           { label: "Net Block (Book Value)", value: fmtINR(s.total_net_block), sub: `Accumulated Dep ${fmtINR(s.total_accumulated_dep)}`, color: "text-green-300", bg: "bg-green-500/10 border-green-500/20", icon: CheckCircle2 },
           { label: "CA Depreciation FY25", value: fmtINR(s.total_ca_depreciation_fy), sub: `IT Act Dep ${fmtINR(s.total_it_depreciation_fy)}`, color: "text-purple-300", bg: "bg-purple-500/10 border-purple-500/20", icon: Calculator },
-          { label: "Capital Work-in-Progress", value: fmtINR(s.total_cwip), sub: `${DEMO_CWIP_RECORDS.filter(c => c.status === "IN_PROGRESS").length} Active Projects`, color: "text-amber-300", bg: "bg-amber-500/10 border-amber-500/20", icon: Clock },
+          { label: "Capital Work-in-Progress", value: fmtINR(s.total_cwip), sub: `${[].filter(c => c.status === "IN_PROGRESS").length} Active Projects`, color: "text-amber-300", bg: "bg-amber-500/10 border-amber-500/20", icon: Clock },
         ].map(({ label, value, sub, color, bg, icon: Icon }) => (
           <div key={label} className={`p-3 rounded-xl border ${bg} flex items-center gap-3`}>
             <div className="p-2 rounded-lg bg-black/20 shrink-0"><Icon className={`w-4 h-4 ${color}`} /></div>
@@ -178,7 +174,7 @@ function AssetRegisterTab() {
   const [categoryFilter, setCategoryFilter] = useState("ALL");
   const [expanded, setExpanded] = useState<string | null>(null);
 
-  const filtered = DEMO_FIXED_ASSETS.filter(a => {
+  const filtered = [].filter(a => {
     const mMatch = a.name.toLowerCase().includes(search.toLowerCase()) || a.asset_tag.toLowerCase().includes(search.toLowerCase()) || a.location.toLowerCase().includes(search.toLowerCase());
     const cMatch = categoryFilter === "ALL" || a.category === categoryFilter;
     return mMatch && cMatch;
@@ -240,8 +236,8 @@ function AssetRegisterTab() {
 function DualDepreciationTab() {
   const [selectedFY, setSelectedFY] = useState("2025-26");
 
-  const totalCA = DEMO_DEPRECIATION_RESULTS.reduce((s, r) => s + r.ca_depreciation_fy, 0);
-  const totalIT = DEMO_DEPRECIATION_RESULTS.reduce((s, r) => s + r.it_depreciation_fy, 0);
+  const totalCA = [].reduce((s, r) => s + r.ca_depreciation_fy, 0);
+  const totalIT = [].reduce((s, r) => s + r.it_depreciation_fy, 0);
   const diff = totalCA - totalIT;
 
   return (
@@ -295,7 +291,7 @@ function DualDepreciationTab() {
               </tr>
             </thead>
             <tbody className="divide-y divide-white/4 font-mono text-[10px]">
-              {DEMO_DEPRECIATION_RESULTS.map(res => (
+              {[].map(res => (
                 <tr key={res.asset_id} className="hover:bg-white/2">
                   <td className="px-3 py-2 text-cyan-300 font-bold">{res.asset_tag}</td>
                   <td className="px-3 py-2 font-sans font-semibold text-foreground text-[11px] max-w-[180px] truncate">{res.asset_name}</td>
@@ -343,7 +339,7 @@ function BlockOfAssetsTab() {
               </tr>
             </thead>
             <tbody className="divide-y divide-white/4 font-mono text-[10px]">
-              {DEMO_ASSET_BLOCKS.map(block => (
+              {[].map(block => (
                 <tr key={block.block} className="hover:bg-white/2">
                   <td className="px-3 py-2 font-bold text-cyan-300">{block.block}</td>
                   <td className="px-3 py-2 font-sans text-foreground text-[11px] max-w-[250px] truncate">{block.description}</td>
@@ -381,7 +377,7 @@ function CWIPDeskTab() {
       </div>
 
       <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-        {DEMO_CWIP_RECORDS.map(cwip => (
+        {[].map(cwip => (
           <div key={cwip.id} className="p-4 rounded-xl border border-white/8 bg-card/40 space-y-3">
             <div className="flex items-start justify-between gap-2">
               <div>
@@ -446,7 +442,7 @@ function DisposalsTab() {
         <p className="text-[10px] text-muted-foreground">Automatic calculation of Profit/Loss under Sec 41(2) & auto-journal posting</p>
       </div>
 
-      {DEMO_DISPOSAL_RECORDS.map(disp => (
+      {[].map(disp => (
         <div key={disp.id} className="p-4 rounded-xl border border-white/8 bg-card/40 space-y-3">
           <div className="flex items-center justify-between flex-wrap gap-2">
             <div>
@@ -475,7 +471,7 @@ function DisposalsTab() {
 // ─────────────────────────────────────────────────────────────────────────────
 
 function DeferredTaxTab() {
-  const totalDTL = DEMO_DEFERRED_TAX_RECORDS.reduce((s, r) => s + r.deferred_tax_liability, 0);
+  const totalDTL = [].reduce((s, r) => s + r.deferred_tax_liability, 0);
 
   return (
     <div className="space-y-4">
@@ -507,7 +503,7 @@ function DeferredTaxTab() {
               </tr>
             </thead>
             <tbody className="divide-y divide-white/4 font-mono text-[10px]">
-              {DEMO_DEFERRED_TAX_RECORDS.map(r => (
+              {[].map(r => (
                 <tr key={r.asset_id} className="hover:bg-white/2">
                   <td className="px-3 py-2 font-sans font-semibold text-foreground text-[11px] max-w-[200px] truncate">{r.asset_name}</td>
                   <td className="px-3 py-2 text-right text-purple-300">{fmtINR(r.ca_depreciation)}</td>
@@ -533,14 +529,19 @@ type Tab9 = "dashboard" | "register" | "dualdep" | "itblock" | "cwip" | "disposa
 
 export function FixedAssetModule({ companyName }: { companyName?: string }) {
   const [activeTab, setActiveTab] = useState<Tab9>("dashboard");
+  const { fixedAssets } = useFinancialEngineStore();
+
+  if (fixedAssets.length === 0) {
+    return <EmptyDataState icon="🏭" title="No Fixed Assets Recorded" message="Import purchase bills with asset account codes to populate the Asset Register." />;
+  }
 
   const tabs: { id: Tab9; label: string; icon: any; badge?: string }[] = [
-    { id: "dashboard",   label: "Portfolio",     icon: Building2,   badge: `${DEMO_FIXED_ASSETS.length} Assets` },
-    { id: "register",    label: "Asset Register",icon: HardDrive,   badge: String(DEMO_FIXED_ASSETS.length) },
+    { id: "dashboard",   label: "Portfolio",     icon: Building2,   badge: `${fixedAssets.length} Assets` },
+    { id: "register",    label: "Asset Register",icon: HardDrive,   badge: String(fixedAssets.length) },
     { id: "dualdep",     label: "Dual Dep Run",  icon: Calculator,  badge: "CA vs IT" },
     { id: "itblock",     label: "IT Block Schedule", icon: FileCheck2, badge: "Form 3CD" },
-    { id: "cwip",        label: "CWIP Desk",     icon: Clock,       badge: String(DEMO_CWIP_RECORDS.length) },
-    { id: "disposal",    label: "Disposals",     icon: TrendingDown,badge: String(DEMO_DISPOSAL_RECORDS.length) },
+    { id: "cwip",        label: "CWIP Desk",     icon: Clock,       badge: "0" },
+    { id: "disposal",    label: "Disposals",     icon: TrendingDown,badge: "0" },
     { id: "deferredtax", label: "Deferred Tax",  icon: Scale,       badge: "AS-22" },
   ];
 
@@ -559,7 +560,7 @@ export function FixedAssetModule({ companyName }: { companyName?: string }) {
         </div>
         <div className="flex items-center gap-2 shrink-0">
           <span className="text-[10px] px-2.5 py-1 rounded-full border font-bold bg-cyan-500/15 border-cyan-500/25 text-cyan-300">
-            Net Block: {fmtINR(DEMO_ASSET_PORTFOLIO_SUMMARY.total_net_block)}
+            Net Block: {fmtINR(({ by_category: {} } as any).total_net_block)}
           </span>
         </div>
       </div>
