@@ -31,6 +31,8 @@ import {
 import { Lock, Unlock } from "lucide-react";
 import { LedgerVoucherDrawer } from "./LedgerVoucherDrawer";
 import { PnLNoteDrawer } from "./PnLNoteDrawer";
+import { TrialBalanceTab } from "./TrialBalanceTab";
+import { NewProfitLossTab } from "./NewProfitLossTab";
 
 // ─────────────────────────────────────────────────────────────────────────────
 // TYPES
@@ -524,7 +526,7 @@ function MetricCard({
 // TAB 1: PROFIT & LOSS ACCOUNT
 // ─────────────────────────────────────────────────────────────────────────────
 
-function ProfitLossTab({
+function _OldProfitLossTab({
   pl,
   trend,
   mode,
@@ -2754,7 +2756,7 @@ interface TBLedger {
 }
 
 
-function TrialBalanceTab({
+function _OldTrialBalanceTab({
   tb,
   mode,
   companyName = "Your Company",
@@ -4983,13 +4985,7 @@ export function FinancialStatementsModule({
               ✓ Live Real Engine
             </span>
           )}
-          <span className={`text-[10px] px-2.5 py-1 rounded-full font-bold border ${
-            balanceSheet.is_balanced
-              ? "bg-emerald-500/15 text-emerald-300 border-emerald-500/25"
-              : "bg-red-500/15 text-red-300 border-red-500/25"
-          }`}>
-            {balanceSheet.is_balanced ? "✓ Books Balanced" : "⚠ Imbalance Detected"}
-          </span>
+          {/* Balance status badges are now shown per-tab (TB badge, BS badge, etc.) */}
           {mode === 'real' && (
             caSignoff?.approved ? (
               <span className="text-[10px] px-2 py-1 rounded-full bg-emerald-500/15 border border-emerald-500/30 text-emerald-300 font-bold">
@@ -5032,17 +5028,16 @@ export function FinancialStatementsModule({
           transition={{ duration: 0.18 }}
         >
           {activeTab === "tb" && <TrialBalanceTab
-            tb={isReal ? undefined : (Array.isArray(trialBalance) ? trialBalance : undefined)}
             mode={mode}
             companyId={cid}
+            companyName={companyName || 'Your Company'}
+            fiscalYear={fiscalYear || 'FY 2025-26'}
           />}
           {activeTab === "pl" && (
-            <ProfitLossTab
-              pl={profitLoss}
-              trend={computedTrend}
+            <NewProfitLossTab
               mode={mode}
-              companyName={companyName || 'Your Company'}
               companyId={cid}
+              companyName={companyName || 'Your Company'}
               fiscalYear={fiscalYear || 'FY 2025-26'}
               assetRegisterDepreciation={_assetRegister?.total_dep_for_year || 0}
               deferredTaxCharge={computedDT.deferred_tax_expense - computedDT.deferred_tax_income}
@@ -5051,6 +5046,7 @@ export function FinancialStatementsModule({
               bankTxns={liveBankTxns}
               payroll={livePayroll}
               expenses={liveExpenses}
+              openingBalances={openingBal}
             />
           )}
           {activeTab === "bs" && <BalanceSheetTab bs={balanceSheet} mode={mode} bankTxns={liveBankTxns} />}
