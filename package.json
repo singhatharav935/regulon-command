@@ -9,6 +9,8 @@
     "build:vercel": "node --max-old-space-size=4096 ./node_modules/vite/bin/vite.js build",
     "deploy": "npx -y vercel build --prod && npx -y vercel deploy --prebuilt --prod --yes --scope team_KY7ZvckvlV78eggy5rjgVkh2",
     "build:dev": "vite build --mode development",
+    "render-build": "npm install --legacy-peer-deps --include=dev && npm run build",
+    "start": "node index.js",
     "lint": "eslint .",
     "preview": "vite preview",
     "test": "vitest run",
