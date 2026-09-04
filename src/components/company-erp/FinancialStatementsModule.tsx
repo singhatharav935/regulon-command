@@ -31,11 +31,8 @@ import {
 import { Lock, Unlock } from "lucide-react";
 import { LedgerVoucherDrawer } from "./LedgerVoucherDrawer";
 import { PnLNoteDrawer } from "./PnLNoteDrawer";
-<<<<<<< HEAD
-=======
 import { TrialBalanceTab } from "./TrialBalanceTab";
 import { NewProfitLossTab } from "./NewProfitLossTab";
->>>>>>> 1130b1d2 (trail and profit loss)
 
 // ─────────────────────────────────────────────────────────────────────────────
 // TYPES
@@ -62,6 +59,91 @@ interface FinancialStatementsModuleProps {
   bankTxns?: any[];
   expenses?: any[];
   payroll?: any[];
+}
+
+// ── BSNoteDetail: Structure for interactive Schedule III Note drawers ──
+interface BSNoteItem {
+  id: string;
+  date: string;
+  ref_no: string;
+  party_name: string;
+  amount: number;
+  is_msme?: boolean;
+  is_overdue?: boolean;
+  days_outstanding?: number;
+}
+
+interface BSNoteDetail {
+  noteNumber: number;
+  title: string;
+  total: number;
+  msme_within_45: number;
+  msme_overdue_45: number;
+  items: BSNoteItem[];
+}
+
+// ── BSDataEngine: Core Balance Sheet data structure (Schedule III compliant) ──
+interface BSDataEngine {
+  is_balanced: boolean;
+  total_assets: number;
+  total_equity_liabilities: number;
+  equity: {
+    share_capital: number;
+    reserves_surplus: number;
+    total: number;
+    partners_capital?: number;
+    partners_current_accounts?: number;
+    proprietors_capital?: number;
+    drawings?: number;
+  };
+  non_current_liabilities: {
+    long_term_borrowings: number;
+    lease_liability_lt: number;
+    deferred_tax_liability: number;
+    long_term_provisions: number;
+    total: number;
+  };
+  current_liabilities: {
+    short_term_borrowings: number;
+    trade_payables: number;
+    trade_payables_msme: number;
+    trade_payables_others: number;
+    gst_payable: number;
+    tds_payable: number;
+    pf_esic_payable: number;
+    salary_payable: number;
+    advance_from_customers: number;
+    income_tax_payable: number;
+    lease_liability_st: number;
+    short_term_provisions: number;
+    other_payables: number;
+    total: number;
+  };
+  non_current_assets: {
+    gross_block: number;
+    accumulated_depreciation: number;
+    net_block: number;
+    rou_asset_nbv: number;
+    capital_wip: number;
+    deferred_tax_asset: number;
+    long_term_loans_advances: number;
+    total: number;
+  };
+  current_assets: {
+    inventories: number;
+    trade_receivables_net: number;
+    unbilled_revenue: number;
+    bank_balance: number;
+    cash_in_hand: number;
+    fixed_deposits: number;
+    advance_to_suppliers: number;
+    prepaid_expenses: number;
+    input_gst_itc: number;
+    gst_cash_ledger: number;
+    tds_receivable: number;
+    other_current_assets: number;
+    total: number;
+  };
 }
 
 // BSData is now the full type from the BS engine, extended with optional legacy fields
@@ -529,11 +611,7 @@ function MetricCard({
 // TAB 1: PROFIT & LOSS ACCOUNT
 // ─────────────────────────────────────────────────────────────────────────────
 
-<<<<<<< HEAD
-function ProfitLossTab({
-=======
 function _OldProfitLossTab({
->>>>>>> 1130b1d2 (trail and profit loss)
   pl,
   trend,
   mode,
@@ -2763,11 +2841,7 @@ interface TBLedger {
 }
 
 
-<<<<<<< HEAD
-function TrialBalanceTab({
-=======
 function _OldTrialBalanceTab({
->>>>>>> 1130b1d2 (trail and profit loss)
   tb,
   mode,
   companyName = "Your Company",
@@ -4774,6 +4848,7 @@ export function FinancialStatementsModule({
 
     // Opening balances
     const openCash     = Number(openingBal?.cash_balance || 0);
+    const openStock    = Number(openingBal?.stock || 0);
     const openDebtors  = Number(openingBal?.debtors || 0);
     const openLoans    = Number(openingBal?.long_term_loans || 0);
     const openCapital  = Number(openingBal?.share_capital || 100000);
@@ -4786,11 +4861,11 @@ export function FinancialStatementsModule({
 
     // Derive totals
     const totalCA_receivables = (receivables || 0) + openDebtors;
-    const totalCA = totalCA_receivables + Math.max(0, bankBal) + openCash;
+    const totalCA = totalCA_receivables + Math.max(0, bankBal) + openCash + itcClaimed + openStock;
     const totalNCA = netBlock;
     const totalAssets = totalCA + totalNCA;
 
-    const totalCL = payables + netGST + tdsPayable + pfPayable + Math.max(0, currentTax);
+    const totalCL = payables + netGST + tdsPayable + pfPayable + salPayable + Math.max(0, currentTax);
     const totalNCL = openLoans;
     const reservesSurplus = openReserves + pat;
     const totalEquity = openCapital + reservesSurplus;
@@ -4842,7 +4917,7 @@ export function FinancialStatementsModule({
         total: totalNCA,
       },
       current_assets: {
-        inventories: 0,
+        inventories: openStock,
         trade_receivables_net: totalCA_receivables,
         unbilled_revenue: 0,
         bank_balance: Math.max(0, bankBal),
@@ -4856,7 +4931,86 @@ export function FinancialStatementsModule({
         other_current_assets: 0,
         total: totalCA,
       },
-      notes: {},
+      notes: {
+        1: {
+          noteNumber: 1, title: 'Share Capital',
+          total: openCapital, msme_within_45: 0, msme_overdue_45: 0,
+          items: openCapital > 0 ? [{ id: 'sc_1', date: '', ref_no: 'Opening', party_name: 'Authorized & Paid-up Share Capital', amount: openCapital }] : [],
+        },
+        2: {
+          noteNumber: 2, title: 'Reserves & Surplus',
+          total: reservesSurplus, msme_within_45: 0, msme_overdue_45: 0,
+          items: [
+            ...(openReserves > 0 ? [{ id: 'rs_open', date: '', ref_no: 'Opening', party_name: 'Opening Retained Earnings', amount: openReserves }] : []),
+            ...(pat !== 0 ? [{ id: 'rs_pat', date: '', ref_no: 'P&L', party_name: 'Current Year Profit After Tax (PAT)', amount: pat }] : []),
+          ],
+        },
+        3: {
+          noteNumber: 3, title: 'Long-Term Borrowings',
+          total: openLoans, msme_within_45: 0, msme_overdue_45: 0,
+          items: openLoans > 0 ? [{ id: 'lt_1', date: '', ref_no: 'Opening', party_name: 'Term Loans / Secured Borrowings', amount: openLoans }] : [],
+        },
+        4: {
+          noteNumber: 4, title: 'Trade Payables',
+          total: payables, msme_within_45: 0, msme_overdue_45: 0,
+          items: livePurchases
+            .filter((p: any) => (p.status || '') !== 'paid')
+            .map((p: any, idx: number) => ({
+              id: p.id || `tp_${idx}`,
+              date: p.date || '',
+              ref_no: p.bill_no || p.invoice_no || '',
+              party_name: p.vendor || p.supplier || 'Unknown Vendor',
+              amount: Number(p.grand_total || p.total || p.amount || 0),
+              is_msme: (p.category || '').toLowerCase().includes('msme'),
+              is_overdue: false,
+              days_outstanding: 0,
+            })),
+        },
+        5: {
+          noteNumber: 5, title: 'Statutory Payables (PF, ESIC, TDS)',
+          total: pfPayable + tdsPayable,
+          msme_within_45: 0, msme_overdue_45: 0,
+          items: [
+            ...(pfPayable > 0 ? [{ id: 'pf_1', date: '', ref_no: 'Payroll', party_name: 'Provident Fund Payable (Employee + Employer)', amount: pfPayable }] : []),
+            ...(tdsPayable > 0 ? [{ id: 'tds_1', date: '', ref_no: 'Purchases', party_name: 'TDS Payable u/s 194C/194J', amount: tdsPayable }] : []),
+          ],
+        },
+        6: {
+          noteNumber: 6, title: 'Property, Plant & Equipment (PPE)',
+          total: netBlock, msme_within_45: 0, msme_overdue_45: 0,
+          items: [
+            ...(grossBlock > 0 ? [{ id: 'ppe_gross', date: '', ref_no: '', party_name: 'Gross Block at Cost', amount: grossBlock }] : []),
+            ...(accDep > 0 ? [{ id: 'ppe_dep', date: '', ref_no: '', party_name: 'Less: Accumulated Depreciation', amount: -accDep }] : []),
+            ...(netBlock > 0 ? [{ id: 'ppe_net', date: '', ref_no: '', party_name: 'Net Block (WDV)', amount: netBlock }] : []),
+          ],
+        },
+        7: {
+          noteNumber: 7, title: 'Inventories',
+          total: openStock, msme_within_45: 0, msme_overdue_45: 0,
+          items: openStock > 0 ? [{ id: 'inv_1', date: '', ref_no: 'Opening', party_name: 'Raw Materials / Work-in-Progress / Finished Goods', amount: openStock }] : [],
+        },
+        8: {
+          noteNumber: 8, title: 'Trade Receivables',
+          total: totalCA_receivables, msme_within_45: 0, msme_overdue_45: 0,
+          items: liveInvoices
+            .filter((i: any) => (i.status || '') !== 'paid')
+            .map((i: any, idx: number) => ({
+              id: i.id || `tr_${idx}`,
+              date: i.date || '',
+              ref_no: i.invoice_no || i.ref_no || '',
+              party_name: i.customer || i.client || 'Unknown Customer',
+              amount: Number(i.grand_total || i.total || i.amount || 0),
+            })),
+        },
+        9: {
+          noteNumber: 9, title: 'Bank Balances & Cash',
+          total: Math.max(0, bankBal) + openCash, msme_within_45: 0, msme_overdue_45: 0,
+          items: [
+            ...(bankBal > 0 ? [{ id: 'bank_1', date: '', ref_no: '', party_name: 'Bank Balance in Current Account', amount: Math.max(0, bankBal) }] : []),
+            ...(openCash > 0 ? [{ id: 'cash_1', date: '', ref_no: 'Opening', party_name: 'Cash in Hand', amount: openCash }] : []),
+          ],
+        },
+      },
     };
   }, [isReal, computedPnL, liveBankTxns, liveInvoices, livePurchases, livePayroll, openingBal, _balanceSheet, _assetRegister]);
 
@@ -4996,17 +5150,7 @@ export function FinancialStatementsModule({
               ✓ Live Real Engine
             </span>
           )}
-<<<<<<< HEAD
-          <span className={`text-[10px] px-2.5 py-1 rounded-full font-bold border ${
-            balanceSheet.is_balanced
-              ? "bg-emerald-500/15 text-emerald-300 border-emerald-500/25"
-              : "bg-red-500/15 text-red-300 border-red-500/25"
-          }`}>
-            {balanceSheet.is_balanced ? "✓ Books Balanced" : "⚠ Imbalance Detected"}
-          </span>
-=======
           {/* Balance status badges are now shown per-tab (TB badge, BS badge, etc.) */}
->>>>>>> 1130b1d2 (trail and profit loss)
           {mode === 'real' && (
             caSignoff?.approved ? (
               <span className="text-[10px] px-2 py-1 rounded-full bg-emerald-500/15 border border-emerald-500/30 text-emerald-300 font-bold">
@@ -5049,19 +5193,6 @@ export function FinancialStatementsModule({
           transition={{ duration: 0.18 }}
         >
           {activeTab === "tb" && <TrialBalanceTab
-<<<<<<< HEAD
-            tb={isReal ? undefined : (Array.isArray(trialBalance) ? trialBalance : undefined)}
-            mode={mode}
-            companyId={cid}
-          />}
-          {activeTab === "pl" && (
-            <ProfitLossTab
-              pl={profitLoss}
-              trend={computedTrend}
-              mode={mode}
-              companyName={companyName || 'Your Company'}
-              companyId={cid}
-=======
             mode={mode}
             companyId={cid}
             companyName={companyName || 'Your Company'}
@@ -5072,7 +5203,6 @@ export function FinancialStatementsModule({
               mode={mode}
               companyId={cid}
               companyName={companyName || 'Your Company'}
->>>>>>> 1130b1d2 (trail and profit loss)
               fiscalYear={fiscalYear || 'FY 2025-26'}
               assetRegisterDepreciation={_assetRegister?.total_dep_for_year || 0}
               deferredTaxCharge={computedDT.deferred_tax_expense - computedDT.deferred_tax_income}
@@ -5081,10 +5211,7 @@ export function FinancialStatementsModule({
               bankTxns={liveBankTxns}
               payroll={livePayroll}
               expenses={liveExpenses}
-<<<<<<< HEAD
-=======
               openingBalances={openingBal}
->>>>>>> 1130b1d2 (trail and profit loss)
             />
           )}
           {activeTab === "bs" && <BalanceSheetTab bs={balanceSheet} mode={mode} bankTxns={liveBankTxns} />}
