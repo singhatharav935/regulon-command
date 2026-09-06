@@ -82,7 +82,7 @@ const Footer = () => {
         {/* Bottom */}
         <div className="mt-8 pt-8 border-t border-border/30 flex flex-col md:flex-row items-center justify-between gap-4">
           <p className="text-sm text-muted-foreground">
-            © {new Date().getFullYear()} SANNIDH. All rights reserved.
+            © {new Date().getFullYear()} Sannidh Technologies Pvt Ltd. Founded by <strong className="text-foreground">Atharav Singh</strong> (CEO & Founder) &amp; <strong className="text-foreground">Rishabh Shukla</strong> (CTO & Co-Founder). All rights reserved.
           </p>
           <div className="flex items-center gap-2 text-sm text-muted-foreground">
             <Shield className="w-4 h-4 text-primary" />
