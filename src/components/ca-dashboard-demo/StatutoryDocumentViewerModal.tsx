@@ -592,7 +592,7 @@ export function StatutoryDocumentViewerModal({
                     </div>
                   ) : (
                     <div
-                      className="origin-top transition-transform duration-200"
+                      className="origin-top transition-transform duration-200 printable-pdf-document"
                       style={{ transform: `scale(${zoom / 100})`, transformOrigin: 'top center', marginBottom: `${(zoom - 100) * 6}px` }}
                     >
                       {/* Outer A4 paper pages */}
@@ -600,7 +600,7 @@ export function StatutoryDocumentViewerModal({
                         <div
                           key={pageIdx}
                           id={`pdf-page-${pageIdx}`}
-                          className="bg-white text-black mx-auto mb-8 shadow-[0_8px_48px_rgba(0,0,0,0.6)] border border-gray-200"
+                          className="bg-white text-black mx-auto mb-8 shadow-[0_8px_48px_rgba(0,0,0,0.6)] border border-gray-200 printable-pdf-page"
                           style={{ width: 794, minHeight: 1123, padding: '72px 80px' }}
                         >
                           {/* Running Header */}

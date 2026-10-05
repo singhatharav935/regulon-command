@@ -509,6 +509,8 @@ export const useAgentOrchestrator = (): OrchestratorContextValue => {
   return context;
 };
 
+export default CompanyAgentProvider;
+
 // Export agent ID to section index mapping for easy lookup
 export const AGENT_SECTION_MAP: Record<number, AgentId> = {
   1: 'ARIA',

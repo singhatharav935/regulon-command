@@ -9,6 +9,7 @@
  */
 
 import { useState, type ReactNode } from 'react';
+import { jsPDF } from 'jspdf';
 import { motion, AnimatePresence } from 'framer-motion';
 import {
   FileText, X, Download, Edit, Save, Copy, Check, Eye, ZoomIn, ZoomOut, RotateCcw,
@@ -65,6 +66,110 @@ export function SingleDocumentPdfViewerModal({
     window.print();
   };
 
+  const handleDownloadPdf = () => {
+    try {
+      const doc = new jsPDF({
+        unit: 'mm',
+        format: 'a4',
+        orientation: 'portrait'
+      });
+
+      const pageWidth = doc.internal.pageSize.getWidth();
+      const pageHeight = doc.internal.pageSize.getHeight();
+      const margin = 15;
+      const maxLineWidth = pageWidth - (margin * 2);
+
+      pages.forEach((pageText, pIdx) => {
+        if (pIdx > 0) doc.addPage();
+
+        // Running Header
+        doc.setFont('helvetica', 'bold');
+        doc.setFontSize(8);
+        doc.setTextColor(120, 120, 120);
+        doc.text(`${clientName.toUpperCase()} · F.Y. ${financialYear}`, margin, 12);
+        doc.text(documentName.toUpperCase(), pageWidth - margin, 12, { align: 'right' });
+        doc.setDrawColor(220, 220, 220);
+        doc.setLineWidth(0.3);
+        doc.line(margin, 14, pageWidth - margin, 14);
+
+        let yPos = 22;
+
+        const lines = pageText.split('\n');
+        lines.forEach((line) => {
+          const trimmed = line.trim();
+          if (!trimmed) {
+            yPos += 3;
+            return;
+          }
+
+          if (yPos > pageHeight - 20) {
+            doc.addPage();
+            yPos = 20;
+          }
+
+          if (trimmed.startsWith('# ')) {
+            doc.setFont('helvetica', 'bold');
+            doc.setFontSize(13);
+            doc.setTextColor(15, 23, 42);
+            const text = trimmed.replace(/^#\s+/, '').replace(/\*\*/g, '');
+            const wrapped = doc.splitTextToSize(text, maxLineWidth);
+            doc.text(wrapped, margin, yPos);
+            yPos += (wrapped.length * 6) + 4;
+          } else if (trimmed.startsWith('## ')) {
+            doc.setFont('helvetica', 'bold');
+            doc.setFontSize(11);
+            doc.setTextColor(30, 41, 59);
+            const text = trimmed.replace(/^##\s+/, '').replace(/\*\*/g, '');
+            const wrapped = doc.splitTextToSize(text, maxLineWidth);
+            doc.text(wrapped, margin, yPos);
+            yPos += (wrapped.length * 5) + 3;
+          } else if (trimmed.startsWith('### ')) {
+            doc.setFont('helvetica', 'bold');
+            doc.setFontSize(9.5);
+            doc.setTextColor(51, 65, 85);
+            const text = trimmed.replace(/^###\s+/, '').replace(/\*\*/g, '');
+            const wrapped = doc.splitTextToSize(text, maxLineWidth);
+            doc.text(wrapped, margin, yPos);
+            yPos += (wrapped.length * 4.5) + 2;
+          } else if (trimmed.startsWith('|')) {
+            doc.setFont('courier', 'normal');
+            doc.setFontSize(8);
+            doc.setTextColor(40, 40, 40);
+            const cleanRow = trimmed.replace(/\|/g, '   ').trim();
+            if (cleanRow && !cleanRow.includes('---')) {
+              const wrapped = doc.splitTextToSize(cleanRow, maxLineWidth);
+              doc.text(wrapped, margin, yPos);
+              yPos += (wrapped.length * 3.8) + 1;
+            }
+          } else {
+            doc.setFont('times', 'normal');
+            doc.setFontSize(9.5);
+            doc.setTextColor(30, 30, 30);
+            const text = trimmed.replace(/\*\*/g, '');
+            const wrapped = doc.splitTextToSize(text, maxLineWidth);
+            doc.text(wrapped, margin, yPos);
+            yPos += (wrapped.length * 4.2) + 1.5;
+          }
+        });
+
+        // Running Footer
+        doc.setFont('helvetica', 'normal');
+        doc.setFontSize(7.5);
+        doc.setTextColor(150, 150, 150);
+        doc.line(margin, pageHeight - 12, pageWidth - margin, pageHeight - 12);
+        doc.text("SANNIDH AUTONOMOUS COMPLIANCE ENGINE", margin, pageHeight - 8);
+        doc.text(`Page ${pIdx + 1} of ${pages.length}`, pageWidth - margin, pageHeight - 8, { align: 'right' });
+      });
+
+      const fileName = documentName.endsWith('.pdf') ? documentName : `${documentName}.pdf`;
+      doc.save(fileName);
+      toast.success(`Successfully downloaded ${fileName}`);
+    } catch (e) {
+      console.error('jsPDF generation error:', e);
+      window.print();
+    }
+  };
+
   const handleClose = () => {
     setIsEditing(false);
     onClose();
@@ -75,7 +180,7 @@ export function SingleDocumentPdfViewerModal({
       <DialogContent className="max-w-[95vw] w-[1200px] bg-[#090b0f] border border-white/10 text-foreground h-[92vh] flex flex-col p-0 overflow-hidden shadow-[0_32px_80px_rgba(0,0,0,0.8)] rounded-2xl">
 
         {/* ── HEADER ────────────────────────────────────────────────────────────── */}
-        <div className="shrink-0 flex flex-wrap items-center justify-between gap-3 border-b border-white/8 px-6 py-4 bg-gradient-to-r from-white/3 to-transparent">
+        <div className="shrink-0 flex flex-wrap items-center justify-between gap-3 border-b border-white/8 px-6 py-4 bg-gradient-to-r from-white/3 to-transparent no-print">
           <div className="flex items-center gap-3.5 min-w-0">
             <div className="shrink-0 p-2.5 rounded-xl bg-indigo-500/10 border border-indigo-500/20">
               <FileText className="w-5 h-5 text-indigo-400" />
@@ -121,7 +226,7 @@ export function SingleDocumentPdfViewerModal({
                 <Button
                   variant="outline"
                   size="sm"
-                  onClick={() => toast.success(`Downloaded: ${documentName}`)}
+                  onClick={handleDownloadPdf}
                   className="h-8 text-xs border-white/12 gap-1.5 px-3"
                 >
                   <Download className="w-3.5 h-3.5" /> Download PDF
@@ -151,7 +256,7 @@ export function SingleDocumentPdfViewerModal({
         </div>
 
         {/* ── TOOLBAR / ZOOM BAR ────────────────────────────────────────────────── */}
-        <div className="shrink-0 flex items-center justify-between px-6 py-2 border-b border-white/8 bg-white/[0.015]">
+        <div className="shrink-0 flex items-center justify-between px-6 py-2 border-b border-white/8 bg-white/[0.015] no-print">
           <div className="flex items-center gap-2">
             <span className="text-[11px] text-muted-foreground">Zoom:</span>
             <Button
@@ -199,14 +304,14 @@ export function SingleDocumentPdfViewerModal({
             </div>
           ) : (
             <div
-              className="origin-top transition-transform duration-200"
+              className="origin-top transition-transform duration-200 printable-pdf-document"
               style={{ transform: `scale(${zoom / 100})`, transformOrigin: 'top center', marginBottom: `${(zoom - 100) * 6}px` }}
             >
               {pages.map((pageText, idx) => (
                 <div
                   key={idx}
                   id={`pdf-page-${idx}`}
-                  className="bg-white text-black mx-auto mb-8 shadow-[0_8px_48px_rgba(0,0,0,0.6)] border border-gray-200 relative min-h-[1050px] flex flex-col justify-between"
+                  className="bg-white text-black mx-auto mb-8 shadow-[0_8px_48px_rgba(0,0,0,0.6)] border border-gray-200 relative min-h-[1050px] flex flex-col justify-between printable-pdf-page"
                   style={{ width: 794, padding: '64px 72px' }}
                 >
                   {/* Running Header */}
@@ -254,7 +359,7 @@ export function SingleDocumentPdfViewerModal({
         </div>
 
         {/* ── FOOTER STATUS ─────────────────────────────────────────────────────── */}
-        <div className="shrink-0 flex items-center justify-between px-6 py-2.5 border-t border-white/8 bg-white/[0.015] text-[11px] text-muted-foreground">
+        <div className="shrink-0 flex items-center justify-between px-6 py-2.5 border-t border-white/8 bg-white/[0.015] text-[11px] text-muted-foreground no-print">
           <div className="flex items-center gap-2">
             <FileCheck className="w-3.5 h-3.5 text-emerald-400" />
             <span>Document Compiled & Ready</span>

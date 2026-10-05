@@ -120,6 +120,7 @@ import {
   FileSearch,
   BellRing,
   FolderCheck,
+  Link2,
 } from "lucide-react";
 import { toast } from "sonner";
 import useCAMetrics from "@/hooks/useCAMetrics";
@@ -129,7 +130,9 @@ import { addCompany as addCompanyAPI } from "@/services/api";
 // CAAgentProvider is now global — provided at App.tsx level
 import { useCAAgentOrchestrator } from "@/components/agents-demo/CAAgentOrchestrator";
 import { CACommandCenterHeader } from "@/components/agents-demo/CACommandCenterHeader";
+import DemoCALinkerSettings from "@/components/ca-dashboard-demo/DemoCALinkerSettings";
 import { CAActionInbox } from "@/components/agents-demo/CAActionInbox";
+import { buildOfflineDraft, readyNoticeTemplates } from "@/components/ca-dashboard-demo/AIDraftingEngine";
 
 // Daily Governance Brief Component
 const DailyGovernanceBrief = () => {
@@ -1670,85 +1673,237 @@ const LiveAIDraftingEngine = () => {
   // Process Digital Portal Notice (Direct Digital Fetching Integration)
   const processDigitalNotice = async (notice: any) => {
     setIsProcessing(true);
-    addAgentLog(`📡 Establishing secure link with ${notice.portal} API Gateway...`);
-    await new Promise(resolve => setTimeout(resolve, 800));
-    addAgentLog(`🔑 GSP Portal Credentials Authorized (CA Rajesh DSC verified).`);
-    addAgentLog(`📥 Downloading digital notice JSON & PDF package for ${notice.client}...`);
-    
-    await new Promise(resolve => setTimeout(resolve, 1000));
-    addAgentLog(`👁️ SANNIDH Structural Parsing Engine active.`);
-    addAgentLog(`✅ Metadata extracted: Notice Ref ${notice.refNumber}, Issued: ${notice.issueDate}, Mismatch: ${notice.mismatchAmount}.`);
-    
-    await new Promise(resolve => setTimeout(resolve, 1000));
-    addAgentLog(`🤖 SANNIDH AI Brain (OpenAI) cross-referencing ledger registers from Zoho / Tally & CBIC rulebook...`);
-    addAgentLog(`🔍 Mismatch identified in supplier GSTIN filings under Section 16(4) of CGST Act.`);
-    
-    await new Promise(resolve => setTimeout(resolve, 1500));
-    
-    const noticeKey = notice.id?.includes('gst') || notice.refNumber?.includes('SCN') || notice.refNumber?.includes('ZD07') ? 'gst-show-cause' :
-                      notice.id?.includes('mca') || notice.refNumber?.includes('ROC') ? 'mca-notice' :
-                      notice.id?.includes('it') || notice.refNumber?.includes('ITBA') ? 'income-tax-response' : 'custom-draft';
+    try {
+      addAgentLog(`Establishing secure link with ${notice.portal} API Gateway...`);
+      await new Promise(resolve => setTimeout(resolve, 600));
+      addAgentLog(`GSP Portal Credentials Authorized (CA Rajesh Kumar, FCA - DSC Verified).`);
+      addAgentLog(`Downloading digital notice JSON & PDF package for ${notice.client}...`);
+      await new Promise(resolve => setTimeout(resolve, 700));
+      addAgentLog(`SANNIDH NEXUS-9 Structural Parsing Engine active.`);
+      addAgentLog(`Metadata extracted: Notice Ref ${notice.refNumber}, Mismatch: ${notice.mismatchAmount}.`);
+      await new Promise(resolve => setTimeout(resolve, 800));
+      addAgentLog(`SANNIDH AI Brain cross-referencing ledger registers & CBIC/CBDT rulebook...`);
+      addAgentLog(`Statutory analysis complete. Drafting para-wise legal response...`);
+      await new Promise(resolve => setTimeout(resolve, 600));
 
-    setCurrentDraftClient(notice.client);
-    setCurrentDraftType(noticeKey);
-    setCurrentDraftRef(notice.refNumber);
-    setCurrentDraftPortal(notice.portal);
-    setCurrentDraftMismatch(notice.mismatchAmount);
-    setDraftApprovalStatus('pending');
-    setSignatureStatus(null);
-    setFilingARN(null);
+      const noticeKey = notice.id?.includes('gst') || notice.refNumber?.includes('SCN') || notice.refNumber?.includes('ZD07')
+        ? 'gst-show-cause'
+        : notice.id?.includes('mca') || notice.refNumber?.includes('ROC')
+        ? 'mca-notice'
+        : notice.id?.includes('it') || notice.refNumber?.includes('ITBA')
+        ? 'income-tax-response'
+        : 'custom-draft';
 
-    const templateText = (readyNoticeTemplates[noticeKey] || "")
-      .replace(/GlobalTrade India Logistics/g, notice.client)
-      .replace(/Acme Technologies Pvt Ltd/g, notice.client)
-      .replace(/TechVenture Solutions/g, notice.client)
-      .replace(/₹18,46,920/g, notice.mismatchAmount)
-      .replace(/₹5,00,000/g, notice.mismatchAmount)
-      .replace(/₹27,80,000/g, notice.mismatchAmount)
-      .replace(/ZD070226019874A/g, notice.refNumber)
-      .replace(/ROC\/KA\/ADJ\/2026\/112/g, notice.refNumber)
-      .replace(/ITBA\/AST\/S\/143\(2\)\/2026-27/g, notice.refNumber);
+      setCurrentDraftClient(notice.client);
+      setCurrentDraftType(noticeKey);
+      setCurrentDraftRef(notice.refNumber);
+      setCurrentDraftPortal(notice.portal);
+      setCurrentDraftMismatch(notice.mismatchAmount);
+      setDraftApprovalStatus('pending');
+      setSignatureStatus(null);
+      setFilingARN(null);
 
-    const draftText = buildOfflineDraft({
-      documentType: noticeKey,
-      companyName: notice.client,
-      authority: notice.portal === "GST Portal" ? "GST Department" : notice.portal === "MCA Portal" ? "ROC" : "Income Tax Department",
-      noticeText: templateText,
-      modeLabel: "conservative",
-      templatePack: "Detailed Para-Wise Reply",
-      promptPack: "Precedent Analysis + Objection Matrix",
-      sovereignEngine: "sannidh_sovereign"
-    });
+      const today = new Date();
+      const dateStr = today.toLocaleDateString('en-IN', { day: '2-digit', month: 'long', year: 'numeric' });
+      const isGST = noticeKey === 'gst-show-cause';
+      const isIT  = noticeKey === 'income-tax-response';
+      const authority = isGST
+        ? 'The Assistant Commissioner / Joint Commissioner of Central Tax'
+        : isIT
+        ? 'The Assessing Officer / Faceless Assessment Unit'
+        : 'The Registrar of Companies';
+      const actRef = isGST
+        ? 'Central Goods & Services Tax Act, 2017 (CGST Act)'
+        : isIT ? 'Income Tax Act, 1961' : 'Companies Act, 2013';
+      const sectionRef = isGST
+        ? 'Section 73 read with Section 16(4) of the CGST Act, 2017'
+        : isIT
+        ? 'Section 143(2) read with Section 142(1) of the Income Tax Act, 1961'
+        : 'Section 92/137 read with Section 403 of the Companies Act, 2013';
 
-    setGeneratedDraft(draftText);
-    setDraftApprovalStatus('pending');
-    setDraftViewMode('pdf'); // Auto-switch to visual PDF preview for premium UX!
-    addAgentLog(`✅ Digital Notice Response drafted successfully by SANNIDH AI Brain.`);
-    
-    const newDemoTask = {
-      id: `task-demo-dig-${Date.now()}`,
-      type: "notice_response",
-      title: `Response to ${notice.noticeType}`,
-      client: notice.client,
-      status: "pending_approval",
-      progress: 100,
-      createdAt: new Date().toISOString(),
-      description: `Drafted Response to ${notice.refNumber} for ${notice.client}. Ready for CA Review.`,
-      result: {
-        documentType: `${notice.noticeType} Response`,
-        pages: 3,
-        sections: ["1. Preliminary Objections", "2. Facts of the Case", "3. Statutory Prayers"],
-        generatedAt: new Date().toISOString()
-      }
-    };
-    
-    setAiTasks(prev => [newDemoTask, ...prev]);
-    setAgentStatus('awaiting_approval');
-    setIsProcessing(false);
-    toast.success('Digital draft generated successfully!', {
-      description: 'The AI swarm has drafted a response from your live database room.'
-    });
-  };
+      const issueDate = notice.issueDate
+        ? new Date(notice.issueDate).toLocaleDateString('en-IN')
+        : new Date(Date.now() - 30 * 24 * 60 * 60 * 1000).toLocaleDateString('en-IN');
+
+      // Build premium GoI-standard ASCII-safe draft
+      const gstRebuttal = `The alleged ITC mismatch under Section 16(4)/16(2)(c) of the CGST Act, 2017 is factually incorrect:
+
+a) SUPPLIER FILING STATUS: Suppliers have filed GSTR-1 correctly. The mismatch in GSTR-2B is attributable to timing differences which does not bar ITC availment under settled law.
+
+b) LEGAL PRECEDENTS:
+   - Union of India v. Bharti Airtel Ltd. (SC 2021): ITC cannot be denied on basis of supplier default where recipient exercised due diligence.
+   - CBIC Circular No. 183/15/2022-GST dated 27.12.2022: ITC permissible if supported by invoices, proof of payment and actual receipt.
+   - Tonbo Imaging India Pvt. Ltd. v. Union of India (Karnataka HC 2023): Sec 16(2)(c) cannot deny ITC where supplier deposited tax.
+
+c) EVIDENCE (SEE ANNEXURES):
+   - GSTR-2B Reconciliation Statement (Annexure A)
+   - Supplier GSTR-1 Extracts with HSN/SAC codes (Annexure B)
+   - Purchase Invoices with E-Way Bills & Bank Payment Proof (Annexure C)
+   - Bank Reconciliation Statement confirming supplier payments (Annexure D)`;
+
+      const itRebuttal = `The alleged discrepancy under the Income Tax Act, 1961 is contested as follows:
+
+a) All income and expenditure for the relevant AY is duly reflected in audited financials and timely filed ITR.
+
+b) TDS COMPLIANCE: All applicable TDS u/s 194C/194I/194J/194Q has been deducted, deposited and Form 26Q/27Q filed.
+
+c) LEGAL PRECEDENTS:
+   - CIT v. Reliance Industries Ltd. (SC): Business expenditure genuinely incurred is allowable u/s 37(1).
+   - PCIT v. Maruti Suzuki India Ltd. (SC 2019): Disallowance must be based on concrete material, not estimation.
+
+d) EVIDENCE (SEE ANNEXURES):
+   - Audited Financial Statements and Form 3CD Tax Audit Report (Annexure A)
+   - ITR-6 Computation of Income (Annexure B)
+   - TDS Challan 281 & Form 26AS Reconciliation (Annexure C)
+   - Ledger/Trial Balance Extract for relevant AY (Annexure D)`;
+
+      const mcaRebuttal = `The alleged non-compliance under the Companies Act, 2013 is contested as follows:
+
+a) M/s ${notice.client} has filed all required returns (MGT-7A, AOC-4) within extended due dates notified by MCA circulars.
+
+b) GROUNDS OF DEFENCE:
+   - Any delay was bona fide due to MCA21 v3.0 portal technical issues during the relevant period.
+   - General Circular No. 02/2022 and subsequent circulars provide for condonation of such delays.
+
+c) EVIDENCE (SEE ANNEXURES):
+   - Filed Form MGT-7A / AOC-4 SRN Receipt (Annexure A)
+   - MCA21 Portal Error Screenshot / Condonation Circular (Annexure B)`;
+
+      const rebuttal = isGST ? gstRebuttal : isIT ? itRebuttal : mcaRebuttal;
+
+      const annexureA = isGST ? 'GSTR-2B Reconciliation Statement (FY 2025-26)' : isIT ? 'Audited Financial Statements & Form 3CD (AY 2026-27)' : 'Filed Form MGT-7A / AOC-4 SRN Receipt';
+      const annexureB = isGST ? 'Supplier GSTR-1 Extracts & Confirmed HSN/SAC Codes' : isIT ? 'ITR-6 Computation of Income' : 'MCA21 Portal Error Proof / Condonation Circular';
+      const annexureC = isGST ? 'Purchase Invoices with E-Way Bills & Bank Payment Proof' : isIT ? 'TDS Challan 281 & Form 26AS Reconciliation' : 'Board Resolution Authorizing Filing';
+      const annexureD = isGST ? 'Bank Reconciliation Statement (Supplier Payments)' : isIT ? 'Ledger/Trial Balance Extract (Relevant AY)' : 'Prior Correspondence with MCA/ROC';
+
+      const premiumDraft = [
+        'WITHOUT PREJUDICE',
+        '',
+        `Date: ${dateStr}`,
+        '',
+        'To,',
+        `${authority},`,
+        `${notice.portal},`,
+        '[Jurisdictional Office]',
+        '',
+        `Sub: Reply to Show Cause Notice / Statutory Notice Ref. No. ${notice.refNumber} dated ${issueDate} -- Issued under ${sectionRef} -- on behalf of M/s ${notice.client} -- reg.`,
+        '',
+        `Ref: Notice No. ${notice.refNumber} | Client: ${notice.client} | Alleged Demand: ${notice.mismatchAmount}`,
+        '',
+        'Respected Sir/Madam,',
+        '',
+        `I, CA Rajesh Kumar (FCA, UDIN: 24509284AAABCD1234), authorized representative of M/s ${notice.client} (hereinafter "the Noticee"), acting under a duly executed Power of Attorney / Letter of Authority, submit this para-wise reply to the captioned notice with utmost respect and in accordance with the principles of natural justice.`,
+        '',
+        '------------------------------------------------------------',
+        '**1. PRELIMINARY SUBMISSIONS',
+        '------------------------------------------------------------',
+        '',
+        '**1.1 JURISDICTIONAL OBJECTION (WITHOUT PREJUDICE TO MERITS)',
+        '',
+        'The Noticee respectfully submits that this reply is filed without prejudice to any rights, contentions, and defences available under law. Nothing herein shall be construed as an admission of any alleged liability, demand, or contravention.',
+        '',
+        '**1.2 BACKGROUND & FACTS OF THE CASE',
+        '',
+        `a) M/s ${notice.client} is a lawfully registered entity, compliant with all applicable provisions of the ${actRef}.`,
+        '',
+        `b) The notice alleges a demand/discrepancy of ${notice.mismatchAmount}, which the Noticee most respectfully denies in its entirety as the same is factually incorrect, legally untenable, and contrary to the material evidence on record.`,
+        '',
+        'c) The Noticee has consistently maintained accurate books of accounts, filed all returns on time, and discharged all statutory liabilities in accordance with applicable law.',
+        '',
+        '------------------------------------------------------------',
+        `**2. REBUTTAL TO ALLEGED DEMAND OF ${notice.mismatchAmount}`,
+        '------------------------------------------------------------',
+        '',
+        rebuttal,
+        '',
+        '------------------------------------------------------------',
+        '**3. GROUNDS FOR DROPPING PROCEEDINGS',
+        '------------------------------------------------------------',
+        '',
+        `In view of the above, the captioned notice / demand of ${notice.mismatchAmount} is liable to be dropped in its entirety on the following grounds:`,
+        '',
+        '   I.   The Noticee has discharged all statutory obligations in letter and spirit;',
+        '   II.  The alleged discrepancy is not supported by any cogent material evidence on record;',
+        '   III. Principles of natural justice demand that a demand cannot be confirmed without affording a full opportunity of hearing;',
+        '   IV.  The department has not rebutted the material evidence placed before it;',
+        '   V.   Penalty, if any, is not sustainable in absence of mens rea / wilful suppression as held in Hindustan Steel Ltd. v. State of Orissa (SC).',
+        '',
+        '------------------------------------------------------------',
+        '**4. PRAYERS',
+        '------------------------------------------------------------',
+        '',
+        'In view of the foregoing submissions, the Noticee most respectfully prays that your good office may:',
+        '',
+        `   a) Drop the notice / SCN in its entirety and not confirm the alleged demand of ${notice.mismatchAmount};`,
+        '   b) Grant a personal hearing before passing any adverse order;',
+        '   c) Not levy any penalty or interest in the facts and circumstances of the present case;',
+        '   d) Pass such other order as may be just, equitable, and in the interest of justice.',
+        '',
+        'The Noticee reserves the right to file additional submissions and produce further evidence at the time of personal hearing.',
+        '',
+        '------------------------------------------------------------',
+        '**5. LIST OF DOCUMENTS / ANNEXURES',
+        '------------------------------------------------------------',
+        '',
+        `Annexure A  --  ${annexureA}`,
+        `Annexure B  --  ${annexureB}`,
+        `Annexure C  --  ${annexureC}`,
+        `Annexure D  --  ${annexureD}`,
+        'Annexure E  --  Power of Attorney / CA Authorization Letter',
+        '',
+        'Thanking You,',
+        '',
+        'Yours faithfully,',
+        `For M/s ${notice.client}`,
+        '',
+        '',
+        '____________________________',
+        'CA Rajesh Kumar',
+        'FCA | ICAI Membership No: 509284',
+        'Firm: Sannidh & Co., Chartered Accountants',
+        'Firm Reg. No: 1029481W',
+        `Date: ${dateStr}`,
+        'Place: New Delhi',
+        '',
+        'Note: This response has been prepared by SANNIDH NEXUS-9 AI Compliance Engine v4.2 -- India\'s first autonomous statutory drafting system. The CA signatory has reviewed and approved this draft per ICAI professional standards.',
+      ].join('\n');
+
+      setGeneratedDraft(premiumDraft);
+      setDraftApprovalStatus('pending');
+      setDraftViewMode('pdf');
+      addAgentLog(`Premium GoI-standard legal response drafted by SANNIDH NEXUS-9.`);
+      addAgentLog(`5 Annexures indexed. Para-wise rebuttal with case laws attached.`);
+
+      const newDemoTask = {
+        id: `task-demo-dig-${Date.now()}`,
+        type: "notice_response",
+        title: `Response to ${notice.noticeType}`,
+        client: notice.client,
+        status: "pending_approval",
+        progress: 100,
+        createdAt: new Date().toISOString(),
+        description: `Drafted Response to ${notice.refNumber} for ${notice.client}. Ready for CA Review.`,
+        result: {
+          documentType: `${notice.noticeType} Response`,
+          pages: 4,
+          sections: ["1. Preliminary Submissions", "2. Para-Wise Rebuttal", "3. Grounds for Dropping", "4. Prayers", "5. Annexures"],
+          generatedAt: new Date().toISOString()
+        }
+      };
+
+      setAiTasks(prev => [newDemoTask, ...prev]);
+      setAgentStatus('awaiting_approval');
+      toast.success('GoI-standard draft generated!', {
+        description: `Para-wise legal response with case laws ready for CA review -- ${notice.refNumber}`
+      });
+    } catch (err) {
+      console.error('[SANNIDH] processDigitalNotice failed:', err);
+      addAgentLog(`Draft generation error: ${err instanceof Error ? err.message : 'Unknown error'}`);
+      toast.error('Draft generation failed. Please try again.');
+    } finally {
+      setIsProcessing(false);
+    }
+  }
 
   const handleApproveAndGeneratePDF = async () => {
     if (!generatedDraft.trim()) {
@@ -1825,36 +1980,117 @@ const LiveAIDraftingEngine = () => {
       doc.line(margin, yPos, pageWidth - margin, yPos);
       yPos += 8;
 
-      // ── DRAFT CONTENT ──
-      doc.setTextColor(30, 41, 59);
-      doc.setFontSize(10);
+      // -- DRAFT CONTENT (smart line renderer) --
+      const rawLines = generatedDraft.split('\n');
       doc.setFont('helvetica', 'normal');
-      
-      const lines = doc.splitTextToSize(generatedDraft, contentWidth);
-      
-      for (let i = 0; i < lines.length; i++) {
-        if (yPos > pageHeight - 30) {
-          // Footer on current page
-          doc.setFontSize(7);
-          doc.setTextColor(148, 163, 184);
-          doc.text('SANNIDH | Privileged & Confidential | AI-Assisted Draft - CA Approved', pageWidth / 2, pageHeight - 10, { align: 'center' });
-          
+      doc.setFontSize(9.5);
+      doc.setTextColor(30, 41, 59);
+
+      const addPageFooter = () => {
+        doc.setFontSize(7);
+        doc.setTextColor(148, 163, 184);
+        doc.text('SANNIDH | Privileged & Confidential | CA-Approved Legal Response', pageWidth / 2, pageHeight - 10, { align: 'center' });
+      };
+      const checkPageBreak = (needed: number) => {
+        if (yPos + needed > pageHeight - 25) {
+          addPageFooter();
           doc.addPage();
-          yPos = margin;
-        }
-        
-        const line = lines[i];
-        // Bold section headers
-        if (line.match(/^\d+\.\s+[A-Z]/) || line.match(/^[A-Z]{2,}/) || line.startsWith('**')) {
-          doc.setFont('helvetica', 'bold');
-          doc.setFontSize(11);
-          doc.text(line.replace(/\*\*/g, ''), margin, yPos);
+          doc.setFillColor(15, 23, 42);
+          doc.rect(0, 0, pageWidth, 6, 'F');
+          yPos = 14;
           doc.setFont('helvetica', 'normal');
-          doc.setFontSize(10);
-        } else {
-          doc.text(line, margin, yPos);
+          doc.setFontSize(9.5);
+          doc.setTextColor(30, 41, 59);
         }
-        yPos += 5;
+      };
+
+      for (let ri = 0; ri < rawLines.length; ri++) {
+        const rawLine = rawLines[ri];
+        const isSectionHeader = /^\*\*\d+\./.test(rawLine) || /^\*\*[A-Z]/.test(rawLine);
+        const isSectionDash   = /^-{20,}$/.test(rawLine.trim());
+        const isNumberedPara  = /^\d+\.\s+[A-Z]/.test(rawLine);
+        const isRomanItem     = /^\s{3,}[IVX]+\.\s/.test(rawLine);
+        const isAlphaItem     = /^\s+[a-d]\)/.test(rawLine);
+        const isBullet        = /^\s+-\s/.test(rawLine);
+        const isEmpty         = rawLine.trim() === '';
+        const isSignatureLine = /^_{4,}$/.test(rawLine.trim());
+        const isWithoutPrej   = rawLine.trim() === 'WITHOUT PREJUDICE';
+
+        if (isEmpty) { yPos += 3; continue; }
+
+        if (isSectionDash) {
+          checkPageBreak(6);
+          doc.setDrawColor(56, 189, 248);
+          doc.setLineWidth(0.4);
+          doc.line(margin, yPos, pageWidth - margin, yPos);
+          yPos += 5;
+          continue;
+        }
+
+        if (isWithoutPrej) {
+          checkPageBreak(8);
+          doc.setFont('helvetica', 'bolditalic');
+          doc.setFontSize(9);
+          doc.setTextColor(100, 116, 139);
+          doc.text(rawLine.trim(), pageWidth / 2, yPos, { align: 'center' });
+          doc.setFont('helvetica', 'normal');
+          doc.setFontSize(9.5);
+          doc.setTextColor(30, 41, 59);
+          yPos += 7;
+          continue;
+        }
+
+        if (isSectionHeader) {
+          const clean = rawLine.replace(/^\*\*/, '').trim();
+          checkPageBreak(12);
+          yPos += 2;
+          doc.setFillColor(239, 246, 255);
+          doc.rect(margin - 2, yPos - 4, contentWidth + 4, 7, 'F');
+          doc.setDrawColor(56, 189, 248);
+          doc.setLineWidth(0.8);
+          doc.line(margin - 2, yPos - 4, margin - 2, yPos + 3);
+          doc.setLineWidth(0.3);
+          doc.setFont('helvetica', 'bold');
+          doc.setFontSize(10);
+          doc.setTextColor(15, 23, 42);
+          doc.text(clean, margin + 3, yPos);
+          doc.setFont('helvetica', 'normal');
+          doc.setFontSize(9.5);
+          doc.setTextColor(30, 41, 59);
+          yPos += 9;
+          continue;
+        }
+
+        if (isSignatureLine) {
+          checkPageBreak(6);
+          doc.setDrawColor(100, 116, 139);
+          doc.setLineWidth(0.3);
+          doc.line(margin, yPos, margin + 55, yPos);
+          yPos += 5;
+          continue;
+        }
+
+        const indent = (isRomanItem || isAlphaItem || isBullet) ? 6 : 0;
+        const textX = margin + indent;
+        const textW = contentWidth - indent;
+
+        doc.setFont('helvetica', isNumberedPara ? 'bold' : 'normal');
+        doc.setFontSize(isNumberedPara ? 10 : 9.5);
+        doc.setTextColor(isNumberedPara ? 15 : 30, isNumberedPara ? 23 : 41, isNumberedPara ? 42 : 59);
+
+        const wrapped = doc.splitTextToSize(rawLine.trim(), textW);
+        for (let wi = 0; wi < wrapped.length; wi++) {
+          checkPageBreak(6);
+          doc.text(wrapped[wi], textX, yPos);
+          yPos += 5;
+        }
+
+        if (isNumberedPara) {
+          doc.setFont('helvetica', 'normal');
+          doc.setFontSize(9.5);
+          doc.setTextColor(30, 41, 59);
+          yPos += 1;
+        }
       }
 
       // ── SIGNATURE BLOCK ──
@@ -3262,7 +3498,7 @@ const DemoSectorGate = ({
 type CADashboardZone = 
   | "command" | "multi-entity" | "e-filing" | "case-room" | "payment" | "clients" | "operations" 
   | "ai-swarm" | "calculations" | "enterprise-api" | "erp-integration" | "doc-ocr" 
-  | "team-rbac" | "notifications" | "branding" | "audit-trail" | "language-hub" | "offline-hub";
+  | "team-rbac" | "notifications" | "branding" | "audit-trail" | "language-hub" | "offline-hub" | "ca-link";
 
 const CADashboard = () => {
   const navigate = useNavigate();
@@ -3737,6 +3973,10 @@ const CADashboard = () => {
                        <Wifi className="w-3.5 h-3.5" />Offline &amp; PWA
                      </TabsTrigger>
                     )}
+                     {/* Company ↔ CA Link Settings — always visible */}
+                     <TabsTrigger value="ca-link" className="px-4 py-2.5 rounded-lg data-[state=active]:bg-indigo-500/20 data-[state=active]:text-indigo-400 font-medium text-xs flex items-center gap-1 border border-transparent data-[state=active]:border-indigo-500/30">
+                       <Link2 className="w-3.5 h-3.5" />Company Link
+                     </TabsTrigger>
                  </TabsList>
                  <Button onClick={() => setIsDrawerOpen(true)} className="ml-4 flex-shrink-0 bg-gradient-to-r from-purple-600 to-cyan-600 hover:from-purple-500 hover:to-cyan-500 text-white border-0 shadow-[0_0_20px_rgba(139,92,246,0.3)]">
                     <Cpu className="w-4 h-4 mr-2" /> Open Engine
@@ -3979,6 +4219,23 @@ const CADashboard = () => {
               {/* ZONE 15: OFFLINE MODE & PROGRESSIVE WEB APP (PWA) */}
               <TabsContent value="offline-hub" className="m-0 focus-visible:outline-none focus-visible:ring-0 space-y-8">
                 {activeZone === "offline-hub" && <OfflinePwaHub />}
+              </TabsContent>
+
+              {/* CA Link Settings Zone */}
+              <TabsContent value="ca-link" className="m-0 focus-visible:outline-none focus-visible:ring-0">
+                {activeZone === "ca-link" && (
+                  <div className="p-6">
+                    <div className="p-6 rounded-2xl bg-gradient-to-r from-indigo-500/10 to-transparent border border-indigo-500/20 mb-6">
+                      <h2 className="text-2xl font-bold text-indigo-400 flex items-center gap-2">
+                        <Link2 className="w-6 h-6" /> Company Connection Settings
+                      </h2>
+                      <p className="text-sm text-muted-foreground mt-1">
+                        Link company clients to your CA dashboard via unique codes and OTP verification. Once connected, all their financial data syncs directly into Client Vault.
+                      </p>
+                    </div>
+                    <DemoCALinkerSettings />
+                  </div>
+                )}
               </TabsContent>
               </Suspense>
             </Tabs>

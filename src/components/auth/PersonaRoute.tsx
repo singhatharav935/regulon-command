@@ -20,3 +20,6 @@ export function PersonaRoute({ children, allowedPersonas }: PersonaRouteProps) {
 
   return <>{children}</>;
 }
+
+export default PersonaRoute;
+

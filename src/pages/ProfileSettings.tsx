@@ -33,6 +33,7 @@ import { toast } from "sonner";
 import { motion } from "framer-motion";
 import { useCAAgentOrchestrator } from "@/components/agents/CAAgentOrchestrator";
 import { Bot, AlertTriangle } from "lucide-react";
+import DemoCALinkerSettings from "@/components/ca-dashboard-demo/DemoCALinkerSettings";
 
 const ProfileSettings = () => {
   const navigate = useNavigate();
@@ -540,6 +541,27 @@ const ProfileSettings = () => {
                   </div>
                 </div>
 
+              </CardContent>
+            </Card>
+          </motion.div>
+
+          {/* ─── Section 1.5: Company ↔ CA Link Settings ──────── */}
+          <motion.div
+            initial={{ opacity: 0, y: 20 }}
+            animate={{ opacity: 1, y: 0 }}
+            transition={{ delay: 0.18 }}
+          >
+            <Card className="bg-card/50 border-border/40 backdrop-blur-sm">
+              <CardHeader className="pb-4">
+                <CardTitle className="text-lg flex items-center gap-2">
+                  <div className="p-2 rounded-lg bg-indigo-500/10">
+                    <Shield className="w-5 h-5 text-indigo-400" />
+                  </div>
+                  Company ↔ CA Link Settings
+                </CardTitle>
+              </CardHeader>
+              <CardContent>
+                <DemoCALinkerSettings />
               </CardContent>
             </Card>
           </motion.div>

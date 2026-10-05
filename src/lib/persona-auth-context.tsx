@@ -64,3 +64,5 @@ export function usePersonaAuth() {
   }
   return context;
 }
+
+export default PersonaAuthProvider;

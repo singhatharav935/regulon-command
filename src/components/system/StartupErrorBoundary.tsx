@@ -57,11 +57,28 @@ class StartupErrorBoundary extends Component<
               background: "#07122a",
             }}
           >
-            <h1 style={{ margin: "0 0 10px 0", fontSize: "20px" }}>
-              SANNIDH startup error
-            </h1>
+            <div style={{ display: "flex", alignItems: "center", justifyContent: "space-between", marginBottom: "12px" }}>
+              <h1 style={{ margin: 0, fontSize: "20px" }}>
+                SANNIDH Workspace Recovery
+              </h1>
+              <button
+                onClick={() => window.location.reload()}
+                style={{
+                  background: "#1976d2",
+                  color: "#ffffff",
+                  border: "none",
+                  borderRadius: "6px",
+                  padding: "8px 16px",
+                  cursor: "pointer",
+                  fontSize: "13px",
+                  fontWeight: 600,
+                }}
+              >
+                Reload Workspace
+              </button>
+            </div>
             <p style={{ margin: "0 0 12px 0", color: "#9eb2d9" }}>
-              The app crashed during render. Copy this and share it.
+              A temporary error occurred during workspace render. Click 'Reload Workspace' to refresh.
             </p>
             <pre
               style={{

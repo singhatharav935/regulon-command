@@ -25,7 +25,14 @@ interface CACommandCenterHeaderProps {
 }
 
 export const CACommandCenterHeader = ({ title, subtitle }: CACommandCenterHeaderProps) => {
-  const { agents, messages, isRunning, systemStatus, startAllAgents, pauseAllAgents, emergencyStop } = useCAAgentOrchestrator();
+  const orchestrator = useCAAgentOrchestrator();
+  const agents = orchestrator?.agents ?? [];
+  const messages = orchestrator?.messages ?? [];
+  const isRunning = orchestrator?.isRunning ?? false;
+  const systemStatus = orchestrator?.systemStatus ?? 'offline';
+  const startAllAgents = orchestrator?.startAllAgents ?? (() => {});
+  const pauseAllAgents = orchestrator?.pauseAllAgents ?? (() => {});
+  const emergencyStop = orchestrator?.emergencyStop ?? (() => {});
 
   // White-Label Branding — live update when CA saves settings
   const [branding, setBranding] = useState<FirmBranding>(loadFirmBranding);

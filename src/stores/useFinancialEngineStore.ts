@@ -943,3 +943,6 @@ export function hasAnyData(state: Pick<FinancialEngineState, 'invoices' | 'purch
     state.bankTxns.length > 0
   );
 }
+
+// Re-export as default so Vite's HMR module resolution never loses the named export
+export default useFinancialEngineStore;

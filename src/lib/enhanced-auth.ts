@@ -149,7 +149,7 @@ class EnhancedAuthService {
    * Listen for Supabase auth state changes and keep local state in sync
    */
   private startSessionListener(): void {
-    supabase.auth.onAuthStateChange((_event, session) => {
+    supabase.auth.onAuthStateChange((event, session) => {
       if (session?.user) {
         const meta = session.user.user_metadata || {};
         const authUser: AuthUser = {
@@ -176,11 +176,12 @@ class EnhancedAuthService {
         if (meta.company_id && !localStorage.getItem('sannidh_company_id')) {
           localStorage.setItem('sannidh_company_id', meta.company_id);
         }
-      } else {
-        // User signed out or session expired
+      } else if (event === 'SIGNED_OUT') {
+        // User explicitly signed out
         this.currentUser = null;
         this.clearStoredAuth();
       }
+      // If token refresh fails in background, preserve local stored user for demo continuity
     });
   }
 

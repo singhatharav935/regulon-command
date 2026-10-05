@@ -33,7 +33,7 @@ const inferPersonaFromMetadata = (registrationRole: unknown): AppPersona | null 
   return null;
 };
 
-const ProtectedRoute = ({ children, allowRoles, allowPersonas, requireVerified = true }: ProtectedRouteProps) => {
+export function ProtectedRoute({ children, allowRoles, allowPersonas, requireVerified = true }: ProtectedRouteProps) {
   const { loading, user, roles, persona, isVerified } = useAuth();
   const location = useLocation();
   const [forceResolve, setForceResolve] = useState(false);
@@ -118,3 +118,4 @@ const ProtectedRoute = ({ children, allowRoles, allowPersonas, requireVerified =
 };
 
 export default ProtectedRoute;
+

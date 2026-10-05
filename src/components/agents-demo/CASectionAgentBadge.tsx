@@ -41,7 +41,9 @@ const STATUS_CONFIG: Record<CAAgentStatus, { color: string; label: string; dotCo
 };
 
 export const CASectionAgentBadge = ({ agentId, compact = false }: CASectionAgentBadgeProps) => {
-  const { agents } = useCAAgentOrchestrator();
+  const orchestrator = useCAAgentOrchestrator();
+  if (!orchestrator) return null;
+  const { agents } = orchestrator;
   const agent = agents.find(a => a.id === agentId);
   
   if (!agent) return null;

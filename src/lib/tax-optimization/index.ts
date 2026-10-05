@@ -5,7 +5,7 @@
  * scan result with categorized summary.
  */
 
-export * from './types';
+export type * from './types';
 export { analyzeIncomeTaxOptimizations } from './tax-rules-engine';
 export { analyzeGSTOptimizations } from './gst-optimization-engine';
 export { analyzeGovtSchemeOptimizations } from './govt-schemes-engine';
@@ -100,3 +100,5 @@ export function runFullTaxOptimizationScan(profile: CompanyProfile): {
     summary,
   };
 }
+
+export default runFullTaxOptimizationScan;

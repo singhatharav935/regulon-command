@@ -490,3 +490,48 @@ html, body {
   .stagger-5 { animation-delay: 0.5s; }
   .stagger-6 { animation-delay: 0.6s; }
 }
+
+
+/* Printable PDF Styles - prevents page repeating in browser print/save */
+@media print {
+  body * {
+    visibility: hidden !important;
+  }
+  .printable-pdf-document,
+  .printable-pdf-document * {
+    visibility: visible !important;
+  }
+  .printable-pdf-document {
+    position: absolute !important;
+    left: 0 !important;
+    top: 0 !important;
+    width: 100% !important;
+    margin: 0 !important;
+    padding: 0 !important;
+    box-shadow: none !important;
+    border: none !important;
+    transform: none !important;
+    background: #ffffff !important;
+    color: #000000 !important;
+    overflow: visible !important;
+  }
+  .printable-pdf-page {
+    page-break-after: always !important;
+    break-after: page !important;
+    page-break-inside: avoid !important;
+    break-inside: avoid !important;
+    margin: 0 auto !important;
+    box-shadow: none !important;
+    border: none !important;
+    width: 100% !important;
+    min-height: 100vh !important;
+  }
+  .no-print,
+  [role="dialog"] > div:first-child {
+    display: none !important;
+  }
+  @page {
+    size: A4 portrait;
+    margin: 0;
+  }
+}

@@ -283,4 +283,5 @@ const ComplianceShowcase = () => {
   );
 };
 
+export { ComplianceShowcase };
 export default ComplianceShowcase;

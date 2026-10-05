@@ -34,7 +34,9 @@ const STATUS_CONFIG: Record<AgentStatus, { color: string; label: string; dotColo
 };
 
 export const SectionAgentBadge = ({ agentId, compact = false }: SectionAgentBadgeProps) => {
-  const { state } = useAgentOrchestrator();
+  const orchestrator = useAgentOrchestrator();
+  if (!orchestrator) return null;
+  const { state } = orchestrator;
   const agent = state.agents.find(a => a.id === agentId);
   
   if (!agent) return null;

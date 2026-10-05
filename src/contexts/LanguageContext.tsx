@@ -7,6 +7,7 @@ import React, { createContext, useContext, useState, useEffect } from 'react';
 import { supabase } from '@/integrations/supabase/client';
 import { fetchLanguagePreference, saveLanguagePreference } from '@/services/localization-service';
 import { toast } from 'sonner';
+import { LANGUAGE_LABELS } from './language-labels';
 
 export type Language = 'en' | 'hi' | 'mr' | 'ta' | 'te' | 'bn';
 
@@ -463,3 +464,5 @@ export const useLanguage = () => {
   }
   return context;
 };
+
+export default LanguageProvider;

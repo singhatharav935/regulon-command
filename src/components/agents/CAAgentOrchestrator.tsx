@@ -79,9 +79,8 @@ export interface CAAgentDefinition {
   icon: string;
 }
 
-// CA_AGENT_SECTION_MAP is exported from ./ca-agent-section-map.ts to keep this
-// file component-only (required by Vite SWC Fast Refresh).
-export { CA_AGENT_SECTION_MAP } from './ca-agent-section-map';
+// CA_AGENT_SECTION_MAP is in ./ca-agent-section-map.ts
+import { CA_AGENT_SECTION_MAP } from './ca-agent-section-map';
 
 
 // Domain-specific consensus messages per group
@@ -501,23 +500,39 @@ export const CAAgentProvider: React.FC<{ children: React.ReactNode }> = ({ child
   }, [realClientNames]);
 
   useEffect(() => {
-    const key = isDemoMode() ? 'sannidh:ca-swarm-running' : 'real:sannidh:ca-swarm-running';
-    localStorage.setItem(key, String(isRunning));
+    try {
+      const key = isDemoMode() ? 'sannidh:ca-swarm-running' : 'real:sannidh:ca-swarm-running';
+      localStorage.setItem(key, String(isRunning));
+    } catch (e) {
+      console.warn('[CAOrchestrator] Storage save failed:', e);
+    }
   }, [isRunning]);
 
   useEffect(() => {
-    const key = isDemoMode() ? 'sannidh:ca-swarm-agents' : 'real:sannidh:ca-swarm-agents';
-    localStorage.setItem(key, JSON.stringify(agents));
+    try {
+      const key = isDemoMode() ? 'sannidh:ca-swarm-agents' : 'real:sannidh:ca-swarm-agents';
+      localStorage.setItem(key, JSON.stringify(agents));
+    } catch (e) {
+      console.warn('[CAOrchestrator] Storage save failed:', e);
+    }
   }, [agents]);
 
   useEffect(() => {
-    const key = isDemoMode() ? 'sannidh:ca-swarm-messages' : 'real:sannidh:ca-swarm-messages';
-    localStorage.setItem(key, JSON.stringify(messages));
+    try {
+      const key = isDemoMode() ? 'sannidh:ca-swarm-messages' : 'real:sannidh:ca-swarm-messages';
+      localStorage.setItem(key, JSON.stringify(messages.slice(0, 50)));
+    } catch (e) {
+      console.warn('[CAOrchestrator] Storage save failed:', e);
+    }
   }, [messages]);
 
   useEffect(() => {
-    const key = isDemoMode() ? 'sannidh:ca-swarm-system-status' : 'real:sannidh:ca-swarm-system-status';
-    localStorage.setItem(key, systemStatus);
+    try {
+      const key = isDemoMode() ? 'sannidh:ca-swarm-system-status' : 'real:sannidh:ca-swarm-system-status';
+      localStorage.setItem(key, systemStatus);
+    } catch (e) {
+      console.warn('[CAOrchestrator] Storage save failed:', e);
+    }
   }, [systemStatus]);
 
   const tickRef = useRef<NodeJS.Timeout>();
@@ -723,3 +738,7 @@ export const useCAAgentOrchestrator = () => {
   }
   return context;
 };
+
+export default CAAgentProvider;
+
+

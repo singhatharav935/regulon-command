@@ -18,10 +18,10 @@
 import { motion, AnimatePresence } from "framer-motion";
 import {
   LayoutDashboard, Shield, BarChart3, BrainCircuit,
-  FolderOpen, Newspaper, Sparkles
+  FolderOpen, Newspaper, Sparkles, Link2
 } from "lucide-react";
 
-export type DashboardTab = "overview" | "compliance" | "news" | "erp" | "cfo" | "tax-optimization" | "documents";
+export type DashboardTab = "overview" | "compliance" | "news" | "erp" | "cfo" | "tax-optimization" | "documents" | "ca-settings";
 
 interface TabConfig {
   id: DashboardTab;
@@ -84,6 +84,14 @@ export const DASHBOARD_TABS: TabConfig[] = [
     label: "Documents",
     icon: FolderOpen,
     description: "Vault & audit records",
+  },
+  {
+    id: "ca-settings",
+    label: "Connect CA",
+    icon: Link2,
+    description: "Link & sync to your CA",
+    badge: "Link",
+    badgeColor: "bg-indigo-500/15 text-indigo-400 border-indigo-500/25",
   },
 ];
 

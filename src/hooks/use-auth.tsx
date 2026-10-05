@@ -199,25 +199,30 @@ export const AuthProvider = ({ children }: { children: ReactNode }) => {
 
     const {
       data: { subscription },
-    } = supabase.auth.onAuthStateChange((_event, nextSession) => {
+    } = supabase.auth.onAuthStateChange((event, nextSession) => {
       if (!mounted) return;
 
-      setSession(nextSession);
-      setUser(nextSession?.user ?? null);
-      setLoading(false);
-
       if (nextSession?.user) {
+        setSession(nextSession);
+        setUser(nextSession.user);
+        setLoading(false);
         // Do not block auth state propagation on profile/role fetches.
         void loadIdentity(nextSession.user);
         // Bind profile store to the new user
         useUserProfile.getState().bindToUser(nextSession.user.id);
-      } else {
+      } else if (event === 'SIGNED_OUT') {
+        setSession(null);
+        setUser(null);
+        setLoading(false);
         setRoles([]);
         setPersona(null);
         setVerificationStatus(null);
         setIsVerified(false);
         // Clear stale profile data from previous user
         useUserProfile.getState().clearProfile();
+      } else {
+        // Background token refresh failure or initial null — preserve active user state
+        setLoading(false);
       }
     });
 
@@ -254,3 +259,5 @@ export const useAuth = () => {
 
   return context;
 };
+
+export default AuthProvider;

@@ -55,10 +55,10 @@ const AgentCard = ({ agent, onTrigger, onPause, onResume }: {
 }) => {
   const Icon = ICON_MAP[agent.icon] || Bot;
   const statusStyle = STATUS_COLORS[agent.status] || STATUS_COLORS.idle;
-  const { state } = useAgentOrchestrator();
+  const orchestrator = useAgentOrchestrator();
   
   // Last 2 messages for this agent
-  const recentMessages = state.messages
+  const recentMessages = (orchestrator?.state.messages ?? [])
     .filter(m => m.fromAgent === agent.id || m.toAgent === agent.id)
     .slice(0, 2);
 
@@ -217,7 +217,9 @@ const CrossWireMessageFeed = ({ messages }: { messages: AgentMessage[] }) => {
 export const AgentNetworkPanel = () => {
   const [expanded, setExpanded] = useState(true);
   const [activeView, setActiveView] = useState<'grid' | 'feed'>('grid');
-  const { state, actions } = useAgentOrchestrator();
+  const orchestrator = useAgentOrchestrator();
+  if (!orchestrator) return null;
+  const { state, actions } = orchestrator;
 
   const activeCount = state.agents.filter(a => 
     a.status === 'active' || a.status === 'working' || a.status === 'analyzing'

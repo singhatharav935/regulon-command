@@ -27,7 +27,9 @@ const ICON_MAP: Record<string, React.ComponentType<any>> = {
 
 export const CompactAgentNetworkSummary = () => {
   const navigate = useNavigate();
-  const { state } = useAgentOrchestrator();
+  const orchestrator = useAgentOrchestrator();
+  if (!orchestrator) return null;
+  const { state } = orchestrator;
 
   const activeCount = state.agents.filter(a => 
     a.status === 'active' || a.status === 'working' || a.status === 'analyzing'

@@ -334,27 +334,51 @@ export const AgentOrchestratorProvider: React.FC<{ children: React.ReactNode }> 
   });
 
   useEffect(() => {
-    localStorage.setItem('sannidh:company-swarm-running', String(isRunning));
+    try {
+      localStorage.setItem('sannidh:company-swarm-running', String(isRunning));
+    } catch (e) {
+      console.warn('[CompanyOrchestrator] Storage save failed:', e);
+    }
   }, [isRunning]);
 
   useEffect(() => {
-    localStorage.setItem('sannidh:company-swarm-agents', JSON.stringify(agents));
+    try {
+      localStorage.setItem('sannidh:company-swarm-agents', JSON.stringify(agents));
+    } catch (e) {
+      console.warn('[CompanyOrchestrator] Storage save failed:', e);
+    }
   }, [agents]);
 
   useEffect(() => {
-    localStorage.setItem('sannidh:company-swarm-messages', JSON.stringify(messages));
+    try {
+      localStorage.setItem('sannidh:company-swarm-messages', JSON.stringify(messages.slice(0, 50)));
+    } catch (e) {
+      console.warn('[CompanyOrchestrator] Storage save failed:', e);
+    }
   }, [messages]);
 
   useEffect(() => {
-    localStorage.setItem('sannidh:company-swarm-total-messages', String(totalMessagesExchanged));
+    try {
+      localStorage.setItem('sannidh:company-swarm-total-messages', String(totalMessagesExchanged));
+    } catch (e) {
+      console.warn('[CompanyOrchestrator] Storage save failed:', e);
+    }
   }, [totalMessagesExchanged]);
 
   useEffect(() => {
-    localStorage.setItem('sannidh:company-swarm-total-tasks', String(totalTasksCompleted));
+    try {
+      localStorage.setItem('sannidh:company-swarm-total-tasks', String(totalTasksCompleted));
+    } catch (e) {
+      console.warn('[CompanyOrchestrator] Storage save failed:', e);
+    }
   }, [totalTasksCompleted]);
 
   useEffect(() => {
-    localStorage.setItem('sannidh:company-swarm-last-sync', lastSyncTime);
+    try {
+      localStorage.setItem('sannidh:company-swarm-last-sync', lastSyncTime);
+    } catch (e) {
+      console.warn('[CompanyOrchestrator] Storage save failed:', e);
+    }
   }, [lastSyncTime]);
 
   // Generate unique message ID
@@ -501,16 +525,17 @@ export const AgentOrchestratorProvider: React.FC<{ children: React.ReactNode }> 
 // HOOK
 // ================================================================
 
-export const useAgentOrchestrator = (): OrchestratorContextValue => {
+export const useAgentOrchestrator = (): OrchestratorContextValue | null => {
   const context = useContext(OrchestratorContext);
-  if (!context) {
-    throw new Error('useAgentOrchestrator must be used within an AgentOrchestratorProvider');
-  }
-  return context;
+  return context ?? null;
 };
 
-// Export agent ID to section index mapping for easy lookup
-export const AGENT_SECTION_MAP: Record<number, AgentId> = {
+export default AgentOrchestratorProvider;
+
+
+
+// Agent ID to section index mapping for easy lookup
+const AGENT_SECTION_MAP: Record<number, AgentId> = {
   1: 'ARIA',
   2: 'ATLAS',
   3: 'SENTINEL',

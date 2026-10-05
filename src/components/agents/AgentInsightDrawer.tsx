@@ -69,7 +69,12 @@ const generateInsights = (agentId: AgentId, messages: any[]): Insight[] => {
 
 export const AgentInsightDrawer = ({ agentId }: AgentInsightDrawerProps) => {
   const [isOpen, setIsOpen] = useState(false);
-  const { state } = useAgentOrchestrator();
+  const orchestrator = useAgentOrchestrator();
+
+  // Render nothing if used outside an AgentOrchestratorProvider
+  if (!orchestrator) return null;
+
+  const { state } = orchestrator;
   const agent = state.agents.find(a => a.id === agentId);
   
   if (!agent) return null;

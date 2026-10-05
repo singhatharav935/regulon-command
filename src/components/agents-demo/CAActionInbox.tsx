@@ -203,7 +203,9 @@ const getDraftContentForAction = (action: ActionItem) => {
 
 export const CAActionInbox = () => {
   const navigate = useNavigate();
-  const { agents, messages, isRunning, systemStatus, acknowledgeMessage } = useCAAgentOrchestrator();
+  const orchestrator = useCAAgentOrchestrator();
+  if (!orchestrator) return null;
+  const { agents, messages, isRunning, systemStatus, acknowledgeMessage } = orchestrator;
   const [filter, setFilter] = useState<'all' | ActionType>('all');
   const [selectedAction, setSelectedAction] = useState<ActionItem | null>(null);
 

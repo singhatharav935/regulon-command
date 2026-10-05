@@ -52,7 +52,9 @@ const PRIORITY_STYLES: Record<string, string> = {
 
 export const CompanyActionInbox = () => {
   const navigate = useNavigate();
-  const { state } = useAgentOrchestrator();
+  const orchestrator = useAgentOrchestrator();
+  if (!orchestrator) return null;
+  const { state } = orchestrator;
   const [filter, setFilter] = useState<'all' | ActionType>('all');
 
   const activeAgentCount = state.agents.filter(a => 

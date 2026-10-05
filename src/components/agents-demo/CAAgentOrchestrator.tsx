@@ -725,8 +725,7 @@ export const CAAgentProvider: React.FC<{ children: React.ReactNode }> = ({ child
 
 export const useCAAgentOrchestrator = () => {
   const context = useContext(CAAgentContext);
-  if (context === undefined) {
-    throw new Error('useCAAgentOrchestrator must be used within a CAAgentProvider');
-  }
-  return context;
+  return context ?? null;
 };
+
+export default CAAgentProvider;

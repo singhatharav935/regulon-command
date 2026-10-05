@@ -1,25 +1,39 @@
-import { useState, useEffect } from "react";
+import { useState, useEffect, lazy, Suspense } from "react";
+import { lazyWithRetry } from "@/lib/lazyWithRetry";
 // Patch for Index.tsx - add live sync import
 import { getLiveRegulatedAnnouncements } from "@/lib/index-live-sync";
 import { useQuery } from "@tanstack/react-query";
 import { useLocation } from "react-router-dom";
-import CinematicEntry from "@/components/CinematicEntry";
+// CinematicEntry uses @react-three/fiber (WebGL) — must be lazy to allow
+// Vite to pre-bundle the CJS react-reconciler before it executes.
+const CinematicEntry = lazyWithRetry(() => import("@/components/CinematicEntry"));
 import Navbar from "@/components/layout/Navbar";
 import Footer from "@/components/layout/Footer";
 import HeroSection from "@/components/platform/HeroSection";
-import RegulatorsSection from "@/components/platform/RegulatorsSection";
-import CapabilitiesSection from "@/components/platform/CapabilitiesSection";
-import ExecutionPipeline from "@/components/platform/ExecutionPipeline";
-import AIAssistantPreview from "@/components/platform/AIAssistantPreview";
-import TargetAudienceSection from "@/components/platform/TargetAudienceSection";
-import TeamSection from "@/components/platform/TeamSection";
-import ComplianceShowcase from "@/components/platform/ComplianceShowcase";
-import FAQSection from "@/components/platform/FAQSection";
 import BackgroundEffects from "@/components/BackgroundEffects";
-import RegulatoryIntelligenceCenter from "@/components/dashboard/RegulatoryIntelligenceCenter";
-import AdvancedComplianceRadar from "@/components/dashboard/AdvancedComplianceRadar";
-import AdvancedRegulatoryNewsPanel from "@/components/dashboard/AdvancedRegulatoryNewsPanel";
 import { workspacePublicRequest } from "@/lib/workspace-backend";
+
+// ── Lazy-load all below-fold heavy components ──────────────────────────────
+// These are NOT above the fold, so we defer their loading to after the hero
+// renders. This cuts initial JS bundle size and makes navigation feel instant.
+const RegulatorsSection = lazyWithRetry(() => import("@/components/platform/RegulatorsSection"));
+const CapabilitiesSection = lazyWithRetry(() => import("@/components/platform/CapabilitiesSection"));
+const ExecutionPipeline = lazyWithRetry(() => import("@/components/platform/ExecutionPipeline"));
+const AIAssistantPreview = lazyWithRetry(() => import("@/components/platform/AIAssistantPreview"));
+const TargetAudienceSection = lazyWithRetry(() => import("@/components/platform/TargetAudienceSection"));
+const TeamSection = lazyWithRetry(() => import("@/components/platform/TeamSection"));
+const ComplianceShowcase = lazyWithRetry(() => import("@/components/platform/ComplianceShowcase"));
+const FAQSection = lazyWithRetry(() => import("@/components/platform/FAQSection"));
+const AdvancedRegulatoryNewsPanel = lazyWithRetry(() => import("@/components/dashboard/AdvancedRegulatoryNewsPanel"));
+const AdvancedComplianceRadar = lazyWithRetry(() => import("@/components/dashboard/AdvancedComplianceRadar"));
+
+// Lightweight skeleton for Suspense fallbacks
+const SectionSkeleton = () => (
+  <div className="w-full py-16 flex items-center justify-center">
+    <div className="w-10 h-10 border-2 border-primary/30 border-t-primary rounded-full animate-spin" />
+  </div>
+);
+
 
 const PATH_SECTION_MAP: Record<string, string> = {
   "/": "hero",
@@ -289,49 +303,51 @@ const Index = () => {
         <section id="hero">
           <HeroSection content={landingOverview ?? null} />
         </section>
-        <section id="regulatory-intelligence">
-          <div className="container mx-auto px-4 max-w-7xl">
-            {/* Advanced Regulatory Intelligence Section */}
-            <AdvancedRegulatoryNewsPanel />
-            <AdvancedComplianceRadar
-              view="universal"
-              onSyncNow={async () => {
-                if (import.meta.env.VITE_WORKSPACE_BACKEND_ENABLED === "true") {
-                  try {
-                    await workspacePublicRequest("/public/regulatory-announcements/sync-now", { method: "POST" });
-                  } catch {
-                    // Edge function not available — silent fallback
+        <Suspense fallback={<SectionSkeleton />}>
+          <section id="regulatory-intelligence">
+            <div className="container mx-auto px-4 max-w-7xl">
+              {/* Advanced Regulatory Intelligence Section */}
+              <AdvancedRegulatoryNewsPanel />
+              <AdvancedComplianceRadar
+                view="universal"
+                onSyncNow={async () => {
+                  if (import.meta.env.VITE_WORKSPACE_BACKEND_ENABLED === "true") {
+                    try {
+                      await workspacePublicRequest("/public/regulatory-announcements/sync-now", { method: "POST" });
+                    } catch {
+                      // Edge function not available — silent fallback
+                    }
                   }
-                }
-                await refetchPublicAnnouncements();
-              }}
-            />
-          </div>
-        </section>
-        <section id="showcase">
-          <ComplianceShowcase />
-        </section>
-        <section id="regulators">
-          <RegulatorsSection />
-        </section>
-        <section id="capabilities">
-          <CapabilitiesSection />
-        </section>
-        <section id="execution">
-          <ExecutionPipeline />
-        </section>
-        <section id="ai-assistant">
-          <AIAssistantPreview />
-        </section>
-        <section id="audience">
-          <TargetAudienceSection />
-        </section>
-        <section id="faq">
-          <FAQSection />
-        </section>
-        <section id="team">
-          <TeamSection />
-        </section>
+                  await refetchPublicAnnouncements();
+                }}
+              />
+            </div>
+          </section>
+          <section id="showcase">
+            <ComplianceShowcase />
+          </section>
+          <section id="regulators">
+            <RegulatorsSection />
+          </section>
+          <section id="capabilities">
+            <CapabilitiesSection />
+          </section>
+          <section id="execution">
+            <ExecutionPipeline />
+          </section>
+          <section id="ai-assistant">
+            <AIAssistantPreview />
+          </section>
+          <section id="audience">
+            <TargetAudienceSection />
+          </section>
+          <section id="faq">
+            <FAQSection />
+          </section>
+          <section id="team">
+            <TeamSection />
+          </section>
+        </Suspense>
       </main>
       <Footer />
     </div>

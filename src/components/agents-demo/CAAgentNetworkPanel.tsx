@@ -69,9 +69,9 @@ const CAAgentCard = ({ agent, onTrigger, onPause, onResume }: {
 }) => {
   const Icon = ICON_MAP[agent.icon] || Bot;
   const statusStyle = STATUS_COLORS[agent.status] || STATUS_COLORS.idle;
-  const { messages } = useCAAgentOrchestrator();
+  const orchestrator = useCAAgentOrchestrator();
   
-  const recentMessages = messages
+  const recentMessages = (orchestrator?.messages ?? [])
     .filter(m => m.fromAgent === agent.id || m.toAgent === agent.id || m.toAgent === agent.groupId)
     .slice(0, 2);
 
@@ -226,7 +226,9 @@ const CAWireFeed = ({ messages }: { messages: CAAgentMessage[] }) => {
 export const CAAgentNetworkPanel = () => {
   const [expanded, setExpanded] = useState(true);
   const [activeView, setActiveView] = useState<'grid' | 'feed'>('grid');
-  const { agents, messages, isRunning, systemStatus, resumeAgent, pauseAgent, triggerAgent, startAllAgents, pauseAllAgents, emergencyStop } = useCAAgentOrchestrator();
+  const orchestrator = useCAAgentOrchestrator();
+  if (!orchestrator) return null;
+  const { agents, messages, isRunning, systemStatus, resumeAgent, pauseAgent, triggerAgent, startAllAgents, pauseAllAgents, emergencyStop } = orchestrator;
 
   const activeCount = agents.filter(a => 
     a.status === 'active' || a.status === 'working' || a.status === 'analyzing'

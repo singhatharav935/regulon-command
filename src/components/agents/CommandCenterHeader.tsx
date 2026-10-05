@@ -25,22 +25,24 @@ interface CommandCenterHeaderProps {
 }
 
 export const CommandCenterHeader = ({ companyName, complianceScore, healthStatus }: CommandCenterHeaderProps) => {
-  const { state, actions } = useAgentOrchestrator();
+  const orchestrator = useAgentOrchestrator();
+  const state = orchestrator?.state;
+  const actions = orchestrator?.actions;
 
-  const activeAgentCount = state.agents.filter(a => 
+  const activeAgentCount = (state?.agents ?? []).filter(a => 
     a.status === 'active' || a.status === 'working' || a.status === 'analyzing'
   ).length;
 
-  const alertCount = state.agents.filter(a => a.status === 'alert').length;
-  const isOnline = state.isRunning && activeAgentCount > 0;
+  const alertCount = (state?.agents ?? []).filter(a => a.status === 'alert').length;
+  const isOnline = (state?.isRunning ?? false) && activeAgentCount > 0;
 
   const timeSinceSync = useMemo(() => {
-    const diff = Date.now() - new Date(state.lastSyncTime).getTime();
+    const diff = Date.now() - new Date(state?.lastSyncTime ?? Date.now()).getTime();
     const mins = Math.floor(diff / 60000);
     if (mins < 1) return 'Just now';
     if (mins < 60) return `${mins}m ago`;
     return `${Math.floor(mins / 60)}h ago`;
-  }, [state.lastSyncTime]);
+  }, [state?.lastSyncTime]);
 
   // SVG arc constants for compliance ring
   const radius = 44;

@@ -122,18 +122,12 @@ export const EnhancedAuthProvider: React.FC<EnhancedAuthProviderProps> = ({ chil
         try {
           await enhancedAuth.refreshToken();
           const updatedUser = enhancedAuth.getCurrentUser();
-          setUser(updatedUser);
+          if (updatedUser) setUser(updatedUser);
         } catch (error) {
-          console.warn('Token refresh failed:', error);
-          // If refresh fails due to network error, keep user logged in.
-          // Otherwise user will be logged out by enhancedAuth service.
-          const errorMsg = (error as any)?.message?.toLowerCase() || '';
-          const isNetworkError = errorMsg.includes('fetch') || 
-                                errorMsg.includes('network') || 
-                                errorMsg.includes('load failed') || 
-                                errorMsg.includes('failed to fetch');
-          if (!isNetworkError) {
-            setUser(null);
+          console.warn('[EnhancedAuth] Token refresh failed (preserving active user session):', error);
+          const currentUser = enhancedAuth.getCurrentUser();
+          if (currentUser) {
+            setUser(currentUser);
           }
         }
       }
@@ -199,7 +193,6 @@ export const EnhancedAuthProvider: React.FC<EnhancedAuthProviderProps> = ({ chil
       setUser(updatedUser);
     } catch (error) {
       console.error('Failed to refresh user:', error);
-      setUser(null);
     }
   };
 
@@ -287,8 +280,10 @@ export const EnhancedProtectedRoute: React.FC<EnhancedProtectedRouteProps> = ({
   }
 
   if (!isAuthenticated || !user) {
-    return null;
+    return <div className="min-h-screen bg-background flex items-center justify-center"><p className="text-muted-foreground text-sm">Redirecting to login...</p></div>;
   }
 
   return <>{children}</>;
 };
+
+export default EnhancedAuthProvider;

@@ -6,12 +6,13 @@
  * No hardcoded data in this file.
  */
 
-import { useState } from "react";
+import { useState, useEffect } from "react";
 import { motion } from "framer-motion";
 import Navbar from "@/components/layout/Navbar";
 import Footer from "@/components/layout/Footer";
 import DashboardTypeNav from "@/components/dashboard/DashboardTypeNav";
 import { CompanyDashboardShell, DashboardTab } from "@/components/company-dashboard/CompanyDashboardShell";
+import { CompanyCADataSyncCard, CompanyCASettingsPanel } from "@/components/company-dashboard/DemoCompanyCASync";
 
 // Tab content components
 import RegulatoryExposurePanel from "@/components/dashboard/RegulatoryExposurePanel";
@@ -26,11 +27,13 @@ import AIBusinessIntelligencePanel from "@/components/dashboard/AIBusinessIntell
 import RegulatoryIntelligenceCenter from "@/components/dashboard/RegulatoryIntelligenceCenter";
 import RegulatoryNewsPanel from "@/components/dashboard/RegulatoryNewsPanel";
 
+import TabErrorBoundary from "@/components/dashboard/TabErrorBoundary";
 import DashboardHeader from "@/components/dashboard/DashboardHeader";
 
 // ERP + CFO (mock-data versions driven by demo-data.ts)
 import { SmartERPModule } from "@/components/company-erp/SmartERPModule";
 import { VirtualCFOModule } from "@/components/company-erp/VirtualCFOModule";
+import { IntelligentTaxOptimization } from "@/components/tax-optimization/IntelligentTaxOptimization";
 
 // All demo data — edit src/data/demo-data.ts to change what's shown
 import {
@@ -59,6 +62,9 @@ function OverviewTab() {
         industry={DEMO_COMPANY.industry}
         complianceHealth={DEMO_COMPANY.compliance_score}
       />
+
+      {/* CA Data Sync Card — Send all data to connected CA */}
+      <CompanyCADataSyncCard />
 
       {/* Quick Actions */}
       <QuickActions />
@@ -146,10 +152,38 @@ function DocumentsTab() {
   );
 }
 
+function TaxOptimizationTab() {
+  return (
+    <IntelligentTaxOptimization
+      companyId="demo-company-101"
+      companyName="Sannidh Precision Machinery Pvt Ltd"
+      demoMode={true}
+    />
+  );
+}
+
+function CaSettingsTab() {
+  return (
+    <div className="space-y-6">
+      <CompanyCASettingsPanel />
+    </div>
+  );
+}
+
 // ─── Main Demo Dashboard ──────────────────────────────────────────────────────
 
 const Dashboard = () => {
   const [activeTab, setActiveTab] = useState<DashboardTab>("overview");
+
+  // Listen for programmatic tab switch from CompanyCADataSyncCard
+  useEffect(() => {
+    const handler = (e: Event) => {
+      const tab = (e as CustomEvent).detail as DashboardTab;
+      if (tab) setActiveTab(tab);
+    };
+    window.addEventListener('company:switch-tab', handler);
+    return () => window.removeEventListener('company:switch-tab', handler);
+  }, []);
 
   const pendingAlerts = DEMO_GAPS.filter(g => g.severity === "high").length;
 
@@ -187,12 +221,16 @@ const Dashboard = () => {
           alertCount={pendingAlerts}
           isDemo
         >
-          {activeTab === "overview" && <OverviewTab />}
-          {activeTab === "compliance" && <ComplianceTab />}
-          {activeTab === "news" && <NewsTab />}
-          {activeTab === "erp" && <ERPTab />}
-          {activeTab === "cfo" && <CFOTab />}
-          {activeTab === "documents" && <DocumentsTab />}
+          <TabErrorBoundary fallbackName={activeTab}>
+            {activeTab === "overview" && <OverviewTab />}
+            {activeTab === "compliance" && <ComplianceTab />}
+            {activeTab === "news" && <NewsTab />}
+            {activeTab === "erp" && <ERPTab />}
+            {activeTab === "cfo" && <CFOTab />}
+            {activeTab === "tax-optimization" && <TaxOptimizationTab />}
+            {activeTab === "documents" && <DocumentsTab />}
+            {activeTab === "ca-settings" && <CaSettingsTab />}
+          </TabErrorBoundary>
         </CompanyDashboardShell>
       </main>
 

@@ -40,7 +40,8 @@ import type {
   TaxOptimization, OptimizationSummary, OptimizationCategory,
   OptimizationStatus, CompanyProfile
 } from "@/lib/tax-optimization/types";
-import { runFullTaxOptimizationScan } from "@/lib/tax-optimization";
+import runFullTaxOptimizationScanDefault, { runFullTaxOptimizationScan as runFullTaxOptimizationScanNamed } from "@/lib/tax-optimization";
+const scanTaxOptimizations = runFullTaxOptimizationScanDefault || runFullTaxOptimizationScanNamed;
 
 // ─── Helpers ─────────────────────────────────────────────────────────────────
 
@@ -260,11 +261,11 @@ function HeroSummaryBanner({ summary }: { summary: OptimizationSummary }) {
 function OptimizationCard({ opt, index }: { opt: TaxOptimization; index: number }) {
   const [expanded, setExpanded] = useState(false);
   const [showLegal, setShowLegal] = useState(false);
-  const statusStyle = STATUS_STYLES[opt.status];
-  const StatusIcon = statusStyle.icon;
+  const statusStyle = STATUS_STYLES[opt.status] || STATUS_STYLES.eligible;
+  const StatusIcon = statusStyle.icon || CheckCircle2;
   const OptIcon = resolveIcon(opt.icon_name);
 
-  const categoryConfig = CATEGORY_CONFIGS.find(c => c.id === opt.category);
+  const categoryConfig = CATEGORY_CONFIGS.find(c => c.id === opt.category) || CATEGORY_CONFIGS[0];
   const catColor = categoryConfig?.color || 'text-cyan-400';
   const catBg = categoryConfig?.bgColor || 'bg-cyan-500/15';
 
@@ -514,13 +515,15 @@ function OptimizationCard({ opt, index }: { opt: TaxOptimization; index: number 
 function BeforeAfterCard({ summary, profile }: { summary: OptimizationSummary; profile: CompanyProfile }) {
   const taxRate = 0.26;
   const normalTax = profile.net_profit_before_tax * taxRate;
-  const totalLeakages = summary.income_tax_savings + summary.gst_recovery;
-  const totalBeforeTax = normalTax + totalLeakages;
-  const afterTaxWithSannidh = normalTax;
+  const totalTaxAndITCRecovery = summary.income_tax_savings + summary.gst_recovery;
   const subsidyCashback = summary.govt_subsidies + summary.state_subsidies;
+  const totalSannidhValueAdd = summary.total_savings;
 
-  const netProfitBefore = profile.net_profit_before_tax - totalBeforeTax;
-  const netProfitAfter = profile.net_profit_before_tax - afterTaxWithSannidh + subsidyCashback + summary.promoter_savings;
+  // Baseline net profit after normal corporate tax WITHOUT Sannidh
+  const netProfitBefore = profile.net_profit_before_tax - normalTax;
+
+  // Net Profit & Total Retained Value WITH Sannidh
+  const netProfitAfter = netProfitBefore + totalSannidhValueAdd;
   const profitBoost = netProfitBefore > 0 ? ((netProfitAfter - netProfitBefore) / netProfitBefore * 100) : 0;
 
   return (
@@ -565,12 +568,12 @@ function BeforeAfterCard({ summary, profile }: { summary: OptimizationSummary; p
                   <span className="font-mono text-red-400">-{fmtINRFull(normalTax)}</span>
                 </div>
                 <div className="flex justify-between text-xs">
-                  <span className="text-muted-foreground">Hidden Leakages & Missed Claims</span>
-                  <span className="font-mono text-red-400">-{fmtINRFull(totalLeakages)}</span>
+                  <span className="text-muted-foreground">Unclaimed Tax Benefits & Subsidies</span>
+                  <span className="font-mono text-slate-500">₹0 (Missed ₹{ (totalSannidhValueAdd / 100000).toFixed(2) } L)</span>
                 </div>
                 <div className="border-t border-red-500/20 pt-2 flex justify-between text-sm font-bold">
-                  <span className="text-muted-foreground">Net Profit in Pocket</span>
-                  <span className="font-mono text-red-400">{fmtINRFull(Math.max(0, netProfitBefore))}</span>
+                  <span className="text-muted-foreground">Baseline Net Profit in Pocket</span>
+                  <span className="font-mono text-slate-200">{fmtINRFull(Math.max(0, netProfitBefore))}</span>
                 </div>
               </div>
             </div>
@@ -593,23 +596,23 @@ function BeforeAfterCard({ summary, profile }: { summary: OptimizationSummary; p
                   <span className="font-mono text-slate-300">{fmtINRFull(profile.net_profit_before_tax)}</span>
                 </div>
                 <div className="flex justify-between text-xs">
-                  <span className="text-muted-foreground">Optimized Tax</span>
-                  <span className="font-mono text-yellow-400">-{fmtINRFull(afterTaxWithSannidh)}</span>
+                  <span className="text-muted-foreground">Normal Tax (26%)</span>
+                  <span className="font-mono text-yellow-400">-{fmtINRFull(normalTax)}</span>
                 </div>
                 <div className="flex justify-between text-xs">
-                  <span className="text-emerald-400">+ IT/GST Savings Recovered</span>
-                  <span className="font-mono text-emerald-400">+{fmtINRFull(totalLeakages)}</span>
+                  <span className="text-emerald-400">+ IT & GST Savings Recovered</span>
+                  <span className="font-mono text-emerald-400">+{fmtINRFull(totalTaxAndITCRecovery)}</span>
                 </div>
                 <div className="flex justify-between text-xs">
                   <span className="text-emerald-400">+ Govt Subsidies Claimed</span>
                   <span className="font-mono text-emerald-400">+{fmtINRFull(subsidyCashback)}</span>
                 </div>
                 <div className="flex justify-between text-xs">
-                  <span className="text-emerald-400">+ Promoter Optimization</span>
+                  <span className="text-emerald-400">+ Promoter Wealth Optimization</span>
                   <span className="font-mono text-emerald-400">+{fmtINRFull(summary.promoter_savings)}</span>
                 </div>
                 <div className="border-t border-emerald-500/20 pt-2 flex justify-between text-sm font-bold">
-                  <span className="text-muted-foreground">Net Profit in Pocket</span>
+                  <span className="text-muted-foreground">Total Retained Value in Pocket</span>
                   <span className="font-mono text-emerald-400">{fmtINRFull(Math.max(0, netProfitAfter))}</span>
                 </div>
               </div>
@@ -629,7 +632,7 @@ function BeforeAfterCard({ summary, profile }: { summary: OptimizationSummary; p
                 +{profitBoost.toFixed(1)}% Pure Profit Boost with Sannidh
               </p>
               <p className="text-[10px] text-muted-foreground mt-1">
-                Extra {fmtINRFull(Math.max(0, netProfitAfter - netProfitBefore))} recovered from legal tax savings, ITC recovery & govt subsidies
+                Extra {fmtINRFull(totalSannidhValueAdd)} recovered from legal tax savings, ITC recovery, promoter structuring & govt subsidies
               </p>
             </motion.div>
           )}
@@ -646,9 +649,12 @@ function BeforeAfterCard({ summary, profile }: { summary: OptimizationSummary; p
 interface IntelligentTaxOptimizationProps {
   companyId: string;
   companyName?: string;
+  /** Set true in demo/marketing dashboards to always show the rich mock MSME example.
+   *  Set false (default) in real company dashboard — uses only actual store data. */
+  demoMode?: boolean;
 }
 
-export function IntelligentTaxOptimization({ companyId, companyName }: IntelligentTaxOptimizationProps) {
+export function IntelligentTaxOptimization({ companyId, companyName, demoMode = false }: IntelligentTaxOptimizationProps) {
   const [activeCategory, setActiveCategory] = useState<OptimizationCategory | 'all'>('all');
   const [showEligibleOnly, setShowEligibleOnly] = useState(false);
   const [sortBy, setSortBy] = useState<'savings' | 'priority' | 'section'>('savings');
@@ -678,6 +684,60 @@ export function IntelligentTaxOptimization({ companyId, companyName }: Intellige
       oneYearAgo.setFullYear(oneYearAgo.getFullYear() - 1);
       return acqDate >= oneYearAgo && (a.category === 'Plant_Machinery' || a.category === 'plant_machinery');
     }).reduce((sum: number, a: any) => sum + (Number(a.cost) || 0), 0);
+
+    const isStorePopulated = totalRevenue > 0 || totalPurchases > 0 || (payroll && payroll.length > 0);
+
+    // ── Demo mode: always use rich MSME mock profile (demo/marketing dashboards) ──
+    if (demoMode || (!isStorePopulated && demoMode)) {
+      return {
+        id: 'demo-company-101',
+        name: 'Sannidh Precision Machinery Pvt Ltd',
+        entity_type: 'pvt_ltd',
+        incorporation_date: '2020-11-12',
+        state: 'Maharashtra',
+        industry: 'Machinery & Precision Engineering',
+        msme_category: 'small',
+        dipp_registered: true,
+        dipp_number: 'DIPP92810',
+        gstin: '27AAACS8920K1ZX',
+        pan: 'AAACS8920K',
+        cin: 'U29253MH2020PTC349810',
+        is_manufacturing: true,
+        is_exporter: true,
+        special_zone: 'none',
+        annual_turnover: 100000000,   // ₹10.00 Crore Annual Turnover
+        total_employees: 32,
+        new_employees_fy: 5,          // 5 new CNC operators hired
+        new_employee_avg_salary: 21500,
+        total_revenue: 100000000,     // ₹10.00 Cr Gross Revenue
+        total_purchases: 61000000,    // ₹6.10 Cr Raw Material & Components
+        total_expenses: 18500000,     // ₹1.85 Cr Operating Expenses
+        gross_profit: 39000000,       // ₹3.90 Cr Gross Profit (39%)
+        net_profit_before_tax: 10000000, // ₹1.00 Cr Net PBT (10%)
+        total_gst_itc_claimed: 10409040,
+        total_gst_itc_available: 10980000,
+        total_gst_output: 18000000,
+        gst_itc_mismatch_amount: 570960,
+        gst_input_rate_avg: 18,
+        gst_output_rate_avg: 18,
+        new_machinery_investment: 2800000,
+        r_and_d_expenditure: 1200000,
+        total_exports: 15000000,
+        msme_vendor_payables: 6100000,
+        msme_overdue_payables: 2250000,
+        total_fixed_assets_cost: 14500000,
+        director_salary: 3600000,
+        dividend_distributed: 800000,
+        preliminary_expenses: 250000,
+        payroll_count: 32,
+      };
+    }
+
+    // ── Real mode: if store has no data yet, return null sentinel ──
+    // The component will render an empty/connect state instead of fake data.
+    if (!isStorePopulated) {
+      return null as unknown as CompanyProfile;
+    }
 
     return {
       id: companyId,
@@ -722,9 +782,10 @@ export function IntelligentTaxOptimization({ companyId, companyName }: Intellige
     };
   }, [companyId, companyName, invoices, purchases, expenses, payroll, bankTxns, fixedAssets]);
 
-  // Run the full tax optimization scan
+  // Run the full tax optimization scan (guard against null in real-mode with no data)
   const { optimizations, summary } = useMemo(() => {
-    return runFullTaxOptimizationScan(profile);
+    if (!profile) return { optimizations: [], summary: { total_savings: 0, income_tax_savings: 0, gst_recovery: 0, govt_subsidies: 0, state_subsidies: 0, promoter_savings: 0, eligible_count: 0, action_required_count: 0, total_optimizations: 0, category_breakdown: [] } };
+    return scanTaxOptimizations(profile);
   }, [profile]);
 
   // Filter & Sort
@@ -768,6 +829,24 @@ export function IntelligentTaxOptimization({ companyId, companyName }: Intellige
       });
     }, 2000);
   }, [optimizations.length, summary]);
+
+  // Real dashboard with no financial data in the store yet — show a clean connect state
+  if (!demoMode && !profile) {
+    return (
+      <div className="flex flex-col items-center justify-center py-24 text-center space-y-4">
+        <div className="p-4 rounded-2xl bg-emerald-500/10 border border-emerald-500/20">
+          <Sparkles className="w-10 h-10 text-emerald-400" />
+        </div>
+        <h3 className="text-lg font-bold text-foreground">No Financial Data Yet</h3>
+        <p className="text-sm text-muted-foreground max-w-sm">
+          Add your invoices, purchases, expenses and payroll data via the ERP tab.
+          Sannidh will then automatically scan all Indian tax provisions and calculate
+          your exact savings opportunities.
+        </p>
+        <p className="text-xs text-slate-500">Go to <strong>ERP &rarr; Invoices / Purchases / Expenses / Payroll</strong> to get started.</p>
+      </div>
+    );
+  }
 
   return (
     <div className="space-y-6 font-sans">
