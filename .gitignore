@@ -24,7 +24,7 @@ dist-ssr
 *.local
 
 # Runtime data
-data/
+/data/
 
 # Lockfiles (using npm)
 bun.lockb
