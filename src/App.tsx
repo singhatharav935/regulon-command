@@ -15,6 +15,7 @@ const AccountSettingsPage = lazyWithRetry(() => import("./pages/AccountSettings"
 const UserOnboardingFlow = lazyWithRetry(() => import("./components/auth/UserOnboardingFlow").then(module => ({ default: module.UserOnboardingFlow })));
 const ForgotPassword = lazyWithRetry(() => import("./pages/ForgotPassword"));
 const ResetPassword = lazyWithRetry(() => import("./pages/ResetPassword"));
+const AuthCallback = lazyWithRetry(() => import("./pages/AuthCallback"));
 const TermsOfService = lazyWithRetry(() => import("./pages/TermsOfService"));
 const PrivacyPolicy = lazyWithRetry(() => import("./pages/PrivacyPolicy"));
 const Disclaimers = lazyWithRetry(() => import("./pages/Disclaimers"));
@@ -133,6 +134,7 @@ const App = () => (
                       <Route path="/auth" element={<AuthReal />} />
                       <Route path="/auth/forgot-password" element={<ForgotPassword />} />
                       <Route path="/auth/reset-password" element={<ResetPassword />} />
+                      <Route path="/auth/callback" element={<AuthCallback />} />
                       <Route path="/onboarding" element={<UserOnboardingFlow />} />
                       <Route path="/settings/account" element={<AccountSettingsPage />} />
                       <Route path="/profile" element={<ProfileSettings />} />

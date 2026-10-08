@@ -178,7 +178,7 @@ export const EmailWaitingPage: React.FC<EmailWaitingPageProps> = ({
         type: 'signup',
         email,
         options: {
-          emailRedirectTo: `${window.location.origin}/auth?mode=login&role=${registrationRole}`,
+          emailRedirectTo: `${window.location.origin}/auth/callback?role=${registrationRole}`,
         },
       });
 

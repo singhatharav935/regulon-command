@@ -112,7 +112,7 @@ const AuthReal = () => {
   useEffect(() => {
     const urlMode = searchParams.get("mode");
     // Don't auto-redirect if user is explicitly navigating to signup/register/reset flows
-    if (urlMode === "signup" || urlMode === "register" || urlMode === "multi-step" || urlMode === "forgot-password" || urlMode === "reset-password" || urlMode === "verify-email") return;
+    if (urlMode === "signup" || urlMode === "register" || urlMode === "multi-step" || urlMode === "forgot-password" || urlMode === "reset-password" || urlMode === "verify-email" || urlMode === "email-waiting") return;
 
     let cancelled = false;
 
@@ -312,7 +312,7 @@ const AuthReal = () => {
 
       // Navigate to appropriate dashboard
       const redirectTo = (location.state as any)?.from || getDashboardRoute(effectiveRole);
-      navigate(redirectTo);
+      navigate(redirectTo, { replace: true });
     } catch (error: any) {
       console.error("Login error:", error);
       toast({

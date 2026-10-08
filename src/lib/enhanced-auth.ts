@@ -270,7 +270,7 @@ class EnhancedAuthService {
       throw new Error(`Password requirements: ${passwordValidation.feedback.join(', ')}`);
     }
 
-    const redirectUrl = `${window.location.origin}/auth?mode=login&role=${registrationRole}`;
+    const redirectUrl = `${window.location.origin}/auth/callback?role=${registrationRole}`;
 
     const { data, error } = await supabase.auth.signUp({
       email: email.trim().toLowerCase(),
@@ -613,7 +613,7 @@ class EnhancedAuthService {
       type: 'signup',
       email,
       options: {
-        emailRedirectTo: `${window.location.origin}/auth?mode=login`,
+        emailRedirectTo: `${window.location.origin}/auth/callback`,
       },
     });
 

@@ -43,7 +43,7 @@ export async function createLocalDemoUser(
 
   if (hasEnv) {
     try {
-      const redirectUrl = `${window.location.origin}/auth?mode=login&role=${registrationRole}`;
+      const redirectUrl = `${window.location.origin}/auth/callback?role=${registrationRole}`;
 
       const { data, error } = await supabase.auth.signUp({
         email: normEmail,
