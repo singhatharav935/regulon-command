@@ -55,8 +55,8 @@ extracted_*
 docs
 *.md
 
-# Supabase (not needed for frontend build)
-supabase
+# Supabase edge functions & migrations (not needed for frontend build)
+/supabase
 
 # Logs
 logs
