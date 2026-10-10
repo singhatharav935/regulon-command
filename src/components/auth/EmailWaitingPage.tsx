@@ -7,6 +7,7 @@ import { Card } from '@/components/ui/card';
 import BackgroundEffects from '@/components/BackgroundEffects';
 import { supabase } from '@/integrations/supabase/client';
 import { useToast } from '@/hooks/use-toast';
+import { getDashboardRoute } from '@/lib/dashboard-routes';
 
 interface EmailWaitingPageProps {
   email: string;
@@ -15,23 +16,6 @@ interface EmailWaitingPageProps {
   onUseAnotherAccount: () => void;
 }
 
-const getDashboardRoute = (role: string): string => {
-  switch (role) {
-    case "external_ca":
-      return "/real-external-ca-dashboard";
-    case "in_house_ca":
-      return "/real-inhouse-ca-dashboard";
-    case "ca_firm":
-      return "/dashboards/ca-firm";
-    case "admin":
-      return "/admin-dashboard";
-    case "in_house_lawyer":
-      return "/dashboards/lawyer";
-    case "company_owner":
-    default:
-      return "/real-company-dashboard";
-  }
-};
 
 export const EmailWaitingPage: React.FC<EmailWaitingPageProps> = ({
   email,
@@ -63,7 +47,7 @@ export const EmailWaitingPage: React.FC<EmailWaitingPageProps> = ({
     // Navigate to dashboard after short delay for the success animation
     setTimeout(() => {
       const dashboardRoute = getDashboardRoute(registrationRole);
-      navigate(dashboardRoute);
+      navigate(dashboardRoute, { replace: true });
     }, 2000);
   }, [isVerified, registrationRole, fullName, navigate, toast]);
 

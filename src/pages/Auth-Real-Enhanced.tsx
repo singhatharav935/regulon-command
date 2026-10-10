@@ -95,11 +95,15 @@ const AuthReal = () => {
   }, [searchParams]);
 
   // Check if user needs email verification — but NEVER hijack a fresh signup/register URL
+  // or the email-waiting screen (which is shown post-signup while user confirms)
   useEffect(() => {
     const urlMode = searchParams.get("mode");
     // If the user is explicitly trying to register/sign up, don't interrupt them
     // with a verification screen for a stale old user from a previous session.
     if (urlMode === "signup" || urlMode === "register" || urlMode === "multi-step") return;
+    // Never override the email-waiting mode — the user just signed up and is
+    // waiting for email confirmation.
+    if (mode === 'email-waiting') return;
     const user = enhancedAuth.getCurrentUser();
     if (user && !user.email_verified && mode !== 'email-verification') {
       setMode('email-verification');
@@ -113,6 +117,9 @@ const AuthReal = () => {
     const urlMode = searchParams.get("mode");
     // Don't auto-redirect if user is explicitly navigating to signup/register/reset flows
     if (urlMode === "signup" || urlMode === "register" || urlMode === "multi-step" || urlMode === "forgot-password" || urlMode === "reset-password" || urlMode === "verify-email" || urlMode === "email-waiting") return;
+
+    // Don't auto-redirect during the post-signup email-waiting or registration flows
+    if (mode === 'email-waiting' || mode === 'multi-step-register') return;
 
     let cancelled = false;
 
@@ -180,7 +187,7 @@ const AuthReal = () => {
       cancelled = true;
       subscription.unsubscribe();
     };
-  }, [searchParams, navigate]);
+  }, [searchParams, navigate, mode]);
 
   const roleOptions = [
     { value: "company_owner", label: "Company Owner", icon: Building2, description: "Business owner needing compliance management" },
@@ -387,6 +394,14 @@ const AuthReal = () => {
 
   const handleMultiStepRegistration = async (formData: RegistrationFormData) => {
     try {
+      // Sign out any stale session before a fresh signup to avoid conflicts
+      // with the onAuthStateChange listener and session overlap.
+      try {
+        await supabase.auth.signOut({ scope: 'local' });
+      } catch {
+        // Ignore — there may not be a session
+      }
+
       const localResponse = await createLocalDemoUser(
         formData.email,
         formData.password,
@@ -405,14 +420,14 @@ const AuthReal = () => {
 
       // If email confirmation is required, show check-email message
       if (localResponse.requiresEmailConfirmation) {
+        // Store role for after confirmation
+        localStorage.setItem('pending_registration_role', formData.registrationRole);
+        localStorage.setItem('current_user_role', formData.registrationRole);
+
         toast({
           title: "✅ Account Created!",
           description: `We've sent a confirmation email to ${formData.email}. Please check your inbox.`,
         });
-
-        // Store role for after confirmation
-        localStorage.setItem('pending_registration_role', formData.registrationRole);
-        localStorage.setItem('current_user_role', formData.registrationRole);
 
         // Show the email waiting page instead of redirecting to login
         setWaitingEmail(formData.email);
@@ -493,11 +508,9 @@ const AuthReal = () => {
       }, 500);
     } catch (error: any) {
       console.error("Registration error:", error);
-      toast({
-        title: "Registration Failed",
-        description: error.message || "Failed to create account. Please try again.",
-        variant: "destructive",
-      });
+      // Re-throw so MultiStepRegistration.handleSubmit shows the toast
+      // (prevents this handler from silently swallowing the error)
+      throw error;
     }
   };
 

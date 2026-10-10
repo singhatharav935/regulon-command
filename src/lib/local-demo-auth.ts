@@ -71,10 +71,35 @@ export async function createLocalDemoUser(
             error: "An account with this email already exists. Please sign in instead.",
           };
         }
-        // If network error, fall back to local auth below
+        if (msg.includes("rate limit") || msg.includes("too many") || msg.includes("after ")) {
+          return {
+            success: false,
+            error: "Too many signup attempts. Please wait a minute and try again.",
+          };
+        }
+        if (msg.includes("password") && (msg.includes("short") || msg.includes("least"))) {
+          return {
+            success: false,
+            error: "Password is too short. Please use at least 8 characters.",
+          };
+        }
+        if (msg.includes("signup") && msg.includes("not allowed")) {
+          return {
+            success: false,
+            error: "Signups are currently disabled. Please contact support.",
+          };
+        }
+        if (msg.includes("email") && msg.includes("invalid")) {
+          return {
+            success: false,
+            error: "Please enter a valid email address.",
+          };
+        }
+        // For any other non-network error, return it
         if (!msg.includes("fetch") && !msg.includes("network")) {
           return { success: false, error: error.message };
         }
+        // Network errors fall through to local fallback below
       } else if (data.user) {
         const needsConfirmation = !data.session;
         const identities = (data.user as any)?.identities ?? data.user?.identities;
@@ -96,6 +121,12 @@ export async function createLocalDemoUser(
               verification_entity_name: entityName,
             },
           },
+        };
+      } else {
+        // signUp returned no error and no user — unexpected state
+        return {
+          success: false,
+          error: "Signup could not be completed. Please try again.",
         };
       }
     } catch (err: any) {
