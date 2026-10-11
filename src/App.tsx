@@ -24,6 +24,9 @@ const ComplianceCenterStandalone = lazyWithRetry(() => import("./pages/Complianc
 const NotFound = lazyWithRetry(() => import("./pages/NotFound"));
 const MarketingOptionPage = lazyWithRetry(() => import("./pages/MarketingOptionPage"));
 const AboutPage = lazyWithRetry(() => import("./pages/AboutPage"));
+const ForBusinessOwnersPage = lazyWithRetry(() => import("./pages/ForBusinessOwnersPage"));
+const ForCAsPage = lazyWithRetry(() => import("./pages/ForCAsPage"));
+const HowItWorksPage = lazyWithRetry(() => import("./pages/HowItWorksPage"));
 
 // Dashboards & Personas
 const RoleLandingRoute = lazyWithRetry(() => import("./components/auth/RoleLandingRoute"));
@@ -126,6 +129,9 @@ const App = () => (
                       <Route path="/security/dpdp-2026" element={<AdvancedSecurityPage />} />
                       <Route path="/security/soc2-type-ii" element={<AdvancedSecurityPage />} />
                       <Route path="/about" element={<AboutPage />} />
+                      <Route path="/for-business-owners" element={<ForBusinessOwnersPage />} />
+                      <Route path="/for-chartered-accountants" element={<ForCAsPage />} />
+                      <Route path="/how-it-works" element={<HowItWorksPage />} />
                       <Route path="/privacy" element={<PrivacyPolicy />} />
                       <Route path="/terms" element={<TermsOfService />} />
                       <Route path="/disclaimers" element={<Disclaimers />} />
@@ -147,9 +153,21 @@ const App = () => (
                       <Route path="/ca-dashboard/payment-challan-pdf" element={<PaymentChallanPdfViewer />} />
                       <Route path="/admin-dashboard" element={<AdminDashboard />} />
                       <Route path="/ca-firm-dashboard" element={<CAFirmDashboard />} />
-                      <Route path="/real-external-ca-dashboard" element={<ExternalCADashboardReal />} />
-                      <Route path="/real-company-dashboard" element={<CompanyDashboardReal />} />
-                      <Route path="/real-inhouse-ca-dashboard" element={<InhouseCADashboardReal />} />
+                      <Route path="/real-external-ca-dashboard" element={
+                        <ProtectedRoute allowRoles={["user", "manager", "admin"]} allowPersonas={["external_ca", "in_house_ca", "ca_firm"]} requireVerified={false}>
+                          <ExternalCADashboardReal />
+                        </ProtectedRoute>
+                      } />
+                      <Route path="/real-company-dashboard" element={
+                        <ProtectedRoute allowRoles={["user", "manager", "admin"]} allowPersonas={["company_owner"]} requireVerified={false}>
+                          <CompanyDashboardReal />
+                        </ProtectedRoute>
+                      } />
+                      <Route path="/real-inhouse-ca-dashboard" element={
+                        <ProtectedRoute allowRoles={["user", "manager", "admin"]} allowPersonas={["in_house_ca", "external_ca"]} requireVerified={false}>
+                          <InhouseCADashboardReal />
+                        </ProtectedRoute>
+                      } />
                       <Route path="/agent-work-review" element={<AgentWorkReview />} />
                       <Route path="/app" element={<RoleLandingRoute />} />
                       <Route

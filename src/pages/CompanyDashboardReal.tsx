@@ -78,6 +78,7 @@ import { IntelligentTaxOptimization } from "@/components/tax-optimization/Intell
 import { CompanyActionInbox } from "@/components/agents/CompanyActionInbox";
 import { SectionAgentBadge } from "@/components/agents/SectionAgentBadge";
 import { AgentInsightDrawer } from "@/components/agents/AgentInsightDrawer";
+import RealCALinkPanel from "@/components/shared/RealCALinkPanel";
 
 // ========================================
 // TYPES
@@ -1743,6 +1744,16 @@ const CompanyDashboardReal = () => {
   const [companyId, setCompanyId] = useState<string | null>(null);
   const [chatDrawerOpen, setChatDrawerOpen] = useState(false);
   const [activeTab, setActiveTab] = useState<DashboardTab>("overview");
+
+  // Listen for programmatic tab switch (e.g. from sync card "Go to Settings" button)
+  useEffect(() => {
+    const handler = (e: Event) => {
+      const tab = (e as CustomEvent).detail as DashboardTab;
+      if (tab) setActiveTab(tab);
+    };
+    window.addEventListener('company:switch-tab', handler);
+    return () => window.removeEventListener('company:switch-tab', handler);
+  }, []);
   
   // Data states
   const [company, setCompany] = useState<CompanyData | null>(null);
@@ -1990,6 +2001,46 @@ const CompanyDashboardReal = () => {
           {activeTab === 'overview' && (
             <div className="space-y-6">
               <CompanyProfileSection company={company} isLoading={isLoading} />
+
+              {/* ─── REAL CA DATA SYNC CARD ─── */}
+              <div className="rounded-2xl border border-white/10 overflow-hidden">
+                <div className="bg-gradient-to-r from-indigo-500/12 via-cyan-500/6 to-emerald-500/8 border-b border-white/8 px-6 py-4 flex items-center gap-4">
+                  <div className="w-10 h-10 rounded-xl bg-indigo-500/20 border border-indigo-500/30 flex items-center justify-center flex-shrink-0">
+                    <svg xmlns="http://www.w3.org/2000/svg" className="w-5 h-5 text-indigo-300" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><path d="M10 13a5 5 0 0 0 7.54.54l3-3a5 5 0 0 0-7.07-7.07l-1.72 1.71"/><path d="M14 11a5 5 0 0 0-7.54-.54l-3 3a5 5 0 0 0 7.07 7.07l1.71-1.71"/></svg>
+                  </div>
+                  <div className="flex-1">
+                    <h3 className="font-bold text-foreground">Send Data to Your CA</h3>
+                    <p className="text-xs text-muted-foreground mt-0.5">
+                      Link your dashboard to your CA and send all financial data with one click. 
+                      Real OTP verification · Powered by Supabase
+                    </p>
+                  </div>
+                  <button
+                    onClick={() => window.dispatchEvent(new CustomEvent('company:switch-tab', { detail: 'ca-settings' }))}
+                    className="text-xs text-indigo-400 hover:text-indigo-300 border border-indigo-500/30 hover:border-indigo-500/50 rounded-lg px-3 py-1.5 transition-colors flex-shrink-0"
+                  >
+                    Open CA Settings →
+                  </button>
+                </div>
+                <div className="px-6 py-4 bg-card/20">
+                  <RealCALinkPanel
+                    role="company"
+                    financialPayload={{
+                      companyName: company?.company_name || 'Company',
+                      gstin: company?.gstin || '',
+                      pan: company?.pan || '',
+                      financialYear: '2024-25',
+                      revenue: company?.annual_revenue ? `₹ ${Number(company.annual_revenue).toLocaleString('en-IN')}` : 'N/A',
+                      profitAfterTax: 'As per books',
+                      totalAssets: 'As per books',
+                      complianceScore: company?.compliance_score || 0,
+                      pendingTasks: tasks?.filter((t: any) => t.status !== 'completed').length || 0,
+                      documents: documents?.slice(0, 6).map((d: any) => ({ name: d.name, type: d.file_type || 'document', status: d.status || 'active' })) || [],
+                    }}
+                  />
+                </div>
+              </div>
+
               <QuickActionsSection companyId={companyId || ''} />
               <AIBusinessIntelligenceSection
                 insights={insights}
@@ -2050,6 +2101,36 @@ const CompanyDashboardReal = () => {
               isLoading={isLoading}
               onRefresh={fetchDashboardData}
             />
+          )}
+
+          {/* ── Tab: CA Settings (Real Link) ─────────────── */}
+          {activeTab === 'ca-settings' && (
+            <div className="space-y-4">
+              <div className="p-5 rounded-2xl bg-gradient-to-r from-indigo-500/10 to-transparent border border-indigo-500/20">
+                <h2 className="text-xl font-bold text-indigo-400 flex items-center gap-2">
+                  <svg xmlns="http://www.w3.org/2000/svg" className="w-5 h-5" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><path d="M10 13a5 5 0 0 0 7.54.54l3-3a5 5 0 0 0-7.07-7.07l-1.72 1.71"/><path d="M14 11a5 5 0 0 0-7.54-.54l-3 3a5 5 0 0 0 7.07 7.07l1.71-1.71"/></svg>
+                  CA Connection Settings
+                </h2>
+                <p className="text-sm text-muted-foreground mt-1">
+                  Link your company to your CA's dashboard. A real OTP is sent to their registered email for secure verification.
+                </p>
+              </div>
+              <RealCALinkPanel
+                role="company"
+                financialPayload={{
+                  companyName: company?.company_name || 'Company',
+                  gstin: company?.gstin || '',
+                  pan: company?.pan || '',
+                  financialYear: '2024-25',
+                  revenue: company?.annual_revenue ? `₹ ${Number(company.annual_revenue).toLocaleString('en-IN')}` : 'N/A',
+                  profitAfterTax: 'As per books',
+                  totalAssets: 'As per books',
+                  complianceScore: company?.compliance_score || 0,
+                  pendingTasks: tasks?.filter((t: any) => t.status !== 'completed').length || 0,
+                  documents: documents?.slice(0, 6).map((d: any) => ({ name: d.name, type: d.file_type || 'document', status: d.status || 'active' })) || [],
+                }}
+              />
+            </div>
           )}
         </CompanyDashboardShell>
       </main>

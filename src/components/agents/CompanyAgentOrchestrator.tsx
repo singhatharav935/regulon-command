@@ -522,12 +522,39 @@ export const AgentOrchestratorProvider: React.FC<{ children: React.ReactNode }> 
 };
 
 // ================================================================
-// HOOK
+// HOOK — Safe fallback if context is un-wrapped
 // ================================================================
 
-export const useAgentOrchestrator = (): OrchestratorContextValue | null => {
+const DEFAULT_ORCHESTRATOR_STATE: OrchestratorContextValue = {
+  state: {
+    agents: createInitialAgents(),
+    messages: [],
+    isRunning: true,
+    totalMessagesExchanged: 0,
+    totalTasksCompleted: 0,
+    systemUptime: 100,
+    lastSyncTime: new Date().toISOString(),
+  },
+  actions: {
+    startAllAgents: () => {},
+    pauseAllAgents: () => {},
+    resumeAgent: () => {},
+    pauseAgent: () => {},
+    triggerAgent: () => {},
+    emergencyStop: () => {},
+    syncNow: () => {},
+    getAgent: (id) => createInitialAgents().find(a => a.id === id),
+    getAgentMessages: () => [],
+    getWireMessages: () => [],
+    acknowledgeMessage: () => {},
+    pushMessage: () => {},
+    updateAgentStatus: () => {},
+  }
+};
+
+export const useAgentOrchestrator = (): OrchestratorContextValue => {
   const context = useContext(OrchestratorContext);
-  return context ?? null;
+  return context || DEFAULT_ORCHESTRATOR_STATE;
 };
 
 export default AgentOrchestratorProvider;

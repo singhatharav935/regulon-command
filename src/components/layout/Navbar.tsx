@@ -258,11 +258,19 @@ const Navbar = () => {
               </AnimatePresence>
             </div>
 
-            <Link to="/customers" className="px-4 py-2 text-sm text-muted-foreground hover:text-foreground transition-colors">
+            <Link to="/for-business-owners" className="px-3 py-2 text-sm text-muted-foreground hover:text-emerald-400 transition-colors">
+              For Businesses
+            </Link>
+            <Link to="/for-chartered-accountants" className="px-3 py-2 text-sm text-muted-foreground hover:text-indigo-400 transition-colors">
+              For CAs
+            </Link>
+            <Link to="/how-it-works" className="px-3 py-2 text-sm text-muted-foreground hover:text-purple-400 transition-colors">
+              How It Works
+            </Link>
+            <Link to="/customers" className="px-3 py-2 text-sm text-muted-foreground hover:text-foreground transition-colors">
               Customers
             </Link>
-
-            <Link to="/about" className="px-4 py-2 text-sm text-muted-foreground hover:text-foreground transition-colors">
+            <Link to="/about" className="px-3 py-2 text-sm text-muted-foreground hover:text-foreground transition-colors">
               About
             </Link>
           </div>
@@ -430,6 +438,30 @@ const Navbar = () => {
                     {link.title}
                   </Link>
                 ))}
+              </div>
+              <div className="space-y-2">
+                <p className="text-xs font-semibold text-muted-foreground uppercase tracking-wider px-3">Explore Sannidh</p>
+                <Link
+                  to="/for-business-owners"
+                  className="block px-3 py-2 text-sm text-emerald-400 font-medium hover:text-emerald-300"
+                  onClick={() => setMobileOpen(false)}
+                >
+                  For Business Owners
+                </Link>
+                <Link
+                  to="/for-chartered-accountants"
+                  className="block px-3 py-2 text-sm text-indigo-400 font-medium hover:text-indigo-300"
+                  onClick={() => setMobileOpen(false)}
+                >
+                  For Chartered Accountants
+                </Link>
+                <Link
+                  to="/how-it-works"
+                  className="block px-3 py-2 text-sm text-purple-400 font-medium hover:text-purple-300"
+                  onClick={() => setMobileOpen(false)}
+                >
+                  How Sannidh Works
+                </Link>
               </div>
               <div className="pt-4 space-y-3 border-t border-border/50">
                 {isLoggedIn ? (

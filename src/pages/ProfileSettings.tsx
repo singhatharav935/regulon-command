@@ -34,6 +34,7 @@ import { motion } from "framer-motion";
 import { useCAAgentOrchestrator } from "@/components/agents/CAAgentOrchestrator";
 import { Bot, AlertTriangle } from "lucide-react";
 import DemoCALinkerSettings from "@/components/ca-dashboard-demo/DemoCALinkerSettings";
+import RealCALinkPanel from "@/components/shared/RealCALinkPanel";
 
 const ProfileSettings = () => {
   const navigate = useNavigate();
@@ -545,7 +546,29 @@ const ProfileSettings = () => {
             </Card>
           </motion.div>
 
-          {/* ─── Section 1.5: Company ↔ CA Link Settings ──────── */}
+          {/* ─── Section 1.5a: REAL Company ↔ CA Link ──────────── */}
+          <motion.div
+            initial={{ opacity: 0, y: 20 }}
+            animate={{ opacity: 1, y: 0 }}
+            transition={{ delay: 0.16 }}
+          >
+            <Card className="bg-card/50 border-cyan-500/20 backdrop-blur-sm">
+              <CardHeader className="pb-4">
+                <CardTitle className="text-lg flex items-center gap-2">
+                  <div className="p-2 rounded-lg bg-cyan-500/10">
+                    <Shield className="w-5 h-5 text-cyan-400" />
+                  </div>
+                  Connect Your Company Clients
+                  <Badge className="bg-emerald-500/15 text-emerald-300 border-emerald-500/30 text-[10px] ml-1">Live · Real OTP</Badge>
+                </CardTitle>
+              </CardHeader>
+              <CardContent>
+                <RealCALinkPanel role="ca" />
+              </CardContent>
+            </Card>
+          </motion.div>
+
+          {/* ─── Section 1.5b: Company ↔ CA Link Settings (Demo) ─── */}
           <motion.div
             initial={{ opacity: 0, y: 20 }}
             animate={{ opacity: 1, y: 0 }}

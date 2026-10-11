@@ -29,9 +29,13 @@ import RegulatoryNewsPanel from "@/components/dashboard/RegulatoryNewsPanel";
 
 import TabErrorBoundary from "@/components/dashboard/TabErrorBoundary";
 import DashboardHeader from "@/components/dashboard/DashboardHeader";
+import { CommandCenterHeader } from "@/components/agents/CommandCenterHeader";
+import { CompanyActionInbox } from "@/components/agents-demo/CompanyActionInbox";
 
 // ERP + CFO (mock-data versions driven by demo-data.ts)
+import { RealERPModule } from "@/components/company-erp/RealERPModule";
 import { SmartERPModule } from "@/components/company-erp/SmartERPModule";
+import { CFOIntelligenceModule } from "@/components/company-erp/CFOIntelligenceModule";
 import { VirtualCFOModule } from "@/components/company-erp/VirtualCFOModule";
 import { IntelligentTaxOptimization } from "@/components/tax-optimization/IntelligentTaxOptimization";
 
@@ -94,9 +98,9 @@ function ComplianceTab() {
     <div className="space-y-6">
       <RegulatoryExposurePanel exposures={DEMO_EXPOSURES.map(e => ({ regulator: e.regulator, status: e.status, notes: e.notes }))} />
       <RegulatoryIntelligenceCenter currentHealthScore={DEMO_COMPANY.compliance_score} updates={regulatoryUpdates} />
-      <ComplianceGapSection />
-      <UpcomingLawImpactSection />
-      <AuditEvidenceVault />
+      <ComplianceGapSection useDemoFallback={true} />
+      <UpcomingLawImpactSection useDemoFallback={true} />
+      <AuditEvidenceVault useDemoFallback={true} />
       <ComplianceTasksTable tasks={DEMO_TASKS.map(t => ({ id: t.id, title: t.title, regulator: t.regulator, priority: t.priority, status: t.status, dueDate: t.due_date }))} />
     </div>
   );
@@ -112,28 +116,16 @@ function NewsTab() {
 
 function ERPTab() {
   return (
-    <SmartERPModule
-      invoices={DEMO_INVOICES}
-      purchases={DEMO_PURCHASES}
-      expenses={DEMO_EXPENSES}
-      payroll={DEMO_PAYROLL}
-      bankTxns={DEMO_BANK_TXNS}
-      inventory={DEMO_INVENTORY}
-      company={{
-        name: DEMO_COMPANY.name,
-        gstin: DEMO_COMPANY.gstin,
-        state: DEMO_COMPANY.state,
-        pan: DEMO_COMPANY.pan,
-      }}
+    <RealERPModule
+      companyId="demo-company-101"
+      companyName={DEMO_COMPANY.name}
     />
   );
 }
 
 function CFOTab() {
   return (
-    <div>
-      <VirtualCFOModule />
-    </div>
+    <CFOIntelligenceModule companyName={DEMO_COMPANY.name} />
   );
 }
 
@@ -209,6 +201,15 @@ const Dashboard = () => {
             </p>
             <span className="text-[10px] text-amber-400/50 shrink-0">Edit: src/data/demo-data.ts</span>
           </motion.div>
+
+          {/* Command Center Header — 1:1 mirror of real company dashboard */}
+          <CommandCenterHeader 
+            companyName={DEMO_COMPANY.name}
+            complianceScore={DEMO_COMPANY.compliance_score}
+            healthStatus={DEMO_COMPANY.health_status}
+          />
+          {/* AI Action Inbox */}
+          <CompanyActionInbox />
         </div>
 
         {/* Tab Shell + Content — full width below */}

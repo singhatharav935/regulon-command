@@ -1,8 +1,12 @@
 /**
- * Authentication Service
- * 
- * Uses Supabase Auth for real user registration and login.
- * Sends confirmation emails on signup; prevents duplicate email accounts.
+ * Authentication Service — Supabase Only
+ *
+ * SECURITY: No local fallbacks. Every registration and login goes through
+ * real Supabase Auth. Fake/unverified accounts are NOT allowed.
+ *
+ * - Registration: Supabase creates the user, sends email confirmation
+ * - Login: Supabase verifies credentials, returns real session
+ * - Routing: Based on registration_role stored in user_metadata
  */
 
 import { supabase } from "@/integrations/supabase/client";
@@ -19,17 +23,12 @@ export interface LocalAuthResult {
     };
   };
   error?: string;
-  /** True when the user was created but must confirm their email before logging in */
   requiresEmailConfirmation?: boolean;
 }
 
 /**
  * Register a new user via Supabase Auth.
- *
- * Supabase will:
- *  - Reject duplicate emails (returns an error)
- *  - Send a confirmation email if email confirmations are enabled
- *  - Trigger the `handle_new_user()` DB function to create profiles/roles/personas
+ * No local fallback — if Supabase is unavailable, registration fails safely.
  */
 export async function createLocalDemoUser(
   email: string,
@@ -39,212 +38,183 @@ export async function createLocalDemoUser(
   entityName?: string
 ): Promise<LocalAuthResult> {
   const normEmail = email.trim().toLowerCase();
-  const hasEnv = Boolean(import.meta.env.VITE_SUPABASE_URL && import.meta.env.VITE_SUPABASE_ANON_KEY);
 
-  if (hasEnv) {
-    try {
-      const redirectUrl = `${window.location.origin}/auth/callback?role=${registrationRole}`;
-
-      const { data, error } = await supabase.auth.signUp({
-        email: normEmail,
-        password,
-        options: {
-          emailRedirectTo: redirectUrl,
-          data: {
-            full_name: fullName,
-            registration_role: registrationRole,
-            verification_entity_name: entityName,
-          },
-        },
-      });
-
-      if (error) {
-        const msg = error.message.toLowerCase();
-        if (
-          msg.includes("already registered") ||
-          msg.includes("already been registered") ||
-          msg.includes("user already exists") ||
-          msg.includes("already exists")
-        ) {
-          return {
-            success: false,
-            error: "An account with this email already exists. Please sign in instead.",
-          };
-        }
-        if (msg.includes("rate limit") || msg.includes("too many") || msg.includes("after ")) {
-          return {
-            success: false,
-            error: "Too many signup attempts. Please wait a minute and try again.",
-          };
-        }
-        if (msg.includes("password") && (msg.includes("short") || msg.includes("least"))) {
-          return {
-            success: false,
-            error: "Password is too short. Please use at least 8 characters.",
-          };
-        }
-        if (msg.includes("signup") && msg.includes("not allowed")) {
-          return {
-            success: false,
-            error: "Signups are currently disabled. Please contact support.",
-          };
-        }
-        if (msg.includes("email") && msg.includes("invalid")) {
-          return {
-            success: false,
-            error: "Please enter a valid email address.",
-          };
-        }
-        // For any other non-network error, return it
-        if (!msg.includes("fetch") && !msg.includes("network")) {
-          return { success: false, error: error.message };
-        }
-        // Network errors fall through to local fallback below
-      } else if (data.user) {
-        const needsConfirmation = !data.session;
-        const identities = (data.user as any)?.identities ?? data.user?.identities;
-        if (Array.isArray(identities) && identities.length === 0) {
-          return {
-            success: false,
-            error: "An account with this email already exists. Please sign in instead.",
-          };
-        }
-        return {
-          success: true,
-          requiresEmailConfirmation: needsConfirmation,
-          user: {
-            id: data.user.id,
-            email: data.user.email!,
-            user_metadata: (data.user.user_metadata as any) ?? {
-              registration_role: registrationRole,
-              full_name: fullName,
-              verification_entity_name: entityName,
-            },
-          },
-        };
-      } else {
-        // signUp returned no error and no user — unexpected state
-        return {
-          success: false,
-          error: "Signup could not be completed. Please try again.",
-        };
-      }
-    } catch (err: any) {
-      console.warn("Supabase auth unavailable, falling back to local auth:", err);
-    }
+  if (!import.meta.env.VITE_SUPABASE_URL || !import.meta.env.VITE_SUPABASE_ANON_KEY) {
+    return {
+      success: false,
+      error: "Authentication service is not configured. Please contact support.",
+    };
   }
 
-  // ══ LOCAL FALLBACK FOR DEVELOPMENT / LOCALHOST ══
-  const localUser = {
-    id: `local-${Date.now()}`,
-    email: normEmail,
-    password,
-    user_metadata: {
-      registration_role: registrationRole,
-      full_name: fullName,
-      verification_entity_name: entityName,
-    },
-  };
-  localStorage.setItem(`sannidh_local_user_${normEmail}`, JSON.stringify(localUser));
-  localStorage.setItem("sannidh_current_user", JSON.stringify(localUser));
-  localStorage.setItem("current_user_role", registrationRole);
+  try {
+    const redirectUrl = `${window.location.origin}/auth?mode=login&role=${registrationRole}`;
 
-  return {
-    success: true,
-    requiresEmailConfirmation: false,
-    user: localUser,
-  };
+    const { data, error } = await supabase.auth.signUp({
+      email: normEmail,
+      password,
+      options: {
+        emailRedirectTo: redirectUrl,
+        data: {
+          full_name: fullName,
+          registration_role: registrationRole,
+          verification_entity_name: entityName,
+        },
+      },
+    });
+
+    if (error) {
+      const msg = error.message.toLowerCase();
+      if (
+        msg.includes("already registered") ||
+        msg.includes("already been registered") ||
+        msg.includes("user already exists") ||
+        msg.includes("already exists")
+      ) {
+        return {
+          success: false,
+          error: "An account with this email already exists. Please sign in instead.",
+        };
+      }
+      return { success: false, error: error.message };
+    }
+
+    if (!data.user) {
+      return { success: false, error: "Registration failed. Please try again." };
+    }
+
+    // Supabase silently returns a user with empty identities for duplicate emails
+    const identities = (data.user as any)?.identities ?? data.user?.identities;
+    if (Array.isArray(identities) && identities.length === 0) {
+      return {
+        success: false,
+        error: "An account with this email already exists. Please sign in instead.",
+      };
+    }
+
+    const needsConfirmation = !data.session;
+    return {
+      success: true,
+      requiresEmailConfirmation: needsConfirmation,
+      user: {
+        id: data.user.id,
+        email: data.user.email!,
+        user_metadata: (data.user.user_metadata as any) ?? {
+          registration_role: registrationRole,
+          full_name: fullName,
+          verification_entity_name: entityName,
+        },
+      },
+    };
+  } catch (err: any) {
+    console.error("Registration error:", err);
+    return {
+      success: false,
+      error: err?.message || "Registration failed. Please check your connection and try again.",
+    };
+  }
 }
 
 /**
  * Log in an existing user via Supabase Auth.
+ * No local fallback — invalid credentials are rejected, not bypassed.
  */
 export async function loginLocalDemoUser(
   email: string,
   password: string
 ): Promise<LocalAuthResult> {
   const normEmail = email.trim().toLowerCase();
-  const hasEnv = Boolean(import.meta.env.VITE_SUPABASE_URL && import.meta.env.VITE_SUPABASE_ANON_KEY);
 
-  if (hasEnv) {
-    try {
-      const { data, error } = await supabase.auth.signInWithPassword({
-        email: normEmail,
-        password,
-      });
+  if (!import.meta.env.VITE_SUPABASE_URL || !import.meta.env.VITE_SUPABASE_ANON_KEY) {
+    return {
+      success: false,
+      error: "Authentication service is not configured. Please contact support.",
+    };
+  }
 
-      if (error) {
-        const msg = error.message.toLowerCase();
-        if (msg.includes("invalid login credentials") || msg.includes("invalid")) {
-          return {
-            success: false,
-            error: "Invalid email or password. Please try again.",
-          };
-        }
-        if (msg.includes("email not confirmed")) {
-          return {
-            success: false,
-            error: "Please confirm your email before signing in. Check your inbox for the confirmation link.",
-          };
-        }
-        if (!msg.includes("fetch") && !msg.includes("network")) {
-          return { success: false, error: error.message };
-        }
-      } else if (data?.user) {
+  try {
+    const { data, error } = await supabase.auth.signInWithPassword({
+      email: normEmail,
+      password,
+    });
+
+    if (error) {
+      const msg = error.message.toLowerCase();
+      if (msg.includes("invalid login credentials") || msg.includes("invalid")) {
         return {
-          success: true,
-          user: {
-            id: data.user.id,
-            email: data.user.email!,
-            user_metadata: (data.user.user_metadata as any) ?? {
-              registration_role: "company_owner",
-              full_name: "",
-            },
-          },
+          success: false,
+          error: "Invalid email or password. Please check your credentials and try again.",
         };
       }
-    } catch (err: any) {
-      console.warn("Supabase auth unavailable, falling back to local auth:", err);
-    }
-  }
-
-  // ══ LOCAL FALLBACK FOR DEVELOPMENT / LOCALHOST ══
-  const storedRaw = localStorage.getItem(`sannidh_local_user_${normEmail}`);
-  if (storedRaw) {
-    try {
-      const stored = JSON.parse(storedRaw);
-      if (stored.password && stored.password !== password) {
-        return { success: false, error: "Invalid password for local account." };
+      if (msg.includes("email not confirmed")) {
+        return {
+          success: false,
+          error: "Your email is not confirmed yet. Please check your inbox for the confirmation link.",
+        };
       }
-      localStorage.setItem("sannidh_current_user", JSON.stringify(stored));
-      localStorage.setItem("current_user_role", stored.user_metadata.registration_role || "company_owner");
-      return { success: true, user: stored };
-    } catch { /* ignore */ }
-  }
+      if (msg.includes("too many requests")) {
+        return {
+          success: false,
+          error: "Too many login attempts. Please wait a few minutes and try again.",
+        };
+      }
+      return { success: false, error: error.message };
+    }
 
-  // Auto-generate local account for testing
-  const mockUser = {
-    id: `local-${Date.now()}`,
-    email: normEmail,
-    user_metadata: {
-      registration_role: "company_owner",
-      full_name: normEmail.split("@")[0],
-    },
-  };
-  localStorage.setItem("sannidh_current_user", JSON.stringify(mockUser));
-  localStorage.setItem("current_user_role", "company_owner");
-  return { success: true, user: mockUser };
+    if (!data?.user) {
+      return { success: false, error: "Login failed. Please try again." };
+    }
+
+    return {
+      success: true,
+      user: {
+        id: data.user.id,
+        email: data.user.email!,
+        user_metadata: (data.user.user_metadata as any) ?? {
+          registration_role: "company_owner",
+          full_name: "",
+        },
+      },
+    };
+  } catch (err: any) {
+    console.error("Login error:", err);
+    return {
+      success: false,
+      error: err?.message || "Login failed. Please check your connection and try again.",
+    };
+  }
 }
 
 /**
- * Check if we should use local demo mode
+ * Returns the correct dashboard route based on the user's role.
+ * Used after login/registration to redirect to the right dashboard.
+ */
+export function getDashboardRoute(role: string): string {
+  switch (role) {
+    case "external_ca":
+      return "/dashboards/external-ca/full";
+    case "in_house_ca":
+      return "/dashboards/inhouse-ca";
+    case "ca_firm":
+      return "/dashboards/ca-firm";
+    case "in_house_lawyer":
+      return "/dashboards/lawyer";
+    case "admin":
+      return "/dashboards/admin";
+    case "company_owner":
+    default:
+      return "/real-company-dashboard";
+  }
+}
+
+/**
+ * Check if we should use local demo mode (only for explicitly flagged preview builds)
  */
 export function shouldUseLocalDemo(): boolean {
   return import.meta.env.VITE_ENABLE_PREVIEW_BYPASS === "true";
 }
 
 /**
- * Get demo dashboard data based on role
+ * Get demo dashboard data based on role (used only in DEMO dashboards, not real ones)
  */
 export function getDemoDashboardData(role: string) {
   const baseData = {
@@ -256,13 +226,12 @@ export function getDemoDashboardData(role: string) {
     case "company_owner":
       return {
         ...baseData,
-        company: { 
-          name: "Your Company", 
-          industry: "Technology", 
-          compliance_health: 0,
-          setup_required: true 
+        company: {
+          name: "Your Company",
+          industry: "Technology",
+          compliance_score: 72,
+          health_status: "good",
         },
-        exposures: [],
         tasks: [],
         documents: [],
         deadlines: [],
@@ -302,7 +271,7 @@ export function getDemoDashboardData(role: string) {
         drafts: [],
         systemHealth: {
           api: "healthy",
-          database: "healthy", 
+          database: "healthy",
           auth: "healthy",
           storage: "healthy",
         },

@@ -46,6 +46,10 @@ import { runFullZeroPenaltyAudit, type ZeroPenaltyReport, type ExceptionAlert } 
 import { getAutonomousSyncStatus, type AutonomousSyncStatusBar } from "@/services/autonomousIngestionService";
 import { DataIngestionModal } from "./DataIngestionModal";
 import { useFinancialEngineStore } from '@/stores/useFinancialEngineStore';
+import {
+  DEMO_INVOICES, DEMO_PURCHASES, DEMO_EXPENSES,
+  DEMO_PAYROLL, DEMO_BANK_TXNS, DEMO_INVENTORY
+} from "@/data/demo-data";
 
 // ─── PROPS ────────────────────────────────────────────────────────────────────
 
@@ -491,16 +495,16 @@ export function RealERPModule({ companyId, companyName }: Props) {
       );
       setIsLiveData(hasLive);
 
-      // Use Supabase data if it has rows; otherwise fall back to localStorage
-      const finalInvoices  = (liveInv  && liveInv.length  > 0) ? liveInv  : lsInvoices;
-      const finalPurchases = (livePur  && livePur.length  > 0) ? livePur  : lsPurchases;
-      const finalExpenses  = (liveExp  && liveExp.length  > 0) ? liveExp  : lsExpenses;
-      const finalPayroll   = (livePay  && livePay.length  > 0) ? livePay  : lsPayroll;
-      const finalBankTxns  = (liveBank && liveBank.length > 0) ? liveBank : lsBankTxns;
-      const finalInventory = liveInvStk ?? [];
+      const isDemoMode = !companyId || companyId.includes("demo");
+      const finalInvoices  = (liveInv  && liveInv.length  > 0) ? liveInv  : (lsInvoices.length > 0 ? lsInvoices : (isDemoMode ? DEMO_INVOICES : []));
+      const finalPurchases = (livePur  && livePur.length  > 0) ? livePur  : (lsPurchases.length > 0 ? lsPurchases : (isDemoMode ? DEMO_PURCHASES : []));
+      const finalExpenses  = (liveExp  && liveExp.length  > 0) ? liveExp  : (lsExpenses.length > 0 ? lsExpenses : (isDemoMode ? DEMO_EXPENSES : []));
+      const finalPayroll   = (livePay  && livePay.length  > 0) ? livePay  : (lsPayroll.length > 0 ? lsPayroll : (isDemoMode ? DEMO_PAYROLL : []));
+      const finalBankTxns  = (liveBank && liveBank.length > 0) ? liveBank : (lsBankTxns.length > 0 ? lsBankTxns : (isDemoMode ? DEMO_BANK_TXNS : []));
+      const finalInventory = (liveInvStk && liveInvStk.length > 0) ? liveInvStk : (isDemoMode ? DEMO_INVENTORY : []);
 
       if (finalBankTxns.length > 0) {
-        console.log(`[RealERP] Loaded ${finalBankTxns.length} bank txns (source: ${liveBank ? 'Supabase' : 'localStorage'})`);
+        console.log(`[RealERP] Loaded ${finalBankTxns.length} bank txns (source: ${liveBank ? 'Supabase' : (lsBankTxns.length > 0 ? 'localStorage' : 'demo')})`);
       }
 
       setInvoices(finalInvoices);

@@ -156,7 +156,7 @@ class EnhancedAuthService {
           id: session.user.id,
           email: session.user.email || '',
           full_name: meta.full_name || '',
-          registration_role: meta.registration_role || 'company_owner',
+          registration_role: meta.registration_role || '',
           verification_entity_name: meta.verification_entity_name,
           email_verified: !!session.user.email_confirmed_at,
           profile_completed: true,
@@ -181,7 +181,7 @@ class EnhancedAuthService {
         this.currentUser = null;
         this.clearStoredAuth();
       }
-      // If token refresh fails in background, preserve local stored user for demo continuity
+      // TOKEN_REFRESHED and other background events preserve current state
     });
   }
 
@@ -194,7 +194,7 @@ class EnhancedAuthService {
       id: supabaseUser.id,
       email: supabaseUser.email || '',
       full_name: meta.full_name || '',
-      registration_role: meta.registration_role || 'company_owner',
+      registration_role: meta.registration_role || '',
       verification_entity_name: meta.verification_entity_name,
       email_verified: !!supabaseUser.email_confirmed_at,
       profile_completed: true,

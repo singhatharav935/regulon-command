@@ -45,12 +45,14 @@ const Footer = () => {
 
           {/* Company */}
           <div>
-            <h4 className="text-sm font-semibold text-foreground mb-4">Company</h4>
+            <h4 className="text-sm font-semibold text-foreground mb-4">Explore</h4>
             <ul className="space-y-3">
-              <li><Link to="/about" className="text-sm text-muted-foreground hover:text-foreground transition-colors">About</Link></li>
+              <li><Link to="/for-business-owners" className="text-sm text-emerald-400/90 hover:text-emerald-300 font-medium transition-colors">For Business Owners</Link></li>
+              <li><Link to="/for-chartered-accountants" className="text-sm text-indigo-400/90 hover:text-indigo-300 font-medium transition-colors">For Chartered Accountants</Link></li>
+              <li><Link to="/how-it-works" className="text-sm text-purple-400/90 hover:text-purple-300 font-medium transition-colors">How It Works</Link></li>
+              <li><Link to="/about" className="text-sm text-muted-foreground hover:text-foreground transition-colors">About Us</Link></li>
               <li><Link to="/customers" className="text-sm text-muted-foreground hover:text-foreground transition-colors">Customers</Link></li>
               <li><Link to="/security" className="text-sm text-muted-foreground hover:text-foreground transition-colors">Security</Link></li>
-
             </ul>
           </div>
 
