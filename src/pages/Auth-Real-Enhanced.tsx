@@ -100,6 +100,8 @@ const AuthReal = () => {
     // If the user is explicitly trying to register/sign up, don't interrupt them
     // with a verification screen for a stale old user from a previous session.
     if (urlMode === "signup" || urlMode === "register" || urlMode === "multi-step") return;
+    // Don't hijack the email-waiting or multi-step-register screens
+    if (mode === 'email-waiting' || mode === 'multi-step-register') return;
     const user = enhancedAuth.getCurrentUser();
     if (user && !user.email_verified && mode !== 'email-verification') {
       setMode('email-verification');
@@ -113,6 +115,8 @@ const AuthReal = () => {
     const urlMode = searchParams.get("mode");
     // Don't auto-redirect if user is explicitly navigating to signup/register/reset flows
     if (urlMode === "signup" || urlMode === "register" || urlMode === "multi-step" || urlMode === "forgot-password" || urlMode === "reset-password" || urlMode === "verify-email") return;
+    // Don't auto-redirect if user is on the email-waiting or multi-step-register screens
+    if (mode === 'email-waiting' || mode === 'multi-step-register') return;
 
     let cancelled = false;
 
@@ -180,7 +184,7 @@ const AuthReal = () => {
       cancelled = true;
       subscription.unsubscribe();
     };
-  }, [searchParams, navigate]);
+  }, [searchParams, navigate, mode]);
 
   const roleOptions = [
     { value: "company_owner", label: "Company Owner", icon: Building2, description: "Business owner needing compliance management" },
@@ -195,19 +199,18 @@ const AuthReal = () => {
   const getDashboardRoute = (role: string): string => {
     switch (role) {
       case "external_ca":
-        return "/dashboards/external-ca/full";
+        return "/real-external-ca-dashboard";
       case "in_house_ca":
-        return "/dashboards/inhouse-ca";
+        return "/real-inhouse-ca-dashboard";
       case "ca_firm":
         return "/dashboards/ca-firm";
       case "admin":
-        return "/dashboards/admin";
+        return "/admin-dashboard";
       case "in_house_lawyer":
         return "/dashboards/lawyer";
       case "company_owner":
         return "/real-company-dashboard";
       default:
-        // Unknown role — send to auth instead of silently granting access
         return "/auth";
     }
   };
@@ -387,9 +390,13 @@ const AuthReal = () => {
       }
     } catch (error: any) {
       console.error("Registration error:", error);
-      const msg = error?.message || error?.error_description || (typeof error === 'string' ? error : null)
+      const rawMsg = error?.message || error?.error_description || (typeof error === 'string' ? error : null)
         || (error?.code ? `Error code: ${error.code}` : null)
         || "Registration failed. This email may already be registered, or there is a server issue. Please try again or use a different email.";
+      // Replace garbage messages from Supabase 500 errors
+      const msg = (!rawMsg || rawMsg === '{}' || rawMsg === '[object Object]')
+        ? "Our server encountered an error. Please try again in a moment."
+        : rawMsg;
       toast({
         title: "Registration Failed",
         description: msg,
@@ -508,9 +515,13 @@ const AuthReal = () => {
       }, 500);
     } catch (error: any) {
       console.error("Registration error:", error);
-      const msg = error?.message || error?.error_description || (typeof error === 'string' ? error : null)
+      const rawMsg = error?.message || error?.error_description || (typeof error === 'string' ? error : null)
         || (error?.code ? `Error code: ${error.code}` : null)
         || "Registration failed. This email may already be registered, or there is a server issue. Please try again or use a different email.";
+      // Replace garbage messages from Supabase 500 errors
+      const msg = (!rawMsg || rawMsg === '{}' || rawMsg === '[object Object]')
+        ? "Our server encountered an error. Please try again in a moment."
+        : rawMsg;
       toast({
         title: "Registration Failed",
         description: msg,

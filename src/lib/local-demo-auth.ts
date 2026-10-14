@@ -47,7 +47,7 @@ export async function createLocalDemoUser(
   }
 
   try {
-    const redirectUrl = `${window.location.origin}/auth?mode=login&role=${registrationRole}`;
+    const redirectUrl = `${window.location.origin}/auth/callback?role=${registrationRole}`;
 
     const { data, error } = await supabase.auth.signUp({
       email: normEmail,
@@ -63,19 +63,56 @@ export async function createLocalDemoUser(
     });
 
     if (error) {
-      const msg = error.message.toLowerCase();
+      // Supabase can return broken error messages like "{}" or empty strings
+      // when the server returns a 500 (e.g. from a failing handle_new_user trigger).
+      let msg = '';
+      try {
+        msg = typeof error.message === 'string' ? error.message : JSON.stringify(error.message);
+      } catch { msg = ''; }
+      const msgLower = msg.toLowerCase();
+
       if (
-        msg.includes("already registered") ||
-        msg.includes("already been registered") ||
-        msg.includes("user already exists") ||
-        msg.includes("already exists")
+        msgLower.includes("already registered") ||
+        msgLower.includes("already been registered") ||
+        msgLower.includes("user already exists") ||
+        msgLower.includes("already exists")
       ) {
         return {
           success: false,
           error: "An account with this email already exists. Please sign in instead.",
         };
       }
-      return { success: false, error: error.message };
+      if (msgLower.includes("rate limit") || msgLower.includes("too many") || msgLower.includes("after ")) {
+        return {
+          success: false,
+          error: "Too many signup attempts. Please wait a minute and try again.",
+        };
+      }
+      if (msgLower.includes("password") && (msgLower.includes("short") || msgLower.includes("least"))) {
+        return {
+          success: false,
+          error: "Password is too short. Please use at least 8 characters.",
+        };
+      }
+      if (msgLower.includes("email") && msgLower.includes("invalid")) {
+        return {
+          success: false,
+          error: "Please enter a valid email address.",
+        };
+      }
+
+      // Detect HTTP 500/503 or empty/garbage error messages from server
+      const status = (error as any)?.status || (error as any)?.statusCode || 0;
+      const isServerError = status >= 500 || !msg || msg === '{}' || msg === '[object Object]' || msg.trim().length === 0;
+
+      if (isServerError) {
+        return {
+          success: false,
+          error: "Our server encountered an error while creating your account. Please try again in a few seconds. If this persists, contact support.",
+        };
+      }
+
+      return { success: false, error: msg };
     }
 
     if (!data.user) {
@@ -191,15 +228,15 @@ export async function loginLocalDemoUser(
 export function getDashboardRoute(role: string): string {
   switch (role) {
     case "external_ca":
-      return "/dashboards/external-ca/full";
+      return "/real-external-ca-dashboard";
     case "in_house_ca":
-      return "/dashboards/inhouse-ca";
+      return "/real-inhouse-ca-dashboard";
     case "ca_firm":
       return "/dashboards/ca-firm";
     case "in_house_lawyer":
       return "/dashboards/lawyer";
     case "admin":
-      return "/dashboards/admin";
+      return "/admin-dashboard";
     case "company_owner":
     default:
       return "/real-company-dashboard";
