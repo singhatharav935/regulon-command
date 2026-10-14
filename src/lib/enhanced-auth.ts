@@ -286,11 +286,17 @@ class EnhancedAuthService {
     });
 
     if (error) {
-      const msg = error.message.toLowerCase();
-      if (msg.includes('already registered') || msg.includes('already exists')) {
+      const msg = typeof error.message === 'string' ? error.message : '';
+      const msgLower = msg.toLowerCase();
+      if (msgLower.includes('already registered') || msgLower.includes('already exists')) {
         throw new Error('An account with this email already exists. Please sign in instead.');
       }
-      throw new Error(error.message);
+      // Detect 500/empty errors from Supabase trigger failures
+      const status = (error as any)?.status || 0;
+      if (status >= 500 || !msg || msg === '{}' || msg === '[object Object]') {
+        throw new Error('Server error while creating account. Please try again in a moment.');
+      }
+      throw new Error(msg || 'Registration failed. Please try again.');
     }
 
     if (!data.user) {
