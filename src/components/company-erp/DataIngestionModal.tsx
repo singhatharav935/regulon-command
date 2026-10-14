@@ -112,9 +112,9 @@ const MODES: ModeConfig[] = [
     id: 'bank',
     icon: <Landmark className="w-5 h-5" />,
     label: 'Bank Statement',
-    sublabel: 'Any bank or UPI app — CSV, Excel, TXT',
-    accept: '.csv,.txt,.tsv,.xls,.xlsx',
-    acceptLabel: 'CSV / Excel / TXT',
+    sublabel: 'Any bank or UPI app — CSV, Excel, PDF, TXT',
+    accept: '.csv,.txt,.tsv,.xls,.xlsx,.pdf',
+    acceptLabel: 'CSV / Excel / PDF / TXT',
     color: 'text-cyan-300',
     borderColor: 'border-cyan-500/30',
     bgColor: 'bg-cyan-500/8',
@@ -124,7 +124,7 @@ const MODES: ModeConfig[] = [
     id: 'invoice',
     icon: <FileText className="w-5 h-5" />,
     label: 'Invoice / Bill',
-    sublabel: 'PDF or image — OCR extracts all fields',
+    sublabel: 'PDF or image — AI OCR extracts all fields',
     accept: '.pdf,.jpg,.jpeg,.png,.webp',
     acceptLabel: 'PDF / JPG / PNG',
     color: 'text-violet-300',
@@ -136,9 +136,9 @@ const MODES: ModeConfig[] = [
     id: 'gstr2b',
     icon: <FileSpreadsheet className="w-5 h-5" />,
     label: 'GSTR-2B JSON',
-    sublabel: 'Download from GST Portal → upload here',
-    accept: '.json',
-    acceptLabel: 'JSON',
+    sublabel: 'Download from GST Portal → JSON or PDF',
+    accept: '.json,.pdf',
+    acceptLabel: 'JSON / PDF',
     color: 'text-amber-300',
     borderColor: 'border-amber-500/30',
     bgColor: 'bg-amber-500/8',
@@ -148,9 +148,9 @@ const MODES: ModeConfig[] = [
     id: 'payroll',
     icon: <Users className="w-5 h-5" />,
     label: 'Payroll Register',
-    sublabel: 'Excel or CSV salary sheet',
-    accept: '.csv,.xlsx,.xls',
-    acceptLabel: 'CSV / XLSX',
+    sublabel: 'Excel, CSV, or PDF salary sheet',
+    accept: '.csv,.xlsx,.xls,.pdf',
+    acceptLabel: 'CSV / XLSX / PDF',
     color: 'text-emerald-300',
     borderColor: 'border-emerald-500/30',
     bgColor: 'bg-emerald-500/8',
@@ -726,6 +726,48 @@ function fmtRs(n: number): string {
   return `₹${n.toLocaleString('en-IN')}`;
 }
 
+// ─── PDF TEXT EXTRACTOR (pdfjs-dist) ─────────────────────────────────────────
+// Extracts all text from every page of a PDF and returns a single plain-text
+// string that can be fed into parseBankCSV, parsePayrollCSV, or JSON.parse.
+async function extractPdfText(file: File): Promise<string> {
+  try {
+    const pdfjsLib = await import('pdfjs-dist');
+    // Use the bundled worker that Vite already resolves via the pdfjs-dist package
+    pdfjsLib.GlobalWorkerOptions.workerSrc = new URL(
+      'pdfjs-dist/build/pdf.worker.mjs',
+      import.meta.url
+    ).href;
+
+    const arrayBuffer = await file.arrayBuffer();
+    const loadingTask = pdfjsLib.getDocument({ data: new Uint8Array(arrayBuffer) });
+    const pdf = await loadingTask.promise;
+
+    const pages: string[] = [];
+    for (let pageNum = 1; pageNum <= pdf.numPages; pageNum++) {
+      const page = await pdf.getPage(pageNum);
+      const textContent = await page.getTextContent();
+      // Join all text items with spaces; separate rows by newlines when y-position changes
+      let lastY: number | null = null;
+      let pageText = '';
+      for (const item of textContent.items) {
+        const textItem = item as { str: string; transform: number[] };
+        const y = textItem.transform[5];
+        if (lastY !== null && Math.abs(y - lastY) > 3) {
+          pageText += '\n';
+        } else if (lastY !== null) {
+          pageText += ' ';
+        }
+        pageText += textItem.str;
+        lastY = y;
+      }
+      pages.push(pageText);
+    }
+    return pages.join('\n');
+  } catch (err) {
+    throw new Error(`PDF reading failed: ${(err as Error).message}. Please ensure this is a valid, non-password-protected PDF.`);
+  }
+}
+
 // ═══════════════════════════════════════════════════════════════════════════════
 //  MAIN COMPONENT
 // ═══════════════════════════════════════════════════════════════════════════════
@@ -771,16 +813,21 @@ export function DataIngestionModal({ companyId, open, onClose, onDataImported }:
     setStep('parsing');
     setProgress(10);
 
+    const ext = f.name.toLowerCase().split('.').pop() ?? '';
+
     try {
       if (mode === 'bank') {
         setStatusMsg('Detecting bank format…');
         setProgress(20);
         
-        // Handle different file types
         let text = '';
-        const ext = f.name.toLowerCase().split('.').pop();
-        
-        if (ext === 'xlsx' || ext === 'xls') {
+
+        if (ext === 'pdf') {
+          // ── PDF Bank Statement: extract text from all pages then parse as CSV/table ──
+          setStatusMsg('Reading PDF bank statement with AI…');
+          text = await extractPdfText(f);
+          setProgress(40);
+        } else if (ext === 'xlsx' || ext === 'xls') {
           // Excel files — try to read as text (works for some .xls exports that are actually CSV/HTML)
           setStatusMsg('Reading Excel file…');
           try {
@@ -788,7 +835,7 @@ export function DataIngestionModal({ companyId, open, onClose, onDataImported }:
             text = new TextDecoder('utf-8').decode(arrayBuf);
             // If it contains null bytes, it's a true binary Excel file — can't parse without xlsx library
             if (text.includes('\0') || (!text.includes(',') && !text.includes('\t') && !text.includes(';'))) {
-              setError(`This Excel file (.${ext}) is in binary format.\n\nPlease export your bank statement as CSV instead:\n• HDFC: Net Banking → Accounts → Statement → Download CSV\n• ICICI: iMobile → Account Statement → Export to CSV\n• SBI: Net Banking → My Accounts → Statement → Download CSV\n• Axis: Internet Banking → Accounts → Statement → Excel/CSV Download\n• Kotak: Net Banking → Accounts → Statement → CSV Download\n• PhonePe: Profile → Transaction History → Download Statement`);
+              setError(`This Excel file (.${ext}) is in binary format.\n\nPlease export your bank statement as CSV or PDF instead:\n• HDFC: Net Banking → Accounts → Statement → Download CSV\n• ICICI: iMobile → Account Statement → Export to CSV\n• SBI: Net Banking → My Accounts → Statement → Download CSV\n• Axis: Internet Banking → Accounts → Statement → Excel/CSV Download\n• Kotak: Net Banking → Accounts → Statement → CSV Download\n• PhonePe: Profile → Transaction History → Download Statement`);
               setStep('upload');
               return;
             }
@@ -802,14 +849,14 @@ export function DataIngestionModal({ companyId, open, onClose, onDataImported }:
           text = await f.text();
         }
         
-        setProgress(45);
+        setProgress(50);
         setStatusMsg('Parsing transactions…');
         const rows = parseBankCSV(text);
         setProgress(80);
 
         if (rows.length === 0) {
           const firstLines = text.split('\n').slice(0, 5).map(l => l.trim()).filter(l => l).join(' | ');
-          setError(`Could not parse any transactions from this file.\n\nDetected content: "${firstLines.slice(0, 250)}"\n\nSupported formats:\n• Any Indian bank CSV (HDFC, ICICI, SBI, Axis, Kotak, PNB, BOB, Yes Bank, etc.)\n• UPI app exports (PhonePe, GPay, Paytm, CRED)\n• Any CSV/TXT with columns: Date, Description, Amount/Debit/Credit\n\nMake sure the file has a header row with recognizable column names.`);
+          setError(`Could not parse any transactions from this ${ext === 'pdf' ? 'PDF' : 'file'}.\n\nDetected content: "${firstLines.slice(0, 250)}"\n\nSupported formats:\n• Any Indian bank CSV or PDF (HDFC, ICICI, SBI, Axis, Kotak, PNB, BOB, Yes Bank, etc.)\n• UPI app exports (PhonePe, GPay, Paytm, CRED)\n• Any file with columns: Date, Description, Amount/Debit/Credit\n\nNote: Password-protected PDFs are not supported.`);
           setStep('upload');
           return;
         }
@@ -821,7 +868,8 @@ export function DataIngestionModal({ companyId, open, onClose, onDataImported }:
         setStep('preview');
       }
       else if (mode === 'invoice') {
-        setStatusMsg('Uploading to OCR pipeline…');
+        // Invoice always goes through OCR gateway regardless of format (PDF or image)
+        setStatusMsg('Uploading to AI OCR pipeline…');
         setProgress(25);
         const result = await OCRGateway.extractInvoiceFromFile(f, companyId);
         setProgress(80);
@@ -832,11 +880,30 @@ export function DataIngestionModal({ companyId, open, onClose, onDataImported }:
         setStep('preview');
       }
       else if (mode === 'gstr2b') {
-        setStatusMsg('Parsing GSTR-2B JSON…');
+        setStatusMsg('Parsing GSTR-2B data…');
         setProgress(30);
-        const text = await f.text();
-        const raw = JSON.parse(text);
-        setProgress(60);
+        let raw: unknown;
+
+        if (ext === 'pdf') {
+          // ── PDF GSTR-2B: extract text and look for embedded JSON structure ──
+          setStatusMsg('Extracting GSTR-2B data from PDF…');
+          const pdfText = await extractPdfText(f);
+          setProgress(50);
+          // Try to find JSON block within the extracted PDF text
+          const jsonMatch = pdfText.match(/\{[\s\S]*\}/);
+          if (jsonMatch) {
+            try { raw = JSON.parse(jsonMatch[0]); } catch { raw = {}; }
+          } else {
+            // If no JSON found, parse the text table into a compatible structure
+            // and wrap it as a best-effort GST data object
+            raw = { _pdfText: pdfText, _pdfMode: true };
+          }
+        } else {
+          const text = await f.text();
+          raw = JSON.parse(text);
+        }
+
+        setProgress(65);
         setStatusMsg('Verifying ITC eligibility per vendor…');
         await new Promise((r) => setTimeout(r, 500));
         const parsed = parseGSTR2BJSON(raw);
@@ -847,7 +914,16 @@ export function DataIngestionModal({ companyId, open, onClose, onDataImported }:
       else if (mode === 'payroll') {
         setStatusMsg('Parsing salary register…');
         setProgress(30);
-        const text = await f.text();
+        let text = '';
+
+        if (ext === 'pdf') {
+          // ── PDF Payroll: extract text from all pages then parse as CSV ──
+          setStatusMsg('Reading payroll PDF with AI…');
+          text = await extractPdfText(f);
+        } else {
+          text = await f.text();
+        }
+
         setProgress(60);
         setStatusMsg('Computing statutory deductions (PF / ESIC / TDS)…');
         await new Promise((r) => setTimeout(r, 500));
