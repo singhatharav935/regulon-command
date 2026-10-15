@@ -103,6 +103,7 @@ const OnboardingStep: React.FC<OnboardingStepProps> = ({
 interface MultiStepRegistrationProps {
   onComplete: (formData: RegistrationFormData) => Promise<void>;
   initialRole?: string;
+  onRoleChange?: (role: string) => void;
 }
 
 export interface RegistrationFormData {
@@ -129,6 +130,7 @@ export interface RegistrationFormData {
 export const MultiStepRegistration: React.FC<MultiStepRegistrationProps> = ({
   onComplete,
   initialRole = 'company_owner',
+  onRoleChange,
 }) => {
   const [currentStep, setCurrentStep] = React.useState(0);
   const [isLoading, setIsLoading] = React.useState(false);
@@ -203,6 +205,10 @@ export const MultiStepRegistration: React.FC<MultiStepRegistrationProps> = ({
 
   const updateFormData = (updates: Partial<RegistrationFormData>) => {
     setFormData(prev => ({ ...prev, ...updates }));
+    // Notify parent when role changes so URL and state stay in sync
+    if (updates.registrationRole && onRoleChange) {
+      onRoleChange(updates.registrationRole);
+    }
   };
 
   const steps = React.useMemo(() => {

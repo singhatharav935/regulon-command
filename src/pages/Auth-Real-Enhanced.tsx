@@ -650,6 +650,13 @@ const AuthReal = () => {
       <MultiStepRegistration
         onComplete={handleMultiStepRegistration}
         initialRole={registrationRole}
+        onRoleChange={(newRole) => {
+          setRegistrationRole(newRole);
+          // Update URL to reflect actual role selection
+          const newParams = new URLSearchParams(searchParams);
+          newParams.set('role', newRole);
+          window.history.replaceState({}, '', `${window.location.pathname}?${newParams.toString()}`);
+        }}
       />
     );
   }
