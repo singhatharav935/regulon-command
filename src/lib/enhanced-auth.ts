@@ -270,7 +270,7 @@ class EnhancedAuthService {
       throw new Error(`Password requirements: ${passwordValidation.feedback.join(', ')}`);
     }
 
-    const redirectUrl = `${window.location.origin}/auth/callback?role=${registrationRole}`;
+    const redirectUrl = `${window.location.origin}/auth?mode=login&role=${registrationRole}`;
 
     const { data, error } = await supabase.auth.signUp({
       email: email.trim().toLowerCase(),
@@ -353,88 +353,54 @@ class EnhancedAuthService {
     const hasEnv = Boolean(import.meta.env.VITE_SUPABASE_URL && import.meta.env.VITE_SUPABASE_ANON_KEY);
 
     if (hasEnv) {
-      try {
-        const { data, error } = await supabase.auth.signInWithPassword({
-          email: normEmail,
-          password,
-        });
+      const { data, error } = await supabase.auth.signInWithPassword({
+        email: normEmail,
+        password,
+      });
 
-        if (error) {
-          const msg = error.message.toLowerCase();
-          if (msg.includes('invalid login credentials') || msg.includes('invalid')) {
-            throw new Error('Invalid email or password. Please check your credentials and try again.');
-          }
-          if (msg.includes('email not confirmed')) {
-            throw new Error('Please confirm your email before signing in. Check your inbox for the confirmation link.');
-          }
-          if (!msg.includes('fetch') && !msg.includes('network')) {
-            throw new Error(error.message);
-          }
-        } else if (data.user && data.session) {
-          const authUser = this.buildAuthUser(data.user);
-          const authSession = this.buildAuthSession(data.session);
-
-          const response: AuthResponse = {
-            user: authUser,
-            token: data.session.access_token,
-            refresh_token: data.session.refresh_token,
-            expires_in: data.session.expires_in,
-            message: 'Login successful!',
-            session: authSession,
-          };
-
-          this.storeAuthData(response, rememberMe);
-          if (trustDevice) {
-            localStorage.setItem(`trusted_device_${this.deviceId}`, 'true');
-          }
-          return response;
+      if (error) {
+        const msg = error.message.toLowerCase();
+        if (msg.includes('invalid login credentials') || msg.includes('invalid')) {
+          throw new Error('Invalid email or password. Please check your credentials and try again.');
         }
-      } catch (err: any) {
-        if (err.message && !err.message.toLowerCase().includes('fetch') && !err.message.toLowerCase().includes('network') && !err.message.toLowerCase().includes('credentials')) {
-          throw err;
+        if (msg.includes('email not confirmed')) {
+          throw new Error('Please verify your email before signing in. Check your inbox for the confirmation link.');
         }
+        throw new Error(error.message || 'Login failed. Please try again.');
       }
+
+      if (!data.user || !data.session) {
+        throw new Error('Invalid email or password. Please check your credentials and try again.');
+      }
+
+      // ── Block login if email is not confirmed ──────────────────────────────
+      if (!data.user.email_confirmed_at) {
+        // Sign out the session Supabase just created so they can't sneak in
+        await supabase.auth.signOut({ scope: 'local' });
+        throw new Error('Please verify your email before signing in. Check your inbox for the confirmation link.');
+      }
+
+      const authUser = this.buildAuthUser(data.user);
+      const authSession = this.buildAuthSession(data.session);
+
+      const response: AuthResponse = {
+        user: authUser,
+        token: data.session.access_token,
+        refresh_token: data.session.refresh_token,
+        expires_in: data.session.expires_in,
+        message: 'Login successful!',
+        session: authSession,
+      };
+
+      this.storeAuthData(response, rememberMe);
+      if (trustDevice) {
+        localStorage.setItem(`trusted_device_${this.deviceId}`, 'true');
+      }
+      return response;
     }
 
-    // ══ LOCALHOST FALLBACK FOR REAL COMPANY OWNER LOGIN ══
-    const fallbackUser: AuthUser = {
-      id: `user-${normEmail.replace(/[^a-z0-9]/g, '_')}`,
-      email: normEmail,
-      full_name: normEmail.split('@')[0].toUpperCase(),
-      registration_role: 'company_owner',
-      email_verified: true,
-      status: 'active',
-      created_at: new Date().toISOString(),
-      updated_at: new Date().toISOString(),
-    };
-
-    const fallbackSession: AuthSession = {
-      user_id: fallbackUser.id,
-      token: `local-token-${Date.now()}`,
-      refresh_token: `local-refresh-${Date.now()}`,
-      expires_at: Date.now() + 86400000,
-      device_id: this.deviceId,
-    };
-
-    const response: AuthResponse = {
-      user: fallbackUser,
-      token: fallbackSession.token,
-      refresh_token: fallbackSession.refresh_token,
-      expires_in: 86400,
-      message: 'Logged in via local session',
-      session: fallbackSession,
-    };
-
-    this.storeAuthData(response, rememberMe);
-    if (trustDevice) {
-      localStorage.setItem(`trusted_device_${this.deviceId}`, 'true');
-    }
-    return response;
-
-    // Reset suspicious activity score on successful login
-    this.suspiciousActivityScore = 0;
-
-    return response;
+    // ── No Supabase env configured — strict block (no fake sessions) ─────────
+    throw new Error('Authentication service is not configured. Please contact support.');
   }
 
   /**
@@ -619,7 +585,7 @@ class EnhancedAuthService {
       type: 'signup',
       email,
       options: {
-        emailRedirectTo: `${window.location.origin}/auth/callback`,
+        emailRedirectTo: `${window.location.origin}/auth?mode=login`,
       },
     });
 

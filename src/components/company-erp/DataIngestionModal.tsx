@@ -208,17 +208,31 @@ type Step = 'select_mode' | 'upload' | 'parsing' | 'preview' | 'saving' | 'done'
 //  Supports: HDFC, ICICI, SBI, Axis, Kotak, Yes Bank, PNB, BOB formats
 // ═══════════════════════════════════════════════════════════════════════════════
 
-function detectBankFormat(headers: string[]): 'hdfc' | 'icici' | 'sbi' | 'axis' | 'kotak' | 'phonepe' | 'gpay' | 'paytm' | 'generic' {
+function detectBankFormat(headers: string[]): 'hdfc' | 'icici' | 'sbi' | 'axis' | 'kotak' | 'union' | 'canara' | 'indusind' | 'federal' | 'idbi' | 'bandhan' | 'phonepe' | 'gpay' | 'paytm' | 'cred' | 'generic' {
   const h = headers.join('|').toLowerCase();
+  // ── Traditional Bank CSV / PDF formats ──
   if (h.includes('withdrawal amt') || (h.includes('narration') && h.includes('chqrefno'))) return 'hdfc';
   if (h.includes('transaction date') && h.includes('transaction remarks') && h.includes('withdrawal amount')) return 'icici';
   if (h.includes('txn date') && h.includes('description') && h.includes('debit')) return 'axis';
   if (h.includes('transaction id') && h.includes('value date') && h.includes('transaction remarks')) return 'kotak';
   if (h.includes('tran date') && h.includes('particulars') && h.includes('debit')) return 'sbi';
-  // PhonePe / GPay / Paytm / UPI Wallets
-  if (h.includes('phonepe') || (h.includes('you paid') || h.includes('paid to') || h.includes('received from'))) return 'phonepe';
+  // Union Bank of India UPI / Net Banking statement
+  if (h.includes('pay/collect') || h.includes('dr/cr sta') || (h.includes('sender') && h.includes('receiver') && h.includes('bank name'))) return 'union';
+  // Canara Bank
+  if (h.includes('canara') || (h.includes('tran id') && h.includes('particulars') && h.includes('withdrawal'))) return 'canara';
+  // IndusInd Bank
+  if (h.includes('indusind') || (h.includes('txn date') && h.includes('txn description') && h.includes('debit amount'))) return 'indusind';
+  // Federal Bank
+  if (h.includes('federal') || (h.includes('posting date') && h.includes('transaction description') && h.includes('withdrawal'))) return 'federal';
+  // IDBI Bank
+  if (h.includes('idbi') || (h.includes('value date') && h.includes('transaction details') && h.includes('debit'))) return 'idbi';
+  // Bandhan Bank
+  if (h.includes('bandhan') || (h.includes('instrument no') && h.includes('debit') && h.includes('credit'))) return 'bandhan';
+  // ── UPI Wallets ──
+  if (h.includes('phonepe') || h.includes('you paid') || h.includes('paid to') || h.includes('received from')) return 'phonepe';
   if (h.includes('google pay') || h.includes('gpay')) return 'gpay';
   if (h.includes('paytm')) return 'paytm';
+  if (h.includes('cred')) return 'cred';
   return 'generic';
 }
 
@@ -308,13 +322,21 @@ function parseBankCSV(text: string): ParsedBankRow[] {
   // Score each line by how many "financial column" keywords it matches.
   // Real headers have 3+ keywords across 3+ non-empty columns.
   const HEADER_KEYWORDS = [
-    'date', 'value date', 'txn date', 'transaction date', 'tran date', 'posting date',
+    // Date variants
+    'date', 'date time', 'value date', 'txn date', 'tran date', 'transaction date', 'posting date',
+    // Amount variants — including Union Bank UPI "pay/collect"
     'amount', 'debit', 'credit', 'withdrawal', 'deposit', 'balance',
+    'pay/collect', 'pay collect', 'amount in rs',
+    // Description variants — including Union Bank "sender" / "receiver"
     'narration', 'description', 'particulars', 'remarks', 'details',
     'transaction details', 'transaction remarks', 'transaction type',
-    'activity', 'chq', 'cheque', 'ref', 'reference',
+    'sender', 'receiver', 'bank name', 'vpa',
+    // Reference / misc
+    'activity', 'chq', 'cheque', 'ref', 'reference', 'payment id',
     'utr', 'time', 'type', 'category', 'mode',
-    'dr', 'cr', 'paid', 'received', 'closing balance',
+    // DR/CR — including Union Bank "dr/cr status"
+    'dr', 'cr', 'dr/cr', 'dr/cr status', 'dr cr',
+    'paid', 'received', 'closing balance',
     'opening balance', 'running balance', 'available balance',
     'withdrawal amount', 'deposit amount', 'txn amount',
   ];
@@ -393,14 +415,21 @@ function parseBankCSV(text: string): ParsedBankRow[] {
     if ((h.includes('credit') && h.includes('debit')) || h.includes('instrument') || h.includes('mode')) poisonCols.push(i);
   });
 
-  let dateCol = findCol(['date', 'txn date', 'tran date', 'transaction date', 'posting date', 'value date']);
-  let descCol = findCol(['transaction details', 'narration', 'description', 'activity', 'particulars', 'remarks', 'transaction remarks', 'details']);
-  let debitCol = findCol(['withdrawal amt', 'withdrawal amount', 'withdrawal', 'debit amount', 'debit amt', 'debit', 'dr amount', 'dr amt', 'dr'], poisonCols);
-  let creditCol = findCol(['deposit amt', 'deposit amount', 'deposit', 'credit amount', 'credit amt', 'credit', 'cr amount', 'cr amt', 'cr'], poisonCols);
+  // ── UPI/Union Bank: "pay/collect" columns contain BOTH pay & collect — exclude from debit/credit matching
+  headers.forEach((h, i) => {
+    if (h.includes('pay') && h.includes('collect')) poisonCols.push(i);
+  });
+
+  let dateCol    = findCol(['date time', 'date', 'txn date', 'tran date', 'transaction date', 'posting date', 'value date']);
+  let descCol    = findCol(['transaction details', 'narration', 'description', 'activity', 'particulars', 'remarks', 'transaction remarks', 'details', 'sender', 'receiver', 'bank name', 'vpa']);
+  let debitCol   = findCol(['withdrawal amt', 'withdrawal amount', 'withdrawal', 'debit amount', 'debit amt', 'debit', 'dr amount', 'dr amt', 'dr'], poisonCols);
+  let creditCol  = findCol(['deposit amt', 'deposit amount', 'deposit', 'credit amount', 'credit amt', 'credit', 'cr amount', 'cr amt', 'cr'], poisonCols);
   let balanceCol = findCol(['balance after transaction', 'closing balance', 'running balance', 'available balance', 'balance after', 'balance']);
-  let amountCol = findCol(['amount', 'transaction amount', 'txn amount', 'txn amt']);
-  let typeCol = findCol(['transaction type', 'txn type', 'type', 'crdr', 'cr/dr', 'cr dr', 'drcr']);
+  let amountCol  = findCol(['pay/collect amount', 'pay collect amount', 'amount (in rs', 'amount in rs', 'amount', 'transaction amount', 'txn amount', 'txn amt'], poisonCols);
+  let typeCol    = findCol(['dr/cr sta', 'dr/cr status', 'dr/cr', 'transaction type', 'txn type', 'type', 'crdr', 'cr/dr', 'cr dr', 'drcr']);
   const categoryCol = findCol(['category', 'classification']);
+  // UPI: Payment ID / Reference Number column (skip for parsing, just identify to avoid confusion)
+  const refCol   = findCol(['payment id', 'reference number', 'upi ref', 'upi transaction id', 'transaction id']);
 
   // ─── STEP 5B: AUTO-DETECT COLUMNS FROM DATA when headers are non-standard ──
   if (headerIdx === -2 || (dateCol === -1 && headers.length > 0)) {
@@ -486,8 +515,8 @@ function parseBankCSV(text: string): ParsedBankRow[] {
     const d = desc.toLowerCase();
     
     // Check type column first
-    if (typ.includes('debit') || typ === 'dr' || typ === 'd' || typ.includes('paid') || typ.includes('sent') || typ.includes('purchase') || typ.includes('withdrawal')) return 'debit';
-    if (typ.includes('credit') || typ === 'cr' || typ === 'c' || typ.includes('received') || typ.includes('refund') || typ.includes('cashback') || typ.includes('deposit')) return 'credit';
+    if (typ.includes('debit') || typ === 'dr' || typ === 'd' || typ.includes('paid') || typ.includes('sent') || typ.includes('purchase') || typ.includes('withdrawal') || typ === 'pay') return 'debit';
+    if (typ.includes('credit') || typ === 'cr' || typ === 'c' || typ.includes('received') || typ.includes('refund') || typ.includes('cashback') || typ.includes('deposit') || typ === 'collect') return 'credit';
     
     // Check amount suffix
     if (amt.endsWith('dr') || amt.endsWith('debit')) return 'debit';
@@ -526,6 +555,9 @@ function parseBankCSV(text: string): ParsedBankRow[] {
         .filter((c, idx) => idx !== dateCol && c.length > 3 && !tryParseDate(c) && tryParseMoney(c) === 0)
         .sort((a, b) => b.length - a.length)[0] || 'Transaction';
     }
+
+    // Also add refCol to poisonCols so numeric-looking reference IDs don't get confused with amounts
+    if (refCol >= 0) poisonCols.push(refCol);
 
     // Get debit/credit amounts
     let debit = 0;
@@ -727,12 +759,20 @@ function fmtRs(n: number): string {
 }
 
 // ─── PDF TEXT EXTRACTOR (pdfjs-dist) ─────────────────────────────────────────
-// Extracts all text from every page of a PDF and returns a single plain-text
-// string that can be fed into parseBankCSV, parsePayrollCSV, or JSON.parse.
+// Extracts all text from every page of a PDF and returns tab-separated plain
+// text rows that parseBankCSV / parsePayrollCSV can process correctly.
+//
+// Algorithm:
+//   1. Collect every text item's str, x (left edge), y (baseline), and width
+//   2. Group items into visual rows by y-position (within 6pt tolerance)
+//   3. Sort rows top→bottom; sort items within each row left→right
+//   4. Between consecutive items in the same row: if the horizontal GAP
+//      (= nextItem.x − (prevItem.x + prevItem.width)) exceeds 8pt we emit
+//      a TAB (’\t’) to signal a new column, otherwise a normal space.
+//   5. Filter out rows that are purely table-border characters (| — − etc.)
 async function extractPdfText(file: File): Promise<string> {
   try {
     const pdfjsLib = await import('pdfjs-dist');
-    // Use the bundled worker that Vite already resolves via the pdfjs-dist package
     pdfjsLib.GlobalWorkerOptions.workerSrc = new URL(
       'pdfjs-dist/build/pdf.worker.mjs',
       import.meta.url
@@ -742,27 +782,68 @@ async function extractPdfText(file: File): Promise<string> {
     const loadingTask = pdfjsLib.getDocument({ data: new Uint8Array(arrayBuffer) });
     const pdf = await loadingTask.promise;
 
-    const pages: string[] = [];
+    const allPageLines: string[] = [];
+
     for (let pageNum = 1; pageNum <= pdf.numPages; pageNum++) {
       const page = await pdf.getPage(pageNum);
       const textContent = await page.getTextContent();
-      // Join all text items with spaces; separate rows by newlines when y-position changes
-      let lastY: number | null = null;
-      let pageText = '';
+
+      // ── STEP 1: Collect items with x, y, width ────────────────────────────
+      type PdfItem = { text: string; x: number; y: number; w: number };
+      const items: PdfItem[] = [];
       for (const item of textContent.items) {
-        const textItem = item as { str: string; transform: number[] };
-        const y = textItem.transform[5];
-        if (lastY !== null && Math.abs(y - lastY) > 3) {
-          pageText += '\n';
-        } else if (lastY !== null) {
-          pageText += ' ';
-        }
-        pageText += textItem.str;
-        lastY = y;
+        const ti = item as { str: string; transform: number[]; width: number };
+        const t = ti.str;
+        if (!t || !t.trim()) continue;
+        items.push({
+          text: t,
+          x: ti.transform[4],          // left edge
+          y: ti.transform[5],          // baseline (PDF y is bottom-up)
+          w: ti.width ?? t.length * 5, // actual rendered width in pts
+        });
       }
-      pages.push(pageText);
+
+      if (items.length === 0) continue;
+
+      // ── STEP 2: Group into rows by y-position (6pt tolerance) ─────────────
+      items.sort((a, b) => b.y - a.y); // descending y = top-to-bottom visually
+
+      const rows: Array<{ y: number; items: PdfItem[] }> = [];
+      for (const item of items) {
+        const existing = rows.find(r => Math.abs(r.y - item.y) <= 6);
+        if (existing) {
+          existing.items.push(item);
+        } else {
+          rows.push({ y: item.y, items: [item] });
+        }
+      }
+
+      // ── STEP 3: Sort items in each row left → right ───────────────────────
+      for (const row of rows) row.items.sort((a, b) => a.x - b.x);
+
+      // ── STEP 4: Build each line, inserting TAB when gap > 8pt ─────────────
+      for (const row of rows) {
+        const parts = row.items;
+        if (parts.length === 0) continue;
+
+        let line = parts[0].text;
+        for (let i = 1; i < parts.length; i++) {
+          const prev = parts[i - 1];
+          const curr = parts[i];
+          // gap = space between right-edge of previous item and left-edge of current
+          const gap = curr.x - (prev.x + prev.w);
+          // Gap > 8pt = different columns in the table → use tab
+          line += gap > 8 ? '\t' + curr.text : ' ' + curr.text;
+        }
+
+        // ── STEP 5: Skip pure-border rows (only |, ─, −, -, _, = chars) ──────
+        if (/^[|\-─−=_\s]+$/.test(line)) continue;
+
+        allPageLines.push(line.trim());
+      }
     }
-    return pages.join('\n');
+
+    return allPageLines.join('\n');
   } catch (err) {
     throw new Error(`PDF reading failed: ${(err as Error).message}. Please ensure this is a valid, non-password-protected PDF.`);
   }
@@ -1292,7 +1373,7 @@ export function DataIngestionModal({ companyId, open, onClose, onDataImported }:
                 </div>
                 {mode === 'bank' && (
                   <div className="flex flex-wrap gap-2 justify-center">
-                    {['HDFC', 'ICICI', 'SBI', 'Axis', 'Kotak', 'PNB', 'BOB', 'Yes Bank'].map((b) => (
+                    {['HDFC', 'ICICI', 'SBI', 'Axis', 'Kotak', 'PNB', 'BOB', 'Yes Bank', 'Union Bank', 'Canara', 'IndusInd', 'Federal', 'IDBI', 'Bandhan', 'PhonePe', 'GPay', 'Paytm', 'CRED'].map((b) => (
                       <Badge key={b} variant="outline" className="text-[10px] border-white/15 text-muted-foreground px-2 py-0.5">
                         {b}
                       </Badge>

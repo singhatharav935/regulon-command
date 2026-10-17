@@ -660,6 +660,20 @@ export function IntelligentTaxOptimization({ companyId, companyName, demoMode = 
   const [sortBy, setSortBy] = useState<'savings' | 'priority' | 'section'>('savings');
   const [isScanning, setIsScanning] = useState(false);
 
+  // ── Elite Subscription Gate ─────────────────────────────────────────────
+  // Every page load starts LOCKED. Clicking Unlock reveals schemes for this
+  // session only. On refresh → locked again (correct freemium behavior).
+  // In production, this would check real subscription status from backend.
+  const [isEliteUnlocked, setIsEliteUnlocked] = useState(false);
+
+  const handleUnlockElite = useCallback(() => {
+    setIsEliteUnlocked(true);
+    toast({
+      title: '🎉 Elite Access Unlocked!',
+      description: 'Full Tax Optimization Engine is now active. All schemes and strategies revealed.',
+    });
+  }, []);
+
   // Read from Zustand store
   const { invoices, purchases, expenses, payroll, bankTxns, fixedAssets } = useFinancialEngineStore();
 
@@ -896,119 +910,276 @@ export function IntelligentTaxOptimization({ companyId, companyName, demoMode = 
         </CardHeader>
       </Card>
 
-      {/* ── Hero Summary Banner ───────────────────────────── */}
+      {/* ── Hero Summary Banner — ALWAYS VISIBLE (free) ──── */}
       <HeroSummaryBanner summary={summary} />
 
-      {/* ── Before vs After Card ──────────────────────────── */}
+      {/* ── Before vs After Card — ALWAYS VISIBLE (free) ─── */}
       <BeforeAfterCard summary={summary} profile={profile} />
 
-      {/* ── Category Filter Tabs ──────────────────────────── */}
-      <div className="rounded-2xl border border-white/10 bg-slate-950/60 p-2 backdrop-blur-xl shadow-xl">
-        <div className="flex items-center gap-1.5 overflow-x-auto no-scrollbar scrollbar-none py-0.5">
-          {CATEGORY_CONFIGS.map((cat) => {
-            const Icon = cat.icon;
-            const isActive = activeCategory === cat.id;
-            const count = cat.id === 'all'
-              ? optimizations.length
-              : optimizations.filter(o => o.category === cat.id).length;
-            const amount = cat.id === 'all'
-              ? summary.total_savings
-              : summary.category_breakdown.find(b => b.category === cat.id)?.amount || 0;
+      {/* ══════════════════════════════════════════════════════
+          ELITE GATE — scheme details blurred for free users
+      ══════════════════════════════════════════════════════ */}
+      {isEliteUnlocked ? (
+        /* ── UNLOCKED: show full scheme details ─────────── */
+        <>
+          {/* Category Filter Tabs */}
+          <div className="rounded-2xl border border-white/10 bg-slate-950/60 p-2 backdrop-blur-xl shadow-xl">
+            <div className="flex items-center gap-1.5 overflow-x-auto no-scrollbar scrollbar-none py-0.5">
+              {CATEGORY_CONFIGS.map((cat) => {
+                const Icon = cat.icon;
+                const isActive = activeCategory === cat.id;
+                const count = cat.id === 'all'
+                  ? optimizations.length
+                  : optimizations.filter(o => o.category === cat.id).length;
+                return (
+                  <button
+                    key={cat.id}
+                    onClick={() => setActiveCategory(cat.id)}
+                    className={`relative flex items-center gap-2 px-3 py-2 rounded-xl text-xs font-semibold whitespace-nowrap transition-all duration-200 shrink-0 ${
+                      isActive
+                        ? `${cat.bgColor} ${cat.color} border ${cat.borderColor} shadow-md`
+                        : 'text-slate-400 hover:text-slate-200 hover:bg-white/5 border border-transparent'
+                    }`}
+                  >
+                    <Icon className={`w-3.5 h-3.5 ${isActive ? cat.color : 'text-slate-400'}`} />
+                    <span>{cat.label}</span>
+                    <span className={`text-[9px] font-bold px-1.5 py-0.5 rounded-full ${
+                      isActive ? `${cat.bgColor} ${cat.color} ${cat.borderColor}` : 'bg-white/5 text-slate-500'
+                    } border`}>
+                      {count}
+                    </span>
+                  </button>
+                );
+              })}
+            </div>
+          </div>
 
-            return (
-              <button
-                key={cat.id}
-                onClick={() => setActiveCategory(cat.id)}
-                className={`relative flex items-center gap-2 px-3 py-2 rounded-xl text-xs font-semibold whitespace-nowrap transition-all duration-200 shrink-0 ${
-                  isActive
-                    ? `${cat.bgColor} ${cat.color} border ${cat.borderColor} shadow-md`
-                    : 'text-slate-400 hover:text-slate-200 hover:bg-white/5 border border-transparent'
-                }`}
+          {/* Sort & Filter Controls */}
+          <div className="flex items-center justify-between">
+            <div className="flex items-center gap-2">
+              <Button
+                size="sm"
+                variant={showEligibleOnly ? "default" : "outline"}
+                className={`text-xs h-7 ${showEligibleOnly ? 'bg-emerald-600 hover:bg-emerald-500 text-white' : 'border-white/10 text-slate-400'}`}
+                onClick={() => setShowEligibleOnly(!showEligibleOnly)}
               >
-                <Icon className={`w-3.5 h-3.5 ${isActive ? cat.color : 'text-slate-400'}`} />
-                <span>{cat.label}</span>
-                <span className={`text-[9px] font-bold px-1.5 py-0.5 rounded-full ${
-                  isActive ? `${cat.bgColor} ${cat.color} ${cat.borderColor}` : 'bg-white/5 text-slate-500'
-                } border`}>
-                  {count}
-                </span>
-              </button>
-            );
-          })}
-        </div>
-      </div>
+                <Filter className="w-3 h-3 mr-1" />
+                Eligible Only
+              </Button>
+            </div>
+            <div className="flex items-center gap-1.5">
+              <span className="text-[10px] text-muted-foreground">Sort by:</span>
+              {[
+                { id: 'savings' as const, label: 'Savings', icon: IndianRupee },
+                { id: 'priority' as const, label: 'Priority', icon: AlertTriangle },
+                { id: 'section' as const, label: 'Section', icon: BookOpen },
+              ].map(s => (
+                <Button
+                  key={s.id}
+                  size="sm"
+                  variant="ghost"
+                  className={`text-[10px] h-6 px-2 ${sortBy === s.id ? 'text-cyan-400 bg-cyan-500/10' : 'text-slate-500'}`}
+                  onClick={() => setSortBy(s.id)}
+                >
+                  <s.icon className="w-2.5 h-2.5 mr-0.5" />
+                  {s.label}
+                </Button>
+              ))}
+            </div>
+          </div>
 
-      {/* ── Sort & Filter Controls ────────────────────────── */}
-      <div className="flex items-center justify-between">
-        <div className="flex items-center gap-2">
-          <Button
-            size="sm"
-            variant={showEligibleOnly ? "default" : "outline"}
-            className={`text-xs h-7 ${showEligibleOnly ? 'bg-emerald-600 hover:bg-emerald-500 text-white' : 'border-white/10 text-slate-400'}`}
-            onClick={() => setShowEligibleOnly(!showEligibleOnly)}
-          >
-            <Filter className="w-3 h-3 mr-1" />
-            Eligible Only
-          </Button>
-        </div>
-        <div className="flex items-center gap-1.5">
-          <span className="text-[10px] text-muted-foreground">Sort by:</span>
-          {[
-            { id: 'savings' as const, label: 'Savings', icon: IndianRupee },
-            { id: 'priority' as const, label: 'Priority', icon: AlertTriangle },
-            { id: 'section' as const, label: 'Section', icon: BookOpen },
-          ].map(s => (
-            <Button
-              key={s.id}
-              size="sm"
-              variant="ghost"
-              className={`text-[10px] h-6 px-2 ${sortBy === s.id ? 'text-cyan-400 bg-cyan-500/10' : 'text-slate-500'}`}
-              onClick={() => setSortBy(s.id)}
-            >
-              <s.icon className="w-2.5 h-2.5 mr-0.5" />
-              {s.label}
-            </Button>
-          ))}
-        </div>
-      </div>
+          {/* Optimization Cards */}
+          <div className="space-y-3">
+            <AnimatePresence mode="wait">
+              <motion.div
+                key={`${activeCategory}-${showEligibleOnly}-${sortBy}`}
+                initial={{ opacity: 0, y: 6 }}
+                animate={{ opacity: 1, y: 0 }}
+                exit={{ opacity: 0, y: -4 }}
+                transition={{ duration: 0.18 }}
+                className="space-y-3"
+              >
+                {filteredOptimizations.length === 0 ? (
+                  <Card className="border-white/8 bg-card/40 backdrop-blur-xl">
+                    <CardContent className="py-12 text-center">
+                      <Search className="w-8 h-8 text-slate-500 mx-auto mb-3" />
+                      <p className="text-sm font-medium text-muted-foreground">No optimizations found in this category</p>
+                      <p className="text-xs text-slate-500 mt-1">Try changing filters or selecting a different category</p>
+                    </CardContent>
+                  </Card>
+                ) : (
+                  filteredOptimizations.map((opt, idx) => (
+                    <OptimizationCard key={opt.id} opt={opt} index={idx} />
+                  ))
+                )}
+              </motion.div>
+            </AnimatePresence>
+          </div>
 
-      {/* ── Optimization Cards List ───────────────────────── */}
-      <div className="space-y-3">
-        <AnimatePresence mode="wait">
+          {/* Footer Disclaimer */}
+          <div className="p-3 rounded-xl bg-slate-900/50 border border-white/5 text-center">
+            <p className="text-[10px] text-slate-500 leading-relaxed">
+              <Shield className="w-3 h-3 inline mr-1" />
+              All tax optimizations are based on the Income Tax Act 1961, GST Act 2017, MSME Development Act 2006, and applicable
+              State Industrial Policies. Savings are estimated based on your financial data and may vary. Consult with your CA
+              for final verification before filing. Sannidh AI continuously monitors law changes and updates recommendations.
+            </p>
+          </div>
+        </>
+      ) : (
+        /* ── LOCKED: glass blur wall + unlock CTA ────────── */
+        <div className="relative">
+          {/* Blurred preview of scheme tabs & cards (pointer-events disabled) */}
+          <div className="select-none pointer-events-none" style={{ filter: 'blur(6px)', opacity: 0.45 }}>
+            {/* Ghost category tabs */}
+            <div className="rounded-2xl border border-white/10 bg-slate-950/60 p-2 backdrop-blur-xl shadow-xl mb-4">
+              <div className="flex items-center gap-1.5 overflow-x-auto no-scrollbar py-0.5">
+                {CATEGORY_CONFIGS.map((cat) => {
+                  const Icon = cat.icon;
+                  const count = cat.id === 'all'
+                    ? optimizations.length
+                    : optimizations.filter(o => o.category === cat.id).length;
+                  return (
+                    <div
+                      key={cat.id}
+                      className={`flex items-center gap-2 px-3 py-2 rounded-xl text-xs font-semibold whitespace-nowrap shrink-0 ${
+                        cat.id === 'all'
+                          ? `${cat.bgColor} ${cat.color} border ${cat.borderColor}`
+                          : 'text-slate-400 border border-transparent'
+                      }`}
+                    >
+                      <Icon className="w-3.5 h-3.5" />
+                      <span>{cat.label}</span>
+                      <span className="text-[9px] font-bold px-1.5 py-0.5 rounded-full bg-white/5 text-slate-500 border">{count}</span>
+                    </div>
+                  );
+                })}
+              </div>
+            </div>
+
+            {/* Ghost scheme cards — show top 5 blurred */}
+            <div className="space-y-3">
+              {optimizations.slice(0, 6).map((opt, idx) => (
+                <div
+                  key={opt.id}
+                  className="p-4 rounded-2xl border border-white/8 bg-gradient-to-br from-card/60 to-background/80 backdrop-blur-xl"
+                >
+                  <div className="flex items-start justify-between gap-4">
+                    <div className="flex-1 space-y-2">
+                      <div className="flex items-center gap-2">
+                        <div className="w-8 h-8 rounded-xl bg-slate-700/50 border border-white/8" />
+                        <div className="space-y-1">
+                          <div className="h-3 w-48 bg-slate-600/60 rounded" />
+                          <div className="h-2 w-24 bg-slate-700/40 rounded" />
+                        </div>
+                      </div>
+                      <div className="h-2 w-full bg-slate-700/30 rounded" />
+                      <div className="h-2 w-3/4 bg-slate-700/20 rounded" />
+                      <div className="flex gap-2">
+                        <div className="h-5 w-16 bg-slate-700/40 rounded-full" />
+                        <div className="h-5 w-12 bg-slate-700/30 rounded-full" />
+                        <div className="h-5 w-20 bg-slate-700/25 rounded-full" />
+                      </div>
+                    </div>
+                    <div className="text-right shrink-0">
+                      <div className="h-3 w-16 bg-emerald-500/30 rounded mb-1" />
+                      <div className="h-5 w-20 bg-emerald-500/20 rounded" />
+                    </div>
+                  </div>
+                </div>
+              ))}
+            </div>
+          </div>
+
+          {/* Glass overlay gradient */}
+          <div
+            className="absolute inset-0 rounded-2xl"
+            style={{
+              background: 'linear-gradient(to bottom, transparent 0%, rgba(2,6,23,0.7) 30%, rgba(2,6,23,0.97) 60%)',
+              backdropFilter: 'blur(2px)',
+            }}
+          />
+
+          {/* ── UNLOCK CTA ─────────────────────────────────── */}
           <motion.div
-            key={`${activeCategory}-${showEligibleOnly}-${sortBy}`}
-            initial={{ opacity: 0, y: 6 }}
-            animate={{ opacity: 1, y: 0 }}
-            exit={{ opacity: 0, y: -4 }}
-            transition={{ duration: 0.18 }}
-            className="space-y-3"
+            initial={{ opacity: 0, y: 20, scale: 0.97 }}
+            animate={{ opacity: 1, y: 0, scale: 1 }}
+            transition={{ duration: 0.5, ease: 'easeOut' }}
+            className="absolute bottom-0 left-0 right-0 flex flex-col items-center pb-6 px-4 pt-32 z-10"
           >
-            {filteredOptimizations.length === 0 ? (
-              <Card className="border-white/8 bg-card/40 backdrop-blur-xl">
-                <CardContent className="py-12 text-center">
-                  <Search className="w-8 h-8 text-slate-500 mx-auto mb-3" />
-                  <p className="text-sm font-medium text-muted-foreground">No optimizations found in this category</p>
-                  <p className="text-xs text-slate-500 mt-1">Try changing filters or selecting a different category</p>
-                </CardContent>
-              </Card>
-            ) : (
-              filteredOptimizations.map((opt, idx) => (
-                <OptimizationCard key={opt.id} opt={opt} index={idx} />
-              ))
-            )}
-          </motion.div>
-        </AnimatePresence>
-      </div>
+            {/* Scheme category pills — no counts shown */}
+            <div className="flex items-center gap-3 mb-5 flex-wrap justify-center">
+              {[
+                { label: 'Income Tax', color: 'text-emerald-400', bg: 'bg-emerald-500/10 border-emerald-500/20' },
+                { label: 'GST Recovery', color: 'text-blue-400', bg: 'bg-blue-500/10 border-blue-500/20' },
+                { label: 'Central Schemes', color: 'text-amber-400', bg: 'bg-amber-500/10 border-amber-500/20' },
+                { label: 'State Subsidies', color: 'text-orange-400', bg: 'bg-orange-500/10 border-orange-500/20' },
+                { label: 'Director Wealth', color: 'text-violet-400', bg: 'bg-violet-500/10 border-violet-500/20' },
+              ].map(item => (
+                <div key={item.label} className={`flex items-center gap-1.5 px-3 py-1.5 rounded-full border text-xs font-semibold ${item.bg}`}>
+                  <Lock className={`w-3 h-3 ${item.color}`} />
+                  <span className={item.color}>{item.label}</span>
+                </div>
+              ))}
+            </div>
 
-      {/* ── Footer Disclaimer ─────────────────────────────── */}
-      <div className="p-3 rounded-xl bg-slate-900/50 border border-white/5 text-center">
-        <p className="text-[10px] text-slate-500 leading-relaxed">
-          <Shield className="w-3 h-3 inline mr-1" />
-          All tax optimizations are based on the Income Tax Act 1961, GST Act 2017, MSME Development Act 2006, and applicable
-          State Industrial Policies. Savings are estimated based on your financial data and may vary. Consult with your CA
-          for final verification before filing. Sannidh AI continuously monitors law changes and updates recommendations.
-        </p>
-      </div>
+            <div className="text-center mb-5 max-w-lg">
+              <div className="inline-flex items-center gap-2 px-3 py-1 rounded-full bg-amber-500/10 border border-amber-500/20 mb-3">
+                <Crown className="w-3.5 h-3.5 text-amber-400" />
+                <span className="text-xs font-bold text-amber-400">Elite Subscription Required</span>
+              </div>
+              <h3 className="text-xl font-bold text-white mb-2">
+                Unlock 150+ Schemes &amp; Claim{' '}
+                <span className="text-emerald-400">{fmtINR(summary.total_savings)}</span>
+              </h3>
+              <p className="text-sm text-slate-400 leading-relaxed">
+                The exact schemes, legal sections, action steps and CA-ready documents
+                to claim every rupee above are locked to Elite subscribers.
+                Upgrade once — save every year.
+              </p>
+            </div>
+
+            {/* ROI pitch */}
+            <div className="flex items-center gap-2 mb-5 px-4 py-2.5 rounded-xl bg-emerald-500/8 border border-emerald-500/15">
+              <TrendingUp className="w-4 h-4 text-emerald-400 shrink-0" />
+              <p className="text-xs text-emerald-300">
+                <strong>Sannidh ROI:</strong> For a ₹50,000/yr subscription, that's a{' '}
+                <strong className="text-emerald-400">
+                  {Math.round(summary.total_savings / 50000)}x return
+                </strong>{' '}on your investment
+              </p>
+            </div>
+
+            {/* Unlock button */}
+            <motion.button
+              whileHover={{ scale: 1.03 }}
+              whileTap={{ scale: 0.97 }}
+              onClick={handleUnlockElite}
+              className="group relative flex items-center gap-3 px-8 py-4 rounded-2xl font-bold text-base text-white shadow-2xl shadow-emerald-500/25 overflow-hidden"
+              style={{
+                background: 'linear-gradient(135deg, #059669 0%, #0891b2 50%, #7c3aed 100%)',
+              }}
+            >
+              {/* Shimmer */}
+              <span
+                className="absolute inset-0 opacity-0 group-hover:opacity-100 transition-opacity duration-500"
+                style={{
+                  background: 'linear-gradient(90deg, transparent, rgba(255,255,255,0.15), transparent)',
+                  animation: 'shimmer 1.5s infinite',
+                }}
+              />
+              <Unlock className="w-5 h-5" />
+              Unlock &amp; Claim {fmtINR(summary.total_savings)} Now
+              <ArrowUpRight className="w-5 h-5 transition-transform group-hover:translate-x-0.5 group-hover:-translate-y-0.5" />
+            </motion.button>
+
+            <p className="text-[10px] text-slate-600 mt-3">
+              <ShieldCheck className="w-3 h-3 inline mr-1" />
+              All schemes are 100% legal under Indian law. Verified by senior CAs.
+            </p>
+          </motion.div>
+        </div>
+      )}
     </div>
   );
 }

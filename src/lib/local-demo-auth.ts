@@ -63,8 +63,12 @@ export async function createLocalDemoUser(
     });
 
     if (error) {
-      // Supabase can return broken error messages like "{}" or empty strings
-      // when the server returns a 500 (e.g. from a failing handle_new_user trigger).
+      // Log the FULL error so we can debug exactly what Supabase returns
+      console.error('[Sannidh Signup Error] Full error object:', error);
+      console.error('[Sannidh Signup Error] Status:', (error as any)?.status);
+      console.error('[Sannidh Signup Error] Message:', error.message);
+      console.error('[Sannidh Signup Error] Name:', error.name);
+
       let msg = '';
       try {
         msg = typeof error.message === 'string' ? error.message : JSON.stringify(error.message);
@@ -199,6 +203,16 @@ export async function loginLocalDemoUser(
 
     if (!data?.user) {
       return { success: false, error: "Login failed. Please try again." };
+    }
+
+    // ── Block login if email is not confirmed ──────────────────────────────
+    if (!data.user.email_confirmed_at) {
+      // Sign the session out immediately so Supabase doesn't keep it active
+      await supabase.auth.signOut({ scope: 'local' });
+      return {
+        success: false,
+        error: "Please verify your email before signing in. Check your inbox for the confirmation link we sent you.",
+      };
     }
 
     return {

@@ -30,21 +30,23 @@ export const resolveLandingPath = ({
   roles: string[];
   metadataPersona: AppPersona | null;
 }) => {
-  // Ultra-resilient local fallback
-  const localRole = localStorage.getItem("current_user_role") || localStorage.getItem("pending_registration_role") || "company_owner";
-  const effectivePersona = persona ?? metadataPersona ?? (localRole as AppPersona);
+  // Read role from localStorage — set during registration/login
+  const localRole = localStorage.getItem("current_user_role") || localStorage.getItem("pending_registration_role");
+  // effectivePersona: use Supabase session persona first, then metadata, then localStorage, never guess
+  const effectivePersona = persona ?? metadataPersona ?? (localRole as AppPersona | null);
 
   if (effectivePersona === "admin") return "/admin-dashboard";
   if (effectivePersona === "in_house_lawyer") return "/dashboards/lawyer";
   if (effectivePersona === "external_ca") return "/real-external-ca-dashboard";
   if (effectivePersona === "in_house_ca") return "/real-inhouse-ca-dashboard";
   if (effectivePersona === "ca_firm") return "/dashboards/ca-firm";
-
   if (effectivePersona === "company_owner") return "/real-company-dashboard";
 
   if (roles.includes("admin")) return "/admin-dashboard";
   if (roles.includes("manager")) return "/real-external-ca-dashboard";
-  return "/real-company-dashboard";
+
+  // No role found anywhere — send to auth instead of guessing company dashboard
+  return "/auth";
 };
 
 const RoleLandingRoute = () => {
