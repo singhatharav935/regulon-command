@@ -1,4 +1,4 @@
-import { useState, useEffect } from "react";
+import { useState, useEffect, useMemo } from "react";
 import { Link, useNavigate, useLocation } from "react-router-dom";
 import { motion, AnimatePresence } from "framer-motion";
 import { ChevronDown, Menu, X, Shield, Cpu, Building2, Users, Lock, LogIn, LogOut, Landmark, FileCheck, LayoutDashboard, Settings } from "lucide-react";
@@ -98,7 +98,18 @@ const Navbar = () => {
     return null;
   };
 
-  const lsUser = getLocalStorageUser();
+  const lsUser = useMemo(() => {
+    try {
+      const sannidh = localStorage.getItem('sannidh_user');
+      if (sannidh) return JSON.parse(sannidh);
+      const personaUser = localStorage.getItem('persona_session');
+      if (personaUser) return JSON.parse(personaUser);
+      const token = localStorage.getItem('auth_token') || localStorage.getItem('sannidh_auth_token');
+      if (token) return { email: 'user@sannidh.in', full_name: 'Logged-in User' };
+    } catch { return null; }
+    return null;
+  // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [directUser]); // re-check only when auth state changes
   const effectiveUser = directUser || authUser || lsUser;
   const isLoggedIn = !!effectiveUser;
   const dashboardPath = isLoggedIn ? getDashboardRoute(persona) : "/auth?mode=login&role=company_owner";

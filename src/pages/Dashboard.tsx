@@ -46,6 +46,14 @@ import {
   DEMO_PAYROLL, DEMO_BANK_TXNS, DEMO_INVENTORY
 } from "@/data/demo-data";
 
+// ─── Stable mapped arrays (module-level = created once, never recreated) ────
+const CFO_INVOICES   = DEMO_INVOICES.map(i  => ({ amount: i.amount,       gst_amount:  i.gst_amount,  date: i.date, party_name: i.party_name }));
+const CFO_PURCHASES  = DEMO_PURCHASES.map(p => ({ amount: p.amount,       gst_amount:  p.gst_amount,  date: p.date, party_name: p.party_name }));
+const CFO_EXPENSES   = DEMO_EXPENSES.map(e  => ({ amount: e.amount,       category:    e.category,    date: e.date }));
+const CFO_PAYROLL    = DEMO_PAYROLL.map(p   => ({ gross_salary: p.gross_salary, net_salary: p.net_salary, pf_employer: p.pf_employer, esic_employer: p.esic_employer }));
+const CFO_BANK_TXNS  = DEMO_BANK_TXNS.map(t => ({ amount: t.amount,       type:        t.type,        date: t.date }));
+const CFO_BANK_BAL   = DEMO_COMPANY.bank_balance ?? 18500000;
+
 // ─── Tab Content Components ───────────────────────────────────────────────────
 
 function OverviewTab() {
@@ -128,12 +136,12 @@ function CFOTab() {
     <CFOIntelligenceModule
       companyId="demo"
       companyName={DEMO_COMPANY.name}
-      invoices={DEMO_INVOICES.map(i => ({ amount: i.amount, gst_amount: i.gst_amount, date: i.date, party_name: i.party_name }))}
-      purchases={DEMO_PURCHASES.map(p => ({ amount: p.amount, gst_amount: p.gst_amount, date: p.date, party_name: p.party_name }))}
-      expenses={DEMO_EXPENSES.map(e => ({ amount: e.amount, category: e.category, date: e.date }))}
-      payroll={DEMO_PAYROLL.map(p => ({ gross_salary: p.gross_salary, net_salary: p.net_salary, pf_employer: p.pf_employer, esic_employer: p.esic_employer }))}
-      bankTxns={DEMO_BANK_TXNS.map(t => ({ amount: t.amount, type: t.type, date: t.date }))}
-      bankBalance={DEMO_COMPANY.bank_balance ?? 18500000}
+      invoices={CFO_INVOICES}
+      purchases={CFO_PURCHASES}
+      expenses={CFO_EXPENSES}
+      payroll={CFO_PAYROLL}
+      bankTxns={CFO_BANK_TXNS}
+      bankBalance={CFO_BANK_BAL}
     />
   );
 }
