@@ -55,8 +55,9 @@ extracted_*
 docs
 *.md
 
-# Supabase (not needed for frontend build)
-supabase
+# Supabase edge functions (not needed for frontend build)
+# Use /supabase to only exclude root-level dir, NOT src/integrations/supabase/
+/supabase
 
 # Logs
 logs

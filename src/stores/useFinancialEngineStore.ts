@@ -461,13 +461,14 @@ export const useFinancialEngineStore = create<FinancialEngineState>((set, get) =
     });
   },
 
-  // ─ Persist helper (strictly namespaced)
+  // ─ Persist helper (strictly namespaced + legacy keys for backward compat)
   _persistToLocalStorage: () => {
     const { companyId, isDemoMode, bankTxns, invoices, purchases, expenses, payroll, openingBalances, depreciationPolicy, fixedAssets } = get();
     if (typeof window === 'undefined') return;
     const prefix = getStoragePrefix(companyId, isDemoMode);
 
     try {
+      // Namespaced keys (primary)
       localStorage.setItem(`${prefix}_bank_txns`, JSON.stringify(bankTxns));
       localStorage.setItem(`${prefix}_invoices`, JSON.stringify(invoices));
       localStorage.setItem(`${prefix}_purchases`, JSON.stringify(purchases));
@@ -476,38 +477,34 @@ export const useFinancialEngineStore = create<FinancialEngineState>((set, get) =
       localStorage.setItem(`${prefix}_opening_balances`, JSON.stringify(openingBalances));
       localStorage.setItem(`${prefix}_dep_policy`, JSON.stringify(depreciationPolicy));
       localStorage.setItem(`${prefix}_fixed_assets`, JSON.stringify(fixedAssets));
-    } catch {}
-  },
 
-  // ─ Persist to localStorage
-  _persistToLocalStorage: () => {
-    const { companyId, bankTxns, invoices, purchases, expenses, payroll, openingBalances, depreciationPolicy, fixedAssets } = get();
-    if (typeof window === 'undefined' || !companyId) return;
-    try {
-      if (bankTxns.length > 0) {
-        localStorage.setItem(`company_bank_transactions_${companyId}`, JSON.stringify(bankTxns));
-        localStorage.setItem(`sannidh_bank_txns_${companyId}`, JSON.stringify(bankTxns));
-      }
-      if (invoices.length > 0) {
-        localStorage.setItem(`company_invoices_${companyId}`, JSON.stringify(invoices));
-        localStorage.setItem(`sannidh_invoices_${companyId}`, JSON.stringify(invoices));
-      }
-      if (purchases.length > 0) {
-        localStorage.setItem(`company_purchases_${companyId}`, JSON.stringify(purchases));
-        localStorage.setItem(`sannidh_purchases_${companyId}`, JSON.stringify(purchases));
-      }
-      if (expenses.length > 0) {
-        localStorage.setItem(`company_expenses_${companyId}`, JSON.stringify(expenses));
-        localStorage.setItem(`sannidh_expenses_${companyId}`, JSON.stringify(expenses));
-      }
-      if (payroll.length > 0) {
-        localStorage.setItem(`company_payroll_${companyId}`, JSON.stringify(payroll));
-        localStorage.setItem(`sannidh_payroll_${companyId}`, JSON.stringify(payroll));
-      }
-      localStorage.setItem(`sannidh_opening_balances_${companyId}`, JSON.stringify(openingBalances));
-      localStorage.setItem(`sannidh_dep_policy_${companyId}`, JSON.stringify(depreciationPolicy));
-      if (fixedAssets.length > 0) {
-        localStorage.setItem(`company_fixed_assets_${companyId}`, JSON.stringify(fixedAssets));
+      // Legacy keys (backward compatibility)
+      if (companyId) {
+        if (bankTxns.length > 0) {
+          localStorage.setItem(`company_bank_transactions_${companyId}`, JSON.stringify(bankTxns));
+          localStorage.setItem(`sannidh_bank_txns_${companyId}`, JSON.stringify(bankTxns));
+        }
+        if (invoices.length > 0) {
+          localStorage.setItem(`company_invoices_${companyId}`, JSON.stringify(invoices));
+          localStorage.setItem(`sannidh_invoices_${companyId}`, JSON.stringify(invoices));
+        }
+        if (purchases.length > 0) {
+          localStorage.setItem(`company_purchases_${companyId}`, JSON.stringify(purchases));
+          localStorage.setItem(`sannidh_purchases_${companyId}`, JSON.stringify(purchases));
+        }
+        if (expenses.length > 0) {
+          localStorage.setItem(`company_expenses_${companyId}`, JSON.stringify(expenses));
+          localStorage.setItem(`sannidh_expenses_${companyId}`, JSON.stringify(expenses));
+        }
+        if (payroll.length > 0) {
+          localStorage.setItem(`company_payroll_${companyId}`, JSON.stringify(payroll));
+          localStorage.setItem(`sannidh_payroll_${companyId}`, JSON.stringify(payroll));
+        }
+        localStorage.setItem(`sannidh_opening_balances_${companyId}`, JSON.stringify(openingBalances));
+        localStorage.setItem(`sannidh_dep_policy_${companyId}`, JSON.stringify(depreciationPolicy));
+        if (fixedAssets.length > 0) {
+          localStorage.setItem(`company_fixed_assets_${companyId}`, JSON.stringify(fixedAssets));
+        }
       }
     } catch (e) {
       console.warn('[FinancialEngine] localStorage persist failed:', e);
