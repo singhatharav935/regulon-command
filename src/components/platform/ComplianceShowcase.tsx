@@ -6,6 +6,7 @@ import { useState, useRef } from "react";
 import { useNavigate } from "react-router-dom";
 import complianceMeetingImage from "@/assets/compliance-meeting.jpg";
 import registrationDemoVideo from "@/assets/registration-demo.mp4";
+import { DemoPasswordGate } from "@/components/platform/DemoPasswordGate";
 
 const IndianRegulatoryFrameworks = [
   { name: "GST Compliance", icon: "📋", color: "from-blue-500 to-blue-600", coverage: "All States" },
@@ -21,6 +22,10 @@ const ComplianceShowcase = () => {
   const [isVideoPlaying, setIsVideoPlaying] = useState(false);
   const videoRef = useRef<HTMLVideoElement>(null);
   const [selectedFramework, setSelectedFramework] = useState(0);
+  const [passwordGateOpen, setPasswordGateOpen] = useState(false);
+  const [pendingAuthPath, setPendingAuthPath] = useState("/auth?mode=signup&role=company_owner");
+
+  const openGate = (path: string) => { setPendingAuthPath(path); setPasswordGateOpen(true); };
 
   const handlePlayVideo = () => {
     if (videoRef.current) {
@@ -200,7 +205,7 @@ const ComplianceShowcase = () => {
                   
                   <Button 
                     className="mt-4 btn-glow"
-                    onClick={() => navigate("/auth?mode=signup&role=company_owner")}
+                    onClick={() => openGate("/auth?mode=signup&role=company_owner")}
                   >
                     Start Your Journey
                     <ArrowRight className="w-4 h-4 ml-2" />
@@ -268,14 +273,19 @@ const ComplianceShowcase = () => {
               Ready to transform your Indian compliance workflow?
             </p>
             <div className="flex flex-wrap items-center justify-center gap-4">
-              <Button size="lg" className="btn-glow" onClick={() => navigate("/auth?mode=signup&role=company_owner")}>
+              <Button size="lg" className="btn-glow" onClick={() => openGate("/auth?mode=signup&role=company_owner")}>
                 Get Started Free
                 <ArrowRight className="w-4 h-4 ml-2" />
               </Button>
-              <Button size="lg" variant="outline" onClick={() => navigate("/dashboard")}>
+              <Button size="lg" variant="outline" onClick={() => openGate("/dashboard")}>
                 View Live Dashboard
               </Button>
             </div>
+            <DemoPasswordGate
+              isOpen={passwordGateOpen}
+              onClose={() => setPasswordGateOpen(false)}
+              onSuccess={() => navigate(pendingAuthPath)}
+            />
           </div>
         </motion.div>
       </div>

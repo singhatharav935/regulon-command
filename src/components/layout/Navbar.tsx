@@ -7,6 +7,7 @@ import { cn } from "@/lib/utils";
 import { useAuth } from "@/hooks/use-auth";
 import { getDashboardRoute } from "@/lib/dashboard-routes";
 import { supabase } from "@/integrations/supabase/client";
+import { DemoPasswordGate } from "@/components/platform/DemoPasswordGate";
 import { Avatar, AvatarFallback, AvatarImage } from "@/components/ui/avatar";
 import {
   DropdownMenu,
@@ -60,6 +61,10 @@ const Navbar = () => {
   const { displayName, avatarUrl, clearProfile } = useUserProfile();
   const [mobileOpen, setMobileOpen] = useState(false);
   const [activeDropdown, setActiveDropdown] = useState<string | null>(null);
+  const [pwGateOpen, setPwGateOpen] = useState(false);
+  const [pendingPath, setPendingPath] = useState("");
+
+  const openGate = (path: string) => { setPendingPath(path); setPwGateOpen(true); };
 
   // ── Direct Supabase auth listener — bypasses useAuth() timeout issues ──
   const [directUser, setDirectUser] = useState<User | null>(null);
@@ -368,11 +373,11 @@ const Navbar = () => {
               </div>
             ) : (
               <>
-                <Button variant="ghost" size="sm" onClick={() => navigate("/auth?mode=login&role=company_owner")}>
+                <Button variant="ghost" size="sm" onClick={() => openGate("/auth?mode=login&role=company_owner")}>
                   <LogIn className="w-4 h-4 mr-2" />
                   Login
                 </Button>
-                <Button size="sm" className="btn-glow" onClick={() => navigate("/auth?mode=signup&role=company_owner")}>
+                <Button size="sm" className="btn-glow" onClick={() => openGate("/auth?mode=signup&role=company_owner")}>
                   Get Started
                 </Button>
               </>
@@ -504,10 +509,10 @@ const Navbar = () => {
                   </>
                 ) : (
                   <>
-                    <Button variant="outline" className="w-full" onClick={() => { navigate("/auth?mode=login&role=company_owner"); setMobileOpen(false); }}>
+                    <Button variant="outline" className="w-full" onClick={() => { openGate("/auth?mode=login&role=company_owner"); setMobileOpen(false); }}>
                       Login
                     </Button>
-                    <Button className="w-full" onClick={() => { navigate("/auth?mode=signup&role=company_owner"); setMobileOpen(false); }}>
+                    <Button className="w-full" onClick={() => { openGate("/auth?mode=signup&role=company_owner"); setMobileOpen(false); }}>
                       Get Started
                     </Button>
                   </>
@@ -517,6 +522,11 @@ const Navbar = () => {
           </motion.div>
         )}
       </AnimatePresence>
+      <DemoPasswordGate
+        isOpen={pwGateOpen}
+        onClose={() => setPwGateOpen(false)}
+        onSuccess={() => navigate(pendingPath)}
+      />
     </nav>
   );
 };

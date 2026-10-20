@@ -264,5 +264,218 @@ export function analyzePromoterOptimizations(profile: CompanyProfile): TaxOptimi
     color_accent: 'teal'
   });
 
+
+  // ─── 8. Director Medical Insurance — Sec 80D ─────────────────────────────
+  const medInsEligible = hasSalary;
+  const medInsSavings = medInsEligible ? 50000 * 0.30 : 0;
+  optimizations.push({
+    id: 'promoter_80d',
+    category: 'promoter_wealth',
+    section: 'Sec 80D',
+    title: 'Director Medical Insurance — ₹50K Deduction (Sec 80D)',
+    short_description: 'Director gets ₹25K deduction for own health insurance + ₹25K for parents = ₹50K total under Sec 80D.',
+    detailed_explanation: 'Under Section 80D, directors can claim ₹25,000 deduction on health insurance premium paid for self/spouse/children, and an additional ₹25,000 for parents (₹50,000 if parents are senior citizens). The company can also pay this as a tax-free perquisite structuring it as part of the CTC package, reducing director\'s personal tax outgo at 30% slab.',
+    legal_reference: 'Section 80D of Income Tax Act, 1961',
+    eligibility_criteria: ['Director receiving salary', 'Health insurance policy in director\'s name or family', 'Premium paid by cheque/digital mode', 'Policy from IRDA-approved insurer'],
+    is_eligible: medInsEligible,
+    status: medInsEligible ? 'eligible' : 'not_eligible',
+    risk_level: 'safe',
+    priority: medInsEligible ? 'medium' : 'low',
+    estimated_savings: medInsSavings,
+    savings_calculation: medInsEligible ? `₹50,000 deduction * 30% slab = ₹${medInsSavings.toFixed(2)}` : 'N/A',
+    action_items: [
+      { id: '80d_1', label: 'Purchase family floater health insurance policy', type: 'compliance', completed: false },
+      { id: '80d_2', label: 'Claim deduction in director personal ITR', type: 'filing', completed: false }
+    ],
+    documents_required: ['Health Insurance Policy Copy', 'Premium Payment Receipt'],
+    deadline: 'Before 31st March',
+    fy_applicable: fy,
+    tags: ['Health Insurance', 'Director', 'Deduction', 'Personal Tax'],
+    icon_name: 'Heart',
+    color_accent: 'rose'
+  });
+
+  // ─── 9. Leave Travel Concession (LTC) ─────────────────────────────────────
+  const ltcEligible = hasSalary;
+  const ltcSavings = ltcEligible ? Math.min(profile.director_salary * 0.05, 50000) * 0.30 : 0;
+  optimizations.push({
+    id: 'promoter_ltc',
+    category: 'promoter_wealth',
+    section: 'Sec 10(5)',
+    title: 'Leave Travel Concession — Tax-Free Domestic Travel',
+    short_description: 'Director gets tax exemption on actual domestic travel costs for 2 journeys in any block of 4 years.',
+    detailed_explanation: 'Under Section 10(5) of the Income Tax Act, Leave Travel Concession (LTC) allows directors and employees to claim exemption on actual domestic travel expenses (economy class air fare or AC first class train fare) for 2 journeys in any block of 4 years. The current block is 2022–2025. This is best structured as part of the director\'s CTC to reduce taxable salary.',
+    legal_reference: 'Section 10(5) of Income Tax Act, 1961 read with Rule 2B',
+    eligibility_criteria: ['Director receiving salary income', 'Actual domestic travel undertaken within India', 'Travel by economy air/AC first class rail/deluxe bus', '2 journeys in a block of 4 calendar years'],
+    is_eligible: ltcEligible,
+    status: ltcEligible ? 'eligible' : 'not_eligible',
+    risk_level: 'safe',
+    priority: ltcEligible ? 'low' : 'low',
+    estimated_savings: ltcSavings,
+    savings_calculation: ltcEligible ? `5% of salary or ₹50K cap * 30% = ₹${ltcSavings.toFixed(2)}` : 'N/A',
+    action_items: [
+      { id: 'ltc_1', label: 'Include LTC in director CTC structure', type: 'compliance', completed: false },
+      { id: 'ltc_2', label: 'Collect travel tickets as documentary proof', type: 'documentation', completed: false }
+    ],
+    documents_required: ['Travel Tickets (Air/Rail)', 'Leave Sanctioned Certificate', 'Journey Details'],
+    deadline: 'Claim in ITR of travel year',
+    fy_applicable: fy,
+    tags: ['LTC', 'Travel', 'Director', 'Exemption'],
+    icon_name: 'Plane',
+    color_accent: 'blue'
+  });
+
+  // ─── 10. Company Car Perquisite Optimization ────────────────────────────────
+  const carEligible = hasSalary && profile.director_salary > 1200000;
+  const carSavings = carEligible ? 150000 * 0.30 : 0;
+  optimizations.push({
+    id: 'promoter_car',
+    category: 'promoter_wealth',
+    section: 'Sec 17(2) — Perquisite',
+    title: 'Company Car — Only ₹1,800/Month Perquisite vs Actual Cost',
+    short_description: 'Director using company car for both official + personal use is taxed at only ₹1,800/month (engine ≤1.6L) perquisite instead of actual car cost.',
+    detailed_explanation: 'Instead of the director buying a car personally from post-tax salary, the company can own and provide the car. The perquisite value is fixed at just ₹1,800/month (engine ≤1.6L) or ₹2,400/month (engine >1.6L) when used for both official and personal purposes and chauffeur is not provided. This vs. actual car EMI of ₹30,000–50,000/month creates massive tax arbitrage. The company also gets depreciation deduction on the car.',
+    legal_reference: 'Section 17(2)(ii) of Income Tax Act, 1961 read with Rule 3(2)(B)',
+    eligibility_criteria: ['Director salary > ₹12 Lakhs per year', 'Company owns the car (not leased)', 'Car used for both official and personal purposes', 'Car cost charged to company P&L as business asset'],
+    is_eligible: carEligible,
+    status: carEligible ? 'eligible' : 'not_eligible',
+    risk_level: 'safe',
+    priority: carEligible ? 'high' : 'low',
+    estimated_savings: carSavings,
+    savings_calculation: carEligible ? `₹1,800/month × 12 = ₹21,600 taxable vs ~₹1.5L actual cost. Director saves ₹${carSavings.toFixed(2)}/yr` : 'N/A',
+    action_items: [
+      { id: 'car_1', label: 'Register car in company name', type: 'compliance', completed: false },
+      { id: 'car_2', label: 'Compute perquisite value at ₹1,800–₹2,400/month in payslip', type: 'documentation', completed: false }
+    ],
+    documents_required: ['Car RC Book (Company Name)', 'Board Resolution for Car Usage Policy', 'Logbook for usage'],
+    deadline: 'Tax structuring before April 1',
+    fy_applicable: fy,
+    tags: ['Car', 'Perquisite', 'Director', 'CTC Structuring'],
+    icon_name: 'Car',
+    color_accent: 'gray'
+  });
+
+  // ─── 11. Superannuation Fund — Sec 10(13) ────────────────────────────────
+  const superEligible = hasSalary && isCompanyType;
+  const superSavings = superEligible ? 100000 * 0.30 : 0;
+  optimizations.push({
+    id: 'promoter_super',
+    category: 'promoter_wealth',
+    section: 'Sec 10(13) + 36(1)(iv)',
+    title: 'Approved Superannuation Fund — ₹1L Tax-Free Annual Benefit',
+    short_description: 'Company contributes up to ₹1 Lakh per year to director\'s superannuation fund — tax-free in their hands.',
+    detailed_explanation: 'Under Section 10(13) read with Section 36(1)(iv), an employer can contribute up to ₹1,50,000 per year per employee to an approved superannuation fund as a deductible business expense. The amount up to ₹1,00,000 is not taxable as perquisite in the employee/director\'s hands. The fund accumulates tax-free and the annuity paid on retirement is exempt (partially). This creates a dual benefit — company tax deduction + director\'s tax-free corpus.',
+    legal_reference: 'Section 10(13) and 36(1)(iv) of Income Tax Act, 1961 — Approved Superannuation Fund',
+    eligibility_criteria: ['Private or Public Limited Company', 'Director receiving salary', 'Trust registered with Income Tax Dept as Approved Superannuation Fund', 'Contribution up to ₹1,50,000/year per employee'],
+    is_eligible: superEligible,
+    status: superEligible ? 'eligible' : 'not_eligible',
+    risk_level: 'safe',
+    priority: superEligible ? 'medium' : 'low',
+    estimated_savings: superSavings,
+    savings_calculation: superEligible ? `₹1,00,000 tax-free + company deduction * 30% director slab = ₹${superSavings.toFixed(2)}` : 'N/A',
+    action_items: [
+      { id: 'super_1', label: 'Set up Approved Superannuation Trust with a life insurer', type: 'compliance', completed: false },
+      { id: 'super_2', label: 'Get IT Dept approval for the trust', type: 'filing', completed: false }
+    ],
+    documents_required: ['Trust Deed', 'IT Approval Order', 'LIC Policy / Insurance Annuity Contract'],
+    deadline: 'Before year-end',
+    fy_applicable: fy,
+    tags: ['Superannuation', 'Retirement', 'Director', 'Tax-Free'],
+    icon_name: 'PiggyBank',
+    color_accent: 'amber'
+  });
+
+  // ─── 12. ESOP — Defer Tax to Capital Gains Rate ─────────────────────────
+  const esopEligible = !!profile.dipp_registered && profile.total_employees > 5;
+  const esopSavings = esopEligible ? profile.director_salary * 0.15 * 0.10 : 0;
+  optimizations.push({
+    id: 'promoter_esop',
+    category: 'promoter_wealth',
+    section: 'Sec 17(2)(vi) + 112A',
+    title: 'ESOP Structuring — Defer Salary Tax to 10% Capital Gains',
+    short_description: 'Grant ESOPs to key employees and director. Tax is deferred to exercise/sale, and at sale rate of 10% LTCG instead of 30% salary slab.',
+    detailed_explanation: 'ESOPs allow key employees/directors to acquire company shares at a pre-determined price. Tax is triggered only at exercise (treated as perquisite = FMV minus exercise price) and again at sale (capital gains). For DPIIT startups, Budget 2020 deferred even the perquisite tax to earliest of sale, employment cessation, or 5 years — effectively converting 30% salary tax into 10% LTCG for listed shares or 20% for unlisted. This is a powerful wealth creation and retention tool.',
+    legal_reference: 'Section 17(2)(vi) of IT Act, 1961 for perquisite; Section 112A for LTCG at 10%; Sec 80-IAC startup tax deferral',
+    eligibility_criteria: ['DPIIT-recognized startup', 'More than 5 employees', 'ESOP scheme approved by Board and shareholders', 'Vesting period minimum 1 year'],
+    is_eligible: esopEligible,
+    status: esopEligible ? 'eligible' : 'not_eligible',
+    risk_level: 'moderate',
+    priority: esopEligible ? 'high' : 'low',
+    estimated_savings: esopSavings,
+    savings_calculation: esopEligible ? `Tax arbitrage: 30% salary → 10% LTCG on ${(profile.director_salary * 0.15).toFixed(0)} = ₹${esopSavings.toFixed(2)}` : 'N/A',
+    action_items: [
+      { id: 'esop_1', label: 'Draft ESOP scheme and get Board + shareholder approval', type: 'compliance', completed: false },
+      { id: 'esop_2', label: 'Register ESOP with DPIIT (for startup tax deferral)', type: 'filing', completed: false }
+    ],
+    documents_required: ['ESOP Scheme Document', 'Board Resolution', 'Shareholder Approval', 'DPIIT Certificate'],
+    deadline: 'Before next salary review',
+    fy_applicable: fy,
+    tags: ['ESOP', 'Startup', 'Capital Gains', 'Wealth Creation'],
+    icon_name: 'TrendingUp',
+    color_accent: 'violet'
+  });
+
+  // ─── 13. HUF Creation for Promoter ───────────────────────────────────────
+  const hufEligible = ['proprietorship', 'partnership', 'huf'].includes(profile.entity_type);
+  const hufSavings = hufEligible ? 250000 * 0.30 : 0;
+  optimizations.push({
+    id: 'promoter_huf',
+    category: 'promoter_wealth',
+    section: 'HUF — Hindu Undivided Family',
+    title: 'HUF Entity — Separate ₹2.5L Basic Exemption + Slab Benefits',
+    short_description: 'Create a HUF entity to get a completely separate ₹2.5 Lakh basic exemption and benefit from the full income tax slab.',
+    detailed_explanation: 'A Hindu Undivided Family (HUF) is a separate taxable entity under Indian law. By creating a HUF, the promoter gets an additional ₹2,50,000 basic exemption (like an individual). Income from ancestral property, gifts from non-relatives, and income from business carried on by HUF can be assessed in the HUF\'s hands, effectively splitting income across two entities and reducing the overall tax incidence. HUF also has access to all the deductions — 80C, 80D, 80G etc.',
+    legal_reference: 'Hindu Undivided Family under Income Tax Act, 1961 — Separate PAN and entity status',
+    eligibility_criteria: ['Hindu, Sikh, Jain or Buddhist promoter', 'Ancestral or coparcenary property available', 'At least 2 members in HUF (Karta + any coparcener)', 'HUF PAN separately obtained from IT Dept'],
+    is_eligible: hufEligible,
+    status: hufEligible ? 'eligible' : 'not_eligible',
+    risk_level: 'safe',
+    priority: hufEligible ? 'high' : 'low',
+    estimated_savings: hufSavings,
+    savings_calculation: hufEligible ? `₹2,50,000 basic exemption slab saved * 30% = ₹${hufSavings.toFixed(2)} (plus further slab benefits)` : 'N/A',
+    action_items: [
+      { id: 'huf_1', label: 'Create HUF deed with all coparceners', type: 'documentation', completed: false },
+      { id: 'huf_2', label: 'Apply for HUF PAN on NSDL portal', type: 'compliance', completed: false },
+      { id: 'huf_3', label: 'Open separate HUF bank account', type: 'compliance', completed: false }
+    ],
+    documents_required: ['HUF Deed', 'PAN Application (HUF)', 'Coparcener Identity Proofs', 'Joint Bank Account'],
+    deadline: 'Any time (better before income accrual)',
+    fy_applicable: fy,
+    tags: ['HUF', 'Income Splitting', 'Exemption', 'Family Tax'],
+    icon_name: 'Home',
+    color_accent: 'emerald'
+  });
+
+  // ─── 14. Director Remuneration Optimization via Professional Fees ─────────
+  const profFeesEligible = hasSalary && profile.director_salary > 2000000;
+  const profFeesSavings = profFeesEligible ? Math.min(profile.director_salary * 0.10, 500000) * 0.20 : 0;
+  optimizations.push({
+    id: 'promoter_prof_fees',
+    category: 'promoter_wealth',
+    section: 'Sec 194J + Consulting Structure',
+    title: 'Restructure Director Fees as Consulting — Move to Lower Slab',
+    short_description: 'Part of director remuneration restructured as legitimate professional/consulting fees to director\'s spouse or family firm at lower tax slab.',
+    detailed_explanation: 'Where a director has a spouse or family member with professional expertise (legal, medical, design, marketing, IT), the company can legitimately pay professional fees under a service agreement instead of paying salary to the director. Income in family member\'s hands at 0–20% slab vs director\'s 30% slab. Under Section 56(2), this must reflect fair market value for actual services rendered to withstand scrutiny.',
+    legal_reference: 'Section 194J of IT Act (TDS on professional fees); Section 56(2) (arm\'s length principle); Clubbing provisions Sec 64 apply if spouse has no independent qualification',
+    eligibility_criteria: ['Director salary > ₹20 Lakhs', 'Qualified family member can render actual services', 'Fair market value fee structure', 'Proper service agreement in place', 'TDS deducted under 194J'],
+    is_eligible: profFeesEligible,
+    status: profFeesEligible ? 'eligible' : 'not_eligible',
+    risk_level: 'moderate',
+    priority: profFeesEligible ? 'medium' : 'low',
+    estimated_savings: profFeesSavings,
+    savings_calculation: profFeesEligible ? `Moving ₹${Math.min(profile.director_salary * 0.10, 500000).toFixed(0)} from 30% to 10% slab = saving 20% = ₹${profFeesSavings.toFixed(2)}` : 'N/A',
+    action_items: [
+      { id: 'pf_1', label: 'Draft professional services agreement at arm\'s length', type: 'documentation', completed: false },
+      { id: 'pf_2', label: 'Deduct TDS u/s 194J at 10% on fees paid', type: 'compliance', completed: false },
+      { id: 'pf_3', label: 'Ensure family member files ITR with this income', type: 'filing', completed: false }
+    ],
+    documents_required: ['Professional Service Agreement', 'Family Member Qualification Proof', 'TDS Challans', 'Fee Payment Records'],
+    deadline: 'Structure before next salary review',
+    fy_applicable: fy,
+    tags: ['Professional Fees', 'Income Splitting', 'Director', 'Slab Optimization'],
+    icon_name: 'Briefcase',
+    color_accent: 'indigo'
+  });
+
   return optimizations;
 }

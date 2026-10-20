@@ -125,7 +125,16 @@ function ERPTab() {
 
 function CFOTab() {
   return (
-    <CFOIntelligenceModule companyName={DEMO_COMPANY.name} />
+    <CFOIntelligenceModule
+      companyId="demo"
+      companyName={DEMO_COMPANY.name}
+      invoices={DEMO_INVOICES.map(i => ({ amount: i.amount, gst_amount: i.gst_amount, date: i.date, party_name: i.party_name }))}
+      purchases={DEMO_PURCHASES.map(p => ({ amount: p.amount, gst_amount: p.gst_amount, date: p.date, party_name: p.party_name }))}
+      expenses={DEMO_EXPENSES.map(e => ({ amount: e.amount, category: e.category, date: e.date }))}
+      payroll={DEMO_PAYROLL.map(p => ({ gross_salary: p.gross_salary, net_salary: p.net_salary, pf_employer: p.pf_employer, esic_employer: p.esic_employer }))}
+      bankTxns={DEMO_BANK_TXNS.map(t => ({ amount: t.amount, type: t.type, date: t.date }))}
+      bankBalance={DEMO_COMPANY.bank_balance ?? 18500000}
+    />
   );
 }
 

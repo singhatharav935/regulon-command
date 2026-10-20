@@ -10,6 +10,7 @@ import { Label } from "@/components/ui/label";
 import { Input } from "@/components/ui/input";
 import { Textarea } from "@/components/ui/textarea";
 import { toast } from "sonner";
+import { DemoPasswordGate } from "@/components/platform/DemoPasswordGate";
 
 type HeroSectionProps = {
   content?: {
@@ -32,6 +33,8 @@ const HeroSection = ({ content }: HeroSectionProps) => {
   const dashboardPath = isLoggedIn ? getDashboardRoute(persona) : "/auth?mode=signup&role=company_owner";
   const [leadDialogOpen, setLeadDialogOpen] = useState(false);
   const [isSubmittingLead, setIsSubmittingLead] = useState(false);
+  const [passwordGateOpen, setPasswordGateOpen] = useState(false);
+  const [pendingAuthPath, setPendingAuthPath] = useState("");
   const [leadForm, setLeadForm] = useState({
     name: "",
     email: "",
@@ -237,11 +240,11 @@ const HeroSection = ({ content }: HeroSectionProps) => {
               </>
             ) : (
               <>
-                <Button size="lg" className="btn-glow h-12 px-8" onClick={() => navigate("/auth?mode=signup&role=company_owner")}>
+                <Button size="lg" className="btn-glow h-12 px-8" onClick={() => { setPendingAuthPath("/auth?mode=signup&role=company_owner"); setPasswordGateOpen(true); }}>
                   {ctaPrimary}
                   <ArrowRight className="w-4 h-4 ml-2" />
                 </Button>
-                <Button size="lg" variant="outline" className="h-12 px-8" onClick={() => navigate("/auth?mode=login&role=company_owner")}>
+                <Button size="lg" variant="outline" className="h-12 px-8" onClick={() => { setPendingAuthPath("/auth?mode=login&role=company_owner"); setPasswordGateOpen(true); }}>
                   {ctaSecondary}
                 </Button>
                 <Button size="lg" variant="ghost" className="h-12 px-8" onClick={() => openLeadDialog()}>
@@ -353,6 +356,11 @@ const HeroSection = ({ content }: HeroSectionProps) => {
           </DialogFooter>
         </DialogContent>
       </Dialog>
+      <DemoPasswordGate
+        isOpen={passwordGateOpen}
+        onClose={() => setPasswordGateOpen(false)}
+        onSuccess={() => navigate(pendingAuthPath)}
+      />
     </section>
   );
 };

@@ -496,11 +496,13 @@ export function RealERPModule({ companyId, companyName }: Props) {
       setIsLiveData(hasLive);
 
       const isDemoMode = !companyId || companyId.includes("demo");
-      const finalInvoices  = (liveInv  && liveInv.length  > 0) ? liveInv  : (lsInvoices.length > 0 ? lsInvoices : (isDemoMode ? DEMO_INVOICES : []));
-      const finalPurchases = (livePur  && livePur.length  > 0) ? livePur  : (lsPurchases.length > 0 ? lsPurchases : (isDemoMode ? DEMO_PURCHASES : []));
-      const finalExpenses  = (liveExp  && liveExp.length  > 0) ? liveExp  : (lsExpenses.length > 0 ? lsExpenses : (isDemoMode ? DEMO_EXPENSES : []));
-      const finalPayroll   = (livePay  && livePay.length  > 0) ? livePay  : (lsPayroll.length > 0 ? lsPayroll : (isDemoMode ? DEMO_PAYROLL : []));
-      const finalBankTxns  = (liveBank && liveBank.length > 0) ? liveBank : (lsBankTxns.length > 0 ? lsBankTxns : (isDemoMode ? DEMO_BANK_TXNS : []));
+      // ── In demo mode: ALWAYS use DEMO_* — ignore localStorage completely ──
+      // If localStorage has old small numbers they will NOT pollute the demo view.
+      const finalInvoices  = (liveInv  && liveInv.length  > 0) ? liveInv  : (isDemoMode ? DEMO_INVOICES  : (lsInvoices.length  > 0 ? lsInvoices  : []));
+      const finalPurchases = (livePur  && livePur.length  > 0) ? livePur  : (isDemoMode ? DEMO_PURCHASES : (lsPurchases.length > 0 ? lsPurchases : []));
+      const finalExpenses  = (liveExp  && liveExp.length  > 0) ? liveExp  : (isDemoMode ? DEMO_EXPENSES  : (lsExpenses.length  > 0 ? lsExpenses  : []));
+      const finalPayroll   = (livePay  && livePay.length  > 0) ? livePay  : (isDemoMode ? DEMO_PAYROLL   : (lsPayroll.length   > 0 ? lsPayroll   : []));
+      const finalBankTxns  = (liveBank && liveBank.length > 0) ? liveBank : (isDemoMode ? DEMO_BANK_TXNS : (lsBankTxns.length  > 0 ? lsBankTxns  : []));
       const finalInventory = (liveInvStk && liveInvStk.length > 0) ? liveInvStk : (isDemoMode ? DEMO_INVENTORY : []);
 
       if (finalBankTxns.length > 0) {

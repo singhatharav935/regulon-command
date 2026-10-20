@@ -263,5 +263,186 @@ export function analyzeGSTOptimizations(profile: CompanyProfile): TaxOptimizatio
     color_accent: 'teal'
   });
 
+
+  // ─── 8. ISD Mechanism — Input Service Distributor ─────────────────────────────
+  const isdEligible = profile.total_revenue > 10000000 && profile.total_gst_itc_available > 500000;
+  const isdSavings = isdEligible ? profile.total_gst_itc_available * 0.05 : 0;
+  optimizations.push({
+    id: 'gst_isd',
+    category: 'gst',
+    section: 'Sec 20 CGST Act',
+    title: 'Input Service Distributor (ISD) Mechanism',
+    short_description: 'Distribute common input tax credit across branches/units via ISD to maximize utilization.',
+    detailed_explanation: 'Companies with multiple GST registrations (branches, factories, offices) can register as an ISD and distribute common input credits (rent, IT services, professional fees) proportionally across all units. This prevents ITC from getting stuck at the head office and optimizes utilization across high-tax-paying units.',
+    legal_reference: 'Section 20 of CGST Act, 2017 read with Rule 39 of CGST Rules',
+    eligibility_criteria: ['Revenue > ₹10 Cr', 'ITC available > ₹50L', 'Multiple GST registrations / branches', 'Common input services procured at HO level'],
+    is_eligible: isdEligible,
+    status: isdEligible ? 'eligible' : 'not_eligible',
+    risk_level: 'safe',
+    priority: isdEligible ? 'high' : 'low',
+    estimated_savings: isdSavings,
+    savings_calculation: isdEligible ? `5% additional ITC recovery via optimal ISD distribution of ₹${profile.total_gst_itc_available.toFixed(0)} = ₹${isdSavings.toFixed(2)}` : 'N/A',
+    action_items: [
+      { id: 'isd_1', label: 'Register Head Office as ISD on GST portal', type: 'compliance', completed: false },
+      { id: 'isd_2', label: 'File monthly ISD-01 return for distribution', type: 'filing', completed: false }
+    ],
+    documents_required: ['ISD Registration Certificate', 'ISD-01 Returns', 'Distribution Formula'],
+    deadline: 'Ongoing monthly',
+    fy_applicable: fy,
+    tags: ['ITC', 'Multi-location', 'Optimization'],
+    icon_name: 'GitBranch',
+    color_accent: 'blue'
+  });
+
+  // ─── 9. Job Work u/s 143 — GST-Free Goods Movement ───────────────────────
+  const jobWorkEligible = !!profile.is_manufacturing;
+  const jobWorkSavings = jobWorkEligible ? profile.total_purchases * 0.03 * 0.18 : 0;
+  optimizations.push({
+    id: 'gst_job_work',
+    category: 'gst',
+    section: 'Sec 143 CGST Act',
+    title: 'Job Work — GST-Free Goods Movement to Subcontractors',
+    short_description: 'Send semi-finished goods to job workers without paying GST — deferring tax outflow legally.',
+    detailed_explanation: 'Under Section 143 of CGST Act, a principal manufacturer can send inputs/semi-finished goods to a registered job worker without payment of GST, provided the goods are returned within 1 year (3 years for capital goods). This preserves working capital and eliminates the need for a refund process.',
+    legal_reference: 'Section 143 of CGST Act, 2017 read with Rule 45',
+    eligibility_criteria: ['Engaged in manufacturing', 'Uses subcontractors/vendors for part processing', 'Job worker is GST registered', 'Goods returned within prescribed time limit'],
+    is_eligible: jobWorkEligible,
+    status: jobWorkEligible ? 'eligible' : 'not_eligible',
+    risk_level: 'safe',
+    priority: jobWorkEligible ? 'high' : 'low',
+    estimated_savings: jobWorkSavings,
+    savings_calculation: jobWorkEligible ? `3% of purchases ₹${(profile.total_purchases * 0.03).toFixed(0)} * 18% GST deferred = ₹${jobWorkSavings.toFixed(2)} working capital saved` : 'N/A',
+    action_items: [
+      { id: 'jw_1', label: 'Issue delivery challans for goods sent to job worker', type: 'compliance', completed: false },
+      { id: 'jw_2', label: 'Maintain job work register in Annexure to GSTR-1', type: 'filing', completed: false }
+    ],
+    documents_required: ['Delivery Challans', 'Job Work Agreement', 'GSTIN of Job Worker'],
+    deadline: 'Return goods within 1 year',
+    fy_applicable: fy,
+    tags: ['Manufacturing', 'Working Capital', 'Job Work'],
+    icon_name: 'Wrench',
+    color_accent: 'orange'
+  });
+
+  // ─── 10. QRMP Scheme — Quarterly Return Monthly Payment ────────────────────
+  const qrmpEligible = profile.annual_turnover <= 50000000;
+  const qrmpSavings = qrmpEligible ? profile.total_gst_output * 0.02 : 0;
+  optimizations.push({
+    id: 'gst_qrmp',
+    category: 'gst',
+    section: 'Sec 39 CGST Act — QRMP',
+    title: 'QRMP Scheme — Reduce Filing Burden & Improve Cash Flow',
+    short_description: 'Switch to Quarterly Return Monthly Payment scheme if turnover ≤ ₹5 Cr — file only 4 GSTR-1s per year.',
+    detailed_explanation: 'The QRMP (Quarterly Return Monthly Payment) scheme allows small taxpayers (turnover up to ₹5 Cr) to file GSTR-1 and GSTR-3B quarterly instead of monthly. Tax is paid monthly via a fixed sum or self-assessed method. This reduces compliance from 24 returns to 8 returns per year, saving significant CA fees and working time.',
+    legal_reference: 'Section 39(1) of CGST Act, 2017 — QRMP Notification 84/2020-CT',
+    eligibility_criteria: ['Annual turnover ≤ ₹5 Crore', 'GST registered regular taxpayer', 'File GSTR-3B monthly with fixed sum method'],
+    is_eligible: qrmpEligible,
+    status: qrmpEligible ? 'eligible' : 'not_eligible',
+    risk_level: 'safe',
+    priority: qrmpEligible ? 'medium' : 'low',
+    estimated_savings: qrmpSavings,
+    savings_calculation: qrmpEligible ? `2% working capital benefit on GST output ₹${profile.total_gst_output.toFixed(0)} = ₹${qrmpSavings.toFixed(2)}` : 'N/A — turnover exceeds ₹5 Cr',
+    action_items: [
+      { id: 'qrmp_1', label: 'Opt for QRMP scheme on GST portal by 31st Jan', type: 'compliance', completed: false },
+      { id: 'qrmp_2', label: 'Choose Fixed Sum or Self-Assessed payment method', type: 'verification', completed: false }
+    ],
+    documents_required: ['Annual Turnover Calculation', 'GST Portal QRMP Opt-in Confirmation'],
+    deadline: '31st January for next FY',
+    fy_applicable: fy,
+    tags: ['Compliance', 'Filing', 'Small Business', 'Cash Flow'],
+    icon_name: 'Calendar',
+    color_accent: 'teal'
+  });
+
+  // ─── 11. GST Amnesty Scheme — Penalty & Interest Waiver ────────────────────
+  const amnestyEligible = profile.gst_itc_mismatch_amount > 100000;
+  const amnestySavings = amnestyEligible ? profile.gst_itc_mismatch_amount * 0.18 : 0;
+  optimizations.push({
+    id: 'gst_amnesty',
+    category: 'gst',
+    section: 'Sec 128A CGST Act',
+    title: 'GST Amnesty — Waiver of Interest & Penalty',
+    short_description: 'Avail GST amnesty to waive interest and penalty on pending tax dues for FY 2017-18 to 2019-20.',
+    detailed_explanation: 'The GST Council periodically introduces amnesty schemes allowing taxpayers with pending dues, interest, and penalties from early GST years to settle at reduced/nil interest. Companies with ITC mismatches or pending notices can clear their position cleanly and avoid litigation costs that far exceed the original tax amount.',
+    legal_reference: 'Section 128A of CGST Act, 2017 (inserted by Finance Act 2024)',
+    eligibility_criteria: ['Has pending GST dues / ITC mismatch > ₹1 Lakh', 'Dues relate to FY 2017-18 to 2019-20', 'No pending appeal against the demand'],
+    is_eligible: amnestyEligible,
+    status: amnestyEligible ? 'action_required' : 'not_eligible',
+    risk_level: 'safe',
+    priority: amnestyEligible ? 'critical' : 'low',
+    estimated_savings: amnestySavings,
+    savings_calculation: amnestyEligible ? `18% penalty waiver on mismatch ₹${profile.gst_itc_mismatch_amount.toFixed(0)} = ₹${amnestySavings.toFixed(2)}` : 'N/A',
+    action_items: [
+      { id: 'amnesty_1', label: 'Identify all pending GST demands and notices', type: 'verification', completed: false },
+      { id: 'amnesty_2', label: 'File for amnesty before scheme deadline', type: 'filing', completed: false }
+    ],
+    documents_required: ['Demand Notices', 'ITC Mismatch Reports', 'CA Certificate'],
+    deadline: 'Scheme deadline — check GST portal',
+    fy_applicable: fy,
+    tags: ['Amnesty', 'Penalty Waiver', 'Compliance'],
+    icon_name: 'ShieldCheck',
+    color_accent: 'emerald'
+  });
+
+  // ─── 12. Cross-Charge Optimization Between Group Entities ────────────────
+  const crossChargeEligible = profile.total_revenue > 20000000 && ['pvt_ltd','public_ltd','company','opc'].includes(profile.entity_type);
+  const crossChargeSavings = crossChargeEligible ? profile.total_expenses * 0.05 * 0.18 : 0;
+  optimizations.push({
+    id: 'gst_cross_charge',
+    category: 'gst',
+    section: 'Sec 7 CGST — Cross-Charge',
+    title: 'Cross-Charge Optimization Between Group Companies',
+    short_description: 'Properly cross-charge shared services between group entities to claim full ITC and avoid deemed supply.',
+    detailed_explanation: 'When a company provides common services (IT, HR, Legal, Finance) to group companies or branches, improper cross-charging creates a risk of \"deemed supply\", attracting GST without ITC benefit. Proper cross-charging with correct invoicing allows the receiving entity to claim full ITC, turning a cost center into a tax-neutral transaction.',
+    legal_reference: 'Section 7 of CGST Act (Schedule I) read with Circular 199/11/2023-GST',
+    eligibility_criteria: ['Revenue > ₹20 Cr', 'Company with group entities or branches', 'Common services shared across entities'],
+    is_eligible: crossChargeEligible,
+    status: crossChargeEligible ? 'eligible' : 'not_eligible',
+    risk_level: 'moderate',
+    priority: crossChargeEligible ? 'high' : 'low',
+    estimated_savings: crossChargeSavings,
+    savings_calculation: crossChargeEligible ? `ITC on 5% of expenses ₹${(profile.total_expenses * 0.05).toFixed(0)} * 18% = ₹${crossChargeSavings.toFixed(2)}` : 'N/A',
+    action_items: [
+      { id: 'cc_1', label: 'Prepare master service agreement for intra-group services', type: 'documentation', completed: false },
+      { id: 'cc_2', label: 'Issue proper tax invoices for cross-charged services', type: 'compliance', completed: false }
+    ],
+    documents_required: ['Intra-group Service Agreement', 'Tax Invoices', 'Cost Allocation Sheet'],
+    deadline: 'Ongoing',
+    fy_applicable: fy,
+    tags: ['Group Company', 'ITC', 'Cross-Charge'],
+    icon_name: 'Network',
+    color_accent: 'violet'
+  });
+
+  // ─── 13. E-Invoicing Compliance — Avoid Penalties ─────────────────────────
+  const eInvEligible = profile.annual_turnover > 50000000;
+  const eInvSavings = eInvEligible ? Math.min(profile.payroll_count * 500, 500000) : 0;
+  optimizations.push({
+    id: 'gst_einv',
+    category: 'gst',
+    section: 'Sec 31 CGST — E-Invoicing',
+    title: 'E-Invoicing Compliance — Prevent ₹10K Per Invoice Penalty',
+    short_description: 'Ensure 100% e-invoicing compliance to avoid penalty of ₹10,000 per non-compliant invoice.',
+    detailed_explanation: 'Businesses with turnover above ₹5 Cr must generate all B2B invoices through the IRP (Invoice Registration Portal) and obtain an IRN (Invoice Reference Number). Non-compliant invoices attract a penalty of ₹10,000 per invoice (or 100% of tax, whichever is higher). Sannidh auto-validates all invoices before issuance.',
+    legal_reference: 'Section 31 of CGST Act read with Rule 48(4) — e-invoicing mandate',
+    eligibility_criteria: ['Annual turnover > ₹5 Crore', 'B2B supply of goods or services', 'Invoice must be generated via IRP portal'],
+    is_eligible: eInvEligible,
+    status: eInvEligible ? 'action_required' : 'not_eligible',
+    risk_level: 'high',
+    priority: eInvEligible ? 'critical' : 'low',
+    estimated_savings: eInvSavings,
+    savings_calculation: eInvEligible ? `Prevents ₹10,000 penalty per non-compliant invoice — estimated saving ₹${eInvSavings.toFixed(0)}` : 'N/A — below threshold',
+    action_items: [
+      { id: 'einv_1', label: 'Integrate billing system with IRP API', type: 'compliance', completed: false },
+      { id: 'einv_2', label: 'Validate all pending invoices for IRN', type: 'verification', completed: false }
+    ],
+    documents_required: ['IRP Registration', 'API Integration Confirmation', 'Invoice Register'],
+    deadline: 'Immediate — ongoing for each invoice',
+    fy_applicable: fy,
+    tags: ['E-Invoicing', 'Compliance', 'Penalty Prevention'],
+    icon_name: 'FileCheck',
+    color_accent: 'red'
+  });
+
   return optimizations;
 }

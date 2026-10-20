@@ -701,48 +701,49 @@ export function IntelligentTaxOptimization({ companyId, companyName, demoMode = 
 
     const isStorePopulated = totalRevenue > 0 || totalPurchases > 0 || (payroll && payroll.length > 0);
 
-    // ── Demo mode: always use rich MSME mock profile (demo/marketing dashboards) ──
+    // ── Demo mode: profile matches DEMO_COMPANY in demo-data.ts exactly ──
+    // Company: Sannidh Demo Co. Pvt. Ltd. | Mfg & Trading | Maharashtra | Rs 10 Cr revenue
     if (demoMode || (!isStorePopulated && demoMode)) {
       return {
         id: 'demo-company-101',
-        name: 'Sannidh Precision Machinery Pvt Ltd',
+        name: 'Sannidh Demo Co. Pvt. Ltd.',          // matches DEMO_COMPANY.name
         entity_type: 'pvt_ltd',
-        incorporation_date: '2020-11-12',
+        incorporation_date: '2020-03-15',             // matches DEMO_COMPANY.registration_date
         state: 'Maharashtra',
-        industry: 'Machinery & Precision Engineering',
-        msme_category: 'small',
-        dipp_registered: true,
-        dipp_number: 'DIPP92810',
-        gstin: '27AAACS8920K1ZX',
-        pan: 'AAACS8920K',
-        cin: 'U29253MH2020PTC349810',
+        industry: 'Manufacturing & Trading',          // matches DEMO_COMPANY.industry
+        msme_category: 'small',                       // Rs 10 Cr turnover = MSME Small
+        dipp_registered: false,                       // not a DPIIT startup
+        dipp_number: '',
+        gstin: '27AABCS1234M1ZP',                    // matches DEMO_COMPANY.gstin
+        pan: 'AABCS1234M',                           // matches DEMO_COMPANY.pan
+        cin: 'U74999MH2020PTC123456',                // matches DEMO_COMPANY.cin
         is_manufacturing: true,
-        is_exporter: true,
+        is_exporter: false,
         special_zone: 'none',
-        annual_turnover: 100000000,   // ₹10.00 Crore Annual Turnover
-        total_employees: 32,
-        new_employees_fy: 5,          // 5 new CNC operators hired
-        new_employee_avg_salary: 21500,
-        total_revenue: 100000000,     // ₹10.00 Cr Gross Revenue
-        total_purchases: 61000000,    // ₹6.10 Cr Raw Material & Components
-        total_expenses: 18500000,     // ₹1.85 Cr Operating Expenses
-        gross_profit: 39000000,       // ₹3.90 Cr Gross Profit (39%)
-        net_profit_before_tax: 10000000, // ₹1.00 Cr Net PBT (10%)
-        total_gst_itc_claimed: 10409040,
-        total_gst_itc_available: 10980000,
-        total_gst_output: 18000000,
-        gst_itc_mismatch_amount: 570960,
+        annual_turnover: 100000000,   // Rs 10,00,00,000 — matches ERP total revenue
+        total_employees: 32,          // 32 employees (8 shown in payroll)
+        new_employees_fy: 4,
+        new_employee_avg_salary: 27344, // Rs 1,05,00,000 annual / 32 emp / 12 mo
+        total_revenue: 100000000,     // Rs 10,00,00,000 — matches DEMO_INVOICES total
+        total_purchases: 61000000,    // Rs  6,10,00,000 — matches DEMO_PURCHASES total
+        total_expenses: 18500000,     // Rs  1,85,00,000 — matches DEMO_EXPENSES annual
+        gross_profit: 39000000,       // Rs  3,90,00,000 (revenue - purchases, 39%)
+        net_profit_before_tax: 10000000, // Rs 1,00,00,000 (10% net margin)
+        total_gst_itc_claimed: 10440000,  // Rs 1,04,40,000 (ITC claimed on eligible bills)
+        total_gst_itc_available: 10980000, // Rs 1,09,80,000 (6.10 Cr x 18%)
+        total_gst_output: 18000000,   // Rs 1,80,00,000 (10 Cr x 18%)
+        gst_itc_mismatch_amount: 540000,  // Rs 5,40,000 — Eta IT Services blocked
         gst_input_rate_avg: 18,
         gst_output_rate_avg: 18,
-        new_machinery_investment: 2800000,
-        r_and_d_expenditure: 1200000,
-        total_exports: 15000000,
-        msme_vendor_payables: 6100000,
-        msme_overdue_payables: 2250000,
-        total_fixed_assets_cost: 14500000,
-        director_salary: 3600000,
-        dividend_distributed: 800000,
-        preliminary_expenses: 250000,
+        new_machinery_investment: 0,
+        r_and_d_expenditure: 0,
+        total_exports: 0,
+        msme_vendor_payables: 61000000, // Rs 6.10 Cr purchases = payables base
+        msme_overdue_payables: 0,
+        total_fixed_assets_cost: 0,
+        director_salary: 0,
+        dividend_distributed: 0,
+        preliminary_expenses: 0,
         payroll_count: 32,
       };
     }
