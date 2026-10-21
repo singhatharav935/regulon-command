@@ -10,8 +10,8 @@
  *   4. WhatsApp alert to Sannidh team (Twilio WhatsApp API)
  */
 
-const TEAM_EMAIL        = "rishabhshukla2510@gmail.com";
-const TEAM_WHATSAPP     = "+919834537694"; // Sannidh owner WhatsApp
+const TEAM_EMAIL      = "rishabhshukla2510@gmail.com";
+const TEAM_WHATSAPP   = ["+917004591850", "+919918923471"]; // Both owners get WhatsApp alerts
 
 // ─── Helper: Send email via Resend ───────────────────────────────────────────
 async function sendResendEmail(key: string, from: string, to: string, subject: string, html: string): Promise<boolean> {
@@ -169,10 +169,12 @@ ${message ? `<div class="msg"><strong>Requirement:</strong><br>${message}</div>`
       tasks.push(sendWhatsApp(phone,
         `Hello ${name}! 👋\n\n✅ *Your query is submitted to SANNIDH.*\n\nOur executive will be in touch with you soon.\n\n📋 *Details received:*\n• Name: ${name}\n• Email: ${email}${companyName ? `\n• Company: ${companyName}` : ""}\n\nThank you for choosing SANNIDH — India's AI-powered Compliance Platform. 🚀\n\nwww.sannidh.in`
       ));
-      // WhatsApp alert to team owner
-      tasks.push(sendWhatsApp(TEAM_WHATSAPP,
-        `🚀 *New Onboarding Request — SANNIDH*\n\n👤 Name: ${name}\n📧 Email: ${email}\n📱 Phone: ${phone}${companyName ? `\n🏢 Company: ${companyName}` : ""}${message ? `\n💬 Requirement: ${message}` : ""}\n\n⏰ Received: ${dateStr} IST\n\nFollow up ASAP! 🔥`
-      ));
+      // WhatsApp alerts to ALL team numbers
+      for (const teamNum of TEAM_WHATSAPP) {
+        tasks.push(sendWhatsApp(teamNum,
+          `🚀 *New Onboarding Request — SANNIDH*\n\n👤 Name: ${name}\n📧 Email: ${email}\n📱 Phone: ${phone}${companyName ? `\n🏢 Company: ${companyName}` : ""}${message ? `\n💬 Requirement: ${message}` : ""}\n\n⏰ Received: ${dateStr} IST\n\nFollow up ASAP! 🔥`
+        ));
+      }
     }
 
     await Promise.allSettled(tasks);
