@@ -1477,7 +1477,7 @@ export type Database = {
         }
         Relationships: []
       }
-
+    }
     Functions: {
       has_role: {
         Args: {
