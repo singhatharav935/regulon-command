@@ -140,6 +140,20 @@
   </head>
 
   <body class="dark">
+    <!-- Suppress CSP violation noise from Chrome extensions (they trigger console errors
+         that are NOT caused by our code). This listener must load before any extension
+         content-scripts run. -->
+    <script>
+      document.addEventListener('securitypolicyviolation', function(e) {
+        if (
+          (e.blockedURI && e.blockedURI.indexOf('chrome-extension://') === 0) ||
+          (e.sourceFile && e.sourceFile.indexOf('chrome-extension://') === 0)
+        ) {
+          e.stopImmediatePropagation();
+          e.preventDefault();
+        }
+      });
+    </script>
     <div id="root"></div>
     <script type="module" src="/src/main.tsx"></script>
   </body>
