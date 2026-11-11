@@ -140,18 +140,21 @@
   </head>
 
   <body class="dark">
-    <div id="root"></div>
-    <!-- Unregister any stale service workers before React loads (dev mode safety) -->
+    <!-- Suppress CSP violation noise from Chrome extensions (they trigger console errors
+         that are NOT caused by our code). This listener must load before any extension
+         content-scripts run. -->
     <script>
-      if ('serviceWorker' in navigator) {
-        navigator.serviceWorker.getRegistrations().then(function(registrations) {
-          registrations.forEach(function(reg) { reg.unregister(); });
-        });
-        caches.keys().then(function(keys) {
-          keys.forEach(function(key) { caches.delete(key); });
-        });
-      }
+      document.addEventListener('securitypolicyviolation', function(e) {
+        if (
+          (e.blockedURI && e.blockedURI.indexOf('chrome-extension://') === 0) ||
+          (e.sourceFile && e.sourceFile.indexOf('chrome-extension://') === 0)
+        ) {
+          e.stopImmediatePropagation();
+          e.preventDefault();
+        }
+      });
     </script>
+    <div id="root"></div>
     <script type="module" src="/src/main.tsx"></script>
   </body>
 </html>

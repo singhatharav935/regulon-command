@@ -1,6 +1,6 @@
 import React from 'react';
 import { motion, AnimatePresence } from 'framer-motion';
-import { ChevronLeft, ChevronRight, Check, Building2, UserCheck, Users, Shield, Gavel, Briefcase, Mail, Lock, User, Eye, EyeOff, ArrowLeft } from 'lucide-react';
+import { ChevronLeft, ChevronRight, Check, Building2, UserCheck, Users, Shield, Gavel, Briefcase, Mail, User, ArrowLeft } from 'lucide-react';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
@@ -263,7 +263,7 @@ export const MultiStepRegistration: React.FC<MultiStepRegistrationProps> = ({
       case 'role-selection':
         return !!formData.registrationRole;
       case 'personal-info':
-        return formData.fullName.trim() && formData.email.trim();
+        return !!(formData.fullName.trim() && formData.email.trim());
       case 'security':
         return formData.password.length >= 8;
       case 'company-info':
