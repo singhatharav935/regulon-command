@@ -1276,9 +1276,9 @@ export function CFOIntelligenceModule({
   const [activeTab, setActiveTab] = useState<CFOIntelTab>("summary");
 
   const bundle = useMemo<CFOBundle>(() => {
-    const isDemoMode = !companyId || companyId.includes("demo");
     const hasRealData = invoices.length > 0 || purchases.length > 0 || payroll.length > 0 || expenses.length > 0;
-    if (!isDemoMode && hasRealData) {
+    // Always compute from live/passed data when any data is present — works for both demo sector override and real company
+    if (hasRealData) {
       return buildCFOFromLiveData(invoices, purchases, expenses, payroll, bankTxns, bankBalance, companyName || "Your Company");
     }
     return {

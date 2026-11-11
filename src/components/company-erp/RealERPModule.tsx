@@ -56,6 +56,16 @@ import {
 interface Props {
   companyId: string;
   companyName?: string;
+  companyGstin?: string;
+  companyState?: string;
+  /** When set, bypasses ALL demo/live/localStorage data and uses these arrays directly. */
+  overrideData?: {
+    invoices: any[];
+    purchases: any[];
+    expenses: any[];
+    payroll: any[];
+    bankTxns: any[];
+  };
 }
 
 // ─── HELPER: Format Indian Rupee ──────────────────────────────────────────────
@@ -337,7 +347,7 @@ function ComplianceScoreGauge({ score, label }: { score: number; label: string }
 //  MAIN COMPONENT
 // ═══════════════════════════════════════════════════════════════════════════════
 
-export function RealERPModule({ companyId, companyName }: Props) {
+export function RealERPModule({ companyId, companyName, companyGstin, companyState, overrideData }: Props) {
   // ─── ERP Data State ─────────────────────────────────────────────────────────
   const [invoices,  setInvoices]  = useState<ERPInvoice[]>([]);
   const [purchases, setPurchases] = useState<ERPPurchase[]>([]);
@@ -346,6 +356,19 @@ export function RealERPModule({ companyId, companyName }: Props) {
   const [bankTxns,  setBankTxns]  = useState<ERPBankTxn[]>([]);
   const [inventory, setInventory] = useState<ERPStockItem[]>([]);
   const [isLiveData, setIsLiveData] = useState(false);
+
+  // ─── Override Effect: apply sector demo data immediately when provided ───────
+  useEffect(() => {
+    if (!overrideData) return;
+    setInvoices(overrideData.invoices as ERPInvoice[]);
+    setPurchases(overrideData.purchases as ERPPurchase[]);
+    setExpenses(overrideData.expenses as ERPExpense[]);
+    setPayroll(overrideData.payroll as ERPPayroll[]);
+    setBankTxns(overrideData.bankTxns as ERPBankTxn[]);
+    setInventory([]);
+    setIsLiveData(false);
+    setLoading(false);
+  }, [overrideData]);
 
   // ─── Engine State ────────────────────────────────────────────────────────────
   const [auditReport, setAuditReport] = useState<ZeroPenaltyReport | null>(null);
@@ -440,6 +463,8 @@ export function RealERPModule({ companyId, companyName }: Props) {
   // ─── Data Fetch ──────────────────────────────────────────────────────────────
 
   const fetchAll = useCallback(async () => {
+    // If override data is supplied externally (sector demo), skip fetching entirely
+    if (overrideData) return;
     setLoading(true);
     try {
       const [inv, pur, exp, pay, bank, inv_stk] = await Promise.all([
@@ -601,7 +626,7 @@ export function RealERPModule({ companyId, companyName }: Props) {
     } finally {
       setLoading(false);
     }
-  }, [companyId, companyName]);
+  }, [companyId, companyName, overrideData]);
 
   useEffect(() => {
     fetchAll();
@@ -1139,8 +1164,8 @@ export function RealERPModule({ companyId, companyName }: Props) {
         inventory={inventory}
         company={{
           name: companyName ?? "Your Company",
-          gstin: "",
-          state: "",
+          gstin: companyGstin ?? "",
+          state: companyState ?? "",
         }}
         companyId={companyId}
         financialYear="2025-26"

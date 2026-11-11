@@ -652,9 +652,25 @@ interface IntelligentTaxOptimizationProps {
   /** Set true in demo/marketing dashboards to always show the rich mock MSME example.
    *  Set false (default) in real company dashboard — uses only actual store data. */
   demoMode?: boolean;
+  /** When set in demo mode, overrides the hardcoded demo profile with sector-specific numbers. */
+  sectorData?: {
+    annualRevenue: number;
+    annualPurchases: number;
+    operatingExpenses: number;
+    grossProfit: number;
+    netProfit: number;
+    gstOutput: number;
+    gstItc: number;
+    employees: number;
+    sector: string;
+    gstin: string;
+    state: string;
+    msmeCategory: string;
+    companyName: string;
+  };
 }
 
-export function IntelligentTaxOptimization({ companyId, companyName, demoMode = false }: IntelligentTaxOptimizationProps) {
+export function IntelligentTaxOptimization({ companyId, companyName, demoMode = false, sectorData }: IntelligentTaxOptimizationProps) {
   const [activeCategory, setActiveCategory] = useState<OptimizationCategory | 'all'>('all');
   const [showEligibleOnly, setShowEligibleOnly] = useState(false);
   const [sortBy, setSortBy] = useState<'savings' | 'priority' | 'section'>('savings');
@@ -701,8 +717,53 @@ export function IntelligentTaxOptimization({ companyId, companyName, demoMode = 
 
     const isStorePopulated = totalRevenue > 0 || totalPurchases > 0 || (payroll && payroll.length > 0);
 
-    // ── Demo mode: profile matches DEMO_COMPANY in demo-data.ts exactly ──
-    // Company: Sannidh Demo Co. Pvt. Ltd. | Mfg & Trading | Maharashtra | Rs 10 Cr revenue
+    // ── Demo mode with sector override: build profile from sector-specific numbers ──
+    if (demoMode && sectorData) {
+      return {
+        id: companyId,
+        name: sectorData.companyName,
+        entity_type: 'pvt_ltd',
+        incorporation_date: '2020-03-15',
+        state: sectorData.state,
+        industry: sectorData.sector,
+        msme_category: sectorData.msmeCategory.toLowerCase() as any,
+        dipp_registered: false,
+        dipp_number: '',
+        gstin: sectorData.gstin,
+        pan: sectorData.gstin.substring(2, 12),
+        cin: '',
+        is_manufacturing: sectorData.sector.toLowerCase().includes('manufactur'),
+        is_exporter: sectorData.sector.toLowerCase().includes('export') || sectorData.sector.toLowerCase().includes('logistics'),
+        special_zone: 'none',
+        annual_turnover: sectorData.annualRevenue,
+        total_employees: sectorData.employees,
+        new_employees_fy: Math.max(1, Math.round(sectorData.employees * 0.1)),
+        new_employee_avg_salary: sectorData.employees > 0 ? Math.round(sectorData.annualRevenue * 0.14 / sectorData.employees / 12) : 0,
+        total_revenue: sectorData.annualRevenue,
+        total_purchases: sectorData.annualPurchases,
+        total_expenses: sectorData.operatingExpenses,
+        gross_profit: sectorData.grossProfit,
+        net_profit_before_tax: sectorData.netProfit,
+        total_gst_itc_claimed: sectorData.gstItc * 0.95,
+        total_gst_itc_available: sectorData.gstItc,
+        total_gst_output: sectorData.gstOutput,
+        gst_itc_mismatch_amount: sectorData.gstItc * 0.05,
+        gst_input_rate_avg: 18,
+        gst_output_rate_avg: 18,
+        new_machinery_investment: sectorData.sector.toLowerCase().includes('manufactur') ? sectorData.annualRevenue * 0.05 : 0,
+        r_and_d_expenditure: sectorData.sector.toLowerCase().includes('it') || sectorData.sector.toLowerCase().includes('pharma') ? sectorData.annualRevenue * 0.03 : 0,
+        total_exports: sectorData.sector.toLowerCase().includes('export') ? sectorData.annualRevenue * 0.3 : 0,
+        msme_vendor_payables: sectorData.annualPurchases * 0.15,
+        msme_overdue_payables: sectorData.annualPurchases * 0.02,
+        total_fixed_assets_cost: sectorData.annualRevenue * 0.4,
+        director_salary: 0,
+        dividend_distributed: 0,
+        preliminary_expenses: 0,
+        payroll_count: sectorData.employees,
+      };
+    }
+
+    // ── Demo mode without sector override: show hardcoded Sannidh demo profile ──
     if (demoMode || (!isStorePopulated && demoMode)) {
       return {
         id: 'demo-company-101',
@@ -795,7 +856,7 @@ export function IntelligentTaxOptimization({ companyId, companyName, demoMode = 
       preliminary_expenses: 0,
       payroll_count: payroll.length,
     };
-  }, [companyId, companyName, invoices, purchases, expenses, payroll, bankTxns, fixedAssets]);
+  }, [companyId, companyName, invoices, purchases, expenses, payroll, bankTxns, fixedAssets, sectorData, demoMode]);
 
   // Run the full tax optimization scan (guard against null in real-mode with no data)
   const { optimizations, summary } = useMemo(() => {
